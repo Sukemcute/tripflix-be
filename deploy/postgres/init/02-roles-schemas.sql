@@ -12,11 +12,6 @@ REVOKE CONNECT ON DATABASE core, commerce, notification FROM PUBLIC;
 GRANT CONNECT ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics;
 GRANT CONNECT ON DATABASE commerce TO tf_commerce;
 GRANT CONNECT ON DATABASE notification TO tf_notification;
--- Trình migrate của Drizzle luôn chạy CREATE SCHEMA IF NOT EXISTS <schema của module>, mà Postgres kiểm quyền
--- CREATE trên database trước khi xét IF NOT EXISTS. Quyền này chỉ cho tạo schema mới, không mở schema của module khác.
-GRANT CREATE ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics;
-GRANT CREATE ON DATABASE commerce TO tf_commerce;
-GRANT CREATE ON DATABASE notification TO tf_notification;
 
 \connect core
 CREATE SCHEMA access AUTHORIZATION tf_access;
