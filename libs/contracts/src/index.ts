@@ -50,6 +50,10 @@ export type AccessUserLockedV1 = z.infer<typeof AccessUserLockedV1Schema>;
 export const AccessUserUnlockedV1Schema = z.object({ userId: z.uuid(), unlockedBy: z.uuid() });
 export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 
+/** access.user.profile_updated v1: người dùng đổi tên hiển thị. Module nào lưu tên từ access.user.registered thì cập nhật theo. */
+export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
+export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -58,4 +62,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.role_changed.v1': AccessUserRoleChangedV1Schema,
   'access.user.locked.v1': AccessUserLockedV1Schema,
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
+  'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
 };
