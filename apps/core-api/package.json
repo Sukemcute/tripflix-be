@@ -11,6 +11,7 @@
     "lint": "oxlint --type-aware src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config vitest.int.config.ts",
     "export-openapi": "node dist/cli/export-openapi.js",
     "db:migrate": "node dist/cli/migrate.js",
     "db:seed": "node dist/cli/seed.js",
@@ -18,6 +19,8 @@
     "db:generate": "node scripts/db-generate.mjs"
   },
   "dependencies": {
+    "@nestjs-cls/transactional": "catalog:",
+    "@nestjs-cls/transactional-adapter-drizzle-orm": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/platform-express": "catalog:",
@@ -33,6 +36,7 @@
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
     "jose": "catalog:",
+    "nestjs-cls": "catalog:",
     "nestjs-pino": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
@@ -43,6 +47,7 @@
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "@nestjs/testing": "catalog:",
+    "@tripflix/testing": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
