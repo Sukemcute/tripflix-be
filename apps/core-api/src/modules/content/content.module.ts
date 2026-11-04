@@ -5,6 +5,7 @@ import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
 import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { ContentFacade } from './content.facade.js';
+import { MediaModule } from './media/media.module.js';
 import {
   AdminPostsController,
   BookmarksController,
@@ -46,10 +47,11 @@ import {
 export const CONTENT_DB = Symbol('CONTENT_DB');
 
 /**
- * Module content. Quản lý Posts, Comments, Reactions, Bookmarks, Shares và Admin Moderation.
+ * Module content. Quản lý Media, Posts, Comments, Reactions, Bookmarks, Shares và Admin Moderation.
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
+  imports: [MediaModule],
   controllers: [
     PostsController,
     ReactionsController,

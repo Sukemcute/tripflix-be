@@ -8,31 +8,36 @@
 
 ## 1. Bảng tổng hợp API Endpoints
 
-Hệ thống API phục vụ toàn bộ 13 Functional Requirements (FR), bao gồm 17 API ban đầu của Thành và 3 API đề xuất bổ sung (Bookmark, Share Tracker) để hoàn thiện 100% đặc tả PRD v3:
+Hệ thống API phục vụ toàn bộ 13 Functional Requirements (FR), bao gồm 17 API ban đầu của Thành và 3 API đề xuất bổ sung (Bookmark, Share Tracker) để hoàn thiện 100% đặc tả PRD v3. Các API được phân rã theo mã task Notion:
+- `TF07` · Tạo bộ bài đăng mô phỏng (Mock posts & seed data structure)
+- `TF24` · Đăng bài video hoặc vlog kèm lộ trình (Post lifecycle 1-7)
+- `TF25` · Tương tác bài đăng trên app và web (Reactions, stats, comments, bookmarks 8-16)
+- `TF38` · Dấu "Đã xác thực" và quyền riêng tư của lộ trình (Verified badge & PII Masking 3, 5)
+- `TF45` · Chia sẻ lên mạng xã hội và deep link (Social share & deep link 17)
 
-| # | Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền truy cập | FR Mapping |
+| # | Phương thức | Endpoint | Mô tả nghiệp vụ | Quyền truy cập | Task / FR Mapping |
 |---|---|---|---|---|---|
-| **I. Quản lý Bài đăng (Posts & Drafts)** |
-| 1 | `POST` | `/v1/posts` | Tạo bản nháp bài đăng | `member` | FR 1, 2, 3 |
-| 2 | `PATCH` | `/v1/posts/{post_id}` | Chỉnh sửa bản nháp hoặc bài đã đăng | Tác giả bài viết | FR 1, 5, 7 |
-| 3 | `POST` | `/v1/posts/{post_id}/publish` | Xuất bản bài đăng (xét duyệt nhãn "Đã xác thực") | Tác giả bài viết | FR 2, 3 |
-| 4 | `DELETE` | `/v1/posts/{post_id}` | Xóa mềm bài đăng của mình | Tác giả bài viết | FR 6 |
-| 5 | `GET` | `/v1/posts/{post_id}` | Chi tiết bài đăng theo quyền người xem (kèm dữ liệu lộ trình ẩn danh) | Công khai / Member | FR 3, 4, 12 |
-| 6 | `GET` | `/v1/posts` | Bảng tin công khai và tìm kiếm (hỗ trợ Keyset Cursor) | Công khai | FR 2, 4 |
-| 7 | `GET` | `/v1/me/posts` | Danh sách bài đăng & bản nháp của người dùng hiện tại | `member` | FR 1 |
-| **II. Tương tác Cảm xúc & Thống kê (Reactions & Stats)** |
-| 8 | `PUT` | `/v1/posts/{post_id}/reaction` | Thả, đổi hoặc hủy cảm xúc (Idempotent) | `member` | FR 10 |
-| 9 | `GET` | `/v1/posts/{post_id}/reaction` | Lấy cảm xúc hiện tại của người dùng đối với bài | `member` | FR 10 |
-| 10 | `GET` | `/v1/posts/{post_id}/stats` | Lấy thống kê tương tác tổng hợp (like, comment, share, save) | Công khai | FR 10 |
-| **III. Bình luận (Comments)** |
-| 11 | `POST` | `/v1/posts/{post_id}/comments` | Tạo bình luận (hỗ trợ phân cấp 1-level reply & chống trùng) | `member` | FR 11 |
-| 12 | `GET` | `/v1/posts/{post_id}/comments` | Danh sách bình luận theo phân trang Cursor | Công khai | FR 11 |
-| 13 | `PATCH` | `/v1/comments/{comment_id}` | Sửa bình luận của mình | Tác giả bình luận | FR 11 |
-| 14 | `DELETE` | `/v1/comments/{comment_id}` | Xóa bình luận của mình | Tác giả bình luận | FR 11 |
-| **IV. Lưu bài viết & Chia sẻ (Bookmarks & Shares - Mở rộng)** |
-| 15 | `PUT` | `/v1/posts/{post_id}/bookmark` | Đánh dấu lưu hoặc bỏ lưu bài viết | `member` | PRD F3 |
-| 16 | `GET` | `/v1/me/bookmarks` | Lấy danh sách bài viết đã lưu để xem offline | `member` | PRD F3 |
-| 17 | `POST` | `/v1/posts/{post_id}/shares` | Ghi nhận sự kiện chia sẻ và lấy deep link | Công khai / Member | FR 12, PRD F11 |
+| **I. Quản lý Bài đăng (Posts & Drafts - TF24, TF38)** |
+| 1 | `POST` | `/v1/posts` | Tạo bản nháp bài đăng | `member` | TF24 (FR 1, 2, 3) |
+| 2 | `PATCH` | `/v1/posts/{post_id}` | Chỉnh sửa bản nháp hoặc bài đã đăng | Tác giả bài viết | TF24 (FR 1, 5, 7) |
+| 3 | `POST` | `/v1/posts/{post_id}/publish` | Xuất bản bài đăng (xét duyệt nhãn "Đã xác thực") | Tác giả bài viết | TF24, TF38 (FR 2, 3) |
+| 4 | `DELETE` | `/v1/posts/{post_id}` | Xóa mềm bài đăng của mình | Tác giả bài viết | TF24 (FR 6) |
+| 5 | `GET` | `/v1/posts/{post_id}` | Chi tiết bài đăng theo quyền người xem (kèm dữ liệu lộ trình ẩn danh) | Công khai / Member | TF24, TF38 (FR 3, 4, 12) |
+| 6 | `GET` | `/v1/posts` | Bảng tin công khai và tìm kiếm (hỗ trợ Keyset Cursor) | Công khai | TF24, TF07 (FR 2, 4) |
+| 7 | `GET` | `/v1/me/posts` | Danh sách bài đăng & bản nháp của người dùng hiện tại | `member` | TF24 (FR 1) |
+| **II. Tương tác Cảm xúc & Thống kê (Reactions & Stats - TF25)** |
+| 8 | `PUT` | `/v1/posts/{post_id}/reaction` | Thả, đổi hoặc hủy cảm xúc (Idempotent) | `member` | TF25 (FR 10) |
+| 9 | `GET` | `/v1/posts/{post_id}/reaction` | Lấy cảm xúc hiện tại của người dùng đối với bài | `member` | TF25 (FR 10) |
+| 10 | `GET` | `/v1/posts/{post_id}/stats` | Lấy thống kê tương tác tổng hợp (like, comment, share, save) | Công khai | TF25 (FR 10) |
+| **III. Bình luận (Comments - TF25)** |
+| 11 | `POST` | `/v1/posts/{post_id}/comments` | Tạo bình luận (hỗ trợ phân cấp 1-level reply & chống trùng) | `member` | TF25 (FR 11) |
+| 12 | `GET` | `/v1/posts/{post_id}/comments` | Danh sách bình luận theo phân trang Cursor | Công khai | TF25 (FR 11) |
+| 13 | `PATCH` | `/v1/comments/{comment_id}` | Sửa bình luận của mình | Tác giả bình luận | TF25 (FR 11) |
+| 14 | `DELETE` | `/v1/comments/{comment_id}` | Xóa bình luận của mình | Tác giả bình luận | TF25 (FR 11) |
+| **IV. Lưu bài viết & Chia sẻ (Bookmarks & Shares - TF25, TF45)** |
+| 15 | `PUT` | `/v1/posts/{post_id}/bookmark` | Đánh dấu lưu hoặc bỏ lưu bài viết | `member` | TF25 (PRD F3) |
+| 16 | `GET` | `/v1/me/bookmarks` | Lấy danh sách bài viết đã lưu để xem offline | `member` | TF25 (PRD F3) |
+| 17 | `POST` | `/v1/posts/{post_id}/shares` | Ghi nhận sự kiện chia sẻ và lấy deep link | Công khai / Member | TF45 (FR 12, PRD F11) |
 | **V. Quản trị & Kiểm duyệt (Admin Moderation - Phối hợp Trang)** |
 | 18 | `GET` | `/v1/admin/posts` | Danh sách bài viết trong hàng đợi quản trị | `moderator`, `superadmin` | FR 13 |
 | 19 | `GET` | `/v1/admin/posts/{post_id}` | Chi tiết bài viết cho kiểm duyệt kèm nhật ký xử lý | `moderator`, `superadmin` | FR 13 |

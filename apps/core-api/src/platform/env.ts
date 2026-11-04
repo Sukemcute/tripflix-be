@@ -19,6 +19,11 @@ export const coreEnvSchema = baseEnvSchema
     AUTH_JWT_KID: OptionalStringSchema,
     AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
     AUTH_JWT_AUDIENCE: z.string().default('tripflix'),
+    // Media trên S3. Có giá trị mặc định để máy chưa cấu hình AWS vẫn khởi động được; key AWS do SDK tự đọc.
+    AWS_REGION: z.string().default('ap-southeast-2'),
+    S3_MEDIA_BUCKET: z.string().default('tripflix-media-dev'),
+    S3_KEY_PREFIX: z.string().default('dev/unknown/'),
+    MEDIA_CDN_URL: OptionalStringSchema,
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.AUTH_JWT_PRIVATE_KEY) {

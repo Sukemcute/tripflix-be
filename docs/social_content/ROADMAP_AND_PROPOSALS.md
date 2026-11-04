@@ -14,7 +14,13 @@ Theo [07-phan-cong-nghien-cuu-module.md](../../../../07-phan-cong-nghien-cuu-mod
   - Đồng sở hữu database schema: `content/db/schema/` (cùng Phong và Trang).
 - **Frontend (`tripflix-fe`)**:
   - Phụ trách `apps/web`, `apps/admin`, `packages/ui-web`.
-- **Mục tiêu chính**: Hiện thực hóa toàn bộ **13 Functional Requirements (FR)** và **20 API Endpoints** đã chuẩn hóa, đồng thời vượt qua các bài kiểm thử tự động (Unit test, Typecheck, Lint, Boundary check) trước khi merge vào nhánh `develop`.
+- **Mục tiêu chính**: Hiện thực hóa các nhiệm vụ theo Notion:
+  - `TF07` · Tạo bộ bài đăng mô phỏng
+  - `TF24` · Đăng bài video hoặc vlog kèm lộ trình
+  - `TF25` · Tương tác bài đăng trên app và web
+  - `TF38` · Dấu "Đã xác thực" và quyền riêng tư của lộ trình
+  - `TF45` · Chia sẻ lên mạng xã hội và deep link
+  Bao gồm toàn bộ **13 Functional Requirements (FR)** và **20 API Endpoints** đã chuẩn hóa, đồng thời vượt qua các bài kiểm thử tự động (Unit test, Typecheck, Lint, Boundary check) trước khi merge vào nhánh `develop`.
 
 ---
 
@@ -209,7 +215,12 @@ Dưới đây là checklist theo từng pha (Phase), có thể dùng trực ti�
 - [x] Chạy Typecheck: `pnpm typecheck` (100% sạch lỗi).
 - [x] Chạy Linter: `pnpm lint` (0 warnings, 0 errors).
 - [x] Chạy lệnh `pnpm contracts:build` biên dịch và cập nhật file `contracts/openapi/core-api.json`.
-- [x] Lập file Evidence theo mẫu `RULES.md §7` tại `docs/evidence/TF02-social-content.md` trước khi tạo Pull Request vào `develop`.
+- [x] Lập các file Evidence theo mẫu `RULES.md §7` tại `docs/evidence/` cho các mã task Notion:
+  - `TF07 · Tạo bộ bài đăng mô phỏng` (`docs/evidence/TF07-tao-bo-bai-dang-mo-phong.md`)
+  - `TF24 · Đăng bài video hoặc vlog kèm lộ trình` (`docs/evidence/TF24-dang-bai-video-vlog-kem-lo-trinh.md`)
+  - `TF25 · Tương tác bài đăng trên app và web` (`docs/evidence/TF25-tuong-tac-bai-dang-app-web.md`)
+  - `TF38 · Dấu "Đã xác thực" và quyền riêng tư của lộ trình` (`docs/evidence/TF38-dau-da-xac-thuc-quyen-rieng-tu-lo-trinh.md`)
+  - `TF45 · Chia sẻ lên mạng xã hội và deep link` (`docs/evidence/TF45-chia-se-mang-xa-hoi-deep-link.md`)
 
 ---
 
