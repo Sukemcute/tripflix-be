@@ -12,13 +12,6 @@ x-be-env: &be-env
   DATABASE_URL_ANALYTICS: postgres://tf_analytics:tf_analytics_dev@postgres:5432/core
   DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/commerce
   DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
-  # Access token: core-api ký (bỏ trống khoá ở dev thì tự sinh khoá tạm), service khác kiểm qua JWKS.
-  AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
-  AUTH_JWT_ISSUER: tripflix-core
-  AUTH_JWT_AUDIENCE: tripflix
-  JWKS_URL: http://core-api:3000/.well-known/jwks.json
-  # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.
-  SEED_PASSWORD: ${SEED_PASSWORD:-tripflix-dev-123}
   AWS_REGION: ${AWS_REGION:-ap-southeast-1}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
@@ -66,7 +59,7 @@ services:
   migrate:
     profiles: [be]
     build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
-    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:migrate && pnpm --filter @tripflix/core-api db:seed']
+    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:migrate']
     environment: *be-env
     depends_on:
       postgres: { condition: service_healthy }

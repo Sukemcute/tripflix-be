@@ -26,16 +26,8 @@ export type EventEnvelope<P extends Record<string, unknown> = Record<string, unk
   'payload'
 > & { payload: P };
 
-/** Payload của access.user.registered v1: có người dùng mới đăng ký. Không chứa email (dữ liệu cá nhân). */
-export const AccessUserRegisteredV1Schema = z.object({
-  userId: z.uuid(),
-  displayName: z.string().min(1),
-});
-export type AccessUserRegisteredV1 = z.infer<typeof AccessUserRegisteredV1Schema>;
-
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
   'role.v1': roleSchema,
-  'access.user.registered.v1': AccessUserRegisteredV1Schema,
 };
