@@ -1,0 +1,52 @@
+{
+  "name": "@tripflix/core-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist", "src/modules/*/db/migrations"],
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch --preserveWatchOutput",
+    "start": "node dist/main.js",
+    "lint": "oxlint --type-aware src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "export-openapi": "node dist/cli/export-openapi.js",
+    "db:migrate": "node dist/cli/migrate.js",
+    "db:generate": "node scripts/db-generate.mjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@tripflix/config": "workspace:*",
+    "@tripflix/contracts": "workspace:*",
+    "@tripflix/db": "workspace:*",
+    "@tripflix/event-bus": "workspace:*",
+    "@tripflix/observability": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/supertest": "catalog:",
+    "drizzle-kit": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "supertest": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
