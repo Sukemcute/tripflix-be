@@ -19,6 +19,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Test với Postgres, Redis thật (Testcontainers); runner ubuntu có sẵn Docker.
+      - run: pnpm test:int
       - run: pnpm build
       - name: Hợp đồng (contracts/) đã được sinh lại và commit
         run: pnpm contracts:build && git diff --exit-code contracts/

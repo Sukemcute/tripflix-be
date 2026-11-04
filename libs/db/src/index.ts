@@ -47,3 +47,5 @@ export async function ping(pool: pg.Pool): Promise<boolean> {
     return false;
   }
 }
+
+export * from './transactional.js';

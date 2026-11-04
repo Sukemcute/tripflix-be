@@ -84,6 +84,16 @@ describe('access E2E', () => {
     expect(reg.body).toMatchObject({ email: 'khang@example.com', role: 'member' });
     expect(reg.body).not.toHaveProperty('passwordHash');
     expect(store.userRows.get(reg.body.id)!.passwordHash).toMatch(/^\$argon2id\$/);
+    // Đăng ký ghi đúng một sự kiện vào outbox, payload không có email.
+    const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'access.user.registered',
+      version: 1,
+      producer: 'core-api/access',
+      payload: { userId: reg.body.id, displayName: 'Khang' },
+    });
+    expect(JSON.stringify(events[0]!.payload)).not.toContain('@');
 
     const login = await http().post('/api/auth/login').send({ email: 'khang@example.com', password: PASSWORD }).expect(200);
     expect(login.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
