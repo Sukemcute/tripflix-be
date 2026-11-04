@@ -1,0 +1,186 @@
+# Chạy cả hệ thống Tripflix. Dùng qua các lệnh pnpm stack:* ở gốc repo (xem README).
+# Profile: (không có) = hạ tầng luôn chạy; be, ai, fe, gateway, tools.
+name: tripflix
+
+x-be-env: &be-env
+  NODE_ENV: development
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  REDIS_URL: redis://redis:6379
+  DATABASE_URL_ACCESS: postgres://tf_access:tf_access_dev@postgres:5432/core
+  DATABASE_URL_CONTENT: postgres://tf_content:tf_content_dev@postgres:5432/core
+  DATABASE_URL_DISCOVERY: postgres://tf_discovery:tf_discovery_dev@postgres:5432/core
+  DATABASE_URL_ANALYTICS: postgres://tf_analytics:tf_analytics_dev@postgres:5432/core
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/commerce
+  DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
+  AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
+  S3_KEY_PREFIX: dev/${DEV_NAME:-unknown}/
+  MEDIA_CDN_URL: ${MEDIA_CDN_URL:-}
+
+x-node-health: &node-health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 60s
+
+services:
+  # ---------- Hạ tầng (luôn chạy) ----------
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ['${PG_PORT:-5432}:5432']
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.8-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['${REDIS_PORT:-6379}:6379']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports: ['8025:8025', '1025:1025']
+
+  # ---------- Backend (profile be) ----------
+  migrate:
+    profiles: [be]
+    build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
+    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:migrate']
+    environment: *be-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  core-api:
+    profiles: [be]
+    build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
+    environment:
+      <<: *be-env
+      APP_ROLE: all
+      PORT: 3000
+    ports: ['3000:3000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      <<: *node-health
+    develop:
+      watch:
+        - { action: sync, path: ../apps/core-api/src, target: /repo/apps/core-api/src }
+        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: rebuild, path: ../pnpm-lock.yaml }
+
+  notification-service:
+    profiles: [be]
+    build: { context: .., dockerfile: apps/notification-service/Dockerfile, target: dev }
+    environment:
+      <<: *be-env
+      PORT: 3001
+    ports: ['3001:3001']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      <<: *node-health
+    develop:
+      watch:
+        - { action: sync, path: ../apps/notification-service/src, target: /repo/apps/notification-service/src }
+        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: rebuild, path: ../pnpm-lock.yaml }
+
+  video-worker:
+    profiles: [be]
+    build: { context: .., dockerfile: apps/video-worker/Dockerfile, target: dev }
+    environment: *be-env
+    depends_on:
+      redis: { condition: service_healthy }
+    develop:
+      watch:
+        - { action: sync, path: ../apps/video-worker/src, target: /repo/apps/video-worker/src }
+        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: rebuild, path: ../pnpm-lock.yaml }
+
+  # ---------- AI (profile ai) — build từ repo tripflix-ai đặt cạnh ----------
+  ai-service:
+    profiles: [ai]
+    build: { context: '${AI_REPO:-../../tripflix-ai}', target: dev }
+    environment:
+      CORE_API_URL: http://core-api:3000
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports: ['8000:8000']
+    develop:
+      watch:
+        - { action: sync, path: '${AI_REPO:-../../tripflix-ai}/app', target: /srv/app }
+        - { action: rebuild, path: '${AI_REPO:-../../tripflix-ai}/uv.lock' }
+
+  # ---------- Web, admin (profile fe) — build từ repo tripflix-fe đặt cạnh ----------
+  web:
+    profiles: [fe]
+    build: { context: '${FE_REPO:-../../tripflix-fe}', dockerfile: apps/web/Dockerfile, target: dev }
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports: ['3100:3100']
+    develop:
+      watch:
+        - { action: sync, path: '${FE_REPO:-../../tripflix-fe}/apps/web/src', target: /repo/apps/web/src }
+        - { action: sync, path: '${FE_REPO:-../../tripflix-fe}/packages', target: /repo/packages, ignore: ['**/node_modules'] }
+        - { action: rebuild, path: '${FE_REPO:-../../tripflix-fe}/pnpm-lock.yaml' }
+
+  admin:
+    profiles: [fe]
+    build: { context: '${FE_REPO:-../../tripflix-fe}', dockerfile: apps/admin/Dockerfile, target: dev }
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports: ['3200:3200']
+    develop:
+      watch:
+        - { action: sync, path: '${FE_REPO:-../../tripflix-fe}/apps/admin/src', target: /repo/apps/admin/src }
+        - { action: sync, path: '${FE_REPO:-../../tripflix-fe}/packages', target: /repo/packages, ignore: ['**/node_modules'] }
+        - { action: rebuild, path: '${FE_REPO:-../../tripflix-fe}/pnpm-lock.yaml' }
+
+  # ---------- Gateway (profile gateway) ----------
+  traefik:
+    profiles: [gateway]
+    image: traefik:v3.7
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --api.dashboard=true
+      - --api.insecure=true
+    ports: ['8080:80', '8081:8080']
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+
+  # ---------- Công cụ xem dữ liệu (profile tools) ----------
+  adminer:
+    profiles: [tools]
+    image: adminer:5
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports: ['8090:8080']
+
+  redisinsight:
+    profiles: [tools]
+    image: redis/redisinsight:3.8
+    ports: ['5540:5540']
+
+volumes:
+  pg-data:
+  redis-data:

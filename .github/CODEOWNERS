@@ -1,0 +1,24 @@
+# Chủ code theo RULES.md mục 10. Thay @gh-<tên> bằng GitHub username thật khi có.
+# Dòng khớp sau cùng thắng.
+
+*                                               @gh-dung
+/RULES.md                                       @gh-trang @gh-dung
+/CLAUDE.md                                      @gh-trang @gh-dung
+/.claude/                                       @gh-trang @gh-dung
+/.github/                                       @gh-dung
+/libs/                                          @gh-dung
+/deploy/                                        @gh-dung
+/contracts/                                     @gh-dung
+/apps/core-api/src/platform/                    @gh-dung
+/apps/core-api/src/modules/access/              @gh-dung
+/apps/notification-service/                     @gh-dung
+/apps/core-api/src/modules/commerce/            @gh-thang
+/apps/core-api/src/modules/content/             @gh-phong @gh-thanh @gh-trang
+/apps/core-api/src/modules/content/feed/        @gh-phong
+/apps/core-api/src/modules/content/media/       @gh-phong
+/apps/video-worker/                             @gh-phong
+/libs/storage/                                  @gh-phong
+/apps/core-api/src/modules/content/social/      @gh-thanh
+/apps/core-api/src/modules/content/moderation/  @gh-trang
+/apps/core-api/src/modules/analytics/           @gh-trang
+/apps/core-api/src/modules/discovery/           @gh-duy

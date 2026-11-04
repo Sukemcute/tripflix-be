@@ -1,0 +1,29 @@
+# Một địa chỉ cho web, admin, mobile: http://localhost:8080
+# Rate limit, kiểm JWT sẽ thêm ở đây khi module access có JWKS (Dũng).
+http:
+  routers:
+    core-api:
+      rule: PathPrefix(`/api`)
+      service: core-api
+      entryPoints: [web]
+    notification:
+      rule: PathPrefix(`/notifications`) || PathPrefix(`/ws`)
+      service: notification-service
+      entryPoints: [web]
+    ai:
+      rule: PathPrefix(`/ai`)
+      service: ai-service
+      entryPoints: [web]
+  services:
+    core-api:
+      loadBalancer:
+        servers:
+          - url: http://core-api:3000
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: http://notification-service:3001
+    ai-service:
+      loadBalancer:
+        servers:
+          - url: http://ai-service:8000
