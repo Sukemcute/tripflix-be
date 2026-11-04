@@ -11,6 +11,7 @@
     "lint": "oxlint --type-aware src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config vitest.int.config.ts",
     "export-openapi": "node dist/cli/export-openapi.js",
     "db:migrate": "node dist/cli/migrate.js",
     "db:seed": "node dist/cli/seed.js",
