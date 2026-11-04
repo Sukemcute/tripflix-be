@@ -234,6 +234,9 @@ importers:
       '@nestjs/platform-express':
         specifier: 'catalog:'
         version: 12.3.2(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.3.2)
+      '@tripflix/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
       '@tripflix/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -252,6 +255,9 @@ importers:
       ioredis:
         specifier: 'catalog:'
         version: 6.0.0
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.15
       nestjs-pino:
         specifier: 'catalog:'
         version: 5.3.1(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.3.2)(pino-http@11.0.0)(pino@10.4.0)(rxjs@7.8.2)
@@ -286,12 +292,18 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      '@types/supertest':
+        specifier: 'catalog:'
+        version: 7.2.1
       oxlint:
         specifier: 'catalog:'
         version: 1.91.0(oxlint-tsgolint@7.0.2005)
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
+      supertest:
+        specifier: 'catalog:'
+        version: 7.3.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
