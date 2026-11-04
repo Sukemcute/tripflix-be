@@ -461,7 +461,7 @@ x-be-env: &be-env
   NODE_ENV: development
   PG_HOST: postgres
   REDIS_URL: redis://redis:6379
-  AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}          # key riêng từng người, chỉ ghi được dev/<tên>/
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
   S3_MEDIA_BUCKET: tripflix-media-dev
