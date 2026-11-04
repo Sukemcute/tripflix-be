@@ -1,0 +1,779 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "5786de7a-fcaa-4a4c-b6cf-bb1dc31345c8",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "access"
+      ],
+      "writes": [
+        "s|sch|access",
+        "n|sch|access",
+        "e|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "audit_log"
+      ],
+      "writes": [
+        "s|tbl|access.audit_log",
+        "n|tbl|access.audit_log",
+        "e|tbl|access.audit_log",
+        "n|rel|access.audit_log",
+        "n|type|access.audit_log",
+        "n|rel|access.audit_log_pkey"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "sessions"
+      ],
+      "writes": [
+        "s|tbl|access.sessions",
+        "n|tbl|access.sessions",
+        "e|tbl|access.sessions",
+        "n|rel|access.sessions",
+        "n|type|access.sessions",
+        "n|rel|access.sessions_pkey",
+        "n|rel|access.sessions_refresh_token_hash_key"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "users"
+      ],
+      "writes": [
+        "s|tbl|access.users",
+        "n|tbl|access.users",
+        "e|tbl|access.users",
+        "n|rel|access.users",
+        "n|type|access.users",
+        "n|rel|access.users_pkey",
+        "n|rel|access.users_email_key"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "audit_log",
+        "audit_log_actor_created_idx"
+      ],
+      "writes": [
+        "s|idx|access.audit_log_actor_created_idx",
+        "n|idx|access.audit_log_actor_created_idx",
+        "e|idx|access.audit_log_actor_created_idx",
+        "n|rel|access.audit_log_actor_created_idx"
+      ],
+      "reads": [
+        "n|tbl|access.audit_log",
+        "n|sch|access",
+        "n|col|access.audit_log.actor_user_id",
+        "n|col|access.audit_log.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "sessions",
+        "sessions_previous_token_hash_idx"
+      ],
+      "writes": [
+        "s|idx|access.sessions_previous_token_hash_idx",
+        "n|idx|access.sessions_previous_token_hash_idx",
+        "e|idx|access.sessions_previous_token_hash_idx",
+        "n|rel|access.sessions_previous_token_hash_idx"
+      ],
+      "reads": [
+        "n|tbl|access.sessions",
+        "n|sch|access",
+        "n|col|access.sessions.previous_token_hash"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "sessions",
+        "sessions_user_id_idx"
+      ],
+      "writes": [
+        "s|idx|access.sessions_user_id_idx",
+        "n|idx|access.sessions_user_id_idx",
+        "e|idx|access.sessions_user_id_idx",
+        "n|rel|access.sessions_user_id_idx"
+      ],
+      "reads": [
+        "n|tbl|access.sessions",
+        "n|sch|access",
+        "n|col|access.sessions.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "sessions",
+        "sessions_expires_at_idx"
+      ],
+      "writes": [
+        "s|idx|access.sessions_expires_at_idx",
+        "n|idx|access.sessions_expires_at_idx",
+        "e|idx|access.sessions_expires_at_idx",
+        "n|rel|access.sessions_expires_at_idx"
+      ],
+      "reads": [
+        "n|tbl|access.sessions",
+        "n|sch|access",
+        "n|col|access.sessions.expires_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "users",
+        "users_staff_idx"
+      ],
+      "writes": [
+        "s|idx|access.users_staff_idx",
+        "n|idx|access.users_staff_idx",
+        "e|idx|access.users_staff_idx",
+        "n|rel|access.users_staff_idx"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.role"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "access",
+        "sessions"
+      ],
+      "writes": [
+        "s|fk|access.sessions.sessions_user_id_users_id_fkey",
+        "n|fk|access.sessions.sessions_user_id_users_id_fkey",
+        "e|fk|access.sessions.sessions_user_id_users_id_fkey",
+        "n|con|access.sessions.sessions_user_id_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|access.sessions",
+        "n|sch|access",
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.sessions.user_id",
+        "n|col|access.users.id",
+        "e|uniqueness|access.users.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "access",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "access",
+      "name": "audit_log",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "access",
+      "name": "sessions",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "access",
+      "name": "users",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "id",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": {
+        "type": "always",
+        "name": "audit_log_id_seq",
+        "increment": "1",
+        "startWith": "1",
+        "minValue": "1",
+        "maxValue": "9223372036854775807",
+        "cache": 1,
+        "cycle": false
+      },
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "action",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "actor_user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "ip",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "user_agent",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "meta",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "refresh_token_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "previous_token_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "rotated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "device_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "user_agent",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "ip",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "last_used_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "email",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "password_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "display_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "role",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'member'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "status",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'active'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "audit_log_actor_created_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "actor_user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_previous_token_hash_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "previous_token_hash",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_user_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_expires_at_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_staff_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "role",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"role\" <> 'member'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_user_id_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "access",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "access",
+      "table": "audit_log",
+      "name": "audit_log_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "access",
+      "table": "sessions",
+      "name": "sessions_refresh_token_hash_key",
+      "nameExplicit": true,
+      "columns": [
+        "refresh_token_hash"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_email_key",
+      "nameExplicit": true,
+      "columns": [
+        "email"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_role_check",
+      "value": "\"role\" in ('member', 'moderator', 'superadmin')",
+      "entityType": "checks"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_status_check",
+      "value": "\"status\" in ('active', 'locked')",
+      "entityType": "checks"
+    },
+    {
+      "schema": "access",
+      "table": "users",
+      "name": "users_email_lower_check",
+      "value": "\"email\" = lower(\"email\")",
+      "entityType": "checks"
+    }
+  ]
+}
