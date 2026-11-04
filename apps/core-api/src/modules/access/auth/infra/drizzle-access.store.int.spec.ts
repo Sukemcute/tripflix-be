@@ -20,7 +20,8 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
       migrationsFolder: fileURLToPath(new URL('../../db/migrations', import.meta.url)),
     });
     pool = createPool({ url, max: 10, applicationName: 'access-int-test' });
-    store = new DrizzleAccessStore(createDb(pool));
+    const db = createDb(pool);
+    store = new DrizzleAccessStore(() => db);
   });
 
   afterAll(async () => {
@@ -81,16 +82,5 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(
       await store.users.insert({ email: 'dup@example.com', passwordHash: 'y', displayName: 'B', role: 'member' }),
     ).toBeNull();
-  });
-
-  it('transaction lỗi thì rollback cả user và audit', async () => {
-    await expect(
-      store.transaction(async (tx) => {
-        await tx.users.insert({ email: 'rollback@example.com', passwordHash: 'x', displayName: 'R', role: 'member' });
-        await tx.audit.record({ action: 'auth.register', meta: { email: 'rollback@example.com' } });
-        throw new Error('lỗi giữa chừng');
-      }),
-    ).rejects.toThrow('lỗi giữa chừng');
-    expect(await store.users.findByEmail('rollback@example.com')).toBeNull();
   });
 });

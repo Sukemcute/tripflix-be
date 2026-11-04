@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MemorySidBlocklist } from '@tripflix/auth';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
+import { ClsModule } from 'nestjs-cls';
 import request from 'supertest';
 import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
@@ -47,7 +49,14 @@ describe('access E2E', () => {
 
   beforeAll(async () => {
     store = new MemoryAccessStore();
-    const moduleRef = await Test.createTestingModule({ imports: [FakePlatformModule, AccessModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        FakePlatformModule,
+        // @Transactional('access') chạy được nhưng không mở transaction database (store bộ nhớ).
+        ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() }),
+        AccessModule,
+      ],
+    })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
       .overrideProvider(LOGIN_RATE_LIMITER)

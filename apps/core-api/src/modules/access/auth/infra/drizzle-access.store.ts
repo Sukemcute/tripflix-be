@@ -1,6 +1,6 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
-import { addOutboxEvent, type NewOutboxEvent } from '@tripflix/outbox';
+import { OutboxWriter } from '@tripflix/outbox';
 import { and, asc, eq, ne, or } from 'drizzle-orm';
 import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
 import type {
@@ -36,7 +36,12 @@ const mapSessionRow = (row: SessionRow): SessionRecord => ({
 });
 
 class DrizzleUserRepository implements UserRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
 
   async findByEmail(email: string) {
     const [row] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -60,7 +65,12 @@ class DrizzleUserRepository implements UserRepository {
 }
 
 class DrizzleSessionRepository implements SessionRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
 
   async insert(session: NewSession) {
     const [row] = await this.db.insert(sessions).values(session).returning();
@@ -93,7 +103,12 @@ class DrizzleSessionRepository implements SessionRepository {
 }
 
 class DrizzleAuditLog implements AuditLog {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
 
   async record({ action, actorUserId, ip, userAgent, meta }: AuditEntry) {
     await this.db.insert(auditLogs).values({
@@ -109,30 +124,21 @@ class DrizzleAuditLog implements AuditLog {
 /** Tên nguồn phát ghi vào phong bì sự kiện của access. */
 export const ACCESS_EVENT_PRODUCER = 'core-api/access';
 
-function createRepositories(db: Db) {
-  return {
-    users: new DrizzleUserRepository(db),
-    sessions: new DrizzleSessionRepository(db),
-    audit: new DrizzleAuditLog(db),
-    outbox: {
-      add: (event: NewOutboxEvent) => addOutboxEvent(db, accessOutboxEvents, event, ACCESS_EVENT_PRODUCER),
-    } satisfies AccessOutbox,
-  };
-}
-
-/** Kết nối bằng user Postgres tf_access, chỉ có quyền trên schema access. */
+/**
+ * Repository của access trên user Postgres tf_access, chỉ có quyền trên schema access.
+ * `getDb` trả executor cho từng lệnh: trong Nest là `() => txHost.tx` (transaction của @Transactional('access')
+ * nếu đang mở); ở CLI, test là `() => db`.
+ */
 export class DrizzleAccessStore implements AccessStore {
   readonly users: UserRepository;
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
   readonly outbox: AccessOutbox;
 
-  constructor(private readonly db: Db) {
-    Object.assign(this, createRepositories(db));
-  }
-
-  transaction<T>(fn: (tx: Omit<AccessStore, 'transaction'>) => Promise<T>): Promise<T> {
-    // PgTransaction có cùng các hàm select/insert/update/delete như Db.
-    return this.db.transaction((tx) => fn(createRepositories(tx as unknown as Db)));
+  constructor(getDb: () => Db) {
+    this.users = new DrizzleUserRepository(getDb);
+    this.sessions = new DrizzleSessionRepository(getDb);
+    this.audit = new DrizzleAuditLog(getDb);
+    this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
   }
 }
