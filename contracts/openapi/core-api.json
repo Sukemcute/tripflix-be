@@ -408,6 +408,117 @@
           "admin"
         ]
       }
+    },
+    "/api/media/uploads": {
+      "post": {
+        "operationId": "MediaUploadController_createUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedUploadDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MEDIA_TOO_LARGE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/uploads/{assetId}/parts": {
+      "post": {
+        "operationId": "MediaUploadController_resignParts",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResignPartsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedPartsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MEDIA_UPLOAD_NOT_ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
     }
   },
   "info": {
@@ -636,6 +747,130 @@
         },
         "required": [
           "userId"
+        ]
+      },
+      "CreateUploadDto": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "video/mp4",
+              "video/quicktime"
+            ]
+          },
+          "fileSizeBytes": {
+            "type": "number",
+            "example": 25000000
+          },
+          "durationSec": {
+            "type": "number",
+            "example": 42.5,
+            "description": "Làm tròn lên số nguyên. Tối đa 5 phút."
+          }
+        },
+        "required": [
+          "mimeType",
+          "fileSizeBytes",
+          "durationSec"
+        ]
+      },
+      "SignedPartDto": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string",
+            "description": "Link PUT ký sẵn, không gửi kèm header Authorization."
+          }
+        },
+        "required": [
+          "partNumber",
+          "url"
+        ]
+      },
+      "CreatedUploadDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedPartDto"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "partSizeBytes": {
+            "type": "number",
+            "example": 10485760
+          }
+        },
+        "required": [
+          "parts",
+          "expiresAt",
+          "assetId",
+          "partSizeBytes"
+        ]
+      },
+      "MediaErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "MEDIA_TOO_LARGE"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ResignPartsDto": {
+        "type": "object",
+        "properties": {
+          "partNumbers": {
+            "example": [
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "partNumbers"
+        ]
+      },
+      "SignedPartsDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedPartDto"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "parts",
+          "expiresAt"
         ]
       }
     }

@@ -32,6 +32,7 @@
     "@tripflix/event-bus": "workspace:*",
     "@tripflix/observability": "workspace:*",
     "@tripflix/outbox": "workspace:*",
+    "@tripflix/storage": "workspace:*",
     "argon2": "catalog:",
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
