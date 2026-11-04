@@ -19,7 +19,7 @@ x-be-env: &be-env
   JWKS_URL: http://core-api:3000/.well-known/jwks.json
   # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.
   SEED_PASSWORD: ${SEED_PASSWORD:-tripflix-dev-123}
-  AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
   S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
