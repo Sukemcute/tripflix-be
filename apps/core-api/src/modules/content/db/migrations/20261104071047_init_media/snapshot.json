@@ -1,0 +1,417 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "da006b15-654a-4a53-9e92-dacdf71be995",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "content"
+      ],
+      "writes": [
+        "s|sch|content",
+        "n|sch|content",
+        "e|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|tbl|content.media_assets",
+        "n|tbl|content.media_assets",
+        "e|tbl|content.media_assets",
+        "n|rel|content.media_assets",
+        "n|type|content.media_assets",
+        "n|rel|content.media_assets_pkey"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "renditions"
+      ],
+      "writes": [
+        "s|tbl|content.renditions",
+        "n|tbl|content.renditions",
+        "e|tbl|content.renditions",
+        "n|rel|content.renditions",
+        "n|type|content.renditions",
+        "n|rel|content.pk_renditions"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "content",
+        "renditions"
+      ],
+      "writes": [
+        "s|fk|content.renditions.fk_renditions_asset_id",
+        "n|fk|content.renditions.fk_renditions_asset_id",
+        "e|fk|content.renditions.fk_renditions_asset_id",
+        "n|con|content.renditions.fk_renditions_asset_id"
+      ],
+      "reads": [
+        "n|tbl|content.renditions",
+        "n|sch|content",
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.renditions.asset_id",
+        "n|col|content.media_assets.id",
+        "e|uniqueness|content.media_assets.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "content",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "content",
+      "name": "media_assets",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "content",
+      "name": "renditions",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "owner_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "status",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'uploading'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "mime_type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "file_size_bytes",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "source_key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "s3_upload_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "hls_prefix",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "duration_sec",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "aspect",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "transcode_attempts",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "error",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "asset_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "level",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "fk_renditions_asset_id",
+      "nameExplicit": true,
+      "columns": [
+        "asset_id"
+      ],
+      "schemaTo": "content",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "pk_renditions",
+      "columns": [
+        "asset_id",
+        "level"
+      ],
+      "nameExplicit": true,
+      "entityType": "pks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "media_assets_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_status",
+      "value": "\"status\" in ('uploading', 'processing', 'ready', 'failed')",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_mime_type",
+      "value": "\"mime_type\" in ('video/mp4', 'video/quicktime')",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_aspect",
+      "value": "\"aspect\" in ('9:16', '16:9', '1:1')",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_file_size_bytes",
+      "value": "\"file_size_bytes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_duration_sec",
+      "value": "\"duration_sec\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_transcode_attempts",
+      "value": "\"transcode_attempts\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "media_assets",
+      "name": "ck_media_assets_ready_has_playback",
+      "value": "\"status\" <> 'ready' or (\"hls_prefix\" is not null and \"aspect\" is not null)",
+      "entityType": "checks"
+    },
+    {
+      "schema": "content",
+      "table": "renditions",
+      "name": "ck_renditions_level",
+      "value": "\"level\" in (360, 540, 720)",
+      "entityType": "checks"
+    }
+  ]
+}
