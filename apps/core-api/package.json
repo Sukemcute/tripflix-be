@@ -18,6 +18,8 @@
     "db:generate": "node scripts/db-generate.mjs"
   },
   "dependencies": {
+    "@nestjs-cls/transactional": "catalog:",
+    "@nestjs-cls/transactional-adapter-drizzle-orm": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/platform-express": "catalog:",
@@ -32,6 +34,7 @@
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
     "jose": "catalog:",
+    "nestjs-cls": "catalog:",
     "nestjs-pino": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
@@ -42,6 +45,7 @@
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "@nestjs/testing": "catalog:",
+    "@tripflix/testing": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
