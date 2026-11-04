@@ -40,6 +40,23 @@ export function buildEventEnvelope(event: NewOutboxEvent, producer: string, now:
 }
 
 /**
+ * Ghi sự kiện vào outbox của một module mà không phải truyền `tx`: `getExecutor` trả về transaction
+ * đang mở. Với @Transactional('<module>') của libs/db: `new OutboxWriter(() => txHost.tx, table, producer)`.
+ */
+export class OutboxWriter {
+  constructor(
+    private readonly getExecutor: () => Db,
+    private readonly table: OutboxTable,
+    private readonly producer: string,
+  ) {}
+
+  /** Trả về eventId. Gọi trong hàm có @Transactional để sự kiện đi cùng thay đổi nghiệp vụ. */
+  add(event: NewOutboxEvent): Promise<string> {
+    return addOutboxEvent(this.getExecutor(), this.table, event, this.producer);
+  }
+}
+
+/**
  * Ghi một sự kiện vào outbox bằng executor được truyền vào. Truyền `tx` của transaction đang mở
  * để sự kiện chỉ được gửi khi thay đổi nghiệp vụ đã commit. Trả về eventId.
  *

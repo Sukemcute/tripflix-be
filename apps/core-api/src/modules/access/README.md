@@ -98,4 +98,4 @@ Mỗi phần con (`auth/`, `staff/`) chia:
 └─ jobs/          # job định kỳ (như trên)
 ```
 
-`@Transactional('access')` chưa có trong `libs/db`, nên use case đang gọi `AccessStore.transaction()` (bọc `db.transaction()` của Drizzle). Đổi sang decorator khi `libs/db` có.
+Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ gồm lệnh ghi database (người dùng, phiên, `audit_logs`, outbox). Băm argon2, Redis và ký token chạy ngoài transaction. Repository lấy executor qua `TransactionHost` (`DrizzleAccessStore(() => txHost.tx)`).

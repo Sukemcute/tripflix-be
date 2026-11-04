@@ -60,8 +60,4 @@ export class MemoryAccessStore implements AccessStore {
       return envelope.eventId;
     },
   };
-
-  transaction<T>(fn: (tx: Omit<AccessStore, 'transaction'>) => Promise<T>): Promise<T> {
-    return fn(this);
-  }
 }

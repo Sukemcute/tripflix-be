@@ -44,8 +44,35 @@ export class MediaRepository {
 }
 ```
 
+Mẫu thật trong repo: `apps/core-api/src/modules/access/` (TF053).
+
+```ts
+// access.module.ts: repository lấy executor qua TransactionHost của access
+{
+  provide: ACCESS_STORE,
+  inject: [buildTransactionHostToken('access')],
+  useFactory: (txHost: ModuleTransactionHost) => new DrizzleAccessStore(() => txHost.tx),
+}
+
+// auth.use-cases.ts: chỉ bước ghi database nằm trong transaction
+async login(input, meta) {
+  // rate limit, argon2.verify: ngoài transaction
+  const session = await this.openSession(user, hash, deviceName, meta);
+  return this.issueTokenPair(user, session.id, refreshToken); // ký token: ngoài transaction
+}
+
+@Transactional('access')
+private async openSession(...) {
+  const created = await this.store.sessions.insert({ ... });
+  await this.store.audit.record({ action: 'auth.login', ... }); // cùng transaction
+  return created;
+}
+```
+
+Đặt `@Transactional` trên hàm nhỏ chỉ gồm lệnh ghi, không đặt trên cả use case có băm mật khẩu, gọi Redis hay dịch vụ ngoài, để transaction không giữ khoá lâu.
+
 - `txHost.tx` là transaction đang mở của module; ngoài hàm có `@Transactional` thì là kết nối thường.
 - Hàm ném lỗi thì rollback.
 - `@Transactional('content')` không mở transaction trên kết nối của `commerce`, nên không thể vô tình ghi chéo module trong một transaction.
 - Không gọi dịch vụ ngoài (thanh toán, AI, S3, gửi thông báo) bên trong hàm có decorator (RULES §10).
-- Test không có database: đăng ký `ClsPluginTransactional` với `NoOpTransactionalAdapter` của `@nestjs-cls/transactional`, hoặc Drizzle giả có hàm `transaction(fn)` (xem `src/transactional.spec.ts`).
+- Test không có database: `ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() })` (xem `apps/core-api/src/modules/access/auth.e2e.spec.ts`). Test với Postgres thật: `createTransactionalPlugins([...])` trên Drizzle của container (xem `auth.use-cases.int.spec.ts`).

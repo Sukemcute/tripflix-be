@@ -1,6 +1,6 @@
 import type { EventEnvelope } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
-import { and, asc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import type { OutboxTable } from './table.js';
 
 export interface ClaimedOutboxEvent {
@@ -84,6 +84,15 @@ export class DrizzleOutboxStore implements OutboxStore {
       .set({ attempts: sql`${this.table.attempts} + 1`, lastError: error.slice(0, 1000) })
       .where(eq(this.table.id, eventId));
   }
+}
+
+/** Xoá sự kiện đã gửi trước mốc `before` (job dọn bảng). Trả về số dòng đã xoá. */
+export async function deletePublishedBefore(db: Db, table: OutboxTable, before: Date): Promise<number> {
+  const rows = await db
+    .delete(table)
+    .where(and(isNotNull(table.publishedAt), lt(table.publishedAt, before)))
+    .returning({ id: table.id });
+  return rows.length;
 }
 
 /** Bản bộ nhớ của OutboxStore, cùng quy tắc giành khoá; dùng cho test. */

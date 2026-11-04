@@ -77,13 +77,12 @@ export interface AccessOutbox {
   add(event: NewOutboxEvent): Promise<string>;
 }
 
-/** Truy cập dữ liệu của access; transaction() chạy fn trong một transaction database. */
+/** Truy cập dữ liệu của access. Transaction do @Transactional('access') ở use case mở, repository tự dùng. */
 export interface AccessStore {
   users: UserRepository;
   sessions: SessionRepository;
   audit: AuditLog;
   outbox: AccessOutbox;
-  transaction<T>(fn: (tx: Omit<AccessStore, 'transaction'>) => Promise<T>): Promise<T>;
 }
 
 export interface PasswordHasher {
