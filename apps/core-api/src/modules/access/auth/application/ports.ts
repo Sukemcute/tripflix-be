@@ -41,6 +41,10 @@ export interface UserRepository {
   /** Trả null khi email đã có người dùng. */
   insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>): Promise<UserRecord | null>;
   listStaff(): Promise<UserRecord[]>;
+  /** Tìm theo email hoặc tên hiển thị (không phân biệt hoa thường), mới nhất trước. */
+  search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
+  updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
+  updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
 }
 
 export interface SessionRepository {
@@ -50,6 +54,8 @@ export interface SessionRepository {
   /** Cập nhật có điều kiện: chỉ đổi khi token hiện tại vẫn là expectedCurrentHash. Trả false nếu request khác đã đổi trước. */
   rotate(id: string, expectedCurrentHash: string, next: SessionRotation): Promise<boolean>;
   delete(id: string): Promise<boolean>;
+  /** Xoá mọi phiên của người dùng, trả về các sid đã xoá để chặn trong Redis. */
+  deleteByUser(userId: string): Promise<string[]>;
 }
 
 export type AuditAction =
@@ -58,7 +64,11 @@ export type AuditAction =
   | 'auth.login_failed'
   | 'auth.refresh'
   | 'auth.refresh_reused'
-  | 'auth.logout';
+  | 'auth.logout'
+  | 'staff.role_granted'
+  | 'staff.role_revoked'
+  | 'user.locked'
+  | 'user.unlocked';
 
 export interface AuditEntry {
   action: AuditAction;

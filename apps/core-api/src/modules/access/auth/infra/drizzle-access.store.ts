@@ -1,7 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, eq, ne, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, ne, or } from 'drizzle-orm';
 import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
 import type {
   AccessOutbox,
@@ -62,6 +62,27 @@ class DrizzleUserRepository implements UserRepository {
     const rows = await this.db.select().from(users).where(ne(users.role, 'member')).orderBy(asc(users.createdAt));
     return rows.map(mapUserRow);
   }
+
+  async search({ query, limit, offset }: { query?: string | undefined; limit: number; offset: number }) {
+    // Thoát % _ \ trong từ khoá để ILIKE so đúng chữ người dùng gõ.
+    const pattern = query ? `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : undefined;
+    const where = pattern ? or(ilike(users.email, pattern), ilike(users.displayName, pattern)) : undefined;
+    const [rows, [counted]] = await Promise.all([
+      this.db.select().from(users).where(where).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+      this.db.select({ total: count() }).from(users).where(where),
+    ]);
+    return { items: rows.map(mapUserRow), total: counted?.total ?? 0 };
+  }
+
+  async updateRole(id: string, role: UserRecord['role']) {
+    const [row] = await this.db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return row ? mapUserRow(row) : null;
+  }
+
+  async updateStatus(id: string, status: UserRecord['status']) {
+    const [row] = await this.db.update(users).set({ status, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return row ? mapUserRow(row) : null;
+  }
 }
 
 class DrizzleSessionRepository implements SessionRepository {
@@ -99,6 +120,11 @@ class DrizzleSessionRepository implements SessionRepository {
   async delete(id: string) {
     const rows = await this.db.delete(sessions).where(eq(sessions.id, id)).returning({ id: sessions.id });
     return rows.length > 0;
+  }
+
+  async deleteByUser(userId: string) {
+    const rows = await this.db.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
+    return rows.map((r) => r.id);
   }
 }
 
