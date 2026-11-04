@@ -1,3 +1,4 @@
+import { createOutboxTable } from '@tripflix/outbox';
 import { sql } from 'drizzle-orm';
 import { bigint, check, foreignKey, index, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
@@ -71,6 +72,9 @@ export const auditLogs = accessSchema.table(
   },
   (t) => [index('idx_audit_logs_actor_user_id_created_at').on(t.actorUserId, t.createdAt)],
 );
+
+/** Sự kiện của access chờ relay gửi sang stream:core.access (libs/outbox). */
+export const accessOutboxEvents = createOutboxTable(accessSchema);
 
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;

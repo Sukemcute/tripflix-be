@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import type { EventEnvelope } from '@tripflix/contracts';
+import { buildEventEnvelope, type NewOutboxEvent } from '@tripflix/outbox';
 import type {
   AccessStore,
   AuditEntry,
@@ -46,6 +48,16 @@ export class MemoryAccessStore implements AccessStore {
   readonly audit = {
     record: async (entry: AuditEntry) => {
       this.auditRows.push(entry);
+    },
+  };
+
+  readonly outboxRows: EventEnvelope[] = [];
+
+  readonly outbox = {
+    add: async (event: NewOutboxEvent) => {
+      const envelope = buildEventEnvelope(event, 'core-api/access');
+      this.outboxRows.push(envelope);
+      return envelope.eventId;
     },
   };
 

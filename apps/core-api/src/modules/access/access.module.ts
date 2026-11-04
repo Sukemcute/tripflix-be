@@ -18,6 +18,7 @@ import {
   type Clock,
   type TokenIssuer,
 } from './auth/application/ports.js';
+import { AccessOutboxRelay } from './auth/infra/access-outbox-relay.js';
 import { Argon2PasswordHasher } from './auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from './auth/infra/drizzle-access.store.js';
 import { JoseTokenIssuer } from './auth/infra/jose-token-issuer.js';
@@ -81,6 +82,6 @@ export class AccessInfraModule {}
     }),
   ],
   controllers: [AuthController, JwksController, AdminController],
-  providers: [AuthUseCases, StaffUseCases],
+  providers: [AuthUseCases, StaffUseCases, AccessOutboxRelay],
 })
 export class AccessModule {}
