@@ -18,6 +18,15 @@ export interface SessionRecord extends RefreshState {
   userId: string;
 }
 
+/** Phiên hiện ở màn "thiết bị đã đăng nhập"; không có bản băm token. */
+export interface SessionSummary {
+  id: string;
+  deviceName: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  lastUsedAt: Date;
+}
+
 export interface NewSession {
   userId: string;
   refreshTokenHash: string;
@@ -45,6 +54,8 @@ export interface UserRepository {
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
   updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
   updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
+  updateDisplayName(id: string, displayName: string): Promise<UserRecord | null>;
+  updatePasswordHash(id: string, passwordHash: string): Promise<UserRecord | null>;
 }
 
 export interface SessionRepository {
@@ -54,8 +65,14 @@ export interface SessionRepository {
   /** Cập nhật có điều kiện: chỉ đổi khi token hiện tại vẫn là expectedCurrentHash. Trả false nếu request khác đã đổi trước. */
   rotate(id: string, expectedCurrentHash: string, next: SessionRotation): Promise<boolean>;
   delete(id: string): Promise<boolean>;
-  /** Xoá mọi phiên của người dùng, trả về các sid đã xoá để chặn trong Redis. */
-  deleteByUser(userId: string): Promise<string[]>;
+  /** Xoá mọi phiên của người dùng (trừ exceptId nếu có), trả về các sid đã xoá để chặn trong Redis. */
+  deleteByUser(userId: string, exceptId?: string): Promise<string[]>;
+  /** Chỉ xoá khi phiên thuộc đúng người dùng; trả false nếu không có phiên đó của người này. */
+  deleteOwned(id: string, userId: string): Promise<boolean>;
+  /** Phiên còn hạn của người dùng, dùng gần nhất trước. */
+  listActiveByUser(userId: string, now: Date): Promise<SessionSummary[]>;
+  /** Xoá phiên hết hạn trước mốc `before`, trả số dòng đã xoá. */
+  deleteExpired(before: Date): Promise<number>;
 }
 
 export type AuditAction =
@@ -65,6 +82,11 @@ export type AuditAction =
   | 'auth.refresh'
   | 'auth.refresh_reused'
   | 'auth.logout'
+  | 'auth.logout_all'
+  | 'auth.session_revoked'
+  | 'auth.profile_updated'
+  | 'auth.password_changed'
+  | 'auth.password_change_failed'
   | 'staff.role_granted'
   | 'staff.role_revoked'
   | 'user.locked'
