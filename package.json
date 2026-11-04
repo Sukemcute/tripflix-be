@@ -1,0 +1,34 @@
+{
+  "name": "tripflix-be",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --filter=./apps/*",
+    "build": "turbo run build",
+    "lint": "turbo run lint && node tools/check-boundaries.mjs",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "format": "prettier --write .",
+    "contracts:build": "turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/contracts export-schemas && pnpm --filter @tripflix/core-api export-openapi",
+    "db:migrate": "pnpm --filter @tripflix/core-api db:migrate",
+    "stack:infra": "docker compose -f deploy/compose.yaml up -d",
+    "stack:up": "docker compose -f deploy/compose.yaml --profile be --profile ai --profile fe --profile gateway up -d --build",
+    "stack:be": "docker compose -f deploy/compose.yaml --profile be --profile gateway up -d --build",
+    "stack:watch": "docker compose -f deploy/compose.yaml --profile be --profile ai --profile fe --profile gateway watch",
+    "stack:tools": "docker compose -f deploy/compose.yaml --profile tools up -d",
+    "stack:logs": "docker compose -f deploy/compose.yaml logs -f",
+    "stack:ps": "docker compose -f deploy/compose.yaml ps",
+    "stack:down": "docker compose -f deploy/compose.yaml --profile be --profile ai --profile fe --profile gateway --profile tools down",
+    "stack:reset": "docker compose -f deploy/compose.yaml --profile be --profile ai --profile fe --profile gateway --profile tools down -v"
+  },
+  "devDependencies": {
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

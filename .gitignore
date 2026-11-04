@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+deploy/.env
+.claude/settings.local.json
+CLAUDE.local.md
+*.log
+.DS_Store

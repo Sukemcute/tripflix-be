@@ -1,0 +1,44 @@
+packages:
+  - apps/*
+  - libs/*
+
+# Mọi package dùng "catalog:" để cả repo chung một phiên bản.
+catalog:
+  '@nestjs/cli': ^12.0.11
+  '@nestjs/common': ^12.3.2
+  '@nestjs/core': ^12.3.2
+  '@nestjs/platform-express': ^12.3.2
+  '@nestjs/schematics': ^12.0.12
+  '@nestjs/swagger': ^12.1.0
+  '@nestjs/testing': ^12.3.2
+  '@types/express': ^5.0.6
+  '@types/node': ^24.0.0
+  '@types/pg': ^8.23.1
+  '@types/supertest': ^7.2.1
+  drizzle-kit: 1.0.0-rc.5
+  drizzle-orm: 1.0.0-rc.5
+  ioredis: ^6.0.0
+  nestjs-pino: ^5.3.1
+  oxlint: ^1.91.0
+  oxlint-tsgolint: ^7.0.2005
+  pg: ^8.23.1
+  pino: ^10.4.0
+  pino-http: ^11.0.0
+  pino-pretty: ^13.2.0
+  prettier: ^3.9.10
+  reflect-metadata: ^0.2.2
+  rxjs: ^7.8.2
+  supertest: ^7.3.1
+  tsx: ^4.23.15
+  turbo: ^2.11.10
+  typescript: 6.0.3
+  vite: ^8.3.5
+  vitest: ^4.1.12
+  zod: ^4.6.7
+
+ignoredBuiltDependencies:
+  - '@scarf/scarf'
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - esbuild

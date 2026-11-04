@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-floating-promises": "error",
+    "no-console": "error"
+  },
+  "env": {
+    "node": true
+  },
+  "ignorePatterns": ["dist", "**/db/migrations/**"]
+}
