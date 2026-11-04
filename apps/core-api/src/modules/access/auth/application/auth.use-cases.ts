@@ -25,8 +25,8 @@ import {
   type TokenIssuer,
   type UserRecord,
 } from './ports.js';
-import { toPublicUser, type PublicUser } from './public-user.js';
-import { hashRefreshToken, newRefreshToken } from './refresh-token.js';
+import { mapPublicUser, type PublicUser } from './public-user.js';
+import { hashRefreshToken, createRefreshToken } from './refresh-token.js';
 
 export interface TokenPair {
   accessToken: string;
@@ -36,7 +36,7 @@ export interface TokenPair {
 }
 
 /**
- * Use case đăng ký, đăng nhập, làm mới, đăng xuất. Ghi database và audit_log trong cùng transaction;
+ * Use case đăng ký, đăng nhập, làm mới, đăng xuất. Ghi database và audit_logs trong cùng transaction;
  * Redis (chặn sid, đếm đăng nhập sai) ghi sau khi commit, không nằm trong transaction.
  */
 @Injectable()
@@ -63,7 +63,7 @@ export class AuthUseCases {
       return created;
     });
     if (!user) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
-    return toPublicUser(user);
+    return mapPublicUser(user);
   }
 
   async login(
@@ -72,15 +72,15 @@ export class AuthUseCases {
   ): Promise<TokenPair> {
     const email = normalizeEmail(input.email);
     const limit = await this.limiter.check(email, meta.ip);
-    if (limit.blocked) throw new AccessError('too_many_attempts', TOO_MANY_ATTEMPTS_MESSAGE, limit.retryAfterSeconds);
+    if (limit.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_ATTEMPTS_MESSAGE, limit.retryAfterSeconds);
 
     const user = await this.store.users.findByEmail(email);
     // Email không tồn tại vẫn chạy argon2 để thời gian phản hồi không lộ email nào có tài khoản.
-    const passwordOk = user
+    const isPasswordValid = user
       ? await this.hasher.verify(user.passwordHash, input.password)
       : await this.hasher.verify(await this.getDummyHash(), input.password).then(() => false);
 
-    if (!user || !passwordOk || user.status !== 'active') {
+    if (!user || !isPasswordValid || user.status !== 'active') {
       await this.limiter.recordFailure(email, meta.ip);
       await this.store.audit.record({
         action: 'auth.login_failed',
@@ -92,7 +92,7 @@ export class AuthUseCases {
     }
 
     await this.limiter.reset(email);
-    const refreshToken = newRefreshToken();
+    const refreshToken = createRefreshToken();
     const session = await this.store.transaction(async (tx) => {
       const created = await tx.sessions.insert({
         userId: user.id,
@@ -105,7 +105,7 @@ export class AuthUseCases {
       await tx.audit.record({ action: 'auth.login', actorUserId: user.id, ...meta, meta: { sid: created.id } });
       return created;
     });
-    return this.pair(user, session.id, refreshToken);
+    return this.issueTokenPair(user, session.id, refreshToken);
   }
 
   async refresh(refreshToken: string, meta: RequestMeta): Promise<TokenPair> {
@@ -129,12 +129,12 @@ export class AuthUseCases {
     const user = await this.store.users.findById(session.userId);
     if (!user || user.status !== 'active') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
 
-    const next = newRefreshToken();
+    const next = createRefreshToken();
     const nextHash = hashRefreshToken(next);
     const expiresAt = new Date(now.getTime() + REFRESH_TTL_MS);
-    const rotated = await this.store.transaction(async (tx) => {
+    const hasRotated = await this.store.transaction(async (tx) => {
       // grace: giữ nguyên token liền trước và mốc xoay, để khoảng 10 giây không bị kéo dài.
-      const ok =
+      const hasUpdated =
         decision === 'rotate'
           ? await tx.sessions.rotate(session.id, presented, {
               refreshTokenHash: nextHash,
@@ -150,13 +150,13 @@ export class AuthUseCases {
               expiresAt,
               lastUsedAt: now,
             });
-      if (ok) {
+      if (hasUpdated) {
         await tx.audit.record({ action: 'auth.refresh', actorUserId: user.id, ...meta, meta: { sid: session.id, decision } });
       }
-      return ok;
+      return hasUpdated;
     });
-    if (!rotated) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
-    return this.pair(user, session.id, next);
+    if (!hasRotated) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    return this.issueTokenPair(user, session.id, next);
   }
 
   async logout(user: AuthUser, meta: RequestMeta): Promise<void> {
@@ -169,13 +169,13 @@ export class AuthUseCases {
     await this.blocklist.block(user.sid, Math.max(remaining, 1));
   }
 
-  async me(userId: string): Promise<PublicUser> {
+  async getMe(userId: string): Promise<PublicUser> {
     const user = await this.store.users.findById(userId);
     if (!user) throw new AccessError('not_found', 'Không tìm thấy người dùng');
-    return toPublicUser(user);
+    return mapPublicUser(user);
   }
 
-  private async pair(user: UserRecord, sid: string, refreshToken: string): Promise<TokenPair> {
+  private async issueTokenPair(user: UserRecord, sid: string, refreshToken: string): Promise<TokenPair> {
     const access = await this.tokens.issue({ userId: user.id, role: user.role, sid });
     return { accessToken: access.token, refreshToken, tokenType: 'Bearer', expiresIn: access.expiresIn };
   }

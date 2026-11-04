@@ -129,7 +129,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "operationId": "AuthController_me",
+        "operationId": "AuthController_getMe",
         "parameters": [],
         "responses": {
           "200": {
@@ -155,7 +155,7 @@
     },
     "/.well-known/jwks.json": {
       "get": {
-        "operationId": "JwksController_jwks",
+        "operationId": "JwksController_getJwks",
         "parameters": [],
         "responses": {
           "200": {
@@ -176,7 +176,7 @@
     },
     "/api/admin/me": {
       "get": {
-        "operationId": "AdminController_me",
+        "operationId": "AdminController_getMe",
         "parameters": [],
         "responses": {
           "200": {
@@ -202,7 +202,7 @@
     },
     "/api/admin/staff": {
       "get": {
-        "operationId": "AdminController_list",
+        "operationId": "AdminController_listStaff",
         "parameters": [],
         "responses": {
           "200": {

@@ -27,7 +27,7 @@ interface AuthRequest {
   user?: AuthUser;
 }
 
-function bearerToken(req: AuthRequest): string | undefined {
+function extractBearerToken(req: AuthRequest): string | undefined {
   const header = req.headers.authorization;
   const value = Array.isArray(header) ? header[0] : header;
   const match = value ? /^Bearer\s+(\S+)$/i.exec(value) : null;
@@ -44,7 +44,7 @@ export class AccessTokenGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthRequest>();
-    const token = bearerToken(req);
+    const token = extractBearerToken(req);
     if (!token) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
     let user: AuthUser;
     try {

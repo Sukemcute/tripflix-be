@@ -21,14 +21,14 @@ export class AdminController {
   /** Trang quản trị gọi để biết người đang đăng nhập có phải nhân viên không. */
   @Get('me')
   @ApiOkResponse({ type: UserDto })
-  me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.userId);
+  getMe(@CurrentUser() user: AuthUser) {
+    return this.auth.getMe(user.userId);
   }
 
   @Get('staff')
   @Roles('superadmin')
   @ApiOkResponse({ type: UserDto, isArray: true })
-  list() {
+  listStaff() {
     return this.staff.listStaff();
   }
 }

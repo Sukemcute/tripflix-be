@@ -10,7 +10,7 @@ export interface PublicUser {
   createdAt: string;
 }
 
-export function toPublicUser(user: UserRecord): PublicUser {
+export function mapPublicUser(user: UserRecord): PublicUser {
   return {
     id: user.id,
     email: user.email,

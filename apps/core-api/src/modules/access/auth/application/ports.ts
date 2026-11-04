@@ -92,11 +92,11 @@ export interface IssuedAccessToken {
 export interface TokenIssuer {
   issue(claims: { userId: string; role: Role; sid: string }): Promise<IssuedAccessToken>;
   /** Khoá công khai cho /.well-known/jwks.json. */
-  jwks(): { keys: JWK[] };
+  getJwks(): { keys: JWK[] };
 }
 
 export interface RateLimitStatus {
-  blocked: boolean;
+  isBlocked: boolean;
   retryAfterSeconds: number;
 }
 

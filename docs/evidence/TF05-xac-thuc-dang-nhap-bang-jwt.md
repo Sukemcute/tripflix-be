@@ -4,13 +4,14 @@
 
 ## Đã làm
 - `libs/auth` (mới): `createAccessTokenVerifier` kiểm JWT ES256 qua JWKS (iss, aud, exp, đủ claim), `AccessTokenGuard`, `@Roles(...)` + `RolesGuard`, `@CurrentUser()`, danh sách chặn `sid` trong Redis dùng chung cho mọi service.
-- Module `access`: bảng `users`, `sessions`, `audit_log` và migration đầu; API `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `/.well-known/jwks.json`, `/admin/me`, `/admin/staff`.
+- Module `access`: bảng `users`, `sessions`, `audit_logs` và migration đầu; API `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `/.well-known/jwks.json`, `/admin/me`, `/admin/staff`.
 - Refresh token xoay vòng, chỉ lưu SHA-256; dùng lại token cũ quá 10 giây thì thu hồi cả phiên (trong 10 giây vẫn nhận, phòng mạng yếu làm mất phản hồi).
 - Chặn đăng nhập sai: 5 lần theo email hoặc 20 lần theo IP trong 15 phút thì `429`.
 - `pnpm db:seed`: tài khoản mẫu `superadmin@`, `moderator@`, `member@tripflix.local`. `auth:keygen`: sinh khoá ES256 cho staging.
 - `notification-service`: kiểm access token qua `JWKS_URL`, `GET /notifications/me`.
 - Sửa lỗi có sẵn ở `deploy/postgres/init/02-roles-schemas.sql`: cấp `CREATE` trên database cho user từng module, vì Drizzle luôn chạy `CREATE SCHEMA IF NOT EXISTS` nên `pnpm db:migrate` lỗi ở mọi module.
 - `deploy/compose.yaml`: `JWKS_URL`, biến khoá ký, service `migrate` chạy thêm `db:seed`.
+- Đã merge `origin/develop` (có RULES §4.1 mới) và đặt tên theo quy ước: constraint `uq_`, `idx_`, `ck_`, `fk_<table>_<...>`; bảng số nhiều `audit_logs` (docs/10 còn ghi `audit_log`); Zod schema `RegisterRequestSchema`...; boolean `is`/`has`; hàm bắt đầu bằng động từ. Migration đầu được sinh lại (chưa merge nên không vi phạm quy tắc "không sửa migration đã merge").
 
 ## Đối chiếu "Xong khi"
 | Tiêu chí (chép từ Notion) | Đạt | Bằng chứng (tên test, lệnh, ảnh, link) |
@@ -55,7 +56,7 @@ pnpm turbo run lint typecheck test --affected    → 15/15 task pass (scope: //,
 pnpm contracts:build && git diff --exit-code contracts/ → không khác
 ```
 
-Kiểm tay trên Postgres 17 + Redis 8.8 thật (`pnpm stack:infra`), core-api và notification-service chạy bằng `node dist/main.js`: **27/27 PASS**.
+Kiểm tay trên Postgres 17 + Redis 8.8 thật (`pnpm stack:infra`), core-api và notification-service chạy bằng `node dist/main.js`: **27/27 PASS**. Chạy 2 lần: trước và sau khi đổi tên theo RULES §4.1 (lần 2 trên bảng tạo từ migration mới, constraint `ck_users_email_lowercase`, `ck_users_role`, `ck_users_status`, `fk_sessions_user_id`, `uq_sessions_refresh_token_hash`, `uq_users_email`).
 
 ```
 (1)  PASS  POST /api/auth/register trả 201, role luôn member
@@ -82,7 +83,7 @@ Kiểm tay trên Postgres 17 + Redis 8.8 thật (`pnpm stack:infra`), core-api v
 (26) PASS  superadmin gọi /api/admin/me → 200    (27) PASS  superadmin gọi /api/admin/staff → 200
 ```
 
-Database sau khi kiểm: `access.audit_log` có `auth.register` 1, `auth.login` 5, `auth.login_failed` 6, `auth.refresh` 2, `auth.refresh_reused` 1, `auth.logout` 1. Các bảng `access.*` thuộc `tf_access`. `tf_access` vẫn bị từ chối khi đọc, ghi schema `content` và khi kết nối database `commerce`.
+Database sau khi kiểm: `access.audit_logs` có `auth.register` 1, `auth.login` 5, `auth.login_failed` 6, `auth.refresh` 2, `auth.refresh_reused` 1, `auth.logout` 1. Các bảng `access.*` thuộc `tf_access`. `tf_access` vẫn bị từ chối khi đọc, ghi schema `content` và khi kết nối database `commerce`.
 
 ## Cách kiểm lại
 1. `pnpm install`, `pnpm stack:infra`. Máy đã có volume Postgres từ trước: chạy lệnh `GRANT CREATE ...` trong `apps/core-api/src/modules/access/README.md` một lần.

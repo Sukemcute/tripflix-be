@@ -6,7 +6,7 @@ export {
   type AccessTokenVerifierOptions,
   type AuthUser,
 } from './verifier.js';
-export { MemorySidBlocklist, RedisSidBlocklist, revokedSidKey, type SidBlocklist } from './revocation.js';
+export { MemorySidBlocklist, RedisSidBlocklist, buildRevokedSidKey, type SidBlocklist } from './revocation.js';
 export {
   AUTH_VERIFIER,
   AccessTokenGuard,

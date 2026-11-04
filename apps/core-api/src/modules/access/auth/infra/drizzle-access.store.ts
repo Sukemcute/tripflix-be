@@ -1,7 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { and, asc, eq, ne, or } from 'drizzle-orm';
-import { auditLog, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
+import { auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
 import type {
   AccessStore,
   AuditEntry,
@@ -14,7 +14,7 @@ import type {
   UserRepository,
 } from '../application/ports.js';
 
-const toUser = (row: UserRow): UserRecord => ({
+const mapUserRow = (row: UserRow): UserRecord => ({
   id: row.id,
   email: row.email,
   passwordHash: row.passwordHash,
@@ -24,7 +24,7 @@ const toUser = (row: UserRow): UserRecord => ({
   createdAt: row.createdAt,
 });
 
-const toSession = (row: SessionRow): SessionRecord => ({
+const mapSessionRow = (row: SessionRow): SessionRecord => ({
   id: row.id,
   userId: row.userId,
   refreshTokenHash: row.refreshTokenHash,
@@ -38,22 +38,22 @@ class DrizzleUserRepository implements UserRepository {
 
   async findByEmail(email: string) {
     const [row] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
-    return row ? toUser(row) : null;
+    return row ? mapUserRow(row) : null;
   }
 
   async findById(id: string) {
     const [row] = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
-    return row ? toUser(row) : null;
+    return row ? mapUserRow(row) : null;
   }
 
   async insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>) {
     const [row] = await this.db.insert(users).values(user).onConflictDoNothing({ target: users.email }).returning();
-    return row ? toUser(row) : null;
+    return row ? mapUserRow(row) : null;
   }
 
   async listStaff() {
     const rows = await this.db.select().from(users).where(ne(users.role, 'member')).orderBy(asc(users.createdAt));
-    return rows.map(toUser);
+    return rows.map(mapUserRow);
   }
 }
 
@@ -63,7 +63,7 @@ class DrizzleSessionRepository implements SessionRepository {
   async insert(session: NewSession) {
     const [row] = await this.db.insert(sessions).values(session).returning();
     if (!row) throw new Error('Không tạo được phiên đăng nhập');
-    return toSession(row);
+    return mapSessionRow(row);
   }
 
   async findByTokenHash(hash: string) {
@@ -72,7 +72,7 @@ class DrizzleSessionRepository implements SessionRepository {
       .from(sessions)
       .where(or(eq(sessions.refreshTokenHash, hash), eq(sessions.previousTokenHash, hash)))
       .limit(1);
-    return row ? toSession(row) : null;
+    return row ? mapSessionRow(row) : null;
   }
 
   async rotate(id: string, expectedCurrentHash: string, next: SessionRotation) {
@@ -94,7 +94,7 @@ class DrizzleAuditLog implements AuditLog {
   constructor(private readonly db: Db) {}
 
   async record({ action, actorUserId, ip, userAgent, meta }: AuditEntry) {
-    await this.db.insert(auditLog).values({
+    await this.db.insert(auditLogs).values({
       action,
       actorUserId: actorUserId ?? null,
       ip: ip ?? null,
@@ -104,7 +104,7 @@ class DrizzleAuditLog implements AuditLog {
   }
 }
 
-function repositories(db: Db) {
+function createRepositories(db: Db) {
   return {
     users: new DrizzleUserRepository(db),
     sessions: new DrizzleSessionRepository(db),
@@ -119,11 +119,11 @@ export class DrizzleAccessStore implements AccessStore {
   readonly audit: AuditLog;
 
   constructor(private readonly db: Db) {
-    Object.assign(this, repositories(db));
+    Object.assign(this, createRepositories(db));
   }
 
   transaction<T>(fn: (tx: Omit<AccessStore, 'transaction'>) => Promise<T>): Promise<T> {
     // PgTransaction có cùng các hàm select/insert/update/delete như Db.
-    return this.db.transaction((tx) => fn(repositories(tx as unknown as Db)));
+    return this.db.transaction((tx) => fn(createRepositories(tx as unknown as Db)));
   }
 }

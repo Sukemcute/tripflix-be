@@ -16,15 +16,15 @@ export class MemoryLoginRateLimiter implements LoginRateLimiter {
       [`email:${email}`, LOGIN_MAX_FAILS_PER_EMAIL],
       [`ip:${ip}`, LOGIN_MAX_FAILS_PER_IP],
     ] as const) {
-      const c = this.live(key);
-      if (c && c.count >= max) return { blocked: true, retryAfterSeconds: Math.ceil((c.until - this.now()) / 1000) };
+      const c = this.findLiveCounter(key);
+      if (c && c.count >= max) return { isBlocked: true, retryAfterSeconds: Math.ceil((c.until - this.now()) / 1000) };
     }
-    return { blocked: false, retryAfterSeconds: 0 };
+    return { isBlocked: false, retryAfterSeconds: 0 };
   }
 
   async recordFailure(email: string, ip: string): Promise<void> {
     for (const key of [`email:${email}`, `ip:${ip}`]) {
-      const c = this.live(key) ?? { count: 0, until: this.now() + LOGIN_WINDOW_SECONDS * 1000 };
+      const c = this.findLiveCounter(key) ?? { count: 0, until: this.now() + LOGIN_WINDOW_SECONDS * 1000 };
       this.counters.set(key, { ...c, count: c.count + 1 });
     }
   }
@@ -33,7 +33,7 @@ export class MemoryLoginRateLimiter implements LoginRateLimiter {
     this.counters.delete(`email:${email}`);
   }
 
-  private live(key: string) {
+  private findLiveCounter(key: string) {
     const c = this.counters.get(key);
     return c && c.until > this.now() ? c : undefined;
   }

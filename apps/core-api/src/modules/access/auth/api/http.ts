@@ -56,6 +56,6 @@ export class AccessErrorFilter implements ExceptionFilter {
   }
 }
 
-export function requestMeta(req: Request): RequestMeta {
+export function readRequestMeta(req: Request): RequestMeta {
   return { ip: req.ip ?? 'unknown', userAgent: req.get('user-agent') ?? null };
 }

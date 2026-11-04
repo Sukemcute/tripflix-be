@@ -37,7 +37,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
       provide: TOKEN_ISSUER,
       inject: [CORE_ENV, CLOCK],
       useFactory: async (env: CoreEnv, clock: Clock): Promise<TokenIssuer> => {
-        const { issuer, ephemeral } = await JoseTokenIssuer.create(
+        const { issuer, isEphemeral } = await JoseTokenIssuer.create(
           {
             privateKeyPem: env.AUTH_JWT_PRIVATE_KEY,
             kid: env.AUTH_JWT_KID,
@@ -46,7 +46,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
           },
           clock,
         );
-        if (ephemeral) {
+        if (isEphemeral) {
           new Logger('AccessModule').warn(
             'Chưa đặt AUTH_JWT_PRIVATE_KEY: dùng khoá tạm, token mất hiệu lực khi core-api khởi động lại',
           );
@@ -72,7 +72,7 @@ export class AccessInfraModule {}
       inject: [TOKEN_ISSUER, ACCESS_SID_BLOCKLIST, CORE_ENV],
       useFactory: (tokens: TokenIssuer, blocklist: SidBlocklist, env: CoreEnv) => ({
         verifier: createAccessTokenVerifier({
-          keys: createLocalJWKSet(tokens.jwks()),
+          keys: createLocalJWKSet(tokens.getJwks()),
           issuer: env.AUTH_JWT_ISSUER,
           audience: env.AUTH_JWT_AUDIENCE,
         }),

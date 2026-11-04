@@ -47,7 +47,7 @@ Giới hạn: chỉ phát hiện dùng lại token **liền trước**. Token c�
 |---|---|
 | `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked` |
 | `sessions` | `id` là `sid`. `refresh_token_hash`, `previous_token_hash`, `rotated_at`, `expires_at`, thiết bị, IP |
-| `audit_log` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout` |
+| `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout` |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate access`. Không sửa migration đã merge.
 
@@ -82,7 +82,7 @@ Mỗi phần con (`auth/`, `staff/`) chia:
 ```
 <phần-con>/
 ├─ api/           # controller, DTO; không mở transaction
-├─ application/   # use case, transaction access, ghi audit_log
+├─ application/   # use case, transaction access, ghi audit_logs
 ├─ domain/        # quy tắc nghiệp vụ thuần, không import @nestjs/* hay drizzle-orm
 ├─ infra/         # repository Drizzle, Redis, argon2, jose; infra/memory/ cho test
 ├─ consumers/     # nghe sự kiện (chỉ chạy khi APP_ROLE là worker hoặc all)

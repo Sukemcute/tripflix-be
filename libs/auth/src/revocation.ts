@@ -10,17 +10,17 @@ export interface SidBlocklist {
 }
 
 /** Mọi service đọc cùng một khoá Redis, nên đặt định dạng ở đây. */
-export const revokedSidKey = (sid: string) => `auth:revoked-sid:${sid}`;
+export const buildRevokedSidKey = (sid: string) => `auth:revoked-sid:${sid}`;
 
 export class RedisSidBlocklist implements SidBlocklist {
   constructor(private readonly redis: Pick<Redis, 'set' | 'exists'>) {}
 
   async block(sid: string, ttlSeconds: number): Promise<void> {
-    await this.redis.set(revokedSidKey(sid), '1', 'EX', Math.max(1, Math.ceil(ttlSeconds)));
+    await this.redis.set(buildRevokedSidKey(sid), '1', 'EX', Math.max(1, Math.ceil(ttlSeconds)));
   }
 
   async isBlocked(sid: string): Promise<boolean> {
-    return (await this.redis.exists(revokedSidKey(sid))) === 1;
+    return (await this.redis.exists(buildRevokedSidKey(sid))) === 1;
   }
 }
 

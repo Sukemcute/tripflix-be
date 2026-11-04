@@ -10,11 +10,11 @@ import {
   RegisterDto,
   TokenPairDto,
   UserDto,
-  loginSchema,
-  refreshSchema,
-  registerSchema,
+  LoginRequestSchema,
+  RefreshRequestSchema,
+  RegisterRequestSchema,
 } from './dto.js';
-import { AccessErrorFilter, ZodBody, requestMeta } from './http.js';
+import { AccessErrorFilter, ZodBody, readRequestMeta } from './http.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -25,24 +25,24 @@ export class AuthController {
   @Post('register')
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({ type: UserDto })
-  register(@Body(new ZodBody(registerSchema)) body: z.infer<typeof registerSchema>, @Req() req: Request) {
-    return this.auth.register(body, requestMeta(req));
+  register(@Body(new ZodBody(RegisterRequestSchema)) body: z.infer<typeof RegisterRequestSchema>, @Req() req: Request) {
+    return this.auth.register(body, readRequestMeta(req));
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: TokenPairDto })
-  login(@Body(new ZodBody(loginSchema)) body: z.infer<typeof loginSchema>, @Req() req: Request) {
-    return this.auth.login(body, requestMeta(req));
+  login(@Body(new ZodBody(LoginRequestSchema)) body: z.infer<typeof LoginRequestSchema>, @Req() req: Request) {
+    return this.auth.login(body, readRequestMeta(req));
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: RefreshDto })
   @ApiOkResponse({ type: TokenPairDto })
-  refresh(@Body(new ZodBody(refreshSchema)) body: z.infer<typeof refreshSchema>, @Req() req: Request) {
-    return this.auth.refresh(body.refreshToken, requestMeta(req));
+  refresh(@Body(new ZodBody(RefreshRequestSchema)) body: z.infer<typeof RefreshRequestSchema>, @Req() req: Request) {
+    return this.auth.refresh(body.refreshToken, readRequestMeta(req));
   }
 
   @Post('logout')
@@ -50,14 +50,14 @@ export class AuthController {
   @Authenticated()
   @ApiBearerAuth()
   async logout(@CurrentUser() user: AuthUser, @Req() req: Request): Promise<void> {
-    await this.auth.logout(user, requestMeta(req));
+    await this.auth.logout(user, readRequestMeta(req));
   }
 
   @Get('me')
   @Authenticated()
   @ApiBearerAuth()
   @ApiOkResponse({ type: UserDto })
-  me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.userId);
+  getMe(@CurrentUser() user: AuthUser) {
+    return this.auth.getMe(user.userId);
   }
 }

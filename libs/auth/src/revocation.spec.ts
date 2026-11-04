@@ -1,4 +1,4 @@
-import { MemorySidBlocklist, RedisSidBlocklist, revokedSidKey } from './revocation.js';
+import { MemorySidBlocklist, RedisSidBlocklist, buildRevokedSidKey } from './revocation.js';
 
 describe('MemorySidBlocklist', () => {
   it('chặn sid tới khi hết thời hạn', async () => {
@@ -23,7 +23,7 @@ describe('RedisSidBlocklist', () => {
     };
     const list = new RedisSidBlocklist(redis as never);
     await list.block('s-1', 12.3);
-    expect(calls[0]).toEqual([revokedSidKey('s-1'), '1', 'EX', 13]);
+    expect(calls[0]).toEqual([buildRevokedSidKey('s-1'), '1', 'EX', 13]);
     expect(await list.isBlocked('s-1')).toBe(true);
   });
 });

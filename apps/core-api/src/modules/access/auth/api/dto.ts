@@ -5,19 +5,19 @@ import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
 // Trường lạ (như role) bị bỏ đi, nên không ai tự cấp quyền khi đăng ký.
-export const registerSchema = z.object({
+export const RegisterRequestSchema = z.object({
   email: z.email('Email không hợp lệ').max(254),
   password: z.string().min(PASSWORD_MIN, `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`).max(PASSWORD_MAX),
   displayName: z.string().trim().min(1, 'Tên hiển thị không được để trống').max(50),
 });
 
-export const loginSchema = z.object({
+export const LoginRequestSchema = z.object({
   email: z.string().min(1).max(254),
   password: z.string().min(1).max(PASSWORD_MAX),
   deviceName: z.string().trim().max(100).optional(),
 });
 
-export const refreshSchema = z.object({
+export const RefreshRequestSchema = z.object({
   refreshToken: z.string().min(1).max(200),
 });
 

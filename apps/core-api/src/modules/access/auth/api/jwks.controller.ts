@@ -12,7 +12,7 @@ export class JwksController {
   @Get('jwks.json')
   @Header('Cache-Control', 'public, max-age=300')
   @ApiOkResponse({ type: JwksDto })
-  jwks() {
-    return this.tokens.jwks();
+  getJwks() {
+    return this.tokens.getJwks();
   }
 }

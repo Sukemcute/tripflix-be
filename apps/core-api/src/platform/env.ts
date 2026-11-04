@@ -2,7 +2,7 @@ import { baseEnvSchema } from '@tripflix/config';
 import type { ModuleName } from '@tripflix/db';
 import { z } from 'zod';
 
-const optional = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
+const OptionalStringSchema = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
 
 export const coreEnvSchema = baseEnvSchema
   .extend({
@@ -15,8 +15,8 @@ export const coreEnvSchema = baseEnvSchema
     DATABASE_URL_ANALYTICS: z.string(),
     DATABASE_URL_COMMERCE: z.string(),
     // Khoá ký access token ES256, PEM PKCS8 (sinh bằng pnpm --filter @tripflix/core-api auth:keygen).
-    AUTH_JWT_PRIVATE_KEY: optional,
-    AUTH_JWT_KID: optional,
+    AUTH_JWT_PRIVATE_KEY: OptionalStringSchema,
+    AUTH_JWT_KID: OptionalStringSchema,
     AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
     AUTH_JWT_AUDIENCE: z.string().default('tripflix'),
   })

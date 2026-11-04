@@ -29,8 +29,8 @@ export class JoseTokenIssuer implements TokenIssuer {
     private readonly now: Clock,
   ) {}
 
-  /** ephemeral = true khi phải tự sinh khoá (chỉ cho phép ngoài production, env.ts đã kiểm). */
-  static async create(config: TokenIssuerConfig, now: Clock): Promise<{ issuer: JoseTokenIssuer; ephemeral: boolean }> {
+  /** isEphemeral = true khi phải tự sinh khoá (chỉ cho phép ngoài production, env.ts đã kiểm). */
+  static async create(config: TokenIssuerConfig, now: Clock): Promise<{ issuer: JoseTokenIssuer; isEphemeral: boolean }> {
     const pem = config.privateKeyPem?.replace(/\\n/g, '\n').trim();
     const privateKey = pem
       ? await importPKCS8(pem, ACCESS_TOKEN_ALG, { extractable: true })
@@ -39,7 +39,7 @@ export class JoseTokenIssuer implements TokenIssuer {
     const { d: _secret, ...publicPart } = await exportJWK(privateKey);
     const kid = config.kid || (await calculateJwkThumbprint(publicPart));
     const publicJwk: JWK = { ...publicPart, kid, alg: ACCESS_TOKEN_ALG, use: 'sig' };
-    return { issuer: new JoseTokenIssuer(privateKey, publicJwk, config, now), ephemeral: !pem };
+    return { issuer: new JoseTokenIssuer(privateKey, publicJwk, config, now), isEphemeral: !pem };
   }
 
   async issue({ userId, role, sid }: { userId: string; role: Role; sid: string }): Promise<IssuedAccessToken> {
@@ -55,7 +55,7 @@ export class JoseTokenIssuer implements TokenIssuer {
     return { token, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
   }
 
-  jwks(): { keys: JWK[] } {
+  getJwks(): { keys: JWK[] } {
     return { keys: [this.publicJwk] };
   }
 }

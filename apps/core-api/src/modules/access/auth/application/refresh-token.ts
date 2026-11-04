@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 /** Refresh token là chuỗi ngẫu nhiên 256 bit, không phải JWT. */
-export function newRefreshToken(): string {
+export function createRefreshToken(): string {
   return randomBytes(32).toString('base64url');
 }
 

@@ -54,7 +54,7 @@ class HealthController {
 export class MeController {
   @Get('me')
   @Authenticated()
-  me(@CurrentUser() user: AuthUser) {
+  getMe(@CurrentUser() user: AuthUser) {
     return { userId: user.userId, role: user.role };
   }
 }
