@@ -347,7 +347,7 @@ Lệnh: `uv sync`, `uv run fastapi dev app/main.py`, `uv run pytest`, `uv run py
 
 Chi tiết đầy đủ nằm trong **`RULES.md`** ở gốc mỗi repo (cùng một nội dung cho cả 3 repo). `CLAUDE.md` chỉ có một dòng `@RULES.md`, để Claude Code của mọi người tự đọc luật. `.claude/settings.json` tắt dòng co-author mà Claude tự thêm vào commit và PR. Bản gốc của bộ file này nằm ở `repo-rules/` trong thư mục tài liệu dự án.
 
-- Luồng: nhánh `<tên>/<TFxx>-<mô-tả>` (tạo từ `dev`) → PR vào `dev` (squash merge, 1 review, CI xanh) → test trên staging → PR release `dev` → `main` (merge commit, leader tuần duyệt). Hotfix: nhánh từ `main`, PR vào `main`, rồi PR `main` → `dev`.
+- Luồng: nhánh `<tên>/<TFxx>-<mô-tả>` (tạo từ `develop`) → PR vào `develop` (squash merge, 1 review, CI xanh) → test trên staging → PR release `develop` → `main` (merge commit, leader tuần duyệt). Hotfix: nhánh từ `main`, PR vào `main`, rồi PR `main` → `develop`.
 - `main` và `dev` đều được bảo vệ: không commit, push hay force push thẳng.
 - Commit theo Conventional Commits, scope là module, footer `Refs: TFxx`; không có Co-Authored-By của AI.
 - Xong task phải có evidence: file `docs/evidence/<TFxx>-<mô-tả>.md`, PR có link Notion, task Notion chuyển sang `Test` kèm link PR.
@@ -379,7 +379,7 @@ Cần GitHub username của từng người để điền file thật.
 
 ### 6.5. CI (GitHub Actions)
 
-| Repo | Khi mở PR | Khi merge vào `dev` (deploy staging); khi merge vào `main` (bản demo) |
+| Repo | Khi mở PR | Khi merge vào `develop` (deploy staging); khi merge vào `main` (bản demo) |
 |---|---|---|
 | BE | `turbo run lint typecheck test build --affected`; integration test có Testcontainers; kiểm `contracts/` | Build và đẩy image `core-api`, `notification-service`, `video-worker` lên GHCR; deploy staging |
 | FE | `turbo run lint typecheck test build --affected` | Build web, admin; mobile build APK bằng EAS khi gắn tag `mobile-v*` |
@@ -550,7 +550,7 @@ Mục tiêu ngày đầu là **walking skeleton**: một đường đi xuyên su
 
 | Bước | Việc | Người làm |
 |---|---|---|
-| 1 | Tạo GitHub org, 3 repo, nhánh `main` và `dev`, branch protection, CODEOWNERS; chép `RULES.md`, `CLAUDE.md`, `.claude/settings.json` từ `repo-rules/` vào cả 3 repo | Trang |
+| 1 | Tạo GitHub org, 3 repo, nhánh `main` và `develop`, branch protection, CODEOWNERS; chép `RULES.md`, `CLAUDE.md`, `.claude/settings.json` từ `repo-rules/` vào cả 3 repo | Trang |
 | 2 | BE: khung Turborepo, `libs/config`, `libs/db`, `libs/observability`, `core-api` có `/health`, CI. Docker: `deploy/compose.yaml`, script init Postgres, Dockerfile `core-api`, lệnh `pnpm stack:*` | Dũng |
 | 3 | BE: `access` đăng ký, đăng nhập, `/auth/me`, JWKS; `libs/outbox`, `libs/event-bus` | Dũng |
 | 4 | BE: generator `turbo gen module` tạo khung module; mỗi chủ module tạo module của mình, migration đầu tiên, 1 endpoint đọc | Từng chủ module |

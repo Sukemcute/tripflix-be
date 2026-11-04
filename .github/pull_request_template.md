@@ -1,4 +1,4 @@
-<!-- Tiêu đề: <type>(<scope>): <mô tả> (TFxx). PR vào dev từ nhánh <tên>/<TFxx>-<mô-tả>. Xem RULES.md mục 7. -->
+<!-- Tiêu đề: <type>(<scope>): <mô tả> (TFxx). PR vào develop từ nhánh <tên>/<TFxx>-<mô-tả>. Xem RULES.md mục 7. -->
 
 ## Task
 - Notion:

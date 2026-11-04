@@ -2,7 +2,7 @@ name: publish
 
 on:
   push:
-    branches: [dev, main]
+    branches: [develop, main]
     tags: ["v*", "core-api-v*", "notification-v*", "video-v*"]
 
 permissions:
