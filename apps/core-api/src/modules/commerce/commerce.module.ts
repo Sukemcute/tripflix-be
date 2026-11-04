@@ -4,6 +4,8 @@ import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
 import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
+import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
+import { HotelsController } from './inventory/api/hotels.controller.js';
 import { COMMERCE_STORE, TODAY, type Today } from './inventory/application/ports.js';
 import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
 import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
@@ -17,10 +19,12 @@ const todayInVietnam: Today = () => new Intl.DateTimeFormat('en-CA', { timeZone:
  * Database riêng commerce, user Postgres tf_commerce; test thay store bằng overrideProvider(COMMERCE_STORE).
  */
 @Module({
+  controllers: [HotelsController],
   providers: [
     { provide: COMMERCE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleCommerceStore(createDb(pools.commerce)) },
     { provide: TODAY, useValue: todayInVietnam },
     CatalogUseCases,
+    HotelDetailUseCases,
     CalendarUseCases,
     OpenCalendarJob,
     CommerceFacade,

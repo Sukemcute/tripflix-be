@@ -24,6 +24,7 @@ export class MemoryCommerceStore implements CommerceStore {
         .filter((p) => (!provinceSlug || p.provinceSlug === provinceSlug) && (!afterId || p.id > afterId))
         .sort((a, b) => a.id.localeCompare(b.id))
         .slice(0, limit),
+    findPropertyById: async (id) => this.properties.find((p) => p.id === id) ?? null,
     findRoomTypesByPropertyIds: async (ids) => this.roomTypes.filter((r) => ids.includes(r.propertyId)).sort((a, b) => a.defaultPrice - b.defaultPrice),
     findRoomTypesByIds: async (ids) => this.roomTypes.filter((r) => ids.includes(r.id)),
     listFlights: async ({ destinationSlug, afterKey, limit }) => {
