@@ -4,6 +4,10 @@ packages:
 
 # Mọi package dùng "catalog:" để cả repo chung một phiên bản.
 catalog:
+  '@aws-sdk/client-s3': ^3.1161.0
+  '@aws-sdk/s3-request-presigner': ^3.1161.0
+  '@nestjs-cls/transactional': ^4.0.2
+  '@nestjs-cls/transactional-adapter-drizzle-orm': ^2.0.2
   '@nestjs/cli': ^12.0.11
   '@nestjs/common': ^12.3.2
   '@nestjs/core': ^12.3.2
@@ -11,13 +15,18 @@ catalog:
   '@nestjs/schematics': ^12.0.12
   '@nestjs/swagger': ^12.1.0
   '@nestjs/testing': ^12.3.2
+  '@testcontainers/postgresql': ^12.2.1
+  '@testcontainers/redis': ^12.2.1
   '@types/express': ^5.0.6
   '@types/node': ^24.0.0
   '@types/pg': ^8.23.1
   '@types/supertest': ^7.2.1
+  argon2: ^0.45.2
   drizzle-kit: 1.0.0-rc.5
   drizzle-orm: 1.0.0-rc.5
   ioredis: ^6.0.0
+  jose: ^6.2.15
+  nestjs-cls: ^7.0.2
   nestjs-pino: ^5.3.1
   oxlint: ^1.91.0
   oxlint-tsgolint: ^7.0.2005
@@ -29,6 +38,7 @@ catalog:
   reflect-metadata: ^0.2.2
   rxjs: ^7.8.2
   supertest: ^7.3.1
+  testcontainers: ^12.2.1
   tsx: ^4.23.15
   turbo: ^2.11.10
   typescript: 6.0.3

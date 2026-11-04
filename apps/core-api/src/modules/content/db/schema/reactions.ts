@@ -5,7 +5,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { contentSchema } from './base.js';
+import { contentSchema } from './content-schema.js';
 import { posts } from './posts.js';
 
 export type ReactionType = 'like' | 'love' | 'helpful';

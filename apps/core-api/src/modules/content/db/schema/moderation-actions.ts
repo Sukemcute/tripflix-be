@@ -6,7 +6,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { contentSchema } from './base.js';
+import { contentSchema } from './content-schema.js';
 import { posts, type PostStatus } from './posts.js';
 
 export type ModerationActionType = 'hide' | 'remove' | 'restore';

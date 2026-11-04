@@ -1,6 +1,10 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
+  "globalDependencies": ["tsconfig.base.json"],
+  "futureFlags": {
+    "pruneIncludesGlobalFiles": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -19,6 +23,10 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "test:int": {
+      "dependsOn": ["^build"],
+      "cache": false
     },
     "export-openapi": {
       "dependsOn": ["build"],

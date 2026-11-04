@@ -8,7 +8,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { contentSchema } from './base.js';
+import { contentSchema } from './content-schema.js';
 
 export type PostType = 'video' | 'vlog';
 export type PostStatus = 'draft' | 'published' | 'hidden' | 'removed' | 'deleted';

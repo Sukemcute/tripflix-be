@@ -5,7 +5,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { contentSchema } from './base.js';
+import { contentSchema } from './content-schema.js';
 import { posts } from './posts.js';
 
 /**

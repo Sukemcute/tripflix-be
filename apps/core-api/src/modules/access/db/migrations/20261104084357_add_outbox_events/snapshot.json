@@ -1,0 +1,290 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a9a47a3c-07d9-4dfb-ba05-ace1c91eda90",
+  "prevIds": [
+    "4a211f1b-b177-4fe3-8ea6-266b9e5fec4d"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "outbox_events"
+      ],
+      "writes": [
+        "s|tbl|access.outbox_events",
+        "n|tbl|access.outbox_events",
+        "e|tbl|access.outbox_events",
+        "n|rel|access.outbox_events",
+        "n|type|access.outbox_events",
+        "n|rel|access.outbox_events_pkey"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "outbox_events",
+        "idx_outbox_events_unpublished"
+      ],
+      "writes": [
+        "s|idx|access.idx_outbox_events_unpublished",
+        "n|idx|access.idx_outbox_events_unpublished",
+        "e|idx|access.idx_outbox_events_unpublished",
+        "n|rel|access.idx_outbox_events_unpublished"
+      ],
+      "reads": [
+        "n|tbl|access.outbox_events",
+        "n|sch|access",
+        "n|col|access.outbox_events.occurred_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "name": "outbox_events",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "version",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "producer",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "payload",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "trace_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "published_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "attempts",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "locked_until",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "last_error",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "idx_outbox_events_unpublished",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"published_at\" is null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "outbox_events",
+        "name": "outbox_events_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}
