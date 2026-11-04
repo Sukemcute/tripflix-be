@@ -26,7 +26,24 @@ export class MemoryAccessStore implements AccessStore {
       return row;
     },
     listStaff: async () => [...this.userRows.values()].filter((u) => u.role !== 'member'),
+    search: async ({ query, limit, offset }: { query?: string | undefined; limit: number; offset: number }) => {
+      const q = query?.toLowerCase();
+      const matched = [...this.userRows.values()]
+        .filter((u) => !q || u.email.includes(q) || u.displayName.toLowerCase().includes(q))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return { items: matched.slice(offset, offset + limit), total: matched.length };
+    },
+    updateRole: async (id: string, role: UserRecord['role']) => this.patchUser(id, { role }),
+    updateStatus: async (id: string, status: UserRecord['status']) => this.patchUser(id, { status }),
   };
+
+  private patchUser(id: string, patch: Partial<UserRecord>): UserRecord | null {
+    const row = this.userRows.get(id);
+    if (!row) return null;
+    const next = { ...row, ...patch };
+    this.userRows.set(id, next);
+    return next;
+  }
 
   readonly sessions = {
     insert: async (session: NewSession) => {
@@ -43,6 +60,11 @@ export class MemoryAccessStore implements AccessStore {
       return true;
     },
     delete: async (id: string) => this.sessionRows.delete(id),
+    deleteByUser: async (userId: string) => {
+      const ids = [...this.sessionRows.values()].filter((s) => s.userId === userId).map((s) => s.id);
+      for (const id of ids) this.sessionRows.delete(id);
+      return ids;
+    },
   };
 
   readonly audit = {
