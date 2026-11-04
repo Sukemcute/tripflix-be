@@ -47,9 +47,18 @@ Giới hạn: chỉ phát hiện dùng lại token **liền trước**. Token c�
 |---|---|
 | `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked` |
 | `sessions` | `id` là `sid`. `refresh_token_hash`, `previous_token_hash`, `rotated_at`, `expires_at`, thiết bị, IP |
+| `outbox_events` | Sự kiện chờ gửi (`libs/outbox`) |
 | `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout` |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate access`. Không sửa migration đã merge.
+
+## Sự kiện phát ra
+
+Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `stream:core.access` khi `APP_ROLE` là `worker` hoặc `all` (`libs/outbox`).
+
+| Sự kiện | Khi nào | Payload (`libs/contracts`) |
+|---|---|---|
+| `access.user.registered` v1 | Đăng ký thành công | `AccessUserRegisteredV1Schema`: `{ userId, displayName }`, không có email |
 
 ## Biến môi trường
 
@@ -89,4 +98,4 @@ Mỗi phần con (`auth/`, `staff/`) chia:
 └─ jobs/          # job định kỳ (như trên)
 ```
 
-`@Transactional('access')` chưa có trong `libs/db`, nên use case đang gọi `AccessStore.transaction()` (bọc `db.transaction()` của Drizzle). Đổi sang decorator khi `libs/db` có.
+Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ gồm lệnh ghi database (người dùng, phiên, `audit_logs`, outbox). Băm argon2, Redis và ký token chạy ngoài transaction. Repository lấy executor qua `TransactionHost` (`DrizzleAccessStore(() => txHost.tx)`).

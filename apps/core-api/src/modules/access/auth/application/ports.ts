@@ -1,4 +1,5 @@
 import type { Role } from '@tripflix/contracts';
+import type { NewOutboxEvent } from '@tripflix/outbox';
 import type { JWK } from 'jose';
 import type { RefreshState } from '../domain/refresh-rotation.js';
 
@@ -71,12 +72,17 @@ export interface AuditLog {
   record(entry: AuditEntry): Promise<void>;
 }
 
-/** Truy cập dữ liệu của access; transaction() chạy fn trong một transaction database. */
+/** Ghi sự kiện vào access.outbox_events; gọi trong transaction để sự kiện chỉ đi khi thay đổi đã commit. */
+export interface AccessOutbox {
+  add(event: NewOutboxEvent): Promise<string>;
+}
+
+/** Truy cập dữ liệu của access. Transaction do @Transactional('access') ở use case mở, repository tự dùng. */
 export interface AccessStore {
   users: UserRepository;
   sessions: SessionRepository;
   audit: AuditLog;
-  transaction<T>(fn: (tx: Omit<AccessStore, 'transaction'>) => Promise<T>): Promise<T>;
+  outbox: AccessOutbox;
 }
 
 export interface PasswordHasher {

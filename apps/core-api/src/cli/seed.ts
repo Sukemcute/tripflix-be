@@ -24,7 +24,8 @@ const ACCOUNTS: { email: string; displayName: string; role: Role }[] = [
 
 const pool = createPool({ url: env.DATABASE_URL_ACCESS, max: 1, applicationName: 'seed:access' });
 try {
-  const store = new DrizzleAccessStore(createDb(pool));
+  const db = createDb(pool);
+  const store = new DrizzleAccessStore(() => db);
   const passwordHash = await new Argon2PasswordHasher().hash(env.SEED_PASSWORD);
   for (const account of ACCOUNTS) {
     const created = await store.users.insert({ ...account, passwordHash });

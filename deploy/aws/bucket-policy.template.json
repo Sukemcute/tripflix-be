@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFrontReadsVideosOnly",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::@BUCKET@/dev/*/videos/*",
+      "Condition": { "StringEquals": { "AWS:SourceArn": "@DISTRIBUTION_ARN@" } }
+    }
+  ]
+}

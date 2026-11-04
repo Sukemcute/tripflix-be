@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MemorySidBlocklist } from '@tripflix/auth';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
 import { InMemoryObjectStorage } from '@tripflix/storage';
+import { ClsModule } from 'nestjs-cls';
 import request from 'supertest';
 import type { CoreEnv } from '../../../platform/env.js';
 import { applyGlobalPrefix } from '../../../platform/http.js';
@@ -64,7 +66,15 @@ describe('media upload E2E', () => {
 
   beforeAll(async () => {
     mediaStore = new MemoryMediaAssetStore();
-    const moduleRef = await Test.createTestingModule({ imports: [FakePlatformModule, AccessModule, ContentModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        FakePlatformModule,
+        // @Transactional('access') của đăng ký cần CLS; store bộ nhớ nên không mở transaction database.
+        ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() }),
+        AccessModule,
+        ContentModule,
+      ],
+    })
       .overrideProvider(ACCESS_STORE)
       .useValue(new MemoryAccessStore())
       .overrideProvider(LOGIN_RATE_LIMITER)

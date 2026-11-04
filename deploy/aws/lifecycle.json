@@ -1,0 +1,84 @@
+{
+  "Rules": [
+    {
+      "ID": "abort-incomplete-multipart",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": ""
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    },
+    {
+      "ID": "expire-uploads-trang",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/trang/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-duy",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/duy/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-dung",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/dung/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-phong",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/phong/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-bao",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/bao/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-thang",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/thang/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    },
+    {
+      "ID": "expire-uploads-thanh",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "dev/thanh/uploads/"
+      },
+      "Expiration": {
+        "Days": 7
+      }
+    }
+  ]
+}
