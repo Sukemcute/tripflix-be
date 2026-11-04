@@ -158,6 +158,9 @@ importers:
       '@tripflix/observability':
         specifier: workspace:*
         version: link:../../libs/observability
+      '@tripflix/outbox':
+        specifier: workspace:*
+        version: link:../../libs/outbox
       argon2:
         specifier: 'catalog:'
         version: 0.45.2
@@ -530,6 +533,37 @@ importers:
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15))
+
+  libs/outbox:
+    dependencies:
+      '@tripflix/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@tripflix/db':
+        specifier: workspace:*
+        version: link:../db
+      '@tripflix/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.7)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.91.0(oxlint-tsgolint@7.0.2005)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
