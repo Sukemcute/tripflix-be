@@ -9,7 +9,7 @@
 | Phần | Trạng thái |
 |---|---|
 | `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05) |
-| `staff/`: API `/admin/*` cho nhân viên | Có `GET /admin/me`, `GET /admin/staff`. Cấp quyền, khoá tài khoản làm sau |
+| `staff/`: API `/admin/*` cho nhân viên | Có (TF054): tìm người dùng, cấp và thu hồi quyền kiểm duyệt viên, khoá và mở khoá tài khoản |
 | Đăng nhập Google, quên mật khẩu, token service-to-service | Chưa làm |
 
 ## API
@@ -24,6 +24,10 @@
 | `GET /.well-known/jwks.json` | Gateway, service khác | Khoá công khai ES256. Nằm ngoài `/api` |
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
+| `GET /api/admin/users?query=&page=` | `moderator`, `superadmin` | Tìm theo email, tên; 20 người mỗi trang. Moderator thấy email đã che (`kh***@example.com`) |
+| `POST /api/admin/staff` `{ userId }` | `superadmin` | Cấp `moderator` |
+| `DELETE /api/admin/staff/{userId}` | `superadmin` | Thu hồi về `member` |
+| `POST /api/admin/users/{userId}/lock`, `/unlock` | `superadmin` | Khoá: không đăng nhập được. Mở khoá: đăng nhập lại được |
 
 Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền bằng `@Roles(...)` của `@tripflix/auth` (xem `libs/auth/README.md`).
 
@@ -59,6 +63,8 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | Sự kiện | Khi nào | Payload (`libs/contracts`) |
 |---|---|---|
 | `access.user.registered` v1 | Đăng ký thành công | `AccessUserRegisteredV1Schema`: `{ userId, displayName }`, không có email |
+| `access.user.role_changed` v1 | Cấp hoặc thu hồi quyền | `{ userId, oldRole, newRole, changedBy }` |
+| `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 
 ## Biến môi trường
 
@@ -99,3 +105,10 @@ Mỗi phần con (`auth/`, `staff/`) chia:
 ```
 
 Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ gồm lệnh ghi database (người dùng, phiên, `audit_logs`, outbox). Băm argon2, Redis và ký token chạy ngoài transaction. Repository lấy executor qua `TransactionHost` (`DrizzleAccessStore(() => txHost.tx)`).
+
+## Quản lý nhân viên (TF054)
+
+- Quy tắc (`staff/domain/staff-policy.ts`): không tự đổi quyền hay khoá chính mình; không đổi quyền hay khoá superadmin (nên luôn còn superadmin tạo bằng seed); chỉ cấp quyền cho tài khoản đang hoạt động. Vi phạm: `409` kèm lý do.
+- Đổi quyền hoặc khoá thì xoá mọi phiên của người đó trong cùng transaction rồi chặn từng `sid` trong Redis: token cũ nhận `401` ngay ở request kế tiếp, đăng nhập lại sẽ có `role` mới.
+- Các lệnh này không cần `Idempotency-Key`: gửi lại cho cùng kết quả (đặt giá trị, không cộng dồn); gửi lại sau khi đã làm thì nhận `409` "đã là kiểm duyệt viên" hoặc "đã bị khoá".
+- `audit_logs`: `staff.role_granted`, `staff.role_revoked`, `user.locked`, `user.unlocked` (người làm ở `actor_user_id`, người bị đổi ở `meta.targetUserId`).

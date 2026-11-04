@@ -77,6 +77,34 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.sessions.findByTokenHash(hashRefreshToken('rotated'))).toBeNull();
   });
 
+  it('search tìm theo email hoặc tên, phân trang, thoát ký tự % trong từ khoá', async () => {
+    await store.users.insert({ email: 'search-a@example.com', passwordHash: 'x', displayName: 'Nguyễn An', role: 'member' });
+    await store.users.insert({ email: 'search-b@example.com', passwordHash: 'x', displayName: '100% Bình', role: 'member' });
+    expect((await store.users.search({ query: 'search-', limit: 1, offset: 0 })).total).toBe(2);
+    expect((await store.users.search({ query: 'search-', limit: 1, offset: 0 })).items).toHaveLength(1);
+    expect((await store.users.search({ query: 'NGUYỄN', limit: 10, offset: 0 })).items[0]?.email).toBe('search-a@example.com');
+    // "%" là chữ thường, không phải ký tự đại diện: chỉ khớp "100% Bình".
+    const percent = await store.users.search({ query: '%', limit: 10, offset: 0 });
+    expect(percent.items.map((u) => u.email)).toEqual(['search-b@example.com']);
+  });
+
+  it('updateRole, updateStatus đổi đúng dòng; deleteByUser xoá mọi phiên và trả sid', async () => {
+    const { session } = await createSession('staff@example.com');
+    const second = await store.sessions.insert({
+      userId: session.userId,
+      refreshTokenHash: hashRefreshToken('second'),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      deviceName: null,
+      userAgent: null,
+      ip: null,
+    });
+    expect((await store.users.updateRole(session.userId, 'moderator'))?.role).toBe('moderator');
+    expect((await store.users.updateStatus(session.userId, 'locked'))?.status).toBe('locked');
+    expect((await store.sessions.deleteByUser(session.userId)).sort()).toEqual([session.id, second.id].sort());
+    expect(await store.sessions.deleteByUser(session.userId)).toEqual([]);
+    expect(await store.users.updateRole('0c6a1d3e-7f0e-4c39-9a7f-111111111111', 'member')).toBeNull();
+  });
+
   it('email trùng thì insert trả null, không ném lỗi', async () => {
     await store.users.insert({ email: 'dup@example.com', passwordHash: 'x', displayName: 'A', role: 'member' });
     expect(
