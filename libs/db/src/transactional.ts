@@ -1,7 +1,9 @@
 import {
   ClsPluginTransactional,
   InjectTransactionHost as injectClsTransactionHost,
+  NoOpTransactionalAdapter,
   Transactional as clsTransactional,
+  getTransactionHostToken,
   type TransactionHost,
 } from '@nestjs-cls/transactional';
 import { TransactionalAdapterDrizzleOrm } from '@nestjs-cls/transactional-adapter-drizzle-orm';
@@ -41,3 +43,20 @@ export const Transactional = (module: ModuleName): MethodDecorator => clsTransac
 /** Tiêm TransactionHost của module vào repository: `@InjectTransactionHost('access') txHost: ModuleTransactionHost`. */
 export const InjectTransactionHost = (module: ModuleName): PropertyDecorator & ParameterDecorator =>
   injectClsTransactionHost(module);
+
+/** Token Nest của TransactionHost theo module, dùng trong `inject: [...]` của provider factory. */
+export const buildTransactionHostToken = (module: ModuleName) => getTransactionHostToken(module);
+
+/**
+ * Plugin transaction không làm gì, cho test dùng store bộ nhớ: @Transactional vẫn chạy được
+ * nhưng không mở transaction database nào.
+ */
+export function createNoOpTransactionalPlugins(): ClsPluginTransactional[] {
+  return MODULES.map(
+    (module) =>
+      new ClsPluginTransactional({
+        connectionName: module,
+        adapter: new NoOpTransactionalAdapter({ tx: {}, disableWarning: true }),
+      }),
+  );
+}
