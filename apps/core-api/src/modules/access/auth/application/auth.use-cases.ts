@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
+import type { AccessUserRegisteredV1 } from '@tripflix/contracts';
 import {
   EMAIL_TAKEN_MESSAGE,
   INVALID_CREDENTIALS_MESSAGE,
@@ -60,6 +61,8 @@ export class AuthUseCases {
       const created = await tx.users.insert({ email, passwordHash, displayName: input.displayName.trim(), role: 'member' });
       if (!created) return null;
       await tx.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta });
+      const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
+      await tx.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
       return created;
     });
     if (!user) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);

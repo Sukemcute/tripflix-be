@@ -1,8 +1,10 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
+import { addOutboxEvent, type NewOutboxEvent } from '@tripflix/outbox';
 import { and, asc, eq, ne, or } from 'drizzle-orm';
-import { auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
+import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
 import type {
+  AccessOutbox,
   AccessStore,
   AuditEntry,
   AuditLog,
@@ -104,11 +106,17 @@ class DrizzleAuditLog implements AuditLog {
   }
 }
 
+/** Tên nguồn phát ghi vào phong bì sự kiện của access. */
+export const ACCESS_EVENT_PRODUCER = 'core-api/access';
+
 function createRepositories(db: Db) {
   return {
     users: new DrizzleUserRepository(db),
     sessions: new DrizzleSessionRepository(db),
     audit: new DrizzleAuditLog(db),
+    outbox: {
+      add: (event: NewOutboxEvent) => addOutboxEvent(db, accessOutboxEvents, event, ACCESS_EVENT_PRODUCER),
+    } satisfies AccessOutbox,
   };
 }
 
@@ -117,6 +125,7 @@ export class DrizzleAccessStore implements AccessStore {
   readonly users: UserRepository;
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
+  readonly outbox: AccessOutbox;
 
   constructor(private readonly db: Db) {
     Object.assign(this, createRepositories(db));
