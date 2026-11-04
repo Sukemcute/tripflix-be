@@ -581,12 +581,18 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       '@types/supertest':
         specifier: 'catalog:'
         version: 7.2.1
       oxlint:
         specifier: 'catalog:'
         version: 1.91.0(oxlint-tsgolint@7.0.2005)
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
       reflect-metadata:
         specifier: 'catalog:'
         version: 0.2.2
