@@ -29,10 +29,16 @@ export class PostSummaryRepository {
       .onConflictDoUpdate({
         target: postSummaries.postId,
         set: {
+          status: data.status,
           summary: data.summary,
           keyTakeaways: data.keyTakeaways,
+          content: data.content,
+          safety: data.safety,
           inputHash: data.inputHash,
           commentCountAtSummary: data.commentCountAtSummary,
+          promptVersion: data.promptVersion,
+          modelName: data.modelName,
+          generatedAt: data.generatedAt,
           updatedAt: new Date(),
         },
       })

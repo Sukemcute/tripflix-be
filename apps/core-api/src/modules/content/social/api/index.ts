@@ -10,3 +10,5 @@ export * from './dto/comment.dto.js';
 export * from './dto/reaction.dto.js';
 export * from './dto/bookmark.dto.js';
 export * from './dto/moderation.dto.js';
+export * from './dto/post-summary.dto.js';
+export * from './http.js';

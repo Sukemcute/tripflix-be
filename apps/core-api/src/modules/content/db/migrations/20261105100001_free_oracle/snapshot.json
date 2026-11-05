@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "e82652b1-8129-4059-8ea6-524d9c78255a",
+  "id": "c061464b-302d-4aab-8b0d-07adc2feed97",
   "prevIds": [
     "fa2d3155-cd75-48b0-b813-8b59d48990ad"
   ],
@@ -34,10 +34,10 @@
         "post_summaries"
       ],
       "writes": [
-        "s|fk|content.post_summaries.post_summaries_post_id_posts_id_fkey",
-        "n|fk|content.post_summaries.post_summaries_post_id_posts_id_fkey",
-        "e|fk|content.post_summaries.post_summaries_post_id_posts_id_fkey",
-        "n|con|content.post_summaries.post_summaries_post_id_posts_id_fkey"
+        "s|fk|content.post_summaries.fk_post_summaries_post_id",
+        "n|fk|content.post_summaries.fk_post_summaries_post_id",
+        "e|fk|content.post_summaries.fk_post_summaries_post_id",
+        "n|con|content.post_summaries.fk_post_summaries_post_id"
       ],
       "reads": [
         "n|tbl|content.post_summaries",
@@ -81,10 +81,26 @@
       "row": {
         "schema": "content",
         "table": "post_summaries",
+        "name": "status",
+        "type": "varchar(32)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'ready'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
         "name": "summary",
         "type": "text",
         "typeSchema": null,
-        "notNull": true,
+        "notNull": false,
         "dimensions": 0,
         "default": null,
         "generated": null,
@@ -103,6 +119,38 @@
         "notNull": true,
         "dimensions": 0,
         "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "content",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "safety",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
         "generated": null,
         "identity": null,
         "entityType": "columns"
@@ -145,6 +193,54 @@
       "row": {
         "schema": "content",
         "table": "post_summaries",
+        "name": "prompt_version",
+        "type": "varchar(32)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "model_name",
+        "type": "varchar(64)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "generated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
         "name": "created_at",
         "type": "timestamp with time zone",
         "typeSchema": null,
@@ -177,8 +273,8 @@
       "row": {
         "schema": "content",
         "table": "post_summaries",
-        "name": "post_summaries_post_id_posts_id_fkey",
-        "nameExplicit": false,
+        "name": "fk_post_summaries_post_id",
+        "nameExplicit": true,
         "columns": [
           "post_id"
         ],

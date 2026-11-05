@@ -18,16 +18,38 @@
   - Khi `flat=false` (mặc định): `total` đếm chính xác số lượng bình luận gốc (`parentCommentId IS NULL`) hoặc số phản hồi con của `parentCommentId` tương ứng.
 - **Bảng lưu trữ kết quả tóm tắt `content.post_summaries`**:
   - Tạo schema Drizzle `postSummaries` trong schema `content`:
-    - `post_id` (UUID, PK, FK -> `content.posts(id)` ON DELETE CASCADE)
-    - `summary` (text, NOT NULL)
+    - `post_id` (UUID, PK, FK `fk_post_summaries_post_id` -> `content.posts(id)` ON DELETE CASCADE)
+    - `status` (varchar(32), NOT NULL, mặc định `'ready'`, hỗ trợ `'no_comments'`, `'insufficient_data'`, `'ready'`, `'failed'`)
+    - `summary` (text, cho phép null khi chưa đủ dữ liệu)
     - `key_takeaways` (jsonb, NOT NULL, mảng các ý nổi bật)
+    - `content` (jsonb, chứa phân tích khen/chê/video và thực tế/chủ đề kèm trích dẫn)
+    - `safety` (jsonb, chứa cảnh báo an toàn và khối kiểm duyệt)
     - `input_hash` (varchar(128), bản băm tập bình luận)
     - `comment_count_at_summary` (integer, số bình luận lúc tóm tắt)
+    - `prompt_version` (varchar(64))
+    - `model_name` (varchar(64))
+    - `generated_at` (timestamp with timezone)
     - `created_at`, `updated_at` (timestamp with timezone)
-  - Sinh và chạy migration Drizzle `20261105100001_rare_songbird`.
-- **API lưu và đọc kết quả AI Summary**:
-  - `PUT /api/v1/posts/:postId/ai-summary`: Endpoint nội bộ được bảo vệ bởi `@ServiceOnly('ai-service')` cho phép AI service dùng Service Token lưu/cập nhật kết quả tóm tắt.
-  - `GET /api/v1/posts/:postId/ai-summary`: Endpoint công khai cho Web OTA và Mobile đọc trực tiếp kết quả tóm tắt đã lưu trong database mà không cần gọi LLM lúc người dùng mở xem bài. Phục vụ AI worker tra cứu `inputHash` và `updatedAt` trước khi gọi LLM.
+  - Sinh và chạy migration Drizzle `20261105100001_free_oracle` theo thứ tự thời gian chuẩn.
+- **API lưu và đọc kết quả AI Summary & Bảo mật Service Token**:
+  - `PUT /api/v1/posts/:postId/ai-summary`:
+    - Bảo vệ bởi `@ServiceOnly('ai-service')` và xác thực Service Token audience `core-api`.
+    - Dùng `ZodBody(SavePostSummaryRequestSchema)` để validate nghiêm ngặt payload, chặn dữ liệu sai cấu trúc trả 400 Bad Request (tránh văng lỗi 500 khi không có global ValidationPipe).
+    - Dùng `ParseUUIDPipe` kiểm tra `postId` hợp lệ ngay tại tầng routing.
+    - Chuẩn hóa toàn bộ schema DTO sang `camelCase` (`keyTakeaways`, `inputHash`, `commentCount`, `promptVersion`, `modelName`, `generatedAt`), đồng thời giữ fallback tương thích với `snake_case`.
+  - `GET /api/v1/posts/:postId/ai-summary`:
+    - Endpoint công khai cho Web OTA và Mobile đọc trực tiếp kết quả tóm tắt đã lưu trong database mà không cần gọi LLM lúc người dùng mở xem bài.
+    - Dùng `ParseUUIDPipe` cho param `postId`.
+    - Trả về đầy đủ trạng thái, `inputHash` và thời gian sinh để AI worker tra cứu bỏ qua khi không đổi.
+- **Kiểm thử E2E tích hợp Service Token (`post-summary.e2e.spec.ts`)**:
+  - Bộ 7 tests E2E toàn diện:
+    - `ai-service` với token hợp lệ: 200 OK và lưu tóm tắt thành công.
+    - Chặn dữ liệu body sai kiểu bằng `ZodBody`: 400 Bad Request kèm chi tiết lỗi (không 500).
+    - Chặn `postId` sai định dạng UUID bằng `ParseUUIDPipe`: 400 Bad Request.
+    - Token người dùng (member) bị từ chối ở API `@ServiceOnly`: 401 Unauthorized.
+    - Service khác (`video-worker`) gọi API chỉ dành cho `ai-service`: 403 Forbidden.
+    - Không gửi token: 401 Unauthorized.
+    - GET bài viết chưa có tóm tắt: 404 Not Found.
 - **Phát sự kiện Outbox cho vòng đời bình luận (phục vụ AI Worker gom tóm tắt)**:
   - `AddCommentUseCase`: Ghi outbox `content.comment.created` (đã có từ trước).
   - `EditCommentUseCase`: Bọc `@Transactional('content')`, ghi outbox `content.comment.updated` với payload `{ commentId, postId, authorId, parentCommentId, body, updatedAt }`.
@@ -51,11 +73,13 @@
 | Chặn độ dài bình luận tối đa 10.000 ký tự | Đạt | `apps/core-api/src/modules/content/social/domain/comment.entity.ts`, test pass |
 | Chế độ phẳng `flat=true` và limit 200 cho AI | Đạt | `apps/core-api/src/modules/content/social/application/use-cases/list-comments.use-case.ts`, `comment.repository.ts` |
 | Chuẩn hóa `total` khớp với chế độ phân trang | Đạt | `CommentRepository.countByPostId`, test pass |
-| Bảng `content.post_summaries` và migration | Đạt | `apps/core-api/src/modules/content/db/schema/post-summaries.ts`, migration `20261105100001_rare_songbird` |
-| Endpoint `PUT /posts/:id/ai-summary` với `@ServiceOnly('ai-service')` và `GET` | Đạt | `apps/core-api/src/modules/content/social/api/post-summary.controller.ts` |
+| Bảng `content.post_summaries` với FK `fk_post_summaries_post_id` và migration chuẩn | Đạt | `apps/core-api/src/modules/content/db/schema/post-summaries.ts`, migration `20261105100001_free_oracle` |
+| Endpoint `PUT /posts/:id/ai-summary` với `@ServiceOnly('ai-service')`, `ZodBody`, `ParseUUIDPipe` | Đạt | `apps/core-api/src/modules/content/social/api/post-summary.controller.ts` |
+| DTO camelCase chuẩn hóa và mở rộng cho AI Service | Đạt | `apps/core-api/src/modules/content/social/api/dto/post-summary.dto.ts` |
+| Bộ E2E kiểm thử Service Token thật | Đạt | `apps/core-api/src/modules/content/social/api/post-summary.e2e.spec.ts` (7/7 tests pass) |
 | Outbox events `comment.updated` & `comment.deleted` | Đạt | `EditCommentUseCase`, `DeleteCommentUseCase`, tests pass |
 | JSON Schemas cho comment events | Đạt | `contracts/events/content.comment.*.v1.schema.json`, `libs/contracts` |
-| Chất lượng mã nguồn (Quality Gate) | Đạt | `node tools/check-boundaries.mjs` (0 vi phạm), `pnpm lint` (0 errors), `pnpm typecheck` (pass 100%), `pnpm test` (40 suites, 305/305 tests pass) |
+| Chất lượng mã nguồn (Quality Gate) | Đạt | `node tools/check-boundaries.mjs` (0 vi phạm), `pnpm lint` (0 errors), `pnpm typecheck` (pass 100%), `pnpm test` (48 suites, 352/352 tests pass in core-api) |
 
 ## Kết quả kiểm tra
 - `node tools/check-boundaries.mjs`: Ranh giới module: không có vi phạm.

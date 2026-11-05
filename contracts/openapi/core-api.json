@@ -1672,6 +1672,12 @@
           "200": {
             "description": "Đã lưu tóm tắt thành công"
           },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ hoặc postId sai định dạng UUID"
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
           "403": {
             "description": "Từ chối: Token không có quyền ai-service"
           },
@@ -1705,6 +1711,9 @@
         "responses": {
           "200": {
             "description": "Thông tin tóm tắt bài viết"
+          },
+          "400": {
+            "description": "postId sai định dạng UUID"
           },
           "404": {
             "description": "Bài viết chưa có bản tóm tắt"
@@ -4292,12 +4301,23 @@
       "SavePostSummaryDto": {
         "type": "object",
         "properties": {
-          "summary": {
+          "status": {
             "type": "string",
-            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...",
-            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI"
+            "enum": [
+              "no_comments",
+              "insufficient_data",
+              "ready",
+              "failed"
+            ],
+            "default": "ready",
+            "description": "Trạng thái tóm tắt bài viết"
           },
-          "key_takeaways": {
+          "summary": {
+            "type": "object",
+            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...",
+            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI (bắt buộc khi status là ready)"
+          },
+          "keyTakeaways": {
             "example": [
               "Nên đi thuyền Tràng An lúc 7h sáng",
               "Emeralda Resort có dịch vụ chu đáo"
@@ -4308,20 +4328,40 @@
               "type": "string"
             }
           },
-          "input_hash": {
-            "type": "string",
+          "inputHash": {
+            "type": "object",
             "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "description": "Bản băm hash của tập bình luận đã dùng để tóm tắt"
           },
-          "comment_count": {
+          "commentCount": {
             "type": "number",
             "example": 25,
             "description": "Số lượng bình luận tại thời điểm thực hiện tóm tắt"
+          },
+          "content": {
+            "type": "object",
+            "description": "Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế, trích dẫn commentId"
+          },
+          "safety": {
+            "type": "object",
+            "description": "Cờ và đánh giá an toàn: rủi ro, tin đồn, yêu cầu kiểm duyệt"
+          },
+          "promptVersion": {
+            "type": "object",
+            "example": "v1.0",
+            "description": "Phiên bản prompt"
+          },
+          "modelName": {
+            "type": "object",
+            "example": "gemini-1.5-flash",
+            "description": "Tên mô hình LLM"
+          },
+          "generatedAt": {
+            "type": "object",
+            "example": "2026-11-05T14:00:00Z",
+            "description": "Thời điểm sinh kết quả"
           }
-        },
-        "required": [
-          "summary"
-        ]
+        }
       },
       "CreateUploadDto": {
         "type": "object",
