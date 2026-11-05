@@ -215,16 +215,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository],
-      useFactory: (commentRepo: CommentRepository) => new EditCommentUseCase(commentRepo),
+      inject: [CommentRepository, CONTENT_OUTBOX],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox) =>
+        new EditCommentUseCase(commentRepo, outbox),
     },
     {
       provide: DeleteCommentUseCase,
-      inject: [CommentRepository, PostRepository],
+      inject: [CommentRepository, PostRepository, CONTENT_OUTBOX],
       useFactory: (
         commentRepo: CommentRepository,
         postRepo: PostRepository,
-      ) => new DeleteCommentUseCase(commentRepo, postRepo),
+        outbox: ContentOutbox,
+      ) => new DeleteCommentUseCase(commentRepo, postRepo, outbox),
     },
     {
       provide: ListCommentsUseCase,

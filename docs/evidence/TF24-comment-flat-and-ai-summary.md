@@ -27,10 +27,23 @@
   - Sinh và chạy migration Drizzle `20261105100001_rare_songbird`.
 - **API lưu và đọc kết quả AI Summary**:
   - `PUT /api/v1/posts/:postId/ai-summary`: Endpoint nội bộ được bảo vệ bởi `@ServiceOnly('ai-service')` cho phép AI service dùng Service Token lưu/cập nhật kết quả tóm tắt.
-  - `GET /api/v1/posts/:postId/ai-summary`: Endpoint công khai cho Web OTA và Mobile đọc trực tiếp kết quả tóm tắt đã lưu trong database mà không cần gọi LLM lúc người dùng mở xem bài.
+  - `GET /api/v1/posts/:postId/ai-summary`: Endpoint công khai cho Web OTA và Mobile đọc trực tiếp kết quả tóm tắt đã lưu trong database mà không cần gọi LLM lúc người dùng mở xem bài. Phục vụ AI worker tra cứu `inputHash` và `updatedAt` trước khi gọi LLM.
+- **Phát sự kiện Outbox cho vòng đời bình luận (phục vụ AI Worker gom tóm tắt)**:
+  - `AddCommentUseCase`: Ghi outbox `content.comment.created` (đã có từ trước).
+  - `EditCommentUseCase`: Bọc `@Transactional('content')`, ghi outbox `content.comment.updated` với payload `{ commentId, postId, authorId, parentCommentId, body, updatedAt }`.
+  - `DeleteCommentUseCase`: Bọc `@Transactional('content')`, ghi outbox `content.comment.deleted` với payload `{ commentId, postId, authorId, parentCommentId, deletedBy, isSuperAdmin, deletedAt }`.
+  - `ContentOutboxRelay`: Tự động định tuyến các sự kiện có tiền tố `content.*` vào `stream:core.content` (STREAMS.content).
+- **Hợp đồng Event Schemas (`contracts/events/*.schema.json`)**:
+  - Khai báo Zod schemas và xuất ra JSON Schema:
+    - `contracts/events/content.comment.created.v1.schema.json`
+    - `contracts/events/content.comment.updated.v1.schema.json`
+    - `contracts/events/content.comment.deleted.v1.schema.json`
+  - Đảm bảo AI worker của Bảo có thể validate dữ liệu trực tiếp khi consume Redis Streams.
 - **Kiểm thử tự động**:
   - Thêm 10 tests trong `comment.entity.spec.ts` kiểm tra validate độ dài, rỗng, 1-level reply, cập nhật và xóa.
   - Thêm 11 tests trong `post-summary-and-flat-comments.spec.ts` kiểm tra use cases `AddCommentUseCase` (chặn > 10.000 ký tự), `ListCommentsUseCase` (flat mode, max limit 200, total), `SavePostSummaryUseCase`, `GetPostSummaryUseCase`, và `PostSummaryController`.
+  - Bổ sung test kiểm tra `EditCommentUseCase` phát `content.comment.updated` và `DeleteCommentUseCase` phát `content.comment.deleted` trong `social-use-cases.spec.ts`.
+  - Bổ sung kiểm tra định tuyến stream cho `content.comment.updated` và `content.comment.deleted` trong `content-outbox-relay.spec.ts`.
 
 ## Đối chiếu "Xong khi"
 | Tiêu chí | Đạt | Bằng chứng |
@@ -40,15 +53,17 @@
 | Chuẩn hóa `total` khớp với chế độ phân trang | Đạt | `CommentRepository.countByPostId`, test pass |
 | Bảng `content.post_summaries` và migration | Đạt | `apps/core-api/src/modules/content/db/schema/post-summaries.ts`, migration `20261105100001_rare_songbird` |
 | Endpoint `PUT /posts/:id/ai-summary` với `@ServiceOnly('ai-service')` và `GET` | Đạt | `apps/core-api/src/modules/content/social/api/post-summary.controller.ts` |
-| Chất lượng mã nguồn (Quality Gate) | Đạt | `node tools/check-boundaries.mjs` (0 vi phạm), `pnpm lint` (0 errors), `pnpm typecheck` (pass 100%), `pnpm test` (40 suites, 304/304 tests pass) |
+| Outbox events `comment.updated` & `comment.deleted` | Đạt | `EditCommentUseCase`, `DeleteCommentUseCase`, tests pass |
+| JSON Schemas cho comment events | Đạt | `contracts/events/content.comment.*.v1.schema.json`, `libs/contracts` |
+| Chất lượng mã nguồn (Quality Gate) | Đạt | `node tools/check-boundaries.mjs` (0 vi phạm), `pnpm lint` (0 errors), `pnpm typecheck` (pass 100%), `pnpm test` (40 suites, 305/305 tests pass) |
 
 ## Kết quả kiểm tra
 - `node tools/check-boundaries.mjs`: Ranh giới module: không có vi phạm.
 - `pnpm lint`: 22 tasks successful, 0 errors.
 - `pnpm typecheck`: 22 tasks successful (Pass 100%).
-- `pnpm --filter @tripflix/core-api test -- post-summary-and-flat-comments.spec.ts comment.entity.spec.ts`: 21/21 tests pass.
-- `pnpm test`: 40 test files pass, 304/304 tests pass.
-- `pnpm contracts:build`: Đã ghi `contracts/openapi/core-api.json`.
+- `pnpm --filter @tripflix/core-api test -- post-summary-and-flat-comments.spec.ts comment.entity.spec.ts social-use-cases.spec.ts`: All tests pass.
+- `pnpm test`: 40 test files pass, 305/305 tests pass in core-api, toàn bộ mono-repo pass.
+- `pnpm contracts:build`: Đã ghi `contracts/openapi/core-api.json` và 13 JSON Schemas.
 
 ## Cách kiểm lại
 1. `cd tripflix-be`

@@ -33,6 +33,8 @@ describe('ContentOutboxRelay', () => {
     expect(streamFn({ type: 'content.post.published' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.post.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.comment.created' } as any)).toBe(STREAMS.content);
+    expect(streamFn({ type: 'content.comment.updated' } as any)).toBe(STREAMS.content);
+    expect(streamFn({ type: 'content.comment.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.reaction.updated' } as any)).toBe(STREAMS.content);
 
     await relay.onApplicationShutdown();
