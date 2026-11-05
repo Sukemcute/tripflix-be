@@ -5,6 +5,9 @@ import { createDb, createPool } from '@tripflix/db';
 import { z } from 'zod';
 import { Argon2PasswordHasher } from '../modules/access/auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from '../modules/access/auth/infra/drizzle-access.store.js';
+import { seedCatalog } from '../modules/commerce/db/seed/seed-catalog.js';
+import { CalendarUseCases } from '../modules/commerce/inventory/application/calendar.use-cases.js';
+import { DrizzleCommerceStore } from '../modules/commerce/inventory/infra/drizzle-commerce.store.js';
 import { coreEnvSchema } from '../platform/env.js';
 
 // pnpm db:seed: tạo tài khoản mẫu cho 3 vai trò. Chạy lại nhiều lần không tạo trùng. Không chạy ở production.
@@ -33,4 +36,19 @@ try {
   }
 } finally {
   await pool.end();
+}
+
+// Commerce: danh mục khách sạn, chuyến bay giả lập rồi mở lịch trống 180 ngày tới. Chạy lại không tạo trùng.
+const commercePool = createPool({ url: env.DATABASE_URL_COMMERCE, max: 1, applicationName: 'seed:commerce' });
+try {
+  const commerceDb = createDb(commercePool);
+  const catalog = await seedCatalog(commerceDb);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  const opened = await new CalendarUseCases(new DrizzleCommerceStore({ tx: commerceDb }), () => today).openCalendarWindow();
+  process.stdout.write(
+    `commerce: ${catalog.hotels} khách sạn, ${catalog.roomTypes} loại phòng, ${catalog.flights} hạng ghế; ` +
+      `mở thêm ${opened.roomDays} ngày phòng, ${opened.flightDays} ngày bay\n`,
+  );
+} finally {
+  await commercePool.end();
 }
