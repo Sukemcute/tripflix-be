@@ -9,10 +9,14 @@ import request from 'supertest';
 import type { CoreEnv } from '../../../platform/env.js';
 import { applyGlobalPrefix } from '../../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../../platform/tokens.js';
-import { AccessModule } from '../../access/access.module.js';
-import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER } from '../../access/auth/application/ports.js';
-import { MemoryAccessStore } from '../../access/auth/infra/memory/memory-access.store.js';
-import { MemoryLoginRateLimiter } from '../../access/auth/infra/memory/memory-login-rate-limiter.js';
+import {
+  AccessModule,
+  ACCESS_SID_BLOCKLIST,
+  ACCESS_STORE,
+  LOGIN_RATE_LIMITER,
+  MemoryAccessStore,
+  MemoryLoginRateLimiter,
+} from '../../access/index.js';
 import { ContentModule } from '../content.module.js';
 import { MEDIA_ASSET_STORE, MEDIA_CLOCK, OBJECT_STORAGE } from './application/ports.js';
 import { MAX_FILE_SIZE_BYTES, PART_SIZE_BYTES } from './domain/upload-rules.js';

@@ -1,2 +1,7 @@
 export { contentSchema } from './content-schema.js';
 export * from './media.js';
+export * from './posts.js';
+export * from './comments.js';
+export * from './reactions.js';
+export * from './bookmarks.js';
+export * from './moderation-actions.js';
