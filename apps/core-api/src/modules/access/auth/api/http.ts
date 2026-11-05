@@ -42,6 +42,14 @@ export class AccessErrorFilter implements ExceptionFilter {
       case 'not_found':
         http = new NotFoundException(err.message);
         break;
+      case 'staff_rule':
+        // Quy tắc quản lý nhân viên chặn thao tác (tự khoá mình, hạ quyền superadmin...).
+        http = new ConflictException(err.message);
+        break;
+      case 'wrong_password':
+        // 400, không phải 401: client hiểu 401 là token hết hạn rồi tự làm mới hoặc đăng xuất.
+        http = new BadRequestException(err.message);
+        break;
       case 'too_many_attempts':
         if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
         http = new HttpException(

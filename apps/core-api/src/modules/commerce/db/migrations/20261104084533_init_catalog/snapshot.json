@@ -1,0 +1,1366 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "534492be-011c-4322-9130-3a8e8b94adf1",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "commerce"
+      ],
+      "writes": [
+        "s|sch|commerce",
+        "n|sch|commerce",
+        "e|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "flight_inventory"
+      ],
+      "writes": [
+        "s|tbl|commerce.flight_inventory",
+        "n|tbl|commerce.flight_inventory",
+        "e|tbl|commerce.flight_inventory",
+        "n|rel|commerce.flight_inventory",
+        "n|type|commerce.flight_inventory",
+        "n|rel|commerce.pk_flight_inventory"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "flights"
+      ],
+      "writes": [
+        "s|tbl|commerce.flights",
+        "n|tbl|commerce.flights",
+        "e|tbl|commerce.flights",
+        "n|rel|commerce.flights",
+        "n|type|commerce.flights",
+        "n|rel|commerce.flights_pkey"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "properties"
+      ],
+      "writes": [
+        "s|tbl|commerce.properties",
+        "n|tbl|commerce.properties",
+        "e|tbl|commerce.properties",
+        "n|rel|commerce.properties",
+        "n|type|commerce.properties",
+        "n|rel|commerce.properties_pkey"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_inventory"
+      ],
+      "writes": [
+        "s|tbl|commerce.room_inventory",
+        "n|tbl|commerce.room_inventory",
+        "e|tbl|commerce.room_inventory",
+        "n|rel|commerce.room_inventory",
+        "n|type|commerce.room_inventory",
+        "n|rel|commerce.pk_room_inventory"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_rates"
+      ],
+      "writes": [
+        "s|tbl|commerce.room_rates",
+        "n|tbl|commerce.room_rates",
+        "e|tbl|commerce.room_rates",
+        "n|rel|commerce.room_rates",
+        "n|type|commerce.room_rates",
+        "n|rel|commerce.pk_room_rates"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_types"
+      ],
+      "writes": [
+        "s|tbl|commerce.room_types",
+        "n|tbl|commerce.room_types",
+        "e|tbl|commerce.room_types",
+        "n|rel|commerce.room_types",
+        "n|type|commerce.room_types",
+        "n|rel|commerce.room_types_pkey"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "flights",
+        "idx_flights_route"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_flights_route",
+        "n|idx|commerce.idx_flights_route",
+        "e|idx|commerce.idx_flights_route",
+        "n|rel|commerce.idx_flights_route"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce",
+        "n|col|commerce.flights.from_airport",
+        "n|col|commerce.flights.to_airport"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "flights",
+        "idx_flights_flight_key"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_flights_flight_key",
+        "n|idx|commerce.idx_flights_flight_key",
+        "e|idx|commerce.idx_flights_flight_key",
+        "n|rel|commerce.idx_flights_flight_key"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce",
+        "n|col|commerce.flights.flight_key"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "properties",
+        "idx_properties_province_slug"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_properties_province_slug",
+        "n|idx|commerce.idx_properties_province_slug",
+        "e|idx|commerce.idx_properties_province_slug",
+        "n|rel|commerce.idx_properties_province_slug"
+      ],
+      "reads": [
+        "n|tbl|commerce.properties",
+        "n|sch|commerce",
+        "n|col|commerce.properties.province_slug"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "room_types",
+        "idx_room_types_property_id"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_room_types_property_id",
+        "n|idx|commerce.idx_room_types_property_id",
+        "e|idx|commerce.idx_room_types_property_id",
+        "n|rel|commerce.idx_room_types_property_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_types",
+        "n|sch|commerce",
+        "n|col|commerce.room_types.property_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "flight_inventory"
+      ],
+      "writes": [
+        "s|fk|commerce.flight_inventory.fk_flight_inventory_flight_id",
+        "n|fk|commerce.flight_inventory.fk_flight_inventory_flight_id",
+        "e|fk|commerce.flight_inventory.fk_flight_inventory_flight_id",
+        "n|con|commerce.flight_inventory.fk_flight_inventory_flight_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.flight_inventory",
+        "n|sch|commerce",
+        "n|tbl|commerce.flights",
+        "n|sch|commerce",
+        "n|col|commerce.flight_inventory.flight_id",
+        "n|col|commerce.flights.id",
+        "e|uniqueness|commerce.flights.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_inventory"
+      ],
+      "writes": [
+        "s|fk|commerce.room_inventory.fk_room_inventory_room_type_id",
+        "n|fk|commerce.room_inventory.fk_room_inventory_room_type_id",
+        "e|fk|commerce.room_inventory.fk_room_inventory_room_type_id",
+        "n|con|commerce.room_inventory.fk_room_inventory_room_type_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_inventory",
+        "n|sch|commerce",
+        "n|tbl|commerce.room_types",
+        "n|sch|commerce",
+        "n|col|commerce.room_inventory.room_type_id",
+        "n|col|commerce.room_types.id",
+        "e|uniqueness|commerce.room_types.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_rates"
+      ],
+      "writes": [
+        "s|fk|commerce.room_rates.fk_room_rates_room_type_id",
+        "n|fk|commerce.room_rates.fk_room_rates_room_type_id",
+        "e|fk|commerce.room_rates.fk_room_rates_room_type_id",
+        "n|con|commerce.room_rates.fk_room_rates_room_type_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_rates",
+        "n|sch|commerce",
+        "n|tbl|commerce.room_types",
+        "n|sch|commerce",
+        "n|col|commerce.room_rates.room_type_id",
+        "n|col|commerce.room_types.id",
+        "e|uniqueness|commerce.room_types.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "room_types"
+      ],
+      "writes": [
+        "s|fk|commerce.room_types.fk_room_types_property_id",
+        "n|fk|commerce.room_types.fk_room_types_property_id",
+        "e|fk|commerce.room_types.fk_room_types_property_id",
+        "n|con|commerce.room_types.fk_room_types_property_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_types",
+        "n|sch|commerce",
+        "n|tbl|commerce.properties",
+        "n|sch|commerce",
+        "n|col|commerce.room_types.property_id",
+        "n|col|commerce.properties.id",
+        "e|uniqueness|commerce.properties.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "commerce",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "commerce",
+      "name": "flight_inventory",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "name": "flights",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "name": "properties",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "name": "room_inventory",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "name": "room_rates",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "name": "room_types",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "flight_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "date",
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "total",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "held",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "sold",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "price",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "stop_sell",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "flight_key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "airline",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "from_airport",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "to_airport",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "depart_time",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "arrive_time",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "destination_slug",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "destination_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "cabin_code",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "cabin_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "default_seats",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "default_price",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "fare_plans",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "province_slug",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "province_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "city",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "stars",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "brand",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "style",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "thumbnail",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "images",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "room_type_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "date",
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "total",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "held",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "sold",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "stop_sell",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "cta",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "ctd",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "min_los",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "max_los",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "14",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "room_type_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "date",
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "price",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "property_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "code",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "max_guests",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "default_total",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "default_price",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "rate_plans",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "idx_flights_route",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "from_airport",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "to_airport",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "idx_flights_flight_key",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "flight_key",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "idx_properties_province_slug",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "province_slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "idx_room_types_property_id",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "property_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "fk_flight_inventory_flight_id",
+      "nameExplicit": true,
+      "columns": [
+        "flight_id"
+      ],
+      "schemaTo": "commerce",
+      "tableTo": "flights",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "entityType": "fks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "fk_room_inventory_room_type_id",
+      "nameExplicit": true,
+      "columns": [
+        "room_type_id"
+      ],
+      "schemaTo": "commerce",
+      "tableTo": "room_types",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "entityType": "fks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "fk_room_rates_room_type_id",
+      "nameExplicit": true,
+      "columns": [
+        "room_type_id"
+      ],
+      "schemaTo": "commerce",
+      "tableTo": "room_types",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "entityType": "fks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "fk_room_types_property_id",
+      "nameExplicit": true,
+      "columns": [
+        "property_id"
+      ],
+      "schemaTo": "commerce",
+      "tableTo": "properties",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "entityType": "fks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "pk_flight_inventory",
+      "columns": [
+        "flight_id",
+        "date"
+      ],
+      "nameExplicit": true,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "pk_room_inventory",
+      "columns": [
+        "room_type_id",
+        "date"
+      ],
+      "nameExplicit": true,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "pk_room_rates",
+      "columns": [
+        "room_type_id",
+        "date"
+      ],
+      "nameExplicit": true,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "flights_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "properties_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "room_types_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "ck_flight_inventory_not_oversold",
+      "value": "\"held\" >= 0 and \"sold\" >= 0 and \"held\" + \"sold\" <= \"total\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flight_inventory",
+      "name": "ck_flight_inventory_price",
+      "value": "\"price\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "ck_flights_default_seats",
+      "value": "\"default_seats\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "flights",
+      "name": "ck_flights_default_price",
+      "value": "\"default_price\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "properties",
+      "name": "ck_properties_stars",
+      "value": "\"stars\" is null or \"stars\" between 1 and 5",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "ck_room_inventory_not_oversold",
+      "value": "\"held\" >= 0 and \"sold\" >= 0 and \"held\" + \"sold\" <= \"total\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_inventory",
+      "name": "ck_room_inventory_los",
+      "value": "\"min_los\" >= 1 and \"max_los\" >= \"min_los\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_rates",
+      "name": "ck_room_rates_price",
+      "value": "\"price\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "ck_room_types_max_guests",
+      "value": "\"max_guests\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "ck_room_types_default_total",
+      "value": "\"default_total\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "commerce",
+      "table": "room_types",
+      "name": "ck_room_types_default_price",
+      "value": "\"default_price\" > 0",
+      "entityType": "checks"
+    }
+  ]
+}

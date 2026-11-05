@@ -1,4 +1,4 @@
-import { ACCESS_TOKEN_ALG } from '@tripflix/auth';
+import { ACCESS_TOKEN_ALG, SERVICE_TOKEN_TTL_SECONDS, SERVICE_TOKEN_TYPE } from '@tripflix/auth';
 import type { Role } from '@tripflix/contracts';
 import {
   SignJWT,
@@ -53,6 +53,20 @@ export class JoseTokenIssuer implements TokenIssuer {
       .setExpirationTime(iat + ACCESS_TOKEN_TTL_SECONDS)
       .sign(this.privateKey);
     return { token, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
+  }
+
+  async issueServiceToken({ clientId, audience }: { clientId: string; audience: string }): Promise<IssuedAccessToken> {
+    const iat = Math.floor(this.now().getTime() / 1000);
+    // Không có role, sid và aud khác AUTH_JWT_AUDIENCE: AccessTokenGuard luôn từ chối token này.
+    const token = await new SignJWT({ typ: SERVICE_TOKEN_TYPE })
+      .setProtectedHeader({ alg: ACCESS_TOKEN_ALG, kid: this.publicJwk.kid ?? '', typ: 'JWT' })
+      .setSubject(clientId)
+      .setIssuer(this.config.issuer)
+      .setAudience(audience)
+      .setIssuedAt(iat)
+      .setExpirationTime(iat + SERVICE_TOKEN_TTL_SECONDS)
+      .sign(this.privateKey);
+    return { token, expiresIn: SERVICE_TOKEN_TTL_SECONDS };
   }
 
   getJwks(): { keys: JWK[] } {
