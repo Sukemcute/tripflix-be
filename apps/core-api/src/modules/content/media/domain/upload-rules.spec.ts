@@ -4,6 +4,7 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_PART_COUNT,
   PART_SIZE_BYTES,
+  assertAllPartsListed,
   assertWithinUploadLimits,
   buildAllPartNumbers,
   buildSourceRelativeKey,
@@ -62,6 +63,21 @@ describe('số phần', () => {
   it('từ chối số phần vượt quá số phần của file', () => {
     expect(readErrorCode(() => resolveRequestedPartNumbers(PART_SIZE_BYTES * 2, [3]))).toBe(
       'MEDIA_INVALID_PART_NUMBER',
+    );
+  });
+
+  it('nhận đủ các phần, không phân biệt thứ tự', () => {
+    expect(() => assertAllPartsListed(PART_SIZE_BYTES * 2 + 1, [3, 1, 2])).not.toThrow();
+  });
+
+  it.each([
+    ['thiếu phần', [1, 2]],
+    ['thừa phần', [1, 2, 3, 4]],
+    ['trùng phần', [1, 2, 2]],
+    ['số phần ngoài phạm vi', [2, 3, 4]],
+  ])('từ chối khi %s', (_label, partNumbers) => {
+    expect(readErrorCode(() => assertAllPartsListed(PART_SIZE_BYTES * 2 + 1, partNumbers))).toBe(
+      'MEDIA_UPLOAD_INCOMPLETE',
     );
   });
 });

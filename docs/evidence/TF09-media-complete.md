@@ -1,0 +1,52 @@
+# TF09 — Phần 7: API hoàn tất upload và giao việc chuyển mã
+
+- Task: TF09 (SCRUM-13) · Nhánh: `phong/TF09-media-complete` · Người làm: Phong (dùng AI: có) · Ngày: 2026-11-05
+
+PR này là một phần của TF09. Chưa phát được video: còn `video-worker`, phần nhận kết quả và `getPlayback`.
+
+## Đã làm
+- `POST /api/media/uploads/:assetId/complete`: ghép file trên S3, kiểm dung lượng, chuyển `processing`, ghi `content.media.transcode_requested` vào outbox, trả 202.
+- Gọi S3 ngoài transaction; đổi trạng thái và ghi outbox trong cùng `@Transactional('content')`.
+- Kiểm request có đủ mọi phần trước khi gọi S3, vì S3 sẽ ghép thiếu rồi xoá phiên upload, khiến app không tải tiếp được.
+- Gọi lại an toàn: `UPDATE ... WHERE status = 'uploading'` nên nhiều lần gọi chỉ một lần được giao việc. S3 báo mất phiên thì xem file gốc trước khi trả 410, vì lần trước có thể đã ghép xong nhưng ghi database lỗi.
+- `revision` lấy từ `transcode_attempts` sau khi tăng, bắt đầu từ 1.
+- Dùng chung bảng `content.outbox_events` và `ContentOutboxRelay` của Thành (PR #25). Relay đó thêm một điều kiện để `content.media.transcode_requested` đi `stream:media`, vì worker chỉ đọc stream này.
+- Thêm schema `ContentMediaTranscodeRequestedV1Schema` vào `libs/contracts`.
+
+## Đối chiếu kế hoạch
+| Tiêu chí | Đạt | Bằng chứng |
+|---|---|---|
+| 202 `processing`, ghi đúng một việc chuyển mã | Có | E2E `trả 202 processing...`; thử thật |
+| Rollback trạng thái khi ghi outbox lỗi | Có | Int test `ghi outbox lỗi thì rollback trạng thái...` trên Postgres thật |
+| Gọi lại sau khi S3 đã ghép xong vẫn thành công | Có | Int test như trên; thử thật với S3 |
+| Nhiều lần gọi cùng lúc chỉ một sự kiện | Có | Int test `nhiều lần gọi cùng lúc...` |
+| Đi đúng `stream:media`, không đi nhầm `stream:core.content` | Có | Int test relay; thử thật với Redis |
+| 404, 409, 410, 400, 401 | Có | E2E; thử thật với S3 cho 404, 409, 410 |
+
+## Kết quả kiểm tra
+Chạy đủ các bước của CI, tất cả thoát mã 0:
+- `pnpm lint` (có kiểm ranh giới module): 22/22 task.
+- `pnpm typecheck`: 22/22 task.
+- `pnpm test`: 22/22 task; core-api 263/263 test.
+- `pnpm test:int`: 14/14 task; core-api 27/27 test.
+- `pnpm build`: 13/13 task.
+- `pnpm contracts:build`: thêm route `complete` và schema sự kiện mới, đã commit.
+
+Kết quả trên chạy sau khi gộp `develop` và dùng relay của Thành. Thử thật với core-api chạy `APP_ROLE=all`, S3 `dev/phong/`, Postgres và Redis local: 16/16 đạt, đã dọn dữ liệu thử. S3 thật từ chối ETag sai và trả đúng lỗi khi phiên upload đã huỷ.
+
+## Chưa làm
+- **`Idempotency-Key`:** không thêm, Dũng đồng ý bỏ qua nếu tốn nhiều công. Việc này cần thêm bảng, migration, module, và header bắt buộc làm app phải đổi, trong khi gọi lại đã an toàn nhờ kiểm trạng thái. `POST /media/uploads` cũng chưa nhận header.
+- Dung lượng sai sau khi đã ghép thì video giữ `uploading`, app phải tạo upload mới; file gốc tự xoá sau 7 ngày.
+
+## Cách kiểm lại
+1. `pnpm install && pnpm build`.
+2. `pnpm --filter @tripflix/core-api exec vitest run src/modules/content/media`.
+3. `pnpm test:int`, cần Docker.
+
+## Ảnh / video
+- Không đổi giao diện.
+
+## Ảnh hưởng tới phần của người khác
+- Có: `social/infra/content-outbox-relay.ts` và spec của Thành thêm một điều kiện chọn stream cho `content.media.transcode_requested`; sự kiện của `social` không đổi. Phong đồng ý sửa, cần Thành xem lại trong PR.
+- Có: `libs/contracts` của Dũng thêm một schema, tương thích ngược.
+- Có: hợp đồng API với mobile của Trang: `complete` có thể trả `status: 'ready'` khi gọi lại và thêm lỗi `409 MEDIA_UPLOAD_NOT_ACTIVE`.

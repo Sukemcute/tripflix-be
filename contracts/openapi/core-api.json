@@ -1595,6 +1595,81 @@
         ]
       }
     },
+    "/api/media/uploads/{assetId}/complete": {
+      "post": {
+        "operationId": "MediaUploadController_completeUpload",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedUploadDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MEDIA_UPLOAD_INCOMPLETE, MEDIA_UPLOAD_NOT_ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "MEDIA_UPLOAD_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
     "/api/suggest": {
       "get": {
         "description": "Dùng cho web OTA (kiểu Traveloka), gọi sau mỗi lần ngừng gõ khoảng 250 ms. Công khai, không cần đăng nhập.\n\n- Tối đa 8 dòng lẫn loại: khoảng 3 địa điểm, 4 khách sạn, 1 sân bay; loại nào thiếu thì lấy thêm loại khác.\n- Khớp không dấu, gõ tắt (`pq`, `hcm`, `sg`), gõ sai nhẹ (`nha trag`, `da nng`). Khớp đầu từ xếp trước khớp gần đúng.\n- Câu ngắn hơn 4 ký tự (sau khi bỏ ký tự lạ) chỉ khớp đầu từ, không tìm gần đúng.\n- Không có giá, không kiểm còn phòng: chọn địa điểm thì gọi `/api/stays?placeId=<refId>` (chưa có), chọn khách sạn thì mở trang chi tiết.\n- Không khớp gì thì `items: []` (không phải lỗi).",
@@ -2872,6 +2947,58 @@
         "required": [
           "parts",
           "expiresAt"
+        ]
+      },
+      "UploadedPartDto": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "number"
+          },
+          "etag": {
+            "type": "string",
+            "description": "Giá trị header ETag S3 trả về khi PUT phần này, giữ nguyên dấu ngoặc kép."
+          }
+        },
+        "required": [
+          "partNumber",
+          "etag"
+        ]
+      },
+      "CompleteUploadDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "description": "Đủ mọi phần của file, mỗi phần một lần.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadedPartDto"
+            }
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "CompletedUploadDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "ready"
+            ],
+            "description": "ready khi gọi lại lúc video đã chuyển mã xong."
+          }
+        },
+        "required": [
+          "assetId",
+          "status"
         ]
       },
       "SuggestionDto": {

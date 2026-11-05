@@ -54,6 +54,14 @@ export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
+/** content.media.transcode_requested v1: file gốc đã ghép xong, video-worker chuyển mã và ghi vào videos/{assetId}/r{revision}/. */
+export const ContentMediaTranscodeRequestedV1Schema = z.object({
+  assetId: z.uuid(),
+  sourceKey: z.string().min(1),
+  revision: z.number().int().positive(),
+});
+export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
+
 /**
  * Payload của access.password_reset_requested v1: notification-service gửi email đặt lại mật khẩu.
  * Có email vì bên gửi cần người nhận (docs/10 §3.5); resetUrl đã gồm token dùng một lần, sống 30 phút.
@@ -83,6 +91,7 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.locked.v1': AccessUserLockedV1Schema,
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
+  'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
 };

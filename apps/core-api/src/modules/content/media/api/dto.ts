@@ -13,6 +13,13 @@ export const ResignPartsRequestSchema = z.object({
   partNumbers: z.array(z.int().positive()).min(1).max(MAX_PART_COUNT),
 });
 
+export const CompleteUploadRequestSchema = z.object({
+  parts: z
+    .array(z.object({ partNumber: z.int().positive(), etag: z.string().min(1) }))
+    .min(1)
+    .max(MAX_PART_COUNT),
+});
+
 export class CreateUploadDto {
   @ApiProperty({ enum: MEDIA_MIME_TYPES }) mimeType!: MediaMimeType;
   @ApiProperty({ example: 25000000 }) fileSizeBytes!: number;
@@ -36,6 +43,22 @@ export class SignedPartsDto {
 export class CreatedUploadDto extends SignedPartsDto {
   @ApiProperty({ format: 'uuid' }) assetId!: string;
   @ApiProperty({ example: 10485760 }) partSizeBytes!: number;
+}
+
+export class UploadedPartDto {
+  @ApiProperty() partNumber!: number;
+  @ApiProperty({ description: 'Giá trị header ETag S3 trả về khi PUT phần này, giữ nguyên dấu ngoặc kép.' }) etag!: string;
+}
+
+export class CompleteUploadDto {
+  @ApiProperty({ type: [UploadedPartDto], description: 'Đủ mọi phần của file, mỗi phần một lần.' })
+  parts!: UploadedPartDto[];
+}
+
+export class CompletedUploadDto {
+  @ApiProperty({ format: 'uuid' }) assetId!: string;
+  @ApiProperty({ enum: ['processing', 'ready'], description: 'ready khi gọi lại lúc video đã chuyển mã xong.' })
+  status!: 'processing' | 'ready';
 }
 
 export class MediaErrorDto {

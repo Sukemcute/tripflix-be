@@ -29,6 +29,7 @@ describe('ContentOutboxRelay', () => {
 
     expect(streamFn({ type: 'media.asset_uploaded' } as any)).toBe(STREAMS.media);
     expect(streamFn({ type: 'media.transcode_completed' } as any)).toBe(STREAMS.media);
+    expect(streamFn({ type: 'content.media.transcode_requested' } as any)).toBe(STREAMS.media);
     expect(streamFn({ type: 'content.post.published' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.post.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.comment.created' } as any)).toBe(STREAMS.content);
