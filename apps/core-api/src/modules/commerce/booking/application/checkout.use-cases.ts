@@ -12,6 +12,7 @@ import {
   hasCompleteGuests,
   isHoldExpired,
   type ContactInput,
+  type OrderStatus,
   type GuestInput,
 } from '../domain/order-rules.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore } from './ports.js';
@@ -46,6 +47,52 @@ export interface CheckoutView {
   passengersRequired: number;
   policyVersion: string;
 }
+
+export interface TripView {
+  orderId: string;
+  status: OrderRecord['status'];
+  total: number;
+  adults: number;
+  confirmationCode: string | null;
+  cancelReason: string | null;
+  holdExpiresAt: string;
+  createdAt: string;
+  paidAt: string | null;
+  /** Ngày sớm nhất / muộn nhất của các mục (nhận phòng, bay; trả phòng). */
+  startDate: string | null;
+  endDate: string | null;
+  items: CheckoutView['items'];
+}
+
+export interface TripPage {
+  trips: TripView[];
+  nextCursor: string | null;
+}
+
+export interface ListTripsQuery {
+  statuses?: OrderStatus[];
+  cursor?: string | null;
+  limit?: number;
+}
+
+export const TRIPS_DEFAULT_LIMIT = 20;
+export const TRIPS_MAX_LIMIT = 50;
+
+/** Con trỏ trang: (createdAt, id) của đơn cuối trang trước, base64url để client coi là chuỗi mờ. */
+export const encodeTripCursor = (order: { createdAt: Date; id: string }) => Buffer.from(JSON.stringify([order.createdAt.toISOString(), order.id])).toString('base64url');
+export const decodeTripCursor = (cursor: string): { createdAt: Date; id: string } => {
+  try {
+    const [createdAt, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown[];
+    const date = new Date(String(createdAt));
+    if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) && !Number.isNaN(date.getTime())) return { createdAt: date, id };
+  } catch {
+    // Rơi xuống lỗi bên dưới.
+  }
+  throw new CommerceError('invalid_query', 'Con trỏ trang không hợp lệ.');
+};
+
+const toItemViews = (items: OrderItemRecord[]): CheckoutView['items'] =>
+  items.map(({ orderId: _orderId, ...i }) => ({ ...i, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
 
 /** Giá hiện tại của một mục, đọc từ lịch trống (không tin giá client gửi). */
 export interface PricedItem extends NewOrderItem {
@@ -217,11 +264,42 @@ export class CheckoutUseCases {
       adults: order.adults,
       confirmationCode: order.confirmationCode,
       cancelReason: order.cancelReason,
-      items: items.map(({ orderId: _orderId, ...i }) => ({ ...i, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date })),
+      items: toItemViews(items),
       isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates: await this.orders.findGuestBirthdates(orderId), passengersRequired }),
       passengersRequired,
       policyVersion: POLICY_VERSION,
     };
+  }
+
+  /** Chuyến đi của tôi (TF37): mọi đơn của người gọi, mới nhất trước; web và app đọc cùng một nguồn nên đặt xong là thấy. */
+  async listTrips(userId: string, query: ListTripsQuery = {}): Promise<TripPage> {
+    const limit = Math.min(Math.max(query.limit ?? TRIPS_DEFAULT_LIMIT, 1), TRIPS_MAX_LIMIT);
+    const after = query.cursor ? decodeTripCursor(query.cursor) : undefined;
+    const rows = await this.orders.listOrdersOfUser({ userId, statuses: query.statuses, after, limit: limit + 1 });
+    const page = rows.slice(0, limit);
+    const itemsByOrder = new Map<string, OrderItemRecord[]>();
+    for (const item of await this.orders.findItemsOfOrders(page.map((o) => o.id))) {
+      itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
+    }
+    const trips = page.map((order): TripView => {
+      const items = toItemViews(itemsByOrder.get(order.id) ?? []);
+      return {
+        orderId: order.id,
+        status: order.status,
+        total: order.total,
+        adults: order.adults,
+        confirmationCode: order.confirmationCode,
+        cancelReason: order.cancelReason,
+        holdExpiresAt: order.holdExpiresAt.toISOString(),
+        createdAt: order.createdAt.toISOString(),
+        paidAt: order.paidAt?.toISOString() ?? null,
+        startDate: items.reduce<string | null>((min, i) => (min === null || i.date < min ? i.date : min), null),
+        endDate: items.reduce<string | null>((max, i) => (max === null || i.dateTo > max ? i.dateTo : max), null),
+        items,
+      };
+    });
+    const last = page.at(-1);
+    return { trips, nextCursor: rows.length > limit && last ? encodeTripCursor(last) : null };
   }
 
   /** Đơn của đúng người dùng; đơn của người khác trả 404 như không tồn tại, không lộ là có. */

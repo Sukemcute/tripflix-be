@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
-import { and, asc, count, eq, exists, gte, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, refunds, roomInventory, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
 import type { OrderStatus } from '../domain/order-rules.js';
 import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
@@ -105,6 +105,29 @@ export class DrizzleOrderStore implements OrderStore {
   async lockPaymentSkipLocked(paymentId: string) {
     const [row] = await this.db.select().from(payments).where(eq(payments.id, paymentId)).for('update', { skipLocked: true });
     return row ? mapPayment(row) : null;
+  }
+
+  async listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }) {
+    // Postgres giữ tới micro giây, Date của JS chỉ tới mili giây: so và sắp theo mili giây để con trỏ không bỏ sót đơn.
+    const createdAtMs = sql`date_trunc('milliseconds', ${orders.createdAt})`;
+    const rows = await this.db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, input.userId),
+          input.statuses?.length ? inArray(orders.status, input.statuses) : undefined,
+          input.after ? or(sql`${createdAtMs} < ${input.after.createdAt.toISOString()}::timestamptz`, and(sql`${createdAtMs} = ${input.after.createdAt.toISOString()}::timestamptz`, lt(orders.id, input.after.id))) : undefined,
+        ),
+      )
+      .orderBy(desc(createdAtMs), desc(orders.id))
+      .limit(input.limit);
+    return rows.map(mapOrder);
+  }
+
+  async findItemsOfOrders(orderIds: string[]) {
+    if (!orderIds.length) return [];
+    return (await this.db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItem);
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }) {

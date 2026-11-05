@@ -171,6 +171,10 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
 
   afterAll(async () => {
     await app?.close();
+    // Dừng container có thể cắt kết nối đang đóng dở (57P01); không bắt thì Vitest báo lỗi dù test đã pass.
+    pool?.on('error', (error: Error & { code?: string }) => {
+      if (error.code !== '57P01') throw error;
+    });
     await pool?.end();
     await postgres?.stop();
   });

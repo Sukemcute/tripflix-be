@@ -88,6 +88,10 @@ export interface OrderStore {
   /** FOR UPDATE SKIP LOCKED: hàng đang bị giữ thì trả null, không chờ. */
   lockOrderSkipLocked(orderId: string): Promise<OrderRecord | null>;
   lockPaymentSkipLocked(paymentId: string): Promise<PaymentRecord | null>;
+  /** Đơn của người dùng, mới nhất trước (created_at, id giảm dần), sau con trỏ nếu có. Đọc không khoá. */
+  listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }): Promise<OrderRecord[]>;
+  /** Mục của nhiều đơn trong một câu truy vấn. */
+  findItemsOfOrders(orderIds: string[]): Promise<OrderItemRecord[]>;
   insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
   insertItems(orderId: string, items: NewOrderItem[]): Promise<void>;
   findItems(orderId: string): Promise<OrderItemRecord[]>;
