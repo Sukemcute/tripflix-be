@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MemorySidBlocklist } from '@tripflix/auth';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
+import { ClsModule } from 'nestjs-cls';
 import request from 'supertest';
 import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
@@ -47,7 +49,14 @@ describe('access E2E', () => {
 
   beforeAll(async () => {
     store = new MemoryAccessStore();
-    const moduleRef = await Test.createTestingModule({ imports: [FakePlatformModule, AccessModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        FakePlatformModule,
+        // @Transactional('access') chạy được nhưng không mở transaction database (store bộ nhớ).
+        ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() }),
+        AccessModule,
+      ],
+    })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
       .overrideProvider(LOGIN_RATE_LIMITER)
@@ -84,6 +93,16 @@ describe('access E2E', () => {
     expect(reg.body).toMatchObject({ email: 'khang@example.com', role: 'member' });
     expect(reg.body).not.toHaveProperty('passwordHash');
     expect(store.userRows.get(reg.body.id)!.passwordHash).toMatch(/^\$argon2id\$/);
+    // Đăng ký ghi đúng một sự kiện vào outbox, payload không có email.
+    const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'access.user.registered',
+      version: 1,
+      producer: 'core-api/access',
+      payload: { userId: reg.body.id, displayName: 'Khang' },
+    });
+    expect(JSON.stringify(events[0]!.payload)).not.toContain('@');
 
     const login = await http().post('/api/auth/login').send({ email: 'khang@example.com', password: PASSWORD }).expect(200);
     expect(login.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });

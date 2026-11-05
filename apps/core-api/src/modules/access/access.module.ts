@@ -1,10 +1,12 @@
 import { Logger, Module } from '@nestjs/common';
 import { AuthModule, RedisSidBlocklist, createAccessTokenVerifier, type SidBlocklist } from '@tripflix/auth';
-import { createDb } from '@tripflix/db';
+import { buildTransactionHostToken, type ModuleTransactionHost } from '@tripflix/db';
 import type { Redis } from 'ioredis';
 import { createLocalJWKSet } from 'jose';
 import type { CoreEnv } from '../../platform/env.js';
-import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import { CORE_ENV, REDIS } from '../../platform/tokens.js';
+import { AccountController } from './account/api/account.controller.js';
+import { AccountUseCases } from './account/application/account.use-cases.js';
 import { AuthController } from './auth/api/auth.controller.js';
 import { JwksController } from './auth/api/jwks.controller.js';
 import { AuthUseCases } from './auth/application/auth.use-cases.js';
@@ -18,10 +20,12 @@ import {
   type Clock,
   type TokenIssuer,
 } from './auth/application/ports.js';
+import { AccessOutboxRelay } from './auth/infra/access-outbox-relay.js';
 import { Argon2PasswordHasher } from './auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from './auth/infra/drizzle-access.store.js';
 import { JoseTokenIssuer } from './auth/infra/jose-token-issuer.js';
 import { RedisLoginRateLimiter } from './auth/infra/redis-login-rate-limiter.js';
+import { AccessCleanupJob } from './auth/jobs/access-cleanup.job.js';
 import { AdminController } from './staff/api/admin.controller.js';
 import { StaffUseCases } from './staff/application/staff.use-cases.js';
 
@@ -29,7 +33,12 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
 @Module({
   providers: [
     { provide: CLOCK, useValue: (() => new Date()) satisfies Clock },
-    { provide: ACCESS_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleAccessStore(createDb(pools.access)) },
+    {
+      provide: ACCESS_STORE,
+      inject: [buildTransactionHostToken('access')],
+      // txHost.tx: transaction đang mở của @Transactional('access'), hoặc kết nối thường của tf_access.
+      useFactory: (txHost: ModuleTransactionHost) => new DrizzleAccessStore(() => txHost.tx),
+    },
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
     { provide: LOGIN_RATE_LIMITER, inject: [REDIS], useFactory: (redis: Redis) => new RedisLoginRateLimiter(redis) },
     { provide: ACCESS_SID_BLOCKLIST, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
@@ -80,7 +89,7 @@ export class AccessInfraModule {}
       }),
     }),
   ],
-  controllers: [AuthController, JwksController, AdminController],
-  providers: [AuthUseCases, StaffUseCases],
+  controllers: [AuthController, AccountController, JwksController, AdminController],
+  providers: [AuthUseCases, AccountUseCases, StaffUseCases, AccessOutboxRelay, AccessCleanupJob],
 })
 export class AccessModule {}

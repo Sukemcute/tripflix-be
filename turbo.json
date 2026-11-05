@@ -24,6 +24,10 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:int": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
     "export-openapi": {
       "dependsOn": ["build"],
       "cache": false
