@@ -4313,7 +4313,8 @@
             "description": "Trạng thái tóm tắt bài viết"
           },
           "summary": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...",
             "description": "Nội dung tóm tắt tiếng Việt sinh từ AI (bắt buộc khi status là ready)"
           },
@@ -4329,7 +4330,8 @@
             }
           },
           "inputHash": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "description": "Bản băm hash của tập bình luận đã dùng để tóm tắt"
           },
@@ -4340,25 +4342,33 @@
           },
           "content": {
             "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
             "description": "Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế, trích dẫn commentId"
           },
           "safety": {
             "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
             "description": "Cờ và đánh giá an toàn: rủi ro, tin đồn, yêu cầu kiểm duyệt"
           },
           "promptVersion": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "example": "v1.0",
             "description": "Phiên bản prompt"
           },
           "modelName": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "example": "gemini-1.5-flash",
             "description": "Tên mô hình LLM"
           },
           "generatedAt": {
-            "type": "object",
-            "example": "2026-11-05T14:00:00Z",
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-05T14:00:00.000Z",
             "description": "Thời điểm sinh kết quả"
           }
         }
