@@ -162,6 +162,19 @@ export type AccessPasswordResetRequestedV1 = z.infer<typeof AccessPasswordResetR
 export const AccessUserGuestMergedV1Schema = z.object({ anonId: z.uuid(), userId: z.uuid() });
 export type AccessUserGuestMergedV1 = z.infer<typeof AccessUserGuestMergedV1Schema>;
 
+/**
+ * access.user.welcome_email_requested v1: tài khoản vừa được tạo (đăng ký hoặc lần đầu đăng nhập Google),
+ * notification-service gửi email chào mừng. Có email vì bên gửi cần người nhận (docs/10 §3.5); chỉ
+ * notification-service dùng sự kiện này, module khác nghe access.user.registered (không có email).
+ */
+export const AccessUserWelcomeEmailRequestedV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  provider: z.enum(['password', 'google']),
+});
+export type AccessUserWelcomeEmailRequestedV1 = z.infer<typeof AccessUserWelcomeEmailRequestedV1Schema>;
+
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
   assetId: z.uuid(),
@@ -198,4 +211,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.comment.deleted.v1': ContentCommentDeletedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
+  'access.user.welcome_email_requested.v1': AccessUserWelcomeEmailRequestedV1Schema,
 };
