@@ -66,7 +66,9 @@ export class AccountUseCases {
     const limit = await this.limiter.check(user.email, meta.ip);
     if (limit.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_ATTEMPTS_MESSAGE, limit.retryAfterSeconds);
 
-    if (!(await this.hasher.verify(user.passwordHash, input.currentPassword))) {
+    // Tài khoản chỉ có Google chưa có mật khẩu: không đổi được ở đây, dùng "quên mật khẩu" để đặt mật khẩu đầu tiên.
+    const isCurrentValid = user.passwordHash ? await this.hasher.verify(user.passwordHash, input.currentPassword) : false;
+    if (!isCurrentValid) {
       await this.limiter.recordFailure(user.email, meta.ip);
       await this.store.audit.record({ action: 'auth.password_change_failed', actorUserId: user.id, ...meta });
       throw new AccessError('wrong_password', WRONG_CURRENT_PASSWORD_MESSAGE);

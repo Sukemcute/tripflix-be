@@ -4,6 +4,32 @@ import { z } from 'zod';
 
 const OptionalStringSchema = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
 
+/** Trang đặt lại mật khẩu của web (Thành); link trong email là địa chỉ này kèm ?token=... */
+export const DEFAULT_PASSWORD_RESET_URL = 'http://localhost:3100/dat-lai-mat-khau';
+
+/** Khoá công khai của Google để kiểm ID token (POST /auth/google). */
+export const DEFAULT_GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+
+/** Origin của web và admin khi dev (deploy/compose.yaml: web 3100, admin 3200). */
+export const DEFAULT_WEB_ORIGINS = ['http://localhost:3100', 'http://localhost:3200'];
+
+/** Đúng dạng origin trình duyệt gửi: http(s)://host[:port], không có đường dẫn hay dấu / cuối. */
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === value;
+  } catch {
+    return false;
+  }
+}
+
+// Danh sách cách nhau bởi dấu phẩy, ví dụ https://tripflix.vn,https://admin.tripflix.vn.
+const WebOriginsSchema = z
+  .string()
+  .default(DEFAULT_WEB_ORIGINS.join(','))
+  .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean))
+  .pipe(z.array(z.string().refine(isOrigin, 'phải là origin dạng http(s)://host[:port], không có đường dẫn hay dấu / cuối')));
+
 export const coreEnvSchema = baseEnvSchema
   .extend({
     APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
@@ -19,6 +45,15 @@ export const coreEnvSchema = baseEnvSchema
     AUTH_JWT_KID: OptionalStringSchema,
     AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
     AUTH_JWT_AUDIENCE: z.string().default('tripflix'),
+    // Web, admin được gọi API từ trình duyệt (CORS) và dùng cookie refresh token (chặn CSRF theo Origin).
+    AUTH_WEB_ORIGINS: WebOriginsSchema,
+    AUTH_PASSWORD_RESET_URL: z.url().default(DEFAULT_PASSWORD_RESET_URL),
+    // OAuth Client ID (Android, iOS, Web) tạo trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google.
+    GOOGLE_CLIENT_IDS: z
+      .string()
+      .default('')
+      .transform((v) => v.split(',').map((id) => id.trim()).filter(Boolean)),
+    GOOGLE_JWKS_URL: z.url().default(DEFAULT_GOOGLE_JWKS_URL),
     // Media trên S3. Có giá trị mặc định để máy chưa cấu hình AWS vẫn khởi động được; key AWS do SDK tự đọc.
     AWS_REGION: z.string().default('ap-southeast-2'),
     S3_MEDIA_BUCKET: z.string().default('tripflix-media-dev'),

@@ -16,6 +16,8 @@
     "db:migrate": "node dist/cli/migrate.js",
     "db:seed": "node dist/cli/seed.js",
     "auth:keygen": "node dist/cli/keygen.js",
+    "auth:create-service-client": "node dist/cli/service-client.js create",
+    "auth:disable-service-client": "node dist/cli/service-client.js disable",
     "db:generate": "node scripts/db-generate.mjs"
   },
   "dependencies": {

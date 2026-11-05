@@ -3,7 +3,7 @@ import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import { eq, inArray } from 'drizzle-orm';
 import type pg from 'pg';
-import { accessOutboxEvents, sessions } from '../../db/schema/index.js';
+import { accessOutboxEvents, passwordResets, sessions, users } from '../../db/schema/index.js';
 import { hashRefreshToken } from '../application/refresh-token.js';
 import { PUBLISHED_EVENT_RETENTION_MS, runAccessCleanup } from '../jobs/access-cleanup.job.js';
 import { DrizzleAccessStore } from './drizzle-access.store.js';
@@ -161,7 +161,7 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     await db.update(accessOutboxEvents).set({ publishedAt: published(PUBLISHED_EVENT_RETENTION_MS + DAY) }).where(eq(accessOutboxEvents.id, oldId));
     await db.update(accessOutboxEvents).set({ publishedAt: published(DAY) }).where(eq(accessOutboxEvents.id, recentId));
 
-    const result = await runAccessCleanup({ sessions: store.sessions, db, now });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now });
     // Phiên hết hạn của các test trước cũng bị dọn, nên chỉ kiểm tối thiểu.
     expect(result.expiredSessions).toBeGreaterThanOrEqual(1);
     expect(result.publishedEvents).toBe(1);
@@ -175,7 +175,76 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(leftEvents.map((r) => r.id).sort()).toEqual([recentId, pendingId].sort());
 
     // Chạy lại không còn gì để dọn.
-    expect(await runAccessCleanup({ sessions: store.sessions, db, now })).toEqual({ expiredSessions: 0, publishedEvents: 0 });
+    expect(await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now })).toEqual({
+      expiredSessions: 0,
+      expiredPasswordResets: 0,
+      publishedEvents: 0,
+    });
+  });
+
+  it('TF058: service_clients lưu mảng audience, trùng clientId trả null, disable giữ mốc đầu tiên', async () => {
+    const created = await store.serviceClients.insert({
+      clientId: 'ai-service',
+      secretHash: '$argon2id$x',
+      allowedAudiences: ['core-api', 'notification-service'],
+    });
+    expect(created).toMatchObject({ clientId: 'ai-service', allowedAudiences: ['core-api', 'notification-service'], disabledAt: null });
+    expect(await store.serviceClients.insert({ clientId: 'ai-service', secretHash: 'y', allowedAudiences: ['core-api'] })).toBeNull();
+
+    const first = new Date('2026-11-05T01:00:00Z');
+    expect(await store.serviceClients.disable('ai-service', first)).toBe(true);
+    expect(await store.serviceClients.disable('ai-service', new Date('2026-11-06T01:00:00Z'))).toBe(true);
+    expect((await store.serviceClients.findById('ai-service'))?.disabledAt?.toISOString()).toBe(first.toISOString());
+    expect(await store.serviceClients.disable('khong-co', first)).toBe(false);
+    expect(await store.serviceClients.findById('khong-co')).toBeNull();
+  });
+
+  it('TF058: ràng buộc database chặn clientId sai dạng và danh sách audience rỗng', async () => {
+    await expect(store.serviceClients.insert({ clientId: 'AI Service', secretHash: 'x', allowedAudiences: ['core-api'] })).rejects.toThrow();
+    await expect(store.serviceClients.insert({ clientId: 'empty-aud', secretHash: 'x', allowedAudiences: [] })).rejects.toThrow();
+  });
+
+  it('TF057: 10 request cùng dùng một token đặt lại mật khẩu: chỉ 1 thành công; token hết hạn không dùng được', async () => {
+    const user = await store.users.insert({ email: 'reset-race@example.com', passwordHash: 'x', displayName: 'R', role: 'member' });
+    const now = new Date();
+    await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-race', expiresAt: new Date(now.getTime() + 60_000) });
+    expect(await store.passwordResets.findUsable('hash-race', now)).toEqual({ userId: user!.id });
+
+    const results = await Promise.all(Array.from({ length: 10 }, () => store.passwordResets.consume('hash-race', now)));
+    expect(results.filter(Boolean)).toEqual([{ userId: user!.id }]);
+    expect(await store.passwordResets.findUsable('hash-race', now)).toBeNull();
+
+    await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-old', expiresAt: new Date(now.getTime() - 1000) });
+    expect(await store.passwordResets.consume('hash-old', now)).toBeNull();
+  });
+
+  it('TF057: deleteUnusedByUser giữ token đã dùng; job dọn xoá token đặt lại đã hết hạn', async () => {
+    const user = await store.users.insert({ email: 'reset-clean@example.com', passwordHash: 'x', displayName: 'C', role: 'member' });
+    const now = new Date();
+    const later = new Date(now.getTime() + 60_000);
+    await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-used', expiresAt: later });
+    await store.passwordResets.consume('hash-used', now);
+    await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-unused', expiresAt: later });
+    expect(await store.passwordResets.deleteUnusedByUser(user!.id)).toBe(1);
+
+    await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-expired', expiresAt: new Date(now.getTime() - 1000) });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now });
+    expect(result.expiredPasswordResets).toBeGreaterThanOrEqual(1);
+    const left = await db.select({ tokenHash: passwordResets.tokenHash }).from(passwordResets).where(eq(passwordResets.userId, user!.id));
+    expect(left.map((r) => r.tokenHash)).toEqual(['hash-used']);
+  });
+
+  it('TF059: tài khoản không có mật khẩu; liên kết Google trùng (provider, subject) trả false; xoá người dùng thì xoá liên kết', async () => {
+    const user = await store.users.insert({ email: 'google-only@gmail.com', passwordHash: null, displayName: 'G', role: 'member' });
+    expect(user?.passwordHash).toBeNull();
+    const identity = { provider: 'google' as const, subject: 'g-sub-1', userId: user!.id, email: 'google-only@gmail.com' };
+    expect(await store.identities.insert(identity)).toBe(true);
+    expect(await store.identities.insert(identity)).toBe(false);
+    expect(await store.identities.findUserId('google', 'g-sub-1')).toBe(user!.id);
+    expect(await store.identities.findUserId('google', 'khong-co')).toBeNull();
+
+    await db.delete(users).where(eq(users.id, user!.id));
+    expect(await store.identities.findUserId('google', 'g-sub-1')).toBeNull();
   });
 
   it('email trùng thì insert trả null, không ném lỗi', async () => {

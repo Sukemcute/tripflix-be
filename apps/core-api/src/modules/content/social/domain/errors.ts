@@ -46,6 +46,12 @@ export class UnauthorizedCommentActionException extends DomainException {
   }
 }
 
+export class InvalidCommentNestingException extends DomainException {
+  constructor() {
+    super('Chỉ hỗ trợ phản hồi bình luận 1 cấp (không thể phản hồi trên một câu trả lời khác)');
+  }
+}
+
 export class InvalidReactionTypeException extends DomainException {
   constructor(type: string) {
     super(`Loại cảm xúc không hợp lệ: "${type}". Hỗ trợ: like, love, helpful`);

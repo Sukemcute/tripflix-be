@@ -3,7 +3,8 @@ import { buildDrizzleToken, buildTransactionHostToken, createDb, type Db, type M
 import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
 import { OutboxWriter } from '@tripflix/outbox';
 import { z } from 'zod';
-import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
+import type { CoreEnv } from '../../platform/env.js';
+import { CORE_ENV, DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CheckoutController } from './booking/api/checkout.controller.js';
 import { CheckoutUseCases } from './booking/application/checkout.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/ports.js';
@@ -11,10 +12,12 @@ import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
 import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
+import { HotelsController } from './inventory/api/hotels.controller.js';
 import { CalendarAdminUseCases } from './inventory/application/calendar-admin.use-cases.js';
 import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
 import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
-import { COMMERCE_STORE, TODAY, type Today } from './inventory/application/ports.js';
+import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
+import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type MediaUrl, type Today } from './inventory/application/ports.js';
 import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
 import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
 import { MockGatewayController } from './payment/api/mock-gateway.controller.js';
@@ -42,6 +45,13 @@ function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
   return { tmnCode: env.VNPAY_TMN_CODE, hashSecret: env.VNPAY_HASH_SECRET, paymentUrl: env.VNPAY_PAYMENT_URL, returnUrl: env.VNPAY_RETURN_URL };
 }
 
+/** Ảnh lưu khoá đầy đủ trên S3 (có tiền tố môi trường); web và app nhận URL CloudFront. */
+function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
+  if (!cdnBaseUrl) return keepMediaKey;
+  const base = cdnBaseUrl.replace(/\/+$/, '');
+  return (key) => (/^https?:\/\//.test(key) ? key : `${base}/${key.replace(/^\/+/, '')}`);
+}
+
 /**
  * Module commerce. Chủ: Thắng (backup Bảo). Xem README.md cùng thư mục.
  * Module khác chỉ dùng những gì được export trong index.ts: CommerceModule và CommerceFacade.
@@ -55,7 +65,7 @@ function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
       useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
     }),
   ],
-  controllers: [AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController],
+  controllers: [HotelsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController],
   providers: [
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     { provide: ORDER_STORE, useClass: DrizzleOrderStore },
@@ -73,7 +83,9 @@ function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
       useFactory: (pools: DbPools): PaymentGateway => new MockGateway(createDb(pools.commerce)),
     },
     { provide: VNPAY_CONFIG, useFactory: () => loadVnpayConfig(process.env) },
+    { provide: MEDIA_URL, inject: [CORE_ENV], useFactory: (env: CoreEnv) => buildMediaUrl(env.MEDIA_CDN_URL) },
     CatalogUseCases,
+    HotelDetailUseCases,
     CalendarUseCases,
     CalendarAdminUseCases,
     CheckoutUseCases,

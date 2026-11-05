@@ -27,6 +27,7 @@ import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
   CLOCK,
+  GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
   TOKEN_ISSUER,
@@ -81,6 +82,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
         { provide: LOGIN_RATE_LIMITER, useValue: new MemoryLoginRateLimiter() },
         { provide: ACCESS_SID_BLOCKLIST, useValue: new MemorySidBlocklist() },
         { provide: CLOCK, useValue: () => new Date() },
+        { provide: GOOGLE_VERIFIER, useValue: { verify: async () => Promise.reject(new Error('không dùng trong test này')) } },
       ],
     }).compile();
     await moduleRef.init();

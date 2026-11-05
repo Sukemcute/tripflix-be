@@ -17,9 +17,23 @@ export const LoginRequestSchema = z.object({
   deviceName: z.string().trim().max(100).optional(),
 });
 
-export const RefreshRequestSchema = z.object({
-  refreshToken: z.string().min(1).max(200),
+// Web, admin không gửi refreshToken trong body (có khi không gửi body): core-api đọc từ cookie tripflix_refresh.
+export const RefreshRequestSchema = z.preprocess(
+  (v) => v ?? {},
+  z.object({
+    refreshToken: z.string().min(1).max(200).optional(),
+  }),
+);
+
+export const GoogleLoginRequestSchema = z.object({
+  idToken: z.string().min(1).max(4096),
+  deviceName: z.string().trim().max(100).optional(),
 });
+
+export class GoogleLoginDto {
+  @ApiProperty({ description: 'ID token lấy từ Google Sign-In trên app hoặc web (credential)' }) idToken!: string;
+  @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
+}
 
 export class RegisterDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
@@ -34,12 +48,16 @@ export class LoginDto {
 }
 
 export class RefreshDto {
-  @ApiProperty() refreshToken!: string;
+  @ApiPropertyOptional({ description: 'App mobile gửi trong body. Web, admin bỏ trống, token nằm trong cookie tripflix_refresh' })
+  refreshToken?: string;
 }
 
 export class TokenPairDto {
   @ApiProperty() accessToken!: string;
-  @ApiProperty() refreshToken!: string;
+  @ApiPropertyOptional({
+    description: 'Không có khi gửi header X-Tripflix-Client: web; khi đó refresh token nằm trong cookie HttpOnly tripflix_refresh',
+  })
+  refreshToken?: string;
   @ApiProperty({ enum: ['Bearer'] }) tokenType!: 'Bearer';
   @ApiProperty({ example: 900, description: 'Số giây access token còn dùng được' }) expiresIn!: number;
 }

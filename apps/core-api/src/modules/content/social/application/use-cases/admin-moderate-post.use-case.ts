@@ -1,10 +1,9 @@
+import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { ModerationActionRepository } from '../../infra/moderation-action.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type {
-  ModerationActionRecord,
   ModerationActionType,
   PostStatus,
 } from '../../../db/schema/index.js';
@@ -31,9 +30,10 @@ export class AdminModeratePostUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly moderationActionRepository: ModerationActionRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
   ) {}
 
+  @Transactional('content')
   async execute(command: AdminModeratePostCommand): Promise<AdminModeratePostResult> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
@@ -84,22 +84,20 @@ export class AdminModeratePostUseCase {
       reportIds: command.reportIds ?? [],
     });
 
-    // Phát sự kiện outbox content.post.moderated để Feed và Discovery loại bỏ/cập nhật <= 3s
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.post.moderated',
-        userId: command.moderatorId,
-        payload: {
-          actionId: actionRecord.id,
-          postId: command.postId,
-          previousStatus,
-          postStatus: newStatus,
-          action: command.action,
-          reasonCode: command.reasonCode,
-          moderatorId: command.moderatorId,
-        },
-      }),
-    );
+    // Ghi sự kiện outbox content.post.moderated trong cùng transaction DB
+    await this.outbox.add({
+      type: 'content.post.moderated',
+      userId: command.moderatorId,
+      payload: {
+        actionId: actionRecord.id,
+        postId: command.postId,
+        previousStatus,
+        postStatus: newStatus,
+        action: command.action,
+        reasonCode: command.reasonCode,
+        moderatorId: command.moderatorId,
+      },
+    });
 
     return {
       actionId: actionRecord.id,

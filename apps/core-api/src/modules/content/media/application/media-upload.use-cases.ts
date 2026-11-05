@@ -1,10 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import type { ObjectStorage } from '@tripflix/storage';
+import type { ContentMediaTranscodeRequestedV1 } from '@tripflix/contracts';
+import { Transactional } from '@tripflix/db';
+import {
+  ObjectNotFoundError,
+  UploadExpiredError,
+  UploadIncompleteError,
+  type ObjectStorage,
+  type UploadedPart,
+} from '@tripflix/storage';
 import { MediaError } from '../domain/errors.js';
 import {
   PART_SIZE_BYTES,
   UPLOAD_LINK_TTL_SECONDS,
+  assertAllPartsListed,
   assertWithinUploadLimits,
   buildAllPartNumbers,
   buildSourceRelativeKey,
@@ -41,7 +50,12 @@ export interface CreatedUpload extends SignedParts {
   partSizeBytes: number;
 }
 
-/** Cấp và ký lại link tải lên. App PUT thẳng từng phần lên S3, backend không nhận file. */
+export interface CompletedUpload {
+  assetId: string;
+  status: 'processing' | 'ready';
+}
+
+/** Cấp, ký lại link tải lên và hoàn tất upload. App PUT thẳng từng phần lên S3, backend không nhận file. */
 @Injectable()
 export class MediaUploadUseCases {
   constructor(
@@ -80,6 +94,58 @@ export class MediaUploadUseCases {
     }
     const requestedPartNumbers = resolveRequestedPartNumbers(target.fileSizeBytes, partNumbers);
     return this.signParts(target.sourceKey, target.s3UploadId, requestedPartNumbers);
+  }
+
+  /** Gọi lại nhiều lần vẫn cho cùng kết quả và chỉ giao việc chuyển mã một lần. */
+  async completeUpload(ownerId: string, assetId: string, parts: UploadedPart[]): Promise<CompletedUpload> {
+    const target = await this.store.findUploadTarget(assetId, ownerId);
+    if (!target) throw new MediaError('MEDIA_NOT_FOUND', 'Không tìm thấy video');
+    if (target.status === 'processing' || target.status === 'ready') return { assetId, status: target.status };
+    if (target.status !== 'uploading' || !target.s3UploadId) {
+      throw new MediaError('MEDIA_UPLOAD_NOT_ACTIVE', 'Video này không còn ở trạng thái đang tải lên');
+    }
+    assertAllPartsListed(target.fileSizeBytes, parts.map((part) => part.partNumber));
+
+    // S3 nằm ngoài transaction. Ghi database lỗi thì app gọi lại, assembleSourceFile nhận ra file đã ghép.
+    await this.assembleSourceFile(target.sourceKey, target.s3UploadId, parts);
+    await this.assertSourceFileSize(target.sourceKey, target.fileSizeBytes);
+    await this.requestTranscode(assetId, ownerId, target.sourceKey);
+    return { assetId, status: 'processing' };
+  }
+
+  private async assembleSourceFile(key: string, uploadId: string, parts: UploadedPart[]): Promise<void> {
+    try {
+      await this.storage.completeMultipartUpload({ key, uploadId, parts });
+    } catch (error) {
+      if (error instanceof UploadIncompleteError) {
+        throw new MediaError('MEDIA_UPLOAD_INCOMPLETE', 'Thiếu phần hoặc ETag không khớp');
+      }
+      // Phiên mất có thể do lần gọi trước đã ghép xong; assertSourceFileSize sẽ phân biệt bằng file gốc.
+      if (!(error instanceof UploadExpiredError)) throw error;
+    }
+  }
+
+  private async assertSourceFileSize(key: string, expectedSizeBytes: number): Promise<void> {
+    let actualSizeBytes: number;
+    try {
+      actualSizeBytes = await this.storage.getObjectSizeBytes(key);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        throw new MediaError('MEDIA_UPLOAD_EXPIRED', 'Phiên tải lên đã hết hạn, cần tải lại video');
+      }
+      throw error;
+    }
+    if (actualSizeBytes !== expectedSizeBytes) {
+      throw new MediaError('MEDIA_UPLOAD_INCOMPLETE', 'Dung lượng file không khớp với lúc xin link');
+    }
+  }
+
+  @Transactional('content')
+  private async requestTranscode(assetId: string, ownerId: string, sourceKey: string): Promise<void> {
+    const revision = await this.store.markProcessing(assetId);
+    if (revision === null) return;
+    const payload: ContentMediaTranscodeRequestedV1 = { assetId, sourceKey, revision };
+    await this.store.outbox.add({ type: 'content.media.transcode_requested', userId: ownerId, payload });
   }
 
   private async signParts(key: string, uploadId: string, partNumbers: number[]): Promise<SignedParts> {

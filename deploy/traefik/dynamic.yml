@@ -1,19 +1,47 @@
 # Một địa chỉ cho web, admin, mobile: http://localhost:8080
-# Rate limit, kiểm JWT sẽ thêm ở đây khi module access có JWKS (Dũng).
+# Rate limit theo IP ở gateway (xem deploy/traefik/README.md). Kiểm JWT: mỗi service tự kiểm bằng @tripflix/auth
+# qua /.well-known/jwks.json, gateway không kiểm. Giới hạn theo tài khoản nằm trong module access.
 http:
+  middlewares:
+    # Mọi API: trung bình 50 request/giây mỗi IP, dồn tối đa 100. Rộng tay vì nhiều máy dùng chung IP (4G, Wi-Fi công ty).
+    rate-limit-api:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 100
+    # API dễ bị dò mật khẩu, spam: trung bình 30 request/phút mỗi IP, dồn tối đa 10.
+    rate-limit-auth:
+      rateLimit:
+        average: 30
+        period: 1m
+        burst: 10
+
   routers:
+    # Ưu tiên hơn router core-api bên dưới, nên các đường dẫn này chỉ chịu giới hạn chặt.
+    core-api-auth:
+      rule: >-
+        Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/google`) ||
+        Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`) || Path(`/api/auth/service-token`))
+      priority: 100
+      service: core-api
+      entryPoints: [web]
+      middlewares: [rate-limit-auth]
     core-api:
       rule: PathPrefix(`/api`)
       service: core-api
       entryPoints: [web]
+      middlewares: [rate-limit-api]
     notification:
       rule: PathPrefix(`/notifications`) || PathPrefix(`/ws`)
       service: notification-service
       entryPoints: [web]
+      middlewares: [rate-limit-api]
     ai:
       rule: PathPrefix(`/ai`)
       service: ai-service
       entryPoints: [web]
+      middlewares: [rate-limit-api]
+
   services:
     core-api:
       loadBalancer:

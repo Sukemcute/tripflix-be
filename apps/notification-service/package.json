@@ -10,7 +10,8 @@
     "start": "node dist/main.js",
     "lint": "oxlint --type-aware src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config vitest.int.config.ts"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",
@@ -25,6 +26,7 @@
     "ioredis": "catalog:",
     "jose": "catalog:",
     "nestjs-pino": "catalog:",
+    "nodemailer": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
@@ -34,8 +36,10 @@
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "@nestjs/testing": "catalog:",
+    "@tripflix/testing": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "@types/nodemailer": "catalog:",
     "@types/pg": "catalog:",
     "@types/supertest": "catalog:",
     "oxlint": "catalog:",

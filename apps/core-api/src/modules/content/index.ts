@@ -4,6 +4,6 @@ export {
   ContentFacade,
   type VisiblePostSummary,
   type PostStatsSummary,
+  type ListPostsFacadeQuery,
+  type ListPostsFacadeResult,
 } from './content.facade.js';
-
-

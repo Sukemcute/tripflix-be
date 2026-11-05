@@ -69,6 +69,7 @@ export class UpdatePostUseCase {
       mediaIds: domainPost.mediaIds,
       coverMediaId: domainPost.coverMediaId,
       tripAttachment: domainPost.tripAttachment,
+      isVerified: domainPost.isVerified,
     });
   }
 }

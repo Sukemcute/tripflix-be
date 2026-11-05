@@ -1,17 +1,33 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, count, desc, eq, gt, ilike, lt, ne, or } from 'drizzle-orm';
-import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
+import { and, asc, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import {
+  accessOutboxEvents,
+  auditLogs,
+  passwordResets,
+  serviceClients,
+  sessions,
+  userIdentities,
+  users,
+  type ServiceClientRow,
+  type SessionRow,
+  type UserRow,
+} from '../../db/schema/index.js';
 import type {
   AccessOutbox,
   AccessStore,
   AuditEntry,
   AuditLog,
   NewSession,
+  PasswordResetRepository,
   SessionRecord,
   SessionRepository,
+  ServiceClientRecord,
+  ServiceClientRepository,
   SessionRotation,
+  IdentityProvider,
+  UserIdentityRepository,
   UserRecord,
   UserRepository,
 } from '../application/ports.js';
@@ -169,6 +185,107 @@ class DrizzleSessionRepository implements SessionRepository {
   }
 }
 
+const mapServiceClientRow = (row: ServiceClientRow): ServiceClientRecord => ({ ...row });
+
+class DrizzleServiceClientRepository implements ServiceClientRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async findById(clientId: string) {
+    const [row] = await this.db.select().from(serviceClients).where(eq(serviceClients.clientId, clientId)).limit(1);
+    return row ? mapServiceClientRow(row) : null;
+  }
+
+  async insert(client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>) {
+    const [row] = await this.db.insert(serviceClients).values(client).onConflictDoNothing().returning();
+    return row ? mapServiceClientRow(row) : null;
+  }
+
+  async disable(clientId: string, at: Date) {
+    const rows = await this.db
+      .update(serviceClients)
+      .set({ disabledAt: sql`coalesce(${serviceClients.disabledAt}, ${at})` })
+      .where(eq(serviceClients.clientId, clientId))
+      .returning({ clientId: serviceClients.clientId });
+    return rows.length > 0;
+  }
+}
+
+class DrizzleUserIdentityRepository implements UserIdentityRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async findUserId(provider: IdentityProvider, subject: string) {
+    const [row] = await this.db
+      .select({ userId: userIdentities.userId })
+      .from(userIdentities)
+      .where(and(eq(userIdentities.provider, provider), eq(userIdentities.subject, subject)))
+      .limit(1);
+    return row?.userId ?? null;
+  }
+
+  async insert(identity: { provider: IdentityProvider; subject: string; userId: string; email: string }) {
+    const rows = await this.db.insert(userIdentities).values(identity).onConflictDoNothing().returning({ userId: userIdentities.userId });
+    return rows.length > 0;
+  }
+}
+
+class DrizzlePasswordResetRepository implements PasswordResetRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async insert(reset: { userId: string; tokenHash: string; expiresAt: Date }) {
+    await this.db.insert(passwordResets).values(reset);
+  }
+
+  async deleteUnusedByUser(userId: string) {
+    const rows = await this.db
+      .delete(passwordResets)
+      .where(and(eq(passwordResets.userId, userId), isNull(passwordResets.usedAt)))
+      .returning({ id: passwordResets.id });
+    return rows.length;
+  }
+
+  async findUsable(tokenHash: string, now: Date) {
+    const [row] = await this.db
+      .select({ userId: passwordResets.userId })
+      .from(passwordResets)
+      .where(this.usable(tokenHash, now))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async consume(tokenHash: string, now: Date) {
+    const [row] = await this.db
+      .update(passwordResets)
+      .set({ usedAt: now })
+      .where(this.usable(tokenHash, now))
+      .returning({ userId: passwordResets.userId });
+    return row ?? null;
+  }
+
+  async deleteExpired(before: Date) {
+    const rows = await this.db.delete(passwordResets).where(lt(passwordResets.expiresAt, before)).returning({ id: passwordResets.id });
+    return rows.length;
+  }
+
+  private usable(tokenHash: string, now: Date) {
+    return and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now));
+  }
+}
+
 class DrizzleAuditLog implements AuditLog {
   constructor(private readonly getDb: () => Db) {}
 
@@ -201,11 +318,17 @@ export class DrizzleAccessStore implements AccessStore {
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
   readonly outbox: AccessOutbox;
+  readonly serviceClients: ServiceClientRepository;
+  readonly passwordResets: PasswordResetRepository;
+  readonly identities: UserIdentityRepository;
 
   constructor(getDb: () => Db) {
     this.users = new DrizzleUserRepository(getDb);
     this.sessions = new DrizzleSessionRepository(getDb);
     this.audit = new DrizzleAuditLog(getDb);
     this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
+    this.serviceClients = new DrizzleServiceClientRepository(getDb);
+    this.passwordResets = new DrizzlePasswordResetRepository(getDb);
+    this.identities = new DrizzleUserIdentityRepository(getDb);
   }
 }

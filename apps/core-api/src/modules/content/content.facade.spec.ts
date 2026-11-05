@@ -39,25 +39,33 @@ describe('ContentFacade', () => {
   const mockPostRepo = {
     findById: vi.fn(),
     findByIds: vi.fn(),
+    findPostsForSync: vi.fn(),
   };
 
   const facade = new ContentFacade(mockPostRepo as any);
 
   describe('getPostById', () => {
-    it('trả về bản ghi bài viết khi tồn tại', async () => {
-      const mock = createMockPost();
+    it('trả về bài viết an toàn đã mask PII khi tồn tại và published', async () => {
+      const mock = createMockPost({ status: 'published', deletedAt: null });
       mockPostRepo.findById.mockResolvedValueOnce(mock);
 
       const res = await facade.getPostById(mock.id);
-      expect(res).toEqual(mock);
+      expect(res).not.toBeNull();
+      expect(res?.id).toBe(mock.id);
+      expect(res?.tripAttachment?.priceDisclaimer).toBe('Giá chỉ mang tính chất tham khảo');
+      expect((res?.tripAttachment as any)?.bookingId).toBeUndefined();
       expect(mockPostRepo.findById).toHaveBeenCalledWith(mock.id);
     });
 
-    it('trả về null khi bài viết không tồn tại', async () => {
+    it('trả về null khi bài viết không tồn tại, ở trạng thái draft/hidden hoặc đã xóa', async () => {
       mockPostRepo.findById.mockResolvedValueOnce(null);
+      expect(await facade.getPostById('non-existent')).toBeNull();
 
-      const res = await facade.getPostById('non-existent');
-      expect(res).toBeNull();
+      mockPostRepo.findById.mockResolvedValueOnce(createMockPost({ status: 'draft' }));
+      expect(await facade.getPostById('p1')).toBeNull();
+
+      mockPostRepo.findById.mockResolvedValueOnce(createMockPost({ status: 'published', deletedAt: new Date() }));
+      expect(await facade.getPostById('p1')).toBeNull();
     });
   });
 
@@ -135,6 +143,52 @@ describe('ContentFacade', () => {
 
       mockPostRepo.findById.mockResolvedValueOnce(createMockPost({ status: 'deleted' }));
       expect(await facade.getPostStats('deleted-post')).toBeNull();
+    });
+  });
+
+  describe('listPosts', () => {
+    it('lấy danh sách bài đăng phục vụ đồng bộ chỉ mục (Sync/Discovery) và che PII', async () => {
+      const p1 = createMockPost({ id: 'p1', updatedAt: new Date('2026-11-04T10:00:00Z') });
+      const p2 = createMockPost({ id: 'p2', updatedAt: new Date('2026-11-04T11:00:00Z') });
+
+      mockPostRepo.findPostsForSync.mockResolvedValueOnce([p1, p2]);
+
+      const res = await facade.listPosts({ limit: 10 });
+      expect(res.items.length).toBe(2);
+      expect(res.items[0]?.id).toBe('p1');
+      expect((res.items[0]?.tripAttachment as any)?.bookingId).toBeUndefined();
+      expect(res.items[0]?.tripAttachment?.priceDisclaimer).toBe('Giá chỉ mang tính chất tham khảo');
+      expect(res.nextCursor).toBeNull();
+      expect(mockPostRepo.findPostsForSync).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 11 }),
+      );
+    });
+
+    it('tạo nextCursor khi số lượng vượt limit và giải mã cursor trang tiếp theo', async () => {
+      const p1 = createMockPost({ id: 'p1', updatedAt: new Date('2026-11-04T10:00:00Z') });
+      const p2 = createMockPost({ id: 'p2', updatedAt: new Date('2026-11-04T11:00:00Z') });
+      const p3 = createMockPost({ id: 'p3', updatedAt: new Date('2026-11-04T12:00:00Z') });
+
+      // Gọi với limit = 2, repo trả 3 phần tử (limit + 1)
+      mockPostRepo.findPostsForSync.mockResolvedValueOnce([p1, p2, p3]);
+
+      const res = await facade.listPosts({ limit: 2, updatedAfter: '2026-11-04T00:00:00Z' });
+      expect(res.items.length).toBe(2);
+      expect(res.items.map((i) => i.id)).toEqual(['p1', 'p2']);
+      expect(res.nextCursor).toBeTruthy();
+
+      // Kiểm tra gọi tiếp với nextCursor
+      mockPostRepo.findPostsForSync.mockResolvedValueOnce([p3]);
+      const nextRes = await facade.listPosts({ limit: 2, cursor: res.nextCursor });
+      expect(nextRes.items.length).toBe(1);
+      expect(nextRes.items[0]?.id).toBe('p3');
+      expect(nextRes.nextCursor).toBeNull();
+      expect(mockPostRepo.findPostsForSync).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cursorUpdatedAt: new Date('2026-11-04T11:00:00Z'),
+          cursorId: 'p2',
+        }),
+      );
     });
   });
 });

@@ -49,7 +49,20 @@
     "/api/auth/login": {
       "post": {
         "operationId": "AuthController_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -70,6 +83,62 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/google": {
+      "post": {
+        "operationId": "AuthController_loginWithGoogle",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Đăng nhập bằng Google không thành công"
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          },
+          "503": {
+            "description": "Đăng nhập bằng Google chưa được bật"
           }
         },
         "tags": [
@@ -80,9 +149,22 @@
     "/api/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -101,6 +183,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
           }
         },
         "tags": [
@@ -287,6 +372,101 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/forgot": {
+      "post": {
+        "operationId": "PasswordResetController_forgot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordAcceptedDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bạn đã yêu cầu đặt lại mật khẩu quá nhiều lần, vui lòng thử lại sau"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/reset": {
+      "post": {
+        "operationId": "PasswordResetController_reset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/service-token": {
+      "post": {
+        "operationId": "ServiceTokenController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTokenDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thông tin service không đúng"
+          }
+        },
         "tags": [
           "auth"
         ]
@@ -1415,6 +1595,323 @@
         ]
       }
     },
+    "/api/media/uploads/{assetId}/complete": {
+      "post": {
+        "operationId": "MediaUploadController_completeUpload",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedUploadDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MEDIA_UPLOAD_INCOMPLETE, MEDIA_UPLOAD_NOT_ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "MEDIA_UPLOAD_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/suggest": {
+      "get": {
+        "description": "Dùng cho web OTA (kiểu Traveloka), gọi sau mỗi lần ngừng gõ khoảng 250 ms. Công khai, không cần đăng nhập.\n\n- Tối đa 8 dòng lẫn loại: khoảng 3 địa điểm, 4 khách sạn, 1 sân bay; loại nào thiếu thì lấy thêm loại khác.\n- Khớp không dấu, gõ tắt (`pq`, `hcm`, `sg`), gõ sai nhẹ (`nha trag`, `da nng`). Khớp đầu từ xếp trước khớp gần đúng.\n- Câu ngắn hơn 4 ký tự (sau khi bỏ ký tự lạ) chỉ khớp đầu từ, không tìm gần đúng.\n- Không có giá, không kiểm còn phòng: chọn địa điểm thì gọi `/api/stays?placeId=<refId>` (chưa có), chọn khách sạn thì mở trang chi tiết.\n- Không khớp gì thì `items: []` (không phải lỗi).",
+        "operationId": "SuggestController_suggest",
+        "parameters": [
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Lọc loại: place, hotel, airport",
+            "schema": {
+              "example": "place,hotel"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Chữ người dùng gõ, có dấu hay không đều được (2–100 ký tự)",
+            "schema": {
+              "example": "da lat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` ngắn hơn 2 hoặc dài hơn 100 ký tự, hoặc `types` có loại lạ"
+          }
+        },
+        "summary": "Gợi ý địa điểm, khách sạn, sân bay khi gõ ở ô tìm trang đặt chỗ",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/stays": {
+      "get": {
+        "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars`, `priceMin`/`priceMax` theo giá một đêm một phòng. `sort=price` (mặc định, rẻ trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
+        "operationId": "StaysController_listStays",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–50, mặc định 20",
+            "schema": {
+              "example": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "`nextCursor` của trang trước",
+            "schema": {}
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "price",
+                "stars"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "priceMax",
+            "required": false,
+            "in": "query",
+            "description": "VND, một đêm một phòng",
+            "schema": {
+              "example": 2000000
+            }
+          },
+          {
+            "name": "priceMin",
+            "required": false,
+            "in": "query",
+            "description": "VND, một đêm một phòng",
+            "schema": {}
+          },
+          {
+            "name": "minStars",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 4
+            }
+          },
+          {
+            "name": "rooms",
+            "required": false,
+            "in": "query",
+            "description": "Bỏ trống thì commerce tự tính theo số khách",
+            "schema": {}
+          },
+          {
+            "name": "adults",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 2
+            }
+          },
+          {
+            "name": "checkOut",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-03"
+            }
+          },
+          {
+            "name": "checkIn",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-01"
+            }
+          },
+          {
+            "name": "placeId",
+            "required": true,
+            "in": "query",
+            "description": "`refId` của dòng `place` trong `/api/suggest`",
+            "schema": {
+              "example": "lam-dong"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StayPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu hoặc sai tham số, nơi không tồn tại, ngày nhận phòng trước hôm nay, ở quá số đêm cho phép"
+          }
+        },
+        "summary": "Khách sạn còn phòng ở một nơi cho ngày đã chọn (trang kết quả web OTA)",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/recommendations/home": {
+      "get": {
+        "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi, mỗi nơi 2 khách sạn: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do \"Rẻ hơn X% so với …\".\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
+        "operationId": "HomeRecommendationsController_recommendForHome",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 8",
+            "schema": {
+              "example": 8
+            }
+          },
+          {
+            "name": "recentPlaceIds",
+            "required": false,
+            "in": "query",
+            "description": "CSV, tối đa 10; nơi lạ bị bỏ qua",
+            "schema": {
+              "example": "da-lat,phu-quoc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeRecommendationsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`limit` ngoài 1–20 hoặc quá 10 nơi"
+          }
+        },
+        "summary": "Gợi ý khách sạn cho trang chủ web, mỗi gợi ý kèm lý do ngắn",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/hotels/{id}": {
+      "get": {
+        "operationId": "HotelsController_getHotel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có khách sạn này"
+          }
+        },
+        "tags": [
+          "hotels"
+        ]
+      }
+    },
     "/api/admin/commerce/room-types/{id}/calendar": {
       "get": {
         "operationId": "AdminCalendarController_getRoomCalendar",
@@ -2117,7 +2614,8 @@
             "type": "string"
           },
           "refreshToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Không có khi gửi header X-Tripflix-Client: web; khi đó refresh token nằm trong cookie HttpOnly tripflix_refresh"
           },
           "tokenType": {
             "type": "string",
@@ -2133,21 +2631,34 @@
         },
         "required": [
           "accessToken",
-          "refreshToken",
           "tokenType",
           "expiresIn"
+        ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "ID token lấy từ Google Sign-In trên app hoặc web (credential)"
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "Pixel 8"
+          }
+        },
+        "required": [
+          "idToken"
         ]
       },
       "RefreshDto": {
         "type": "object",
         "properties": {
           "refreshToken": {
-            "type": "string"
+            "type": "string",
+            "description": "App mobile gửi trong body. Web, admin bỏ trống, token nằm trong cookie tripflix_refresh"
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "UpdateProfileDto": {
         "type": "object",
@@ -2215,6 +2726,95 @@
           "createdAt",
           "lastUsedAt",
           "isCurrent"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgotPasswordAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Nếu email này có tài khoản, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Giá trị ?token= trên link trong email"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "token",
+          "newPassword"
+        ]
+      },
+      "ServiceTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "example": "ai-service"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Secret in ra một lần khi tạo client (auth:create-service-client)"
+          },
+          "audience": {
+            "type": "string",
+            "example": "core-api",
+            "description": "Service sẽ nhận token (claim aud)"
+          }
+        },
+        "required": [
+          "clientId",
+          "clientSecret",
+          "audience"
+        ]
+      },
+      "ServiceTokenDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Số giây token còn dùng được"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn"
         ]
       },
       "JwksDto": {
@@ -2736,6 +3336,547 @@
         "required": [
           "parts",
           "expiresAt"
+        ]
+      },
+      "UploadedPartDto": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "number"
+          },
+          "etag": {
+            "type": "string",
+            "description": "Giá trị header ETag S3 trả về khi PUT phần này, giữ nguyên dấu ngoặc kép."
+          }
+        },
+        "required": [
+          "partNumber",
+          "etag"
+        ]
+      },
+      "CompleteUploadDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "description": "Đủ mọi phần của file, mỗi phần một lần.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadedPartDto"
+            }
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "CompletedUploadDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "ready"
+            ],
+            "description": "ready khi gọi lại lúc video đã chuyển mã xong."
+          }
+        },
+        "required": [
+          "assetId",
+          "status"
+        ]
+      },
+      "SuggestionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "place:da-lat",
+            "description": "`<type>:<refId>`, duy nhất trong danh sách"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "place",
+              "hotel",
+              "airport"
+            ],
+            "description": "place: tỉnh hoặc điểm đến · hotel: khách sạn · airport: sân bay"
+          },
+          "refId": {
+            "type": "string",
+            "example": "da-lat",
+            "description": "place: placeId để gọi /stays · hotel: mã khách sạn của commerce · airport: mã IATA"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Lạt",
+            "description": "Tên hiện ở dòng chính"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Lâm Đồng",
+            "description": "Dòng phụ: tỉnh cha của điểm đến, nơi của khách sạn, \"mã · nơi\" của sân bay; tỉnh thì null"
+          },
+          "placeId": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat",
+            "description": "Địa điểm chứa dòng này"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "refId",
+          "name",
+          "subtitle",
+          "placeId"
+        ]
+      },
+      "SuggestResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Đã xếp theo mức khớp; rỗng khi không khớp gì",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestionDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "StayProvinceDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "da-lat"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Lạt"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "StayDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "Mã khách sạn của commerce; mở trang chi tiết bằng mã này"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "example": 5
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true,
+            "example": "/images/vinpearl/vp-luxury-nha-trang-1.jpg"
+          },
+          "province": {
+            "description": "Nơi của khách sạn (tỉnh hoặc điểm đến)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StayProvinceDto"
+              }
+            ]
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 1200000,
+            "description": "Giá thật một đêm một phòng (VND), gói giá mặc định, cho đúng ngày đã chọn"
+          },
+          "totalPrice": {
+            "type": "number",
+            "example": 2400000,
+            "description": "Tổng tiền cả kỳ ở, mọi phòng (VND)"
+          }
+        },
+        "required": [
+          "hotelId",
+          "name",
+          "stars",
+          "thumbnail",
+          "province",
+          "unitPrice",
+          "totalPrice"
+        ]
+      },
+      "StayPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Chỉ khách sạn còn phòng cho ngày và số khách đã chọn, đã lọc và sắp",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StayDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số khách sạn khớp trên mọi trang"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "example": "20",
+            "description": "Gửi lại ở `cursor` để lấy trang sau; null là hết"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "nextCursor"
+        ]
+      },
+      "HomeProvinceDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "da-lat"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Lạt"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "HomeReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "recent_place",
+              "good_deal"
+            ],
+            "description": "recent_place: nơi vừa tìm · good_deal: rẻ hơn trung vị cùng hạng sao"
+          },
+          "text": {
+            "type": "string",
+            "example": "Vì bạn vừa tìm Đà Lạt",
+            "description": "Câu hiện dưới thẻ, tiếng Việt"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "HomePickDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-3",
+            "description": "Mã khách sạn của commerce; mở trang chi tiết bằng mã này"
+          },
+          "name": {
+            "type": "string",
+            "example": "Swiss-Belresort Tuyền Lâm"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "example": 5
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true,
+            "example": "Mường Thanh",
+            "description": "Chuỗi khách sạn; null nếu độc lập"
+          },
+          "province": {
+            "$ref": "#/components/schemas/HomeProvinceDto"
+          },
+          "priceFrom": {
+            "type": "number",
+            "example": 2750000,
+            "description": "Giá thấp nhất một đêm một phòng trong 30 ngày tới (VND), hiện \"từ X/đêm\""
+          },
+          "reason": {
+            "$ref": "#/components/schemas/HomeReasonDto"
+          }
+        },
+        "required": [
+          "hotelId",
+          "name",
+          "thumbnail",
+          "stars",
+          "brand",
+          "province",
+          "priceFrom",
+          "reason"
+        ]
+      },
+      "HomeRecommendationsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Có thể rỗng: chưa có nơi vừa tìm và không có khách sạn nào giá tốt",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomePickDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ProvinceDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "da-nang"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Nẵng"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "HotelRatePlanQuoteDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "BB"
+          },
+          "name": {
+            "type": "string",
+            "example": "Kèm ăn sáng · huỷ miễn phí"
+          },
+          "meal": {
+            "type": "string",
+            "example": "breakfast"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelDays": {
+            "type": "number",
+            "description": "Huỷ miễn phí trước ngày nhận phòng bao nhiêu ngày"
+          },
+          "totalPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Cả kỳ ở, mọi phòng (VND)"
+          },
+          "pricePerNight": {
+            "type": "number",
+            "nullable": true,
+            "description": "Một đêm một phòng (VND)"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "meal",
+          "isRefundable",
+          "freeCancelDays",
+          "totalPrice",
+          "pricePerNight"
+        ]
+      },
+      "HotelRoomOfferDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-dn-01--DLX",
+            "description": "Mã dùng khi đặt chỗ"
+          },
+          "name": {
+            "type": "string",
+            "example": "Deluxe hướng vườn"
+          },
+          "maxGuests": {
+            "type": "number"
+          },
+          "roomsNeeded": {
+            "type": "number",
+            "description": "Số phòng cần cho số khách đã chọn"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NOT_ON_SALE",
+              "STOP_SELL",
+              "CTA",
+              "CTD",
+              "MIN_LOS",
+              "MAX_LOS",
+              "SOLD_OUT",
+              "NOT_ENOUGH_ROOMS"
+            ],
+            "nullable": true
+          },
+          "remaining": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số phòng thật còn lại suốt kỳ ở"
+          },
+          "ratePlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelRatePlanQuoteDto"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "maxGuests",
+          "roomsNeeded",
+          "isAvailable",
+          "reason",
+          "remaining",
+          "ratePlans"
+        ]
+      },
+      "CalendarDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một đêm rẻ nhất ngày đó (VND)"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "priceFrom",
+          "isAvailable"
+        ]
+      },
+      "HotelDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "P-h-dn-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vinpearl Beach Đà Nẵng"
+          },
+          "province": {
+            "$ref": "#/components/schemas/ProvinceDto"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 5
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "style": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true,
+            "description": "Đường dẫn ảnh đại diện"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stay": {
+            "$ref": "#/components/schemas/StayDto"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một đêm rẻ nhất cho kỳ ở này (VND)"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelRoomOfferDto"
+            }
+          },
+          "calendar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarDayDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "province",
+          "city",
+          "stars",
+          "brand",
+          "style",
+          "thumbnail",
+          "images",
+          "stay",
+          "priceFrom",
+          "isAvailable",
+          "rooms",
+          "calendar"
         ]
       },
       "AdminRoomDayDto": {
