@@ -58,9 +58,12 @@ const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date
 /** Sắp xếp ô theo (sản phẩm, ngày) trước khi giữ: hai giỏ chạy cùng lúc khoá theo cùng thứ tự nên không deadlock. */
 const sortCells = (cells: InventoryCell[]) => [...cells].sort((a, b) => a.productId.localeCompare(b.productId) || a.date.localeCompare(b.date));
 
+/** Mọi ô của đơn, đúng thứ tự khoá ở trên: giữ, nhả và bán chạy cùng lúc đều không deadlock. */
+export const listSortedCells = (items: OrderItemRecord[]) => sortCells(items.flatMap(cellsOf));
+
 /**
  * Giữ chỗ và tạo đơn (TF29, docs/10 §3.4, không saga): giữ mọi mục + tạo đơn pending trong một transaction,
- * thiếu một ô thì rollback cả giỏ. Hết hạn sau 30 phút; job nhả chỗ hết hạn thuộc TF30.
+ * thiếu một ô thì rollback cả giỏ. Hết hạn sau 30 phút, ExpireHoldsJob nhả chỗ.
  */
 @Injectable()
 export class CheckoutUseCases {
@@ -177,9 +180,7 @@ export class CheckoutUseCases {
 
   /** Trả chỗ của cả đơn về kho và đổi trạng thái. Dùng trong transaction đang mở. */
   async releaseOrder(orderId: string, status: 'cancelled' | 'expired', reason: string): Promise<void> {
-    for (const item of await this.orders.findItems(orderId)) {
-      for (const cell of cellsOf(item)) await this.orders.releaseCell(cell);
-    }
+    for (const cell of listSortedCells(await this.orders.findItems(orderId))) await this.orders.releaseCell(cell);
     await this.orders.updateOrder(orderId, { status, cancelReason: reason, cancelledAt: this.now() });
   }
 

@@ -2,13 +2,14 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import type { OutboxWriter } from '@tripflix/outbox';
-import { CheckoutUseCases, type CheckoutView } from '../../booking/application/checkout.use-cases.js';
+import { CheckoutUseCases, listSortedCells, type CheckoutView } from '../../booking/application/checkout.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type OrderStore, type PaymentRecord } from '../../booking/application/ports.js';
 import {
   MAX_FAILED_PAYMENTS,
   POLICY_VERSION,
   buildChargeKey,
   buildCompensationRefundKey,
+  buildLateSuccessRefundKey,
   createConfirmationCode,
   hasCompleteGuests,
   isHoldExpired,
@@ -193,18 +194,24 @@ export class PaymentUseCases {
 
     if (result.status === 'succeeded') {
       if (payment.status === 'succeeded') return order.status === 'paid' ? { kind: 'paid' } : { kind: 'compensated' };
+      // Cổng chưa tự hoàn được thì chuyển người xử lý ngay trong transaction này: server chết sau đó cũng không mất dấu khoản hoàn.
+      const needsReview = payment.gateway !== this.gateway.name;
+      if (payment.status === 'failed') {
+        // Tiền về muộn cho lần đã bỏ ngang: giữ failed vì đơn có thể đang có khoản khác còn sống (uq_payments_one_live_per_order).
+        // Không đụng đơn và chỗ; chỉ ghi mã giao dịch để hoàn đúng giao dịch đó.
+        await this.orders.updatePayment(payment.id, { gatewayRef: result.ref ?? payment.gatewayRef, cardLast4: result.last4 ?? payment.cardLast4 });
+        await this.orders.insertRefund({ orderId: order.id, paymentId: payment.id, gatewayKey: buildLateSuccessRefundKey(payment.id), amount: payment.amount, reason: 'late_success', needsReview });
+        return { kind: 'compensated' };
+      }
       await this.orders.updatePayment(payment.id, { status: 'succeeded', gatewayRef: result.ref ?? null, cardLast4: result.last4 ?? null, failureCode: null });
       if (order.status !== 'paying') {
         // Tiền đã trừ mà đơn không còn chờ trả (hết hạn, đã huỷ): bù bằng hoàn tiền, không chốt đơn.
-        await this.orders.insertRefund({ orderId: order.id, paymentId: payment.id, gatewayKey: buildCompensationRefundKey(order.id), amount: payment.amount, reason: 'compensation' });
+        await this.orders.insertRefund({ orderId: order.id, paymentId: payment.id, gatewayKey: buildCompensationRefundKey(order.id), amount: payment.amount, reason: 'compensation', needsReview });
         return { kind: 'compensated' };
       }
       const items = await this.orders.findItems(order.id);
-      for (const item of items) {
-        for (let n = 0; n < item.nights; n++) {
-          const cell = { productType: item.productType, productId: item.productId, date: addDays(item.date, n), qty: item.qty };
-          if (!(await this.orders.sellCell(cell))) throw new Error(`Không chuyển được chỗ đã giữ sang đã bán: ${item.productId} ${cell.date}`);
-        }
+      for (const cell of listSortedCells(items)) {
+        if (!(await this.orders.sellCell(cell))) throw new Error(`Không chuyển được chỗ đã giữ sang đã bán: ${cell.productId} ${cell.date}`);
       }
       const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(6)) }));
       await this.orders.setItemConfirmationCodes(codes);
@@ -224,10 +231,12 @@ export class PaymentUseCases {
     }
 
     // Thẻ bị từ chối: chỗ vẫn giữ để thử thẻ khác, lần sau dùng khoá mới.
-    if (payment.status === 'initiated' || payment.status === 'requires_action') {
+    // Khoản đã có kết quả từ trước thì không đụng đơn: đơn có thể đang paying vì một lần trả mới còn sống.
+    const wasLive = payment.status === 'initiated' || payment.status === 'requires_action';
+    if (wasLive) {
       await this.orders.updatePayment(payment.id, { status: 'failed', failureCode: result.code ?? 'declined', cardLast4: result.last4 ?? payment.cardLast4 });
     }
-    if (order.status === 'paying') {
+    if (wasLive && order.status === 'paying') {
       const otherPending = (await this.orders.lockOrdersOfUser(order.userId, ['pending'])).length > 0;
       if (otherPending) await this.checkout.releaseOrder(order.id, 'cancelled', 'Đã giữ giỏ mới');
       else await this.orders.updateOrder(order.id, { status: 'pending' });

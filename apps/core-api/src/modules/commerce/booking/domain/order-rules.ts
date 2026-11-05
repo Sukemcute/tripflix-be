@@ -54,3 +54,5 @@ export function createConfirmationCode(randomBytes: Uint8Array): string {
 /** Khoá gửi sang cổng cho lần trả thứ attempt của đơn: cùng lần trả thì cùng khoá, cổng không trừ hai lần. */
 export const buildChargeKey = (orderId: string, attempt: number) => `charge:${orderId}:${attempt}`;
 export const buildCompensationRefundKey = (orderId: string) => `refund:comp:${orderId}`;
+/** Theo từng khoản trừ: một đơn có thể có nhiều lần trả đã bỏ ngang, mỗi lần tiền về muộn là một khoản hoàn riêng. */
+export const buildLateSuccessRefundKey = (paymentId: string) => `refund:late:${paymentId}`;

@@ -50,6 +50,7 @@ export interface PaymentRecord {
   cardLast4: string | null;
   challengeId: string | null;
   checkAttempts: number;
+  createdAt: Date;
 }
 
 export interface RefundRecord {
@@ -82,6 +83,11 @@ export interface OrderStore {
   lockOrder(orderId: string): Promise<OrderRecord | null>;
   /** Đơn của người dùng theo trạng thái, khoá luôn để đổi trạng thái an toàn. */
   lockOrdersOfUser(userId: string, statuses: OrderStatus[]): Promise<OrderRecord[]>;
+  /** Đơn quá hạn giữ, nhả được: pending, hoặc paying có khoản đang chờ OTP / đã quá hạn trang của cổng chuyển hướng. Đọc không khoá. */
+  findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }): Promise<string[]>;
+  /** FOR UPDATE SKIP LOCKED: hàng đang bị giữ thì trả null, không chờ. */
+  lockOrderSkipLocked(orderId: string): Promise<OrderRecord | null>;
+  lockPaymentSkipLocked(paymentId: string): Promise<PaymentRecord | null>;
   insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
   insertItems(orderId: string, items: NewOrderItem[]): Promise<void>;
   findItems(orderId: string): Promise<OrderItemRecord[]>;
@@ -110,7 +116,7 @@ export interface OrderStore {
   countFailedCharges(orderId: string): Promise<number>;
 
   /** Chèn khoản hoàn; khoá đã có thì bỏ qua (chạy lại không hoàn hai lần). */
-  insertRefund(refund: { orderId: string; paymentId: string; gatewayKey: string; amount: number; reason: string }): Promise<void>;
+  insertRefund(refund: { orderId: string; paymentId: string; gatewayKey: string; amount: number; reason: string; needsReview: boolean }): Promise<void>;
   findInitiatedRefunds(orderId: string): Promise<RefundRecord[]>;
   markRefundSucceeded(refundId: string, gatewayRef: string): Promise<void>;
 
