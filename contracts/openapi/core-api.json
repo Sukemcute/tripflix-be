@@ -151,6 +151,145 @@
         "tags": [
           "auth"
         ]
+      },
+      "patch": {
+        "operationId": "AccountController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/change": {
+      "post": {
+        "operationId": "AccountController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "operationId": "AccountController_listSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "AccountController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "operationId": "AccountController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/.well-known/jwks.json": {
@@ -226,6 +365,1053 @@
         ],
         "tags": [
           "admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_grantModerator",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantStaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "operationId": "AdminController_searchUsers",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "query",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/staff/{userId}": {
+      "delete": {
+        "operationId": "AdminController_revokeModerator",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/users/{userId}/lock": {
+      "post": {
+        "operationId": "AdminController_lock",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/users/{userId}/unlock": {
+      "post": {
+        "operationId": "AdminController_unlock",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/posts": {
+      "post": {
+        "operationId": "PostsController_createDraft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bản nháp đã được tạo thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo bản nháp bài đăng (FR1)",
+        "tags": [
+          "Social - Posts"
+        ]
+      },
+      "get": {
+        "operationId": "PostsController_listPublicPosts",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bài lấy mỗi trang (1-50)",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Keyset cursor lấy từ trang trước",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "author_id",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo tác giả",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "post_type",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo loại bài",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "video",
+                "vlog"
+              ]
+            }
+          },
+          {
+            "name": "hashtag",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo hashtag",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "Tìm kiếm từ khóa trong tiêu đề và nội dung",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách bài đăng kèm next_cursor"
+          }
+        },
+        "summary": "Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)",
+        "tags": [
+          "Social - Posts"
+        ]
+      }
+    },
+    "/api/v1/me/posts": {
+      "get": {
+        "operationId": "PostsController_listMyPosts",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bài lấy mỗi trang",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Keyset cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Trạng thái bài",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "draft",
+                "published"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách bài của người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lấy danh sách bài đăng và bản nháp của chính mình (FR1)",
+        "tags": [
+          "Social - Posts"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}": {
+      "get": {
+        "operationId": "PostsController_getPostDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chi tiết bài đăng kèm lộ trình đã ẩn PII và context"
+          }
+        },
+        "summary": "Lấy chi tiết bài đăng theo quyền người xem (FR3, FR4, FR12)",
+        "tags": [
+          "Social - Posts"
+        ]
+      },
+      "patch": {
+        "operationId": "PostsController_updatePost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bài đăng sau khi cập nhật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa bản nháp hoặc bài đã đăng (FR1, FR5, FR7)",
+        "tags": [
+          "Social - Posts"
+        ]
+      },
+      "delete": {
+        "operationId": "PostsController_deletePost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Xóa bài thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa bài đăng của mình (FR6)",
+        "tags": [
+          "Social - Posts"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/publish": {
+      "post": {
+        "operationId": "PostsController_publishPost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bài đăng đã được xuất bản (kèm share_url và dấu xác thực)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xuất bản bản nháp thành bài đăng công khai (FR2, FR3)",
+        "tags": [
+          "Social - Posts"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/shares": {
+      "post": {
+        "operationId": "PostsController_trackShare",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã ghi nhận chia sẻ và trả về share_url"
+          }
+        },
+        "summary": "Ghi nhận lượt chia sẻ bài viết (FR12)",
+        "tags": [
+          "Social - Posts"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/reaction": {
+      "put": {
+        "operationId": "ReactionsController_setReaction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cập nhật cảm xúc thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thêm, đổi hoặc bỏ cảm xúc trên bài đăng (FR10 - Idempotent)",
+        "tags": [
+          "Social - Reactions & Stats"
+        ]
+      },
+      "get": {
+        "operationId": "ReactionsController_getMyReaction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cảm xúc hiện tại của user"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lấy cảm xúc hiện tại của mình đối với bài đăng (FR10)",
+        "tags": [
+          "Social - Reactions & Stats"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/stats": {
+      "get": {
+        "operationId": "ReactionsController_getStats",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thống kê tương tác thời gian thực"
+          }
+        },
+        "summary": "Lấy tổng số cảm xúc, bình luận, chia sẻ, lưu (FR10)",
+        "tags": [
+          "Social - Reactions & Stats"
+        ]
+      }
+    },
+    "/api/v1/posts/{postId}/comments": {
+      "post": {
+        "operationId": "CommentsController_createComment",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bình luận được tạo thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo bình luận mới trên bài đăng (FR11)",
+        "tags": [
+          "Social - Comments"
+        ]
+      },
+      "get": {
+        "operationId": "CommentsController_listComments",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bình luận",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Keyset cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parent_comment_id",
+            "required": false,
+            "in": "query",
+            "description": "ID bình luận cha nếu muốn xem phản hồi con",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách bình luận kèm phân trang cursor"
+          }
+        },
+        "summary": "Lấy danh sách bình luận của bài đăng (FR11)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
+    "/api/v1/comments/{commentId}": {
+      "patch": {
+        "operationId": "CommentsController_editComment",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bình luận sau khi cập nhật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chỉnh sửa bình luận của mình (FR11)",
+        "tags": [
+          "Social - Comments"
+        ]
+      },
+      "delete": {
+        "operationId": "CommentsController_deleteComment",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bình luận đã được xóa thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa bình luận của mình (FR11)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/bookmark": {
+      "put": {
+        "operationId": "BookmarksController_setBookmark",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBookmarkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trạng thái lưu bài sau khi cập nhật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu hoặc bỏ lưu bài viết (PRD F3)",
+        "tags": [
+          "Social - Bookmarks"
+        ]
+      }
+    },
+    "/api/v1/me/bookmarks": {
+      "get": {
+        "operationId": "BookmarksController_listMyBookmarks",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bài lấy mỗi trang",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Keyset cursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách bài đăng đã bookmark"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lấy danh sách bài viết đã lưu của tôi",
+        "tags": [
+          "Social - Bookmarks"
+        ]
+      }
+    },
+    "/api/v1/admin/posts": {
+      "get": {
+        "operationId": "AdminPostsController_listAdminPosts",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bài",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Keyset cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc trạng thái",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "published",
+                "hidden",
+                "removed",
+                "deleted"
+              ]
+            }
+          },
+          {
+            "name": "author_id",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo tác giả",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách bài đăng và tổng số"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách bài đăng trong trang quản trị (FR13)",
+        "tags": [
+          "Social - Admin Moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/posts/{id}": {
+      "get": {
+        "operationId": "AdminPostsController_getAdminPostDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chi tiết bài đăng và lịch sử kiểm duyệt"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết bài đăng kèm lịch sử kiểm duyệt (FR13)",
+        "tags": [
+          "Social - Admin Moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/posts/{id}/moderation-actions": {
+      "post": {
+        "operationId": "AdminPostsController_moderatePost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModerationActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ghi nhận hành động kiểm duyệt thành công"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xử lý kiểm duyệt bài viết (FR13)",
+        "tags": [
+          "Social - Admin Moderation"
+        ]
+      }
+    },
+    "/api/media/uploads": {
+      "post": {
+        "operationId": "MediaUploadController_createUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedUploadDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MEDIA_TOO_LARGE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/uploads/{assetId}/parts": {
+      "post": {
+        "operationId": "MediaUploadController_resignParts",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResignPartsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedPartsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MEDIA_UPLOAD_NOT_ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
         ]
       }
     },
@@ -574,6 +1760,74 @@
           "refreshToken"
         ]
       },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "Khang Nguyễn"
+          }
+        },
+        "required": [
+          "displayName"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "SessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Pixel 8"
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "description": "Phiên của access token đang gọi"
+          }
+        },
+        "required": [
+          "id",
+          "deviceName",
+          "userAgent",
+          "createdAt",
+          "lastUsedAt",
+          "isCurrent"
+        ]
+      },
       "JwksDto": {
         "type": "object",
         "properties": {
@@ -586,6 +1840,513 @@
         },
         "required": [
           "keys"
+        ]
+      },
+      "AdminUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "superadmin"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "locked"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "role",
+          "createdAt",
+          "status"
+        ]
+      },
+      "AdminUserPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "GrantStaffDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "TripItineraryItemDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "number",
+            "example": 1,
+            "description": "Số ngày trong lộ trình"
+          },
+          "title": {
+            "type": "string",
+            "example": "Check-in khách sạn & ngắm hoàng hôn",
+            "description": "Tiêu đề hoạt động"
+          },
+          "location": {
+            "type": "string",
+            "example": "Bãi Dài, Phú Quốc",
+            "description": "Địa điểm"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
+            "description": "Ghi chú"
+          }
+        },
+        "required": [
+          "day",
+          "title"
+        ]
+      },
+      "TripAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "example": "018d9f10-book-7000-8000-000000000099",
+            "description": "ID đơn đặt chỗ đã đi"
+          },
+          "hotelName": {
+            "type": "string",
+            "example": "Vinpearl Resort & Spa Phú Quốc",
+            "description": "Tên khách sạn"
+          },
+          "hotelId": {
+            "type": "string",
+            "example": "018d9f10-prop-7000-8000-000000000010",
+            "description": "ID khách sạn"
+          },
+          "destinationName": {
+            "type": "string",
+            "example": "Phú Quốc, Kiên Giang",
+            "description": "Điểm đến"
+          },
+          "daysCount": {
+            "type": "number",
+            "example": 3,
+            "description": "Số ngày"
+          },
+          "estimatedCostPerPerson": {
+            "type": "number",
+            "example": 3500000,
+            "description": "Chi phí ước tính / người"
+          },
+          "priceDisclaimer": {
+            "type": "string",
+            "example": "Giá chỉ mang tính chất tham khảo",
+            "description": "Lưu ý giá tham khảo"
+          },
+          "items": {
+            "description": "Các mục trong lịch trình",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripItineraryItemDto"
+            }
+          }
+        }
+      },
+      "CreatePostDto": {
+        "type": "object",
+        "properties": {
+          "post_type": {
+            "type": "string",
+            "enum": [
+              "video",
+              "vlog"
+            ],
+            "example": "video",
+            "description": "Loại bài đăng"
+          },
+          "title": {
+            "type": "string",
+            "example": "Khám phá Phú Quốc 3N2Đ cực chất",
+            "description": "Tiêu đề bài viết"
+          },
+          "body": {
+            "type": "string",
+            "example": "Chia sẻ toàn bộ kinh nghiệm ăn chơi...",
+            "description": "Nội dung chi tiết"
+          },
+          "hashtags": {
+            "example": [
+              "phuquoc",
+              "travel",
+              "vinpearl"
+            ],
+            "description": "Hashtags",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "default": "public",
+            "description": "Quyền riêng tư"
+          },
+          "media_ids": {
+            "example": [
+              "018d9f10-1234-7000-8000-000000000001"
+            ],
+            "description": "Danh sách ID media",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cover_media_id": {
+            "type": "string",
+            "example": "018d9f10-1234-7000-8000-000000000001",
+            "description": "ID media làm ảnh bìa"
+          },
+          "trip_attachment": {
+            "description": "Lộ trình chuyến đi đính kèm",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "post_type",
+          "title"
+        ]
+      },
+      "UpdatePostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Tiêu đề cập nhật...",
+            "description": "Tiêu đề mới"
+          },
+          "body": {
+            "type": "string",
+            "example": "Nội dung sửa đổi...",
+            "description": "Nội dung mới"
+          },
+          "hashtags": {
+            "example": [
+              "phuquoc2026"
+            ],
+            "description": "Hashtags mới",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "description": "Quyền riêng tư"
+          },
+          "media_ids": {
+            "description": "Danh sách ID media",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cover_media_id": {
+            "type": "string",
+            "description": "ID ảnh bìa"
+          },
+          "trip_attachment": {
+            "description": "Lộ trình đính kèm",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          }
+        }
+      },
+      "SetReactionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "like",
+              "love",
+              "helpful",
+              null
+            ],
+            "example": "like",
+            "nullable": true,
+            "description": "Loại cảm xúc hoặc null để hủy cảm xúc"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "Bài viết chia sẻ rất chi tiết!",
+            "description": "Nội dung bình luận"
+          },
+          "parent_comment_id": {
+            "type": "string",
+            "example": "018d9f30-comm-7000-8000-000000000001",
+            "description": "ID bình luận cha nếu là phản hồi"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UpdateCommentDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "Nội dung bình luận đã chỉnh sửa...",
+            "description": "Nội dung mới"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "SetBookmarkDto": {
+        "type": "object",
+        "properties": {
+          "is_bookmarked": {
+            "type": "boolean",
+            "example": true,
+            "description": "true: lưu bài, false: bỏ lưu bài"
+          }
+        },
+        "required": [
+          "is_bookmarked"
+        ]
+      },
+      "CreateModerationActionDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "hide",
+              "remove",
+              "restore"
+            ],
+            "example": "hide",
+            "description": "Hành động kiểm duyệt"
+          },
+          "reason_code": {
+            "type": "string",
+            "example": "SPAM_OR_COMMERCIAL",
+            "description": "Mã lý do"
+          },
+          "reason_detail": {
+            "type": "string",
+            "example": "Spam đường link kéo sang nền tảng khác",
+            "description": "Chi tiết lý do"
+          },
+          "report_ids": {
+            "example": [
+              "018d9f40-repo-7000-8000-000000000004"
+            ],
+            "description": "Danh sách ID báo cáo",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "action",
+          "reason_code"
+        ]
+      },
+      "CreateUploadDto": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "video/mp4",
+              "video/quicktime"
+            ]
+          },
+          "fileSizeBytes": {
+            "type": "number",
+            "example": 25000000
+          },
+          "durationSec": {
+            "type": "number",
+            "example": 42.5,
+            "description": "Làm tròn lên số nguyên. Tối đa 5 phút."
+          }
+        },
+        "required": [
+          "mimeType",
+          "fileSizeBytes",
+          "durationSec"
+        ]
+      },
+      "SignedPartDto": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string",
+            "description": "Link PUT ký sẵn, không gửi kèm header Authorization."
+          }
+        },
+        "required": [
+          "partNumber",
+          "url"
+        ]
+      },
+      "CreatedUploadDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedPartDto"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "partSizeBytes": {
+            "type": "number",
+            "example": 10485760
+          }
+        },
+        "required": [
+          "parts",
+          "expiresAt",
+          "assetId",
+          "partSizeBytes"
+        ]
+      },
+      "MediaErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "MEDIA_TOO_LARGE"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ResignPartsDto": {
+        "type": "object",
+        "properties": {
+          "partNumbers": {
+            "example": [
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "partNumbers"
+        ]
+      },
+      "SignedPartsDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedPartDto"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "parts",
+          "expiresAt"
         ]
       },
       "AdminRoomDayDto": {

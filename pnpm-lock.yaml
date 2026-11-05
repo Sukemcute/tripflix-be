@@ -185,6 +185,9 @@ importers:
       '@tripflix/outbox':
         specifier: workspace:*
         version: link:../../libs/outbox
+      '@tripflix/storage':
+        specifier: workspace:*
+        version: link:../../libs/storage
       argon2:
         specifier: 'catalog:'
         version: 0.45.2
