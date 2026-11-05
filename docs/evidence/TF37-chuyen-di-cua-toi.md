@@ -8,6 +8,8 @@
   - Phân trang bằng `cursor` (từ `nextCursor`) và `limit` (1–50, mặc định 20). Con trỏ là (created_at, id); so theo mili giây (`date_trunc`) vì Postgres giữ micro giây còn `Date` của JS thì không, nếu so thẳng sẽ sót đơn ở ranh giới trang.
   - Mỗi chuyến có trạng thái, tổng tiền, mã xác nhận, lúc đặt, lúc trả, `startDate`/`endDate` và các mục (cùng dạng mục của `GET /api/checkout/:id`).
   - Mục của cả trang lấy bằng một câu truy vấn (`findItemsOfOrders`), không N+1. Dùng index sẵn có `idx_orders_user_id (user_id, created_at)`; không có migration.
+- `GET /api/checkout` và `GET /api/checkout/:id` trả `Cache-Control: no-store` (dữ liệu riêng từng người, sau này có CDN cũng không bị giữ lại; theo góp ý của Dũng).
+- Sự kiện `commerce.order.paid` thêm `confirmationCode`, `contactName`, `contactEmail` (optional, cho phép null) để notification gửi email xác nhận đơn. `contactEmail` null khi khách không nhập email; khi đó notification tra email tài khoản theo `userId`. Chỉ thêm trường; sự kiện cũ trong stream vẫn hợp lệ. Sửa `libs/contracts/src/index.ts` (Dũng) và sinh lại `contracts/events/commerce.order.paid.v1.schema.json`.
 - Bài đã lưu (`GET /v1/me/bookmarks`) và bài đã đăng (`GET /v1/me/posts`) đã có sẵn ở `content/social` (Thành); TF37 không sửa phần đó. Màn hình gộp ba mục là việc của web (Thành) và app (Trang).
 - Chỉ thêm, không đổi API cũ. Đã chạy `pnpm contracts:build` (`contracts/openapi/core-api.json` +124 dòng, không xoá dòng nào).
 
@@ -26,6 +28,7 @@ Giao diện web/app chưa làm trong task này nên chưa có ảnh.
 - `pnpm turbo run lint typecheck test --filter=@tripflix/core-api`: 13/13 task thành công; unit 45 file, 323 test pass; lint 0 lỗi (61 cảnh báo có sẵn, không có cảnh báo nào ở file TF37).
 - `pnpm --filter @tripflix/core-api test:int` (Postgres thật qua Testcontainers): 9 file, 76 test pass.
 - `checkout.int.spec.ts` sau khi thêm 5 test TF37: 20/20 pass.
+- Sau khi thêm `no-store` và trường liên hệ cho sự kiện: test tích hợp commerce 44/44, `@tripflix/contracts` 4/4, core-api unit 323/323 pass.
 - `node tools/check-boundaries.mjs`: không vi phạm ranh giới module.
 - `pnpm contracts:build`: `contracts/openapi/core-api.json` +124 dòng, 0 dòng xoá.
 - Thử làm hỏng code để kiểm test: 12 kiểu (bỏ lọc người dùng, bỏ so theo mili giây, con trỏ `lt`→`lte`, sắp tăng dần, bỏ lọc trạng thái, không lấy dư 1 đơn, con trỏ lấy đơn đầu trang, `endDate` sai, con trỏ rác không báo lỗi, bỏ giới hạn `limit`, gắn mục sai đơn, `paidAt` luôn null). Lần đầu 11/12 bị bắt; kiểu "gắn mục sai đơn" lọt nên đã thêm kiểm tra mục theo từng đơn, chạy lại thì bị bắt: 12/12.
@@ -41,5 +44,6 @@ Giao diện web/app chưa làm trong task này nên chưa có ảnh.
 
 ## Ảnh hưởng tới phần của người khác
 - `contracts/openapi/core-api.json` (CODEOWNERS: Dũng): sinh lại bằng lệnh, chỉ thêm endpoint và schema mới.
+- `libs/contracts/src/index.ts` và `contracts/events/commerce.order.paid.v1.schema.json` (Dũng): chỉ thêm 3 trường optional cho `commerce.order.paid`, theo yêu cầu của Dũng cho email xác nhận.
 - Gateway (Dũng): cần cho `GET /api/checkout` (không có `:id`) đi qua nếu gateway lọc theo từng đường dẫn.
 - Web (Thành) và app (Trang): có endpoint mới để làm màn "Chuyến đi của tôi".
