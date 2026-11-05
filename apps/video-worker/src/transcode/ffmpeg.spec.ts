@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { buildEncodeArgs, buildPosterArgs, parseProbeOutput } from './ffmpeg.js';
 import { QUALITY_RUNGS, type VideoMetadata } from './levels.js';
 
@@ -70,8 +71,8 @@ describe('buildEncodeArgs', () => {
 
   it('ghi đoạn và playlist vào đúng thư mục của mức', () => {
     const args = buildEncodeArgs(input);
-    expect(readOption(args, '-hls_segment_filename')).toBe('/tmp/360p/seg_%03d.ts');
-    expect(args.at(-1)).toBe('/tmp/360p/index.m3u8');
+    expect(readOption(args, '-hls_segment_filename')).toBe(join(input.outputDir, 'seg_%03d.ts'));
+    expect(args.at(-1)).toBe(join(input.outputDir, 'index.m3u8'));
   });
 
   it('video không có tiếng thì không chọn luồng và codec âm thanh', () => {
