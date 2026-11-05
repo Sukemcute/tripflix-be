@@ -1,7 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, count, desc, eq, ilike, ne, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, lt, ne, or } from 'drizzle-orm';
 import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
 import type {
   AccessOutbox,
@@ -80,7 +80,19 @@ class DrizzleUserRepository implements UserRepository {
   }
 
   async updateStatus(id: string, status: UserRecord['status']) {
-    const [row] = await this.db.update(users).set({ status, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return this.patch(id, { status });
+  }
+
+  async updateDisplayName(id: string, displayName: string) {
+    return this.patch(id, { displayName });
+  }
+
+  async updatePasswordHash(id: string, passwordHash: string) {
+    return this.patch(id, { passwordHash });
+  }
+
+  private async patch(id: string, values: Partial<Pick<UserRow, 'status' | 'displayName' | 'passwordHash'>>) {
+    const [row] = await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return row ? mapUserRow(row) : null;
   }
 }
@@ -122,9 +134,38 @@ class DrizzleSessionRepository implements SessionRepository {
     return rows.length > 0;
   }
 
-  async deleteByUser(userId: string) {
-    const rows = await this.db.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
+  async deleteByUser(userId: string, exceptId?: string) {
+    const where = exceptId ? and(eq(sessions.userId, userId), ne(sessions.id, exceptId)) : eq(sessions.userId, userId);
+    const rows = await this.db.delete(sessions).where(where).returning({ id: sessions.id });
     return rows.map((r) => r.id);
+  }
+
+  async deleteOwned(id: string, userId: string) {
+    const rows = await this.db
+      .delete(sessions)
+      .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
+      .returning({ id: sessions.id });
+    return rows.length > 0;
+  }
+
+  async listActiveByUser(userId: string, now: Date) {
+    return this.db
+      .select({
+        id: sessions.id,
+        deviceName: sessions.deviceName,
+        userAgent: sessions.userAgent,
+        createdAt: sessions.createdAt,
+        lastUsedAt: sessions.lastUsedAt,
+      })
+      .from(sessions)
+      .where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, now)))
+      .orderBy(desc(sessions.lastUsedAt));
+  }
+
+  async deleteExpired(before: Date) {
+    // Có idx_sessions_expires_at nên không quét cả bảng.
+    const rows = await this.db.delete(sessions).where(lt(sessions.expiresAt, before)).returning({ id: sessions.id });
+    return rows.length;
   }
 }
 

@@ -8,7 +8,8 @@ export class AccessError extends Error {
       | 'invalid_refresh'
       | 'session_revoked'
       | 'not_found'
-      | 'staff_rule',
+      | 'staff_rule'
+      | 'wrong_password',
     message: string,
     readonly retryAfterSeconds?: number,
   ) {

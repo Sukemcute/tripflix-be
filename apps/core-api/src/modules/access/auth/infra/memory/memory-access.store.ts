@@ -7,13 +7,17 @@ import type {
   NewSession,
   SessionRecord,
   SessionRotation,
+  SessionSummary,
   UserRecord,
 } from '../../application/ports.js';
 
 /** Bản lưu trong bộ nhớ của AccessStore, dùng cho E2E (CI không có Postgres). Không có rollback. */
 export class MemoryAccessStore implements AccessStore {
   readonly userRows = new Map<string, UserRecord>();
-  readonly sessionRows = new Map<string, SessionRecord & Omit<NewSession, 'userId' | 'refreshTokenHash' | 'expiresAt'>>();
+  readonly sessionRows = new Map<
+    string,
+    SessionRecord & Omit<NewSession, 'userId' | 'refreshTokenHash' | 'expiresAt'> & { createdAt: Date; lastUsedAt: Date }
+  >();
   readonly auditRows: AuditEntry[] = [];
 
   readonly users = {
@@ -35,6 +39,8 @@ export class MemoryAccessStore implements AccessStore {
     },
     updateRole: async (id: string, role: UserRecord['role']) => this.patchUser(id, { role }),
     updateStatus: async (id: string, status: UserRecord['status']) => this.patchUser(id, { status }),
+    updateDisplayName: async (id: string, displayName: string) => this.patchUser(id, { displayName }),
+    updatePasswordHash: async (id: string, passwordHash: string) => this.patchUser(id, { passwordHash }),
   };
 
   private patchUser(id: string, patch: Partial<UserRecord>): UserRecord | null {
@@ -47,7 +53,8 @@ export class MemoryAccessStore implements AccessStore {
 
   readonly sessions = {
     insert: async (session: NewSession) => {
-      const row = { ...session, id: randomUUID(), previousTokenHash: null, rotatedAt: null };
+      const now = new Date();
+      const row = { ...session, id: randomUUID(), previousTokenHash: null, rotatedAt: null, createdAt: now, lastUsedAt: now };
       this.sessionRows.set(row.id, row);
       return row;
     },
@@ -60,10 +67,22 @@ export class MemoryAccessStore implements AccessStore {
       return true;
     },
     delete: async (id: string) => this.sessionRows.delete(id),
-    deleteByUser: async (userId: string) => {
-      const ids = [...this.sessionRows.values()].filter((s) => s.userId === userId).map((s) => s.id);
+    deleteByUser: async (userId: string, exceptId?: string) => {
+      const ids = [...this.sessionRows.values()].filter((s) => s.userId === userId && s.id !== exceptId).map((s) => s.id);
       for (const id of ids) this.sessionRows.delete(id);
       return ids;
+    },
+    deleteOwned: async (id: string, userId: string) =>
+      this.sessionRows.get(id)?.userId === userId ? this.sessionRows.delete(id) : false,
+    listActiveByUser: async (userId: string, now: Date): Promise<SessionSummary[]> =>
+      [...this.sessionRows.values()]
+        .filter((s) => s.userId === userId && s.expiresAt > now)
+        .sort((a, b) => b.lastUsedAt.getTime() - a.lastUsedAt.getTime())
+        .map(({ id, deviceName, userAgent, createdAt, lastUsedAt }) => ({ id, deviceName, userAgent, createdAt, lastUsedAt })),
+    deleteExpired: async (before: Date) => {
+      const ids = [...this.sessionRows.values()].filter((s) => s.expiresAt < before).map((s) => s.id);
+      for (const id of ids) this.sessionRows.delete(id);
+      return ids.length;
     },
   };
 
