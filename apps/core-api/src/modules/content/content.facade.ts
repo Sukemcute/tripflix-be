@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import type { PostRecord } from './db/schema/index.js';
 import { Post, type TripAttachment } from './social/domain/index.js';
 import { PostRepository } from './social/infra/post.repository.js';
 
@@ -43,10 +42,61 @@ export class ContentFacade {
   constructor(private readonly postRepo: PostRepository) {}
 
   /**
-   * Lấy bản ghi bài viết theo ID.
+   * Lấy thông tin bài viết theo ID cho các module khác (discovery, analytics, feed...).
+   * Chỉ trả về bài viết đã xuất bản (published) và chưa bị xoá,
+   * đồng thời ẩn thông tin nhạy cảm PII (bookingId trong tripAttachment).
    */
-  async getPostById(id: string): Promise<PostRecord | null> {
-    return this.postRepo.findById(id);
+  async getPostById(id: string): Promise<VisiblePostSummary | null> {
+    const record = await this.postRepo.findById(id);
+    if (!record || record.status !== 'published' || record.deletedAt) {
+      return null;
+    }
+
+    const domainPost = new Post({
+      id: record.id,
+      authorId: record.authorId,
+      postType: record.postType,
+      title: record.title,
+      body: record.body,
+      hashtags: record.hashtags,
+      status: record.status,
+      visibility: record.visibility,
+      isVerified: record.isVerified,
+      mediaIds: record.mediaIds,
+      coverMediaId: record.coverMediaId ?? undefined,
+      tripAttachment: record.tripAttachment,
+      reactionCounts: record.reactionCounts,
+      reactionTotal: record.reactionTotal,
+      commentCount: record.commentCount,
+      shareCount: record.shareCount,
+      bookmarkCount: record.bookmarkCount,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      publishedAt: record.publishedAt ?? undefined,
+      deletedAt: record.deletedAt ?? undefined,
+    });
+
+    return {
+      id: record.id,
+      authorId: record.authorId,
+      postType: record.postType,
+      title: record.title,
+      body: record.body,
+      hashtags: record.hashtags,
+      status: record.status,
+      visibility: record.visibility,
+      isVerified: record.isVerified,
+      mediaIds: record.mediaIds,
+      coverMediaId: record.coverMediaId,
+      tripAttachment: domainPost.getMaskedTripAttachment(),
+      reactionCounts: record.reactionCounts,
+      reactionTotal: record.reactionTotal,
+      commentCount: record.commentCount,
+      shareCount: record.shareCount,
+      bookmarkCount: record.bookmarkCount,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
   }
 
   /**

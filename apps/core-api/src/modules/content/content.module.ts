@@ -10,6 +10,7 @@ import {
   AdminPostsController,
   BookmarksController,
   CommentsController,
+  OptionalAuthGuard,
   PostsController,
   ReactionsController,
 } from './social/api/index.js';
@@ -23,8 +24,11 @@ import {
   DeletePostUseCase,
   EditCommentUseCase,
   EVENT_PUBLISHER_PORT,
+  GetAdminPostDetailUseCase,
+  GetMyReactionUseCase,
   GetPostDetailUseCase,
   GetPostStatsUseCase,
+  ListAdminPostsUseCase,
   ListBookmarksUseCase,
   ListCommentsUseCase,
   ListPostsUseCase,
@@ -233,8 +237,29 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
         eventPublisher: EventPublisherPort,
       ) => new AdminModeratePostUseCase(postRepo, modRepo, eventPublisher),
     },
+    {
+      provide: GetMyReactionUseCase,
+      inject: [ReactionRepository],
+      useFactory: (reactionRepo: ReactionRepository) => new GetMyReactionUseCase(reactionRepo),
+    },
+    {
+      provide: ListAdminPostsUseCase,
+      inject: [PostRepository],
+      useFactory: (postRepo: PostRepository) => new ListAdminPostsUseCase(postRepo),
+    },
+    {
+      provide: GetAdminPostDetailUseCase,
+      inject: [PostRepository, ModerationActionRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        modRepo: ModerationActionRepository,
+      ) => new GetAdminPostDetailUseCase(postRepo, modRepo),
+    },
 
-    // 5. Facade cho các module khác
+    // 5. Guard cho optional authentication
+    OptionalAuthGuard,
+
+    // 6. Facade cho các module khác
     ContentFacade,
   ],
   exports: [ContentFacade],

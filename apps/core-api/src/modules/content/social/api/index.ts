@@ -3,7 +3,7 @@ export * from './reactions.controller.js';
 export * from './comments.controller.js';
 export * from './bookmarks.controller.js';
 export * from './admin-posts.controller.js';
-export * from './decorators/current-user.decorator.js';
+export * from './optional-auth.guard.js';
 export * from './dto/post.dto.js';
 export * from './dto/comment.dto.js';
 export * from './dto/reaction.dto.js';
