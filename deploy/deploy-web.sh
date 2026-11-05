@@ -43,11 +43,15 @@ is_web_healthy() {
 }
 
 # Chỉ đọc đúng một biến, không nạp cả file có mật khẩu vào script.
-WEB_HOST="$(sed -n 's/^WEB_HOST=//p' .env.server)"
-if [ -z "$WEB_HOST" ]; then
-  echo "Thiếu WEB_HOST trong .env.server" >&2
-  exit 1
-fi
+# Đọc như compose: dòng cuối được dùng; bỏ comment cuối dòng, dấu nháy, khoảng trắng và CR.
+WEB_HOST="$(sed -n 's/^WEB_HOST=//p' .env.server | tail -n 1 | sed 's/[[:space:]]#.*$//' | tr -d "\"' \t\r")"
+# Kiểm tra trước khi đụng tới web, để cấu hình sai không làm khởi động lại container.
+case "$WEB_HOST" in
+  '' | *[!a-zA-Z0-9.-]*)
+    echo "WEB_HOST trong .env.server không hợp lệ" >&2
+    exit 1
+    ;;
+esac
 
 cp .env.web .env.web.prev
 printf 'WEB_IMAGE=%s\nWEB_TAG=%s\n' "$WEB_IMAGE" "$TAG" > .env.web
