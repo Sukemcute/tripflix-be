@@ -1,40 +1,31 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import type { Db } from '@tripflix/db';
 import { eq, sql } from 'drizzle-orm';
 import { properties, reviews } from '../schema/index.js';
+import { generateReviews, type CatalogHotelForReviews, type ReviewPhoto } from './generate-reviews.js';
 
-/** Đánh giá giả lập cho demo (sinh tất định từ catalog.json). Không phải đánh giá của người thật. */
-interface ReviewSeed {
-  reviews: {
-    id: string;
-    propertyId: string;
-    roomTypeId: string | null;
-    authorName: string;
-    rating: number;
-    title: string | null;
-    body: string;
-    tags: string[];
-    travelerType: string | null;
-    stayMonth: string | null;
-    createdAt: string;
-    images: string[];
-    helpfulCount: number;
-  }[];
-  /** Tóm tắt ý kiến khách theo id khách sạn. */
-  summaries: Record<string, string>;
+/** Ảnh đánh giá kiểu khách tự chụp (Unsplash, Pexels, Wikimedia Commons), kèm nguồn, tác giả, giấy phép. File ảnh nằm ở <S3_KEY_PREFIX>images/hotels/reviews/. */
+export const REVIEW_PHOTOS_FILE = 'src/modules/commerce/db/seed/review-photos.json';
+const BATCH = 1000;
+
+export function loadReviewPhotos(file = REVIEW_PHOTOS_FILE): ReviewPhoto[] {
+  return JSON.parse(readFileSync(file, 'utf8')) as ReviewPhoto[];
 }
 
-export const REVIEW_SEED_FILE = 'src/modules/commerce/db/seed/reviews.json';
-const BATCH = 500;
-
 /**
- * Nạp đánh giá demo trong transaction của seed danh mục (gọi sau khi đã có khách sạn và loại phòng). Chạy lại được:
- * đánh giá cùng id thì ghi đè. Chỉ đụng dòng is_seeded, không đụng đánh giá thật. Chưa có file thì bỏ qua.
+ * Nạp đánh giá demo trong transaction của seed danh mục (gọi sau khi đã có khách sạn và loại phòng). Đánh giá sinh
+ * tất định từ danh mục lúc seed (khoảng 53.000 dòng, không lưu sẵn file). Chạy lại được: xoá đánh giá demo cũ
+ * (is_seeded) rồi nạp lại, nên bộ sinh đổi số lượng cũng không để sót dòng cũ; không đụng đánh giá thật.
  */
-export async function seedReviews(tx: Pick<Db, 'insert' | 'update'>, toImageKey: (sourcePath: string) => string, file = REVIEW_SEED_FILE): Promise<number> {
-  if (!existsSync(file)) return 0;
-  const seed = JSON.parse(readFileSync(file, 'utf8')) as ReviewSeed;
-  const rows = seed.reviews.map((r) => ({ ...r, createdAt: new Date(r.createdAt), images: r.images.map(toImageKey), isSeeded: true, status: 'published' }));
+export async function seedReviews(
+  tx: Pick<Db, 'insert' | 'update' | 'delete'>,
+  hotels: CatalogHotelForReviews[],
+  toImageKey: (sourcePath: string) => string,
+  photos: ReviewPhoto[] = loadReviewPhotos(),
+): Promise<number> {
+  const generated = generateReviews(hotels, photos);
+  await tx.delete(reviews).where(eq(reviews.isSeeded, true));
+  const rows = generated.reviews.map((r) => ({ ...r, createdAt: new Date(r.createdAt), images: r.images.map(toImageKey), isSeeded: true, status: 'published' }));
   for (let i = 0; i < rows.length; i += BATCH) {
     await tx
       .insert(reviews)
@@ -58,7 +49,7 @@ export async function seedReviews(tx: Pick<Db, 'insert' | 'update'>, toImageKey:
         setWhere: sql`${reviews.isSeeded}`,
       });
   }
-  for (const [propertyId, summary] of Object.entries(seed.summaries)) {
+  for (const [propertyId, summary] of Object.entries(generated.summaries)) {
     await tx
       .update(properties)
       .set({ details: sql`${properties.details} || ${JSON.stringify({ reviewSummary: summary })}::jsonb` })

@@ -6,6 +6,7 @@ import { ObjectNotFoundError, S3ObjectStorage } from '@tripflix/storage';
 import { coreEnvSchema } from '../../../../platform/env.js';
 import { HOTEL_IMAGE_KEY_ROOT } from './image-keys.js';
 import { CATALOG_SEED_FILE } from './seed-catalog.js';
+import { loadReviewPhotos } from './seed-reviews.js';
 
 // Tải ảnh khách sạn giả lập lên S3 một lần: node dist/modules/commerce/db/seed/upload-hotel-images.js <thư mục images> [--check]
 // Khoá: <S3_KEY_PREFIX>images/hotels/<đường dẫn sau /images/>. Ảnh đã có cùng kích thước thì bỏ qua, nên chạy lại được.
@@ -46,10 +47,11 @@ async function check() {
   if (env.MEDIA_CDN_URL) process.stdout.write(`URL CDN: ${storage.getCdnUrl(key)}\n`);
 }
 
-/** Ảnh mà danh mục seed thực sự dùng, dạng đường dẫn tương đối trong thư mục images (vinpearl/a.jpg). */
+/** Ảnh mà danh mục và đánh giá seed thực sự dùng, dạng đường dẫn tương đối trong thư mục images (vinpearl/a.jpg, reviews/room-01.jpg). */
 function listCatalogImages(): Set<string> {
   const catalog = JSON.parse(readFileSync(CATALOG_SEED_FILE, 'utf8')) as { hotels: { thumbnail: string | null; images: string[] }[] };
-  const paths = catalog.hotels.flatMap((h) => [h.thumbnail, ...h.images]).filter((p): p is string => !!p && !/^https?:\/\//.test(p));
+  const reviewImages = loadReviewPhotos().map((photo) => `reviews/${photo.file}`);
+  const paths = [...catalog.hotels.flatMap((h) => [h.thumbnail, ...h.images]), ...reviewImages].filter((p): p is string => !!p && !/^https?:\/\//.test(p));
   return new Set(paths.map((p) => p.replace(/^\/?images\//, '')));
 }
 

@@ -165,7 +165,7 @@ export async function seedCatalog(
         });
     }
     // Sau khi có khách sạn, loại phòng: đánh giá demo trỏ khoá ngoại tới chúng; tóm tắt ghi đè lên details vừa nạp.
-    reviewCount = await seedReviews(tx, toImageKey);
+    reviewCount = await seedReviews(tx, seed.hotels, toImageKey);
   });
   return { hotels: seed.hotels.length, roomTypes: roomTypeRows.length, flights: seed.flights.length, reviews: reviewCount };
 }
