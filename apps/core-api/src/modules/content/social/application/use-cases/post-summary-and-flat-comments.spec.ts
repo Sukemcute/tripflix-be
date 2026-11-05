@@ -182,10 +182,16 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       expect(result.summary).toBe(mockSummaryRecord.summary);
       expect(mockPostSummaryRepo.upsert).toHaveBeenCalledWith({
         postId,
+        status: 'ready',
         summary: 'Tóm tắt bài viết trải nghiệm du lịch Ninh Bình...',
         keyTakeaways: ['Đi thuyền sớm', 'Emeralda chu đáo'],
+        content: null,
+        safety: null,
         inputHash: 'hash-abc',
         commentCountAtSummary: 25,
+        promptVersion: null,
+        modelName: null,
+        generatedAt: null,
       });
     });
 
@@ -258,11 +264,12 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const controller = new PostSummaryController(saveUseCase, getUseCase);
 
       const saved = await controller.saveSummary(postId, {
+        status: 'ready',
         summary: 'Tóm tắt bài viết',
-        key_takeaways: ['Ý 1'],
-        input_hash: 'hash-1',
-        comment_count: 10,
-      });
+        keyTakeaways: ['Ý 1'],
+        inputHash: 'hash-1',
+        commentCount: 10,
+      } as any);
       expect(saved).toEqual(mockSummaryRecord);
 
       const fetched = await controller.getSummary(postId);

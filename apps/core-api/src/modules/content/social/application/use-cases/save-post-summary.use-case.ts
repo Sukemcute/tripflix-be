@@ -5,10 +5,16 @@ import type { PostSummaryRecord } from '../../../db/schema/index.js';
 
 export interface SavePostSummaryCommand {
   postId: string;
-  summary: string;
+  status?: string;
+  summary?: string | null;
   keyTakeaways?: string[];
-  inputHash?: string;
+  content?: unknown;
+  safety?: unknown;
+  inputHash?: string | null;
   commentCount?: number;
+  promptVersion?: string | null;
+  modelName?: string | null;
+  generatedAt?: Date | null;
 }
 
 export class SavePostSummaryUseCase {
@@ -23,17 +29,24 @@ export class SavePostSummaryUseCase {
       throw new PostNotFoundException(command.postId);
     }
 
+    const status = command.status ?? 'ready';
     const summary = (command.summary ?? '').trim();
-    if (!summary) {
-      throw new Error('Nội dung tóm tắt không được để trống');
+    if (status === 'ready' && !summary) {
+      throw new Error('Nội dung tóm tắt không được để trống khi trạng thái là ready');
     }
 
     return this.postSummaryRepository.upsert({
       postId: command.postId,
-      summary,
+      status,
+      summary: summary || null,
       keyTakeaways: command.keyTakeaways ?? [],
+      content: (command.content as any) ?? null,
+      safety: (command.safety as any) ?? null,
       inputHash: command.inputHash ?? null,
       commentCountAtSummary: command.commentCount ?? 0,
+      promptVersion: command.promptVersion ?? null,
+      modelName: command.modelName ?? null,
+      generatedAt: command.generatedAt ?? null,
     });
   }
 }
