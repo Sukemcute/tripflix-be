@@ -388,6 +388,9 @@ importers:
       '@tripflix/observability':
         specifier: workspace:*
         version: link:../../libs/observability
+      '@tripflix/storage':
+        specifier: workspace:*
+        version: link:../../libs/storage
       ioredis:
         specifier: 'catalog:'
         version: 6.0.0
@@ -395,6 +398,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@tripflix/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
