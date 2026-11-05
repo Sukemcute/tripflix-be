@@ -1,8 +1,8 @@
+import { Transactional } from '@tripflix/db';
 import { PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { ReactionRepository } from '../../infra/reaction.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { ReactionType } from '../../../db/schema/index.js';
 
 export interface SetReactionCommand {
@@ -22,9 +22,10 @@ export class SetReactionUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly reactionRepository: ReactionRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
   ) {}
 
+  @Transactional('content')
   async execute(command: SetReactionCommand): Promise<SetReactionResult> {
     const post = await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted') {
@@ -45,20 +46,18 @@ export class SetReactionUseCase {
     // Cập nhật ngược lại bảng posts
     await this.postRepository.updateReactionCounts(command.postId, reactionCounts, reactionTotal);
 
-    // Bắn sự kiện outbox content.reaction.updated
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.reaction.updated',
+    // Ghi sự kiện outbox content.reaction.updated trong cùng transaction DB
+    await this.outbox.add({
+      type: 'content.reaction.updated',
+      userId: command.userId,
+      payload: {
+        postId: command.postId,
         userId: command.userId,
-        payload: {
-          postId: command.postId,
-          userId: command.userId,
-          type: command.type,
-          reactionTotal,
-          reactionCounts,
-        },
-      }),
-    );
+        type: command.type,
+        reactionTotal,
+        reactionCounts,
+      },
+    });
 
     return {
       postId: command.postId,
