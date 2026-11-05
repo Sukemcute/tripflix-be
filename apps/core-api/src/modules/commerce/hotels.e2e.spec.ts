@@ -110,6 +110,51 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
     expect(fam.ratePlans[0].totalPrice).toBeNull();
   });
 
+  it('trả thông tin trang chi tiết: địa chỉ, đánh giá, tiện ích, chính sách, chi tiết phòng, giá gạch', async () => {
+    Object.assign(store.properties[0]!, {
+      address: '78 Trần Phú, Nha Trang',
+      lat: 12.2388,
+      lng: 109.1967,
+      ratingAvg: 4.9,
+      reviewCount: 2200,
+      ratingSource: 'tripadvisor',
+      checkInTime: '15:00',
+      checkOutTime: '12:00',
+      details: {
+        description: 'Gần biển.',
+        nearby: [{ name: 'Chùa Long Sơn', distanceKm: 3.1 }],
+        amenities: [{ group: 'wellness', name: 'Spa', icon: 'spa', featured: true }],
+        policies: { depositAmount: 1_000_000 },
+      },
+    });
+    store.roomTypes[0]!.details = { bedType: '1 giường siêu lớn', areaM2: 42, view: 'city', images: ['dev/thang/images/hotels/r.jpg'], amenities: ['Ghế sofa'] };
+    store.roomTypes[0]!.ratePlans = [{ ...plans[0]!, discountPct: 35, perks: ['Ưu đãi 30% Spa'] }];
+    const res = await request(app.getHttpServer()).get('/api/hotels/H1').expect(200);
+    expect(res.body).toMatchObject({
+      address: '78 Trần Phú, Nha Trang',
+      location: { lat: 12.2388, lng: 109.1967 },
+      rating: { average: 4.9, count: 2200, source: 'tripadvisor' },
+      checkInTime: '15:00',
+      description: 'Gần biển.',
+      nearby: [{ name: 'Chùa Long Sơn', distanceKm: 3.1 }],
+      amenities: [{ name: 'Spa', featured: true }],
+      highlights: [],
+      facts: { floors: null },
+      policies: { depositAmount: 1_000_000, child: null },
+    });
+    const std = res.body.rooms[0];
+    expect(std).toMatchObject({ bedType: '1 giường siêu lớn', areaM2: 42, view: 'city', images: ['https://cdn.test/dev/thang/images/hotels/r.jpg'] });
+    // Giá khách trả giữ nguyên; giá gạch = 1.000.000 / 0.65, làm tròn lên 10.000đ.
+    expect(std.ratePlans[0]).toMatchObject({ pricePerNight: 1_000_000, listPricePerNight: 1_540_000, discountPct: 35, perks: ['Ưu đãi 30% Spa'] });
+  });
+
+  it('khách sạn chưa có dữ liệu chi tiết thì trả null / mảng rỗng, không lỗi', async () => {
+    const res = await request(app.getHttpServer()).get('/api/hotels/H1').expect(200);
+    expect(res.body).toMatchObject({ address: null, location: null, rating: null, description: null, amenities: [], nearby: [] });
+    expect(res.body.rooms[1]).toMatchObject({ bedType: null, images: [], amenities: [] });
+    expect(res.body.rooms[0].ratePlans[0]).toMatchObject({ listPricePerNight: null, discountPct: null, perks: [] });
+  });
+
   it('khách sạn không có thì 404; ngày sai hoặc quá khứ thì 400 kèm tên trường', async () => {
     await request(app.getHttpServer()).get('/api/hotels/KHONG-CO').expect(404);
     const past = await request(app.getHttpServer()).get('/api/hotels/H1?checkIn=2026-11-01').expect(400);

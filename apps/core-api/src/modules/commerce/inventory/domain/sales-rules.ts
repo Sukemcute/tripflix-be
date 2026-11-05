@@ -12,6 +12,9 @@ export interface PricePlan {
   refundable: boolean;
   freeCancelDays: number;
   priceFactor: number;
+  /** Chỉ để hiện giá gạch; không đổi số tiền khách trả. */
+  discountPct?: number;
+  perks?: string[];
 }
 
 /** Một ngày của lịch phòng: số phòng, giá gốc và luật bán của ngày nhận phòng. */

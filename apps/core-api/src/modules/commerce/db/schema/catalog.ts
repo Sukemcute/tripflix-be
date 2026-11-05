@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, primaryKey, smallint, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, check, date, doublePrecision, foreignKey, index, integer, jsonb, primaryKey, smallint, text, timestamp } from 'drizzle-orm/pg-core';
 import { commerceSchema } from './commerce-schema.js';
 
 /** Một gói giá của loại phòng hoặc hạng ghế: ăn sáng, hoàn huỷ, hệ số giá so với giá gốc của ngày. */
@@ -11,6 +11,51 @@ export interface RatePlan {
   refundable: boolean;
   freeCancelDays: number;
   priceFactor: number;
+  /** % giảm so với giá niêm yết, chỉ để hiện giá gạch; không đổi số tiền khách trả. */
+  discountPct?: number;
+  /** Quyền lợi kèm gói, ví dụ "Bữa sáng buffet cho 2 người". */
+  perks?: string[];
+}
+
+/** Một tiện ích của khách sạn. group: dining | sports | wellness | kids | general. featured: hiện ở mục "Tiện ích nổi bật". */
+export interface HotelAmenity {
+  group: string;
+  name: string;
+  icon: string;
+  featured: boolean;
+}
+
+/** Thông tin hiển thị ở trang chi tiết, không dùng để lọc hay tính giá nên gom vào một cột JSONB. */
+export interface HotelDetails {
+  description?: string;
+  highlights?: { icon: string; text: string }[];
+  nearby?: { name: string; distanceKm: number }[];
+  amenities?: HotelAmenity[];
+  languages?: string[];
+  facts?: {
+    voltage?: string | null;
+    floors?: number;
+    openedAt?: string;
+    roomCount?: number;
+    restaurants?: number;
+    bars?: number;
+  };
+  policies?: {
+    child?: string;
+    extraBed?: string;
+    deposit?: string;
+    depositAmount?: number;
+    stay?: string;
+  };
+}
+
+/** Thông tin hiển thị của loại phòng. view: city | sea | garden | mountain | pool | river. */
+export interface RoomTypeDetails {
+  bedType?: string;
+  areaM2?: number;
+  view?: string;
+  images?: string[];
+  amenities?: string[];
 }
 
 /** Khách sạn. Dữ liệu giả lập do seed nạp; ảnh là đường dẫn, file ảnh nằm ở kho media. */
@@ -27,12 +72,25 @@ export const properties = commerceSchema.table(
     style: text('style'),
     thumbnail: text('thumbnail'),
     images: jsonb('images').$type<string[]>().notNull().default([]),
+    address: text('address'),
+    lat: doublePrecision('lat'),
+    lng: doublePrecision('lng'),
+    ratingAvg: doublePrecision('rating_avg'),
+    reviewCount: integer('review_count').notNull().default(0),
+    // tripadvisor | google: nguồn của điểm đánh giá.
+    ratingSource: text('rating_source'),
+    // Giờ địa phương dạng HH:MM.
+    checkInTime: text('check_in_time'),
+    checkOutTime: text('check_out_time'),
+    details: jsonb('details').$type<HotelDetails>().notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('idx_properties_province_slug').on(t.provinceSlug),
     check('ck_properties_stars', sql`${t.stars} is null or ${t.stars} between 1 and 5`),
+    check('ck_properties_rating_avg', sql`${t.ratingAvg} is null or ${t.ratingAvg} between 0 and 5`),
+    check('ck_properties_review_count', sql`${t.reviewCount} >= 0`),
   ],
 );
 
@@ -48,6 +106,7 @@ export const roomTypes = commerceSchema.table(
     defaultTotal: integer('default_total').notNull(),
     defaultPrice: bigint('default_price', { mode: 'number' }).notNull(),
     ratePlans: jsonb('rate_plans').$type<RatePlan[]>().notNull(),
+    details: jsonb('details').$type<RoomTypeDetails>().notNull().default({}),
   },
   (t) => [
     foreignKey({ name: 'fk_room_types_property_id', columns: [t.propertyId], foreignColumns: [properties.id] }),

@@ -9,6 +9,11 @@
   - Đặt dưới `images/` vì CloudFront chỉ phát công khai `dev/*/images/*` và `dev/*/videos/*` (`deploy/aws/bucket-policy.template.json`).
   - Seed lưu **khoá đầy đủ** trong database (đúng quy ước khoá của `libs/storage`); API ghép `MEDIA_CDN_URL` để trả URL. Chưa đặt `MEDIA_CDN_URL` thì trả nguyên khoá. `listCatalog` của `CommerceFacade` cũng trả URL.
 
+- Mở rộng dữ liệu trang chi tiết theo trang OTA thật (tham khảo Vinpearl Beachfront Nha Trang trên vinpearlota.com):
+  - Migration mới `20261105102339_add_hotel_details` (chỉ `ADD COLUMN`, không sửa migration của TF06): `properties` thêm `address`, `lat`, `lng`, `rating_avg`, `review_count`, `rating_source`, `check_in_time`, `check_out_time`, `details` (JSONB: mô tả, điểm nổi bật, địa danh lân cận, tiện ích theo nhóm, ngôn ngữ, thông số, chính sách); `room_types` thêm `details` (giường, diện tích, hướng nhìn, ảnh phòng, tiện nghi phòng). Gói giá thêm `discountPct`, `perks` (không bắt buộc).
+  - `GET /api/hotels/:id` chỉ **thêm** trường: `address`, `location`, `rating`, `checkInTime`, `checkOutTime`, `description`, `highlights`, `nearby`, `amenities`, `languages`, `facts`, `policies`; mỗi phòng thêm `bedType`, `areaM2`, `view`, `images`, `amenities`; mỗi gói thêm `listPricePerNight` (giá gạch), `discountPct`, `perks`. Giá gạch chỉ để hiển thị, **không đổi số tiền khách trả** (`pricePerNight`, `totalPrice` giữ nguyên cách tính). Khách sạn chưa có dữ liệu chi tiết trả `null` / mảng rỗng.
+  - `catalog.json`: 220 khách sạn có thêm dữ liệu giả lập tất định (script do Codex viết, Claude chạy và soát): địa chỉ trên đường thật, toạ độ trong khu vực, địa danh thật của 42 tỉnh, 3.174 tiện ích, chính sách, chi tiết 642 loại phòng. Trường cũ và chuyến bay không đổi. **Khoảng cách tới địa danh và số nhà là số giả lập**, không phải số đo thật.
+
 ## Chưa làm / phụ thuộc người khác
 - Giao diện app: `HotelScreen` ở nhánh `trang/mobile-ui` (Trang) đang dùng số cứng, cần gọi API trên.
 - Giao diện web `/hotels/[id]` trong `tripflix-fe/apps/web` (Thành).
@@ -24,7 +29,14 @@
 | Từ một reel bấm 1 lần tới trang chi tiết | Chưa | Phụ thuộc feed (Phong) và giao diện (Trang, Thành) |
 | Vài bài nổi bật | Chưa | Phụ thuộc content (Thành) |
 
-## Kết quả kiểm tra
+## Kết quả kiểm tra (mở rộng dữ liệu chi tiết, 05/11)
+- `vitest run` (core-api): **240/240 pass**; test mới trong `hotels.e2e.spec.ts`: trả đủ trường chi tiết, giá gạch 1.000.000 / 0,65 → 1.540.000đ còn giá trả giữ 1.000.000đ; khách sạn chưa có dữ liệu chi tiết trả null.
+- `vitest run --config vitest.int.config.ts` (Postgres thật): **23/23 pass**. `tsc --noEmit` pass, `oxlint` không có cảnh báo ở commerce, `check-boundaries` không vi phạm.
+- Chạy thật: migrate + seed (220 khách sạn, 642 loại phòng), `GET /api/hotels/P-h-nt-01` trả 200 kèm địa chỉ, đánh giá 4.6 (759), 18 tiện ích (5 nổi bật), ảnh phòng qua CloudFront HTTP 200.
+- `contracts/openapi/core-api.json` sinh lại bằng `export-openapi` (chỉ thêm trường).
+- Lưu ý: seed lấy tiền tố ảnh từ `S3_KEY_PREFIX`; ảnh đang ở `dev/thang/`, nên seed với `S3_KEY_PREFIX=dev/thang/`.
+
+## Kết quả kiểm tra (lần đầu)
 - `pnpm turbo run lint typecheck test --filter=@tripflix/core-api`: lint 0 lỗi (53 cảnh báo đều ở `content`, không có ở commerce), typecheck pass, **221/221 test pass**.
 - `pnpm --filter @tripflix/core-api test:int` (Postgres thật): **19/19 pass**.
 - `node tools/check-boundaries.mjs`: không vi phạm.

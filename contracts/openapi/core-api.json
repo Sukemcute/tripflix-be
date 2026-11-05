@@ -5072,6 +5072,182 @@
           "name"
         ]
       },
+      "LocationDto": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "example": 12.2388
+          },
+          "lng": {
+            "type": "number",
+            "example": 109.1967
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "RatingDto": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number",
+            "example": 4.9
+          },
+          "count": {
+            "type": "number",
+            "example": 2200
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "example": "tripadvisor"
+          }
+        },
+        "required": [
+          "average",
+          "count",
+          "source"
+        ]
+      },
+      "HighlightDto": {
+        "type": "object",
+        "properties": {
+          "icon": {
+            "type": "string",
+            "example": "pool"
+          },
+          "text": {
+            "type": "string",
+            "example": "Hồ bơi vô cực toàn cảnh"
+          }
+        },
+        "required": [
+          "icon",
+          "text"
+        ]
+      },
+      "NearbyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Chùa Long Sơn"
+          },
+          "distanceKm": {
+            "type": "number",
+            "example": 3.1
+          }
+        },
+        "required": [
+          "name",
+          "distanceKm"
+        ]
+      },
+      "AmenityDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "example": "wellness",
+            "description": "dining | sports | wellness | kids | general"
+          },
+          "name": {
+            "type": "string",
+            "example": "Spa"
+          },
+          "icon": {
+            "type": "string",
+            "example": "spa"
+          },
+          "featured": {
+            "type": "boolean",
+            "description": "Hiện ở mục Tiện ích nổi bật"
+          }
+        },
+        "required": [
+          "group",
+          "name",
+          "icon",
+          "featured"
+        ]
+      },
+      "FactsDto": {
+        "type": "object",
+        "properties": {
+          "voltage": {
+            "type": "string",
+            "nullable": true,
+            "example": "110V / 220V"
+          },
+          "floors": {
+            "type": "number",
+            "nullable": true,
+            "example": 41
+          },
+          "openedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "roomCount": {
+            "type": "number",
+            "nullable": true,
+            "example": 895
+          },
+          "restaurants": {
+            "type": "number",
+            "nullable": true
+          },
+          "bars": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "voltage",
+          "floors",
+          "openedAt",
+          "roomCount",
+          "restaurants",
+          "bars"
+        ]
+      },
+      "PoliciesDto": {
+        "type": "object",
+        "properties": {
+          "child": {
+            "type": "string",
+            "nullable": true
+          },
+          "extraBed": {
+            "type": "string",
+            "nullable": true
+          },
+          "deposit": {
+            "type": "string",
+            "nullable": true
+          },
+          "depositAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "VND/phòng/đêm"
+          },
+          "stay": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "child",
+          "extraBed",
+          "deposit",
+          "depositAmount",
+          "stay"
+        ]
+      },
       "HotelRatePlanQuoteDto": {
         "type": "object",
         "properties": {
@@ -5103,6 +5279,26 @@
             "type": "number",
             "nullable": true,
             "description": "Một đêm một phòng (VND)"
+          },
+          "listPricePerNight": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá gạch một đêm một phòng (VND), chỉ để hiển thị"
+          },
+          "discountPct": {
+            "type": "number",
+            "nullable": true,
+            "example": 35,
+            "description": "% giảm so với giá gạch"
+          },
+          "perks": {
+            "example": [
+              "Bữa sáng buffet cho 2 người"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -5112,7 +5308,10 @@
           "isRefundable",
           "freeCancelDays",
           "totalPrice",
-          "pricePerNight"
+          "pricePerNight",
+          "listPricePerNight",
+          "discountPct",
+          "perks"
         ]
       },
       "HotelRoomOfferDto": {
@@ -5129,6 +5328,39 @@
           },
           "maxGuests": {
             "type": "number"
+          },
+          "bedType": {
+            "type": "string",
+            "nullable": true,
+            "example": "1 giường siêu lớn"
+          },
+          "areaM2": {
+            "type": "number",
+            "nullable": true,
+            "example": 42
+          },
+          "view": {
+            "type": "string",
+            "nullable": true,
+            "example": "city",
+            "description": "city | sea | garden | mountain | pool | river"
+          },
+          "images": {
+            "description": "URL ảnh phòng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "amenities": {
+            "example": [
+              "Ghế sofa",
+              "Điều hoà không khí"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "roomsNeeded": {
             "type": "number",
@@ -5167,6 +5399,11 @@
           "productId",
           "name",
           "maxGuests",
+          "bedType",
+          "areaM2",
+          "view",
+          "images",
+          "amenities",
           "roomsNeeded",
           "isAvailable",
           "reason",
@@ -5239,6 +5476,76 @@
               "type": "string"
             }
           },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocationDto"
+              }
+            ]
+          },
+          "rating": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RatingDto"
+              }
+            ]
+          },
+          "checkInTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "15:00"
+          },
+          "checkOutTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "12:00"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HighlightDto"
+            }
+          },
+          "nearby": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NearbyDto"
+            }
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmenityDto"
+            }
+          },
+          "languages": {
+            "example": [
+              "vi",
+              "en"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "facts": {
+            "$ref": "#/components/schemas/FactsDto"
+          },
+          "policies": {
+            "$ref": "#/components/schemas/PoliciesDto"
+          },
           "stay": {
             "$ref": "#/components/schemas/StayDto"
           },
@@ -5273,6 +5580,18 @@
           "style",
           "thumbnail",
           "images",
+          "address",
+          "location",
+          "rating",
+          "checkInTime",
+          "checkOutTime",
+          "description",
+          "highlights",
+          "nearby",
+          "amenities",
+          "languages",
+          "facts",
+          "policies",
           "stay",
           "priceFrom",
           "isAvailable",
