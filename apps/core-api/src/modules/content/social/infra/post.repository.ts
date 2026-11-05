@@ -63,6 +63,14 @@ export class PostRepository {
     return record ?? null;
   }
 
+  /**
+   * Khóa bi quan dòng post (SELECT ... FOR UPDATE) để tuần tự hóa các cập nhật tương tác đồng thời.
+   */
+  async findByIdForUpdate(id: string): Promise<PostRecord | null> {
+    const [record] = await this.db.select().from(posts).where(eq(posts.id, id)).for('update');
+    return record ?? null;
+  }
+
   async findByIds(ids: string[]): Promise<PostRecord[]> {
     if (ids.length === 0) return [];
     return this.db.select().from(posts).where(inArray(posts.id, ids));

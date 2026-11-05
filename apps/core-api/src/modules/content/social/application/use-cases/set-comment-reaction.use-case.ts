@@ -53,15 +53,28 @@ export class SetCommentReactionUseCase {
     let likeCount = comment.likeCount ?? 0;
 
     if (shouldLike) {
-      if (!existing) {
-        await this.commentReactionRepository.upsert(command.commentId, command.userId, 'like');
+      const inserted = await this.commentReactionRepository.insertIfAbsent(
+        command.commentId,
+        command.userId,
+        'like',
+      );
+      if (inserted) {
         likeCount = await this.commentRepository.incrementLikeCount(command.commentId, 1);
+      } else {
+        const current = await this.commentRepository.findById(command.commentId);
+        likeCount = current?.likeCount ?? comment.likeCount;
       }
       isLiked = true;
     } else {
-      if (existing) {
-        await this.commentReactionRepository.delete(command.commentId, command.userId);
+      const deleted = await this.commentReactionRepository.delete(
+        command.commentId,
+        command.userId,
+      );
+      if (deleted) {
         likeCount = await this.commentRepository.incrementLikeCount(command.commentId, -1);
+      } else {
+        const current = await this.commentRepository.findById(command.commentId);
+        likeCount = current?.likeCount ?? comment.likeCount;
       }
       isLiked = false;
     }

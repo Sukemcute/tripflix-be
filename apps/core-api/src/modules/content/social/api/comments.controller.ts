@@ -83,6 +83,7 @@ export class CommentsController {
     @OptionalCurrentUser() user?: AuthUser,
   ) {
     const isFlat = query.flat === true || (query.flat as unknown) === 'true';
+    const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
     return this.listCommentsUseCase.execute({
       postId,
       limit: query.limit ? Number(query.limit) : undefined,
@@ -90,6 +91,7 @@ export class CommentsController {
       parentCommentId: query.parent_comment_id,
       flat: isFlat,
       viewerId: user?.userId,
+      isStaff,
     });
   }
 

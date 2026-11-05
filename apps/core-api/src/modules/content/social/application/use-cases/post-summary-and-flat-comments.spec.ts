@@ -154,6 +154,37 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       expect(result.items).toHaveLength(2);
       expect(result.total).toBe(2);
     });
+
+    it('từ chối xem danh sách bình luận nếu bài viết ở trạng thái draft và người xem là người lạ', async () => {
+      mockPostRepo.findById.mockResolvedValueOnce({
+        ...mockPost,
+        status: 'draft',
+        authorId: 'author-123',
+      });
+
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+      await expect(
+        useCase.execute({
+          postId,
+          viewerId: 'stranger-456',
+        }),
+      ).rejects.toThrow(PostNotFoundException);
+    });
+
+    it('cho phép tác giả bài viết xem bình luận của bài viết draft của chính mình', async () => {
+      mockPostRepo.findById.mockResolvedValueOnce({
+        ...mockPost,
+        status: 'draft',
+        authorId: 'author-123',
+      });
+
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+      const res = await useCase.execute({
+        postId,
+        viewerId: 'author-123',
+      });
+      expect(res.items).toBeDefined();
+    });
   });
 
   describe('SavePostSummaryUseCase & GetPostSummaryUseCase', () => {
@@ -218,13 +249,53 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       ).rejects.toThrow('Nội dung tóm tắt không được để trống');
     });
 
-    it('lấy tóm tắt bài viết thành công', async () => {
+    it('bỏ qua ghi đè và giữ nguyên bản ghi hiện tại nếu kết quả mới có generatedAt cũ hơn (Compare-and-Swap)', async () => {
+      const existingRecord = {
+        postId,
+        status: 'ready',
+        summary: 'Bản tóm tắt mới hơn',
+        generatedAt: new Date('2026-11-05T14:30:00Z'),
+      };
+      mockPostSummaryRepo.findByPostId.mockResolvedValueOnce(existingRecord);
+
+      const useCase = new SavePostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
+      const result = await useCase.execute({
+        postId,
+        summary: 'Bản tóm tắt cũ bị trễ',
+        generatedAt: new Date('2026-11-05T14:15:00Z'), // Cũ hơn bản hiện tại
+      });
+
+      expect(result).toBe(existingRecord);
+      expect(mockPostSummaryRepo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('không ghi đè trạng thái failed lên bản ghi đã ready trước đó', async () => {
+      const existingReadyRecord = {
+        postId,
+        status: 'ready',
+        summary: 'Bản tóm tắt chuẩn',
+        generatedAt: new Date('2026-11-05T14:00:00Z'),
+      };
+      mockPostSummaryRepo.findByPostId.mockResolvedValueOnce(existingReadyRecord);
+
+      const useCase = new SavePostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
+      const result = await useCase.execute({
+        postId,
+        status: 'failed',
+        summary: null,
+      });
+
+      expect(result).toBe(existingReadyRecord);
+      expect(mockPostSummaryRepo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('lấy tóm tắt bài viết thành công kèm cờ isStale', async () => {
       const mockSummaryRecord = {
         postId,
         summary: 'Tóm tắt bài viết',
         keyTakeaways: [],
         inputHash: null,
-        commentCountAtSummary: 0,
+        commentCountAtSummary: 5,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -233,7 +304,24 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const useCase = new GetPostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
       const result = await useCase.execute(postId);
 
-      expect(result).toEqual(mockSummaryRecord);
+      // post có commentCount: 5 và summary có commentCountAtSummary: 5 -> isStale: false
+      expect(result).toEqual({ ...mockSummaryRecord, isStale: false });
+    });
+
+    it('từ chối xem tóm tắt nếu bài viết ở trạng thái draft và người xem không phải tác giả', async () => {
+      mockPostRepo.findById.mockResolvedValueOnce({
+        ...mockPost,
+        status: 'draft',
+        authorId: 'author-123',
+      });
+
+      const useCase = new GetPostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
+      await expect(
+        useCase.execute({
+          postId,
+          viewerId: 'stranger-456',
+        }),
+      ).rejects.toThrow(PostNotFoundException);
     });
 
     it('trả về null khi bài viết chưa có tóm tắt', async () => {

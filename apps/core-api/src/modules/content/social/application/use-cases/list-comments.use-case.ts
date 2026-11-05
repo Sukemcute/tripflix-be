@@ -1,5 +1,5 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
-import { PostNotFoundException } from '../../domain/index.js';
+import { Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { CommentReactionRepository } from '../../infra/comment-reaction.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
@@ -12,6 +12,7 @@ export interface ListCommentsQuery {
   parentCommentId?: string;
   flat?: boolean;
   viewerId?: string;
+  isStaff?: boolean;
 }
 
 export type EnrichedCommentItem = CommentRecord & {
@@ -34,7 +35,13 @@ export class ListCommentsUseCase {
 
   async execute(query: ListCommentsQuery): Promise<ListCommentsResult> {
     const post = await this.postRepository.findById(query.postId);
-    if (!post || post.status === 'deleted') {
+    if (!post) {
+      throw new PostNotFoundException(query.postId);
+    }
+
+    // Bảo vệ quyền xem bài viết (draft, private, hidden)
+    const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+    if (!domainPost.canBeViewedBy(query.viewerId, query.isStaff)) {
       throw new PostNotFoundException(query.postId);
     }
 

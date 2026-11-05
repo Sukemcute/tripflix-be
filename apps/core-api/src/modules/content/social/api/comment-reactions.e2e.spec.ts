@@ -137,6 +137,12 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     };
 
     const mockCommentReactionRepo = {
+      insertIfAbsent: async (commentId: string, userId: string, type: 'like' = 'like') => {
+        const key = makeKey(commentId, userId);
+        if (reactionStore.has(key)) return false;
+        reactionStore.set(key, { commentId, userId, type });
+        return true;
+      },
       upsert: async (commentId: string, userId: string, type: 'like' = 'like') => {
         const rec = { commentId, userId, type };
         reactionStore.set(makeKey(commentId, userId), rec);

@@ -1,4 +1,5 @@
 import {
+  InvalidCommentBodyException,
   InvalidCommentNestingException,
   UnauthorizedCommentActionException,
 } from './errors.js';
@@ -43,10 +44,10 @@ export class Comment {
   static validateBody(body: string): string {
     const trimmed = (body ?? '').trim();
     if (!trimmed) {
-      throw new Error('Nội dung bình luận không được để trống');
+      throw new InvalidCommentBodyException('Nội dung bình luận không được để trống');
     }
     if (trimmed.length > Comment.MAX_BODY_LENGTH) {
-      throw new Error(`Nội dung bình luận không được vượt quá ${Comment.MAX_BODY_LENGTH.toLocaleString()} ký tự`);
+      throw new InvalidCommentBodyException(`Nội dung bình luận không được vượt quá ${Comment.MAX_BODY_LENGTH.toLocaleString()} ký tự`);
     }
     return trimmed;
   }

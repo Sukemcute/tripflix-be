@@ -14,6 +14,28 @@ export class CommentReactionRepository {
   }
 
   /**
+   * Thêm cảm xúc nếu chưa có (Atomic Idempotent Insert).
+   * Trả về true nếu thêm mới thành công, false nếu đã tồn tại trước đó.
+   */
+  async insertIfAbsent(
+    commentId: string,
+    userId: string,
+    type: CommentReactionType = 'like',
+  ): Promise<boolean> {
+    const rows = await this.db
+      .insert(commentReactions)
+      .values({
+        commentId,
+        userId,
+        type,
+      })
+      .onConflictDoNothing()
+      .returning({ id: commentReactions.id });
+
+    return rows.length > 0;
+  }
+
+  /**
    * Thêm hoặc cập nhật cảm xúc cho bình luận (Idempotent Upsert).
    */
   async upsert(

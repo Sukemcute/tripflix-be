@@ -40,6 +40,12 @@ export class CommentNotFoundException extends DomainException {
   }
 }
 
+export class InvalidCommentBodyException extends DomainException {
+  constructor(reason: string) {
+    super(reason);
+  }
+}
+
 export class UnauthorizedCommentActionException extends DomainException {
   constructor(action: string, commentId: string) {
     super(`Bạn không có quyền ${action} trên bình luận ID: ${commentId}`);

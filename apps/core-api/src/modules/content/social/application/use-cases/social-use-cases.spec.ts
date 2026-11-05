@@ -102,6 +102,7 @@ describe('Social Application Use Cases', () => {
       findById: vi.fn(),
       update: vi.fn(),
       softDelete: vi.fn(),
+      softDeleteWithReplies: vi.fn(),
       findByPostId: vi.fn(),
       countByPostId: vi.fn(),
     };
@@ -484,13 +485,13 @@ describe('Social Application Use Cases', () => {
       };
 
       mockCommentRepo.findById.mockResolvedValue(commentRecord);
-      mockCommentRepo.softDelete.mockResolvedValue(undefined);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([commentRecord]);
 
       const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
       const result = await useCase.execute({ commentId: 'comm-1', userId: otherUserId });
 
       expect(result.deleted).toBe(true);
-      expect(mockCommentRepo.softDelete).toHaveBeenCalledWith('comm-1');
+      expect(mockCommentRepo.softDeleteWithReplies).toHaveBeenCalledWith('comm-1');
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', -1);
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -505,6 +506,62 @@ describe('Social Application Use Cases', () => {
           }),
         }),
       );
+    });
+
+    it('xóa bình luận gốc cascade xóa các reply con và giảm commentCount đúng tổng số dòng bị xóa', async () => {
+      const rootCommentRecord: CommentRecord = {
+        id: 'comm-root',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: null,
+        body: 'Bình luận gốc có phản hồi',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      const childReply1: CommentRecord = {
+        id: 'reply-1',
+        postId,
+        authorId: authorId,
+        parentCommentId: 'comm-root',
+        body: 'Phản hồi 1',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      const childReply2: CommentRecord = {
+        id: 'reply-2',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: 'comm-root',
+        body: 'Phản hồi 2',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      mockCommentRepo.findById.mockResolvedValue(rootCommentRecord);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([
+        rootCommentRecord,
+        childReply1,
+        childReply2,
+      ]);
+
+      const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
+      const result = await useCase.execute({ commentId: 'comm-root', userId: otherUserId });
+
+      expect(result.deleted).toBe(true);
+      expect(mockCommentRepo.softDeleteWithReplies).toHaveBeenCalledWith('comm-root');
+      expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', -3);
+      expect(mockOutbox.add).toHaveBeenCalledTimes(3);
     });
   });
 

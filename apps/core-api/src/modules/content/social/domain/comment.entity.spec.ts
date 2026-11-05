@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Comment,
+  InvalidCommentBodyException,
   InvalidCommentNestingException,
   UnauthorizedCommentActionException,
 } from './index.js';
@@ -18,14 +19,14 @@ describe('Comment Domain Entity', () => {
 
   describe('validateBody', () => {
     it('ném lỗi nếu nội dung rỗng hoặc chỉ có khoảng trắng', () => {
-      expect(() => Comment.validateBody('')).toThrow('Nội dung bình luận không được để trống');
-      expect(() => Comment.validateBody('   ')).toThrow('Nội dung bình luận không được để trống');
-      expect(() => Comment.validateBody(null as unknown as string)).toThrow('Nội dung bình luận không được để trống');
+      expect(() => Comment.validateBody('')).toThrow(InvalidCommentBodyException);
+      expect(() => Comment.validateBody('   ')).toThrow(InvalidCommentBodyException);
+      expect(() => Comment.validateBody(null as unknown as string)).toThrow(InvalidCommentBodyException);
     });
 
     it('ném lỗi nếu nội dung vượt quá 10.000 ký tự', () => {
       const longBody = 'A'.repeat(10_001);
-      expect(() => Comment.validateBody(longBody)).toThrow('Nội dung bình luận không được vượt quá 10,000 ký tự');
+      expect(() => Comment.validateBody(longBody)).toThrow(InvalidCommentBodyException);
     });
 
     it('hợp lệ và tự động trim khi nội dung đúng quy chuẩn (1 - 10.000 ký tự)', () => {

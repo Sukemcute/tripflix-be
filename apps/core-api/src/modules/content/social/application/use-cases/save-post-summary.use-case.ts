@@ -35,6 +35,23 @@ export class SavePostSummaryUseCase {
       throw new Error('Nội dung tóm tắt không được để trống khi trạng thái là ready');
     }
 
+    const existing = await this.postSummaryRepository.findByPostId(command.postId);
+    if (existing) {
+      // 1. Chống worker cũ chạy muộn ghi đè lên kết quả mới hơn (Compare-and-Swap)
+      if (
+        command.generatedAt &&
+        existing.generatedAt &&
+        new Date(command.generatedAt) < new Date(existing.generatedAt)
+      ) {
+        return existing;
+      }
+
+      // 2. Không ghi đè bản ghi thất bại ('failed') lên bản ghi đã 'ready' trước đó
+      if (status === 'failed' && existing.status === 'ready') {
+        return existing;
+      }
+    }
+
     return this.postSummaryRepository.upsert({
       postId: command.postId,
       status,

@@ -76,9 +76,24 @@
 - `node tools/check-boundaries.mjs`: Ranh giới module: không có vi phạm.
 - `pnpm lint`: Found 0 errors, 13 packages lint pass.
 - `pnpm typecheck`: 23 successful, 23 total.
-- `pnpm --filter @tripflix/core-api test -- src/modules/content/social`: 9 passed, 107 passed (107).
-- `pnpm --filter @tripflix/core-api test`: 49 passed, 365 passed (365).
+- `pnpm --filter @tripflix/core-api test -- src/modules/content/social`: 9 passed, 114 passed (114).
+- `pnpm --filter @tripflix/core-api test`: 49 passed, 372 passed (372).
 - `pnpm contracts:build`: Đã build thành công OpenAPI và contracts/openapi/core-api.json.
+
+## Các cải tiến kỹ thuật toàn diện cho Social & Content (Roadmap TF25)
+1. **Chống Race Condition & Đảm bảo tính nhất quán (Giai đoạn 1)**:
+   - Sử dụng atomic `insertIfAbsent` (`ON CONFLICT DO NOTHING RETURNING id`) và `delete (... RETURNING id)` trong `SetCommentReactionUseCase`, đảm bảo chỉ tăng/giảm `likeCount` khi hàng thực sự được thêm/xóa.
+   - Thêm `findByIdForUpdate` (khóa bi quan `SELECT ... FOR UPDATE`) trong `SetReactionUseCase` để chống mất cập nhật bộ đếm cảm xúc bài viết khi nhiều user tương tác đồng thời.
+   - Thêm `InvalidCommentBodyException` vào domain errors và map sang HTTP 400 trong `SocialErrorFilter` (thay vì văng 500 khi client gửi body rỗng hoặc vượt quá 10.000 ký tự).
+   - Hạ `promptVersion` trong Zod Schema xuống `max(32)` khớp chính xác với constraint DB `varchar(32)`. Dọn dẹp các fallback `snake_case` cũ trong DTO.
+2. **Bảo vệ quyền riêng tư & Tính toàn vẹn dữ liệu (Giai đoạn 2)**:
+   - Áp dụng kiểm tra quyền xem bài viết `domainPost.canBeViewedBy(viewerId, isStaff)` cho cả `ListCommentsUseCase` (`GET /api/v1/posts/:postId/comments`) và `GetPostSummaryUseCase` (`GET /api/v1/posts/:postId/ai-summary`), ngăn lộ thông tin các bài đăng `draft`, `hidden`, hoặc `private`.
+   - Cung cấp `softDeleteWithReplies` trong `CommentRepository` và cập nhật `DeleteCommentUseCase`: Khi xóa bình luận gốc, tự động cascade soft-delete toàn bộ các phản hồi con và trừ `commentCount` của bài viết theo đúng tổng số dòng bị ẩn, phát sự kiện outbox tương ứng cho từng bình luận bị xóa để AI worker đồng bộ lại.
+   - Đưa việc gọi kiểm tra booking (`verifyCompletedBooking`) ra ngoài transaction DB trong `PublishPostUseCase`, tránh giữ kết nối database pool khi gọi external network.
+3. **Compare-and-Swap & Cảnh báo dữ liệu cũ cho AI Summary (Giai đoạn 3)**:
+   - Cơ chế CAS cho `SavePostSummaryUseCase` (`PUT /api/v1/posts/:postId/ai-summary`): So sánh `generatedAt`, ngăn chặn worker cũ chạy chậm ghi đè lên kết quả tóm tắt mới hơn; không ghi đè trạng thái `failed` lên bản ghi đã `ready` trước đó (giữ lại nội dung tốt cho người dùng).
+   - Bổ sung cờ `isStale: boolean` trong `GetPostSummaryUseCase` và `PostSummaryResponseDto`: Đánh dấu `true` khi số lượng comment hiện tại của bài viết lệch so với `commentCountAtSummary`.
+   - Cập nhật OpenAPI documentation với `PostSummaryResponseDto`.
 
 ## Cách kiểm lại
 1. Chạy migration: `pnpm db:migrate`

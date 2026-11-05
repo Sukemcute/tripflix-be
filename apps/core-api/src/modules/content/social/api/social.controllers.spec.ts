@@ -205,6 +205,7 @@ describe('Social API Controllers', () => {
         parentCommentId: undefined,
         flat: false,
         viewerId: undefined,
+        isStaff: false,
       });
     });
 

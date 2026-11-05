@@ -66,6 +66,30 @@ export class CommentRepository {
   }
 
   /**
+   * Xóa mềm bình luận gốc cùng tất cả các phản hồi con (nếu có) trong cùng một thao tác.
+   * Chỉ cập nhật những bản ghi có deletedAt IS NULL.
+   * Trả về danh sách tất cả bản ghi vừa bị soft-delete để use case cập nhật counter và phát outbox events.
+   */
+  async softDeleteWithReplies(id: string): Promise<CommentRecord[]> {
+    const now = new Date();
+    const deletedRecords = await this.db
+      .update(comments)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          or(eq(comments.id, id), eq(comments.parentCommentId, id)),
+          isNull(comments.deletedAt),
+        ),
+      )
+      .returning();
+
+    return deletedRecords;
+  }
+
+  /**
    * Cập nhật số lượt thích của bình luận (Atomic counter với SQL GREATEST).
    */
   async incrementLikeCount(id: string, delta: number): Promise<number> {
