@@ -3,7 +3,7 @@
 - Notion: <dán link task TF10> · Nhánh: `thang/TF10-danh-gia-khach-san` · Người làm: Thắng Nguyễn Lê Phúc (dùng AI: có) · Ngày: 2026-11-05
 
 ## Đã làm (module commerce)
-- Bảng mới `commerce.reviews` (migration `20261105164753_add_hotel_reviews`, chỉ `CREATE TABLE`, không sửa migration cũ): khách sạn, loại phòng đã ở, `booking_id` (duy nhất: mỗi booking một đánh giá), `user_id`, tên hiển thị, số sao (CHECK 1–5), tiêu đề, nội dung, tag, ảnh (khoá S3), kiểu khách, tháng lưu trú, số lượt hữu ích, `status` (`published` | `hidden`, ẩn khi kiểm duyệt chứ không xoá), `is_seeded`.
+- Bảng mới `commerce.reviews` (migration `20261105182815_add_hotel_details_reviews`, gộp cùng phần chi tiết khách sạn, nối sau `add_orders_payments` của develop; chỉ `CREATE TABLE`, `ADD COLUMN`): khách sạn, loại phòng đã ở, `booking_id` (duy nhất: mỗi booking một đánh giá), `user_id`, tên hiển thị, số sao (CHECK 1–5), tiêu đề, nội dung, tag, ảnh (khoá S3), kiểu khách, tháng lưu trú, số lượt hữu ích, `status` (`published` | `hidden`, ẩn khi kiểm duyệt chứ không xoá), `is_seeded`.
 - `properties.details.reviewSummary`: đoạn tóm tắt ý kiến khách (chỗ để sau này AI sinh; hiện là dữ liệu demo). Không cần cột mới.
 - API mới `GET /api/hotels/:id/reviews?sort=newest|highest|lowest|helpful&rating=&tag=&travelerType=&page=&limit=`: công khai, chỉ đọc, chỉ trả đánh giá `published`.
   - `summary`: điểm trung bình, số đánh giá, phân bố 5→1 sao, 10 tag nhiều nhất kèm số lần (giống chip "Phù hợp gia đình 58"), `aiSummary`. Thống kê tính trên mọi đánh giá, không theo bộ lọc.
