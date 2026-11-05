@@ -80,6 +80,33 @@ export const ContentMediaTranscodeRequestedV1Schema = z.object({
 });
 export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
 
+export const MEDIA_QUALITY_LEVELS = [360, 540, 720] as const;
+export const mediaQualityLevelSchema = z.literal(MEDIA_QUALITY_LEVELS);
+export type MediaQualityLevel = z.infer<typeof mediaQualityLevelSchema>;
+
+export const MEDIA_ASPECTS = ['9:16', '16:9', '1:1'] as const;
+export const mediaAspectSchema = z.enum(MEDIA_ASPECTS);
+export type MediaAspect = z.infer<typeof mediaAspectSchema>;
+
+/** media.rendition.completed v1: video-worker xong một mức chất lượng. Có thể gửi lại, bên nhận loại trùng theo (assetId, level). */
+export const MediaRenditionCompletedV1Schema = z.object({
+  assetId: z.uuid(),
+  level: mediaQualityLevelSchema,
+  hlsPrefix: z.string().min(1),
+  durationSec: z.number().int().positive(),
+  aspect: mediaAspectSchema,
+});
+export type MediaRenditionCompletedV1 = z.infer<typeof MediaRenditionCompletedV1Schema>;
+
+/** media.transcode.failed v1: một mức chất lượng lỗi quá số lần thử. Mức 360 lỗi thì video không phát được. */
+export const MediaTranscodeFailedV1Schema = z.object({
+  assetId: z.uuid(),
+  level: mediaQualityLevelSchema,
+  reason: z.string().min(1),
+  attempts: z.number().int().positive(),
+});
+export type MediaTranscodeFailedV1 = z.infer<typeof MediaTranscodeFailedV1Schema>;
+
 /**
  * Payload của access.password_reset_requested v1: notification-service gửi email đặt lại mật khẩu.
  * Có email vì bên gửi cần người nhận (docs/10 §3.5); resetUrl đã gồm token dùng một lần, sống 30 phút.
@@ -111,6 +138,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
   'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
+  'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
+  'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
 };
