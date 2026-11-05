@@ -2424,6 +2424,30 @@
         "tags": [
           "checkout"
         ]
+      },
+      "get": {
+        "operationId": "CheckoutController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
       }
     },
     "/api/checkout/{id}": {
@@ -5470,6 +5494,106 @@
           "isGuestInfoComplete",
           "passengersRequired",
           "policyVersion"
+        ]
+      },
+      "TripDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paying",
+              "paid",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "adults": {
+            "type": "number"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Lúc đặt"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Ngày đi sớm nhất trong đơn"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Ngày về / trả phòng muộn nhất trong đơn"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemDto"
+            }
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "total",
+          "adults",
+          "confirmationCode",
+          "cancelReason",
+          "holdExpiresAt",
+          "createdAt",
+          "paidAt",
+          "startDate",
+          "endDate",
+          "items"
+        ]
+      },
+      "TripPageDto": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "description": "Mới đặt trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Gửi lại làm cursor để lấy trang sau; null là hết"
+          }
+        },
+        "required": [
+          "trips",
+          "nextCursor"
         ]
       },
       "ContactDto": {

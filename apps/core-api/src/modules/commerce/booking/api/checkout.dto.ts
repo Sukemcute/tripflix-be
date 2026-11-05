@@ -25,6 +25,22 @@ export const CheckoutRequestSchema = z
   })
   .strict();
 
+const ORDER_STATUS_VALUES = ['pending', 'paying', 'paid', 'cancelled', 'expired'] as const;
+
+export const ListTripsQuerySchema = z
+  .object({
+    // ?status=paid,expired; bỏ trống là mọi trạng thái.
+    status: z
+      .string()
+      .max(100)
+      .transform((value) => [...new Set(value.split(',').map((s) => s.trim()).filter(Boolean))])
+      .pipe(z.array(z.enum(ORDER_STATUS_VALUES)))
+      .optional(),
+    cursor: z.string().min(1).max(200).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+
 export const SetGuestsRequestSchema = z
   .object({
     contact: z.object({ fullName: z.string().max(100), phone: z.string().max(20), email: z.string().max(254).nullish() }).strict(),
@@ -144,4 +160,31 @@ export class TokenDto {
   @ApiProperty() paymentToken!: string;
   @ApiProperty() last4!: string;
   @ApiProperty() isTestCard!: boolean;
+}
+
+export class ListTripsQueryDto {
+  @ApiPropertyOptional({ example: 'paid,expired', description: 'Lọc trạng thái, nhiều giá trị cách nhau bởi dấu phẩy (pending, paying, paid, cancelled, expired). Bỏ trống: mọi trạng thái' })
+  status?: string;
+  @ApiPropertyOptional({ description: 'Lấy từ nextCursor của trang trước' }) cursor?: string;
+  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 20 }) limit?: number;
+}
+
+export class TripDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ enum: ['pending', 'paying', 'paid', 'cancelled', 'expired'] }) status!: string;
+  @ApiProperty() total!: number;
+  @ApiProperty() adults!: number;
+  @ApiProperty({ type: String, nullable: true }) confirmationCode!: string | null;
+  @ApiProperty({ type: String, nullable: true }) cancelReason!: string | null;
+  @ApiProperty({ format: 'date-time' }) holdExpiresAt!: string;
+  @ApiProperty({ format: 'date-time', description: 'Lúc đặt' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) paidAt!: string | null;
+  @ApiProperty({ type: String, format: 'date', nullable: true, description: 'Ngày đi sớm nhất trong đơn' }) startDate!: string | null;
+  @ApiProperty({ type: String, format: 'date', nullable: true, description: 'Ngày về / trả phòng muộn nhất trong đơn' }) endDate!: string | null;
+  @ApiProperty({ type: [CheckoutItemDto] }) items!: CheckoutItemDto[];
+}
+
+export class TripPageDto {
+  @ApiProperty({ type: [TripDto], description: 'Mới đặt trước' }) trips!: TripDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Gửi lại làm cursor để lấy trang sau; null là hết' }) nextCursor!: string | null;
 }
