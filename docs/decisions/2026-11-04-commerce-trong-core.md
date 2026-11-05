@@ -41,7 +41,7 @@ Code đang dùng `pgSchema('commerce')` (TF06) **không phải sửa**.
 | 6 | `modules/commerce/README.md` (dòng 4, 13), chú thích `commerce.module.ts` (dòng 28) | "Database riêng `commerce`" | "Database `core`, schema `commerce`" | Thắng |
 | 7 | `docs/architecture/11-…md` trong 3 repo | Ghi phần database của v1.1 là "đề xuất, chờ duyệt" | **Đã sửa** ở nhánh `duy/TF57-commerce-schema-trong-core` (3 repo) | Duy (QC kiến trúc) |
 | 8 | `docs/architecture/10-…md` (tóm tắt, §3.11, §4, sơ đồ mermaid) | "2 database: `core` và `commerce`", "database riêng" | **Đã sửa** ở cùng nhánh, có dòng "Cập nhật 04/11" ở đầu | Duy (QC kiến trúc) |
-| 9 | Sơ đồ `06-kien-truc-tong-quan.drawio`, `ARCHITECTURE.md` trong 3 repo | v4.5 (2 Postgres) | `.drawio` **đã thay** bằng v4.6 ở cùng nhánh. **Còn:** xuất lại `06-kien-truc-tong-quan.png` từ `.drawio` | Duy / Tech Lead |
+| 9 | Sơ đồ `06-kien-truc-tong-quan.drawio`, `ARCHITECTURE.md` trong 3 repo | v4.5 (2 Postgres) | `.drawio` **đã thay** bằng v4.6, rồi v4.7 (05/11, bản chính thức hiện tại) ở cùng nhánh. **Còn:** xuất lại `06-kien-truc-tong-quan.png` từ `.drawio` | Duy / Tech Lead |
 | 10 | Jira TF04, TF06, TF29, TF30, TF59 | Mô tả "database riêng `commerce`" | "schema `commerce` trong `core`" | Trang |
 | 11 | PRD v3 §7 | "phân hệ Giao dịch dùng cơ sở dữ liệu riêng" (tự mâu thuẫn với câu "một cơ sở dữ liệu" ngay trước) | Bỏ vế "dùng cơ sở dữ liệu riêng". Đây là quyết định kiến trúc, không thuộc PRD | Người giữ PRD |
 
