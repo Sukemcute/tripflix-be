@@ -6,6 +6,7 @@ import type {
   AuditEntry,
   NewSession,
   SessionRecord,
+  ServiceClientRecord,
   SessionRotation,
   SessionSummary,
   UserRecord,
@@ -89,6 +90,24 @@ export class MemoryAccessStore implements AccessStore {
   readonly audit = {
     record: async (entry: AuditEntry) => {
       this.auditRows.push(entry);
+    },
+  };
+
+  readonly serviceClientRows = new Map<string, ServiceClientRecord>();
+
+  readonly serviceClients = {
+    findById: async (clientId: string) => this.serviceClientRows.get(clientId) ?? null,
+    insert: async (client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>) => {
+      if (this.serviceClientRows.has(client.clientId)) return null;
+      const row: ServiceClientRecord = { ...client, createdAt: new Date(), disabledAt: null };
+      this.serviceClientRows.set(row.clientId, row);
+      return row;
+    },
+    disable: async (clientId: string, at: Date) => {
+      const row = this.serviceClientRows.get(clientId);
+      if (!row) return false;
+      this.serviceClientRows.set(clientId, { ...row, disabledAt: row.disabledAt ?? at });
+      return true;
     },
   };
 

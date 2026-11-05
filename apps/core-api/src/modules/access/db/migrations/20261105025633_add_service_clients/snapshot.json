@@ -1,0 +1,154 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "04c75bf7-28af-4408-a88f-281cc4b4c198",
+  "prevIds": [
+    "a9a47a3c-07d9-4dfb-ba05-ace1c91eda90"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "service_clients"
+      ],
+      "writes": [
+        "s|tbl|access.service_clients",
+        "n|tbl|access.service_clients",
+        "e|tbl|access.service_clients",
+        "n|rel|access.service_clients",
+        "n|type|access.service_clients",
+        "n|rel|access.service_clients_pkey"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "name": "service_clients",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "client_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "secret_hash",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "allowed_audiences",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "disabled_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "service_clients_pkey",
+        "columns": [
+          "client_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "ck_service_clients_client_id_format",
+        "value": "\"client_id\" ~ '^[a-z][a-z0-9-]{1,49}$'",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "service_clients",
+        "name": "ck_service_clients_allowed_audiences_not_empty",
+        "value": "cardinality(\"allowed_audiences\") > 0",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

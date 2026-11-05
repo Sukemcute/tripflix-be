@@ -44,6 +44,23 @@ export interface SessionRotation {
   lastUsedAt: Date;
 }
 
+/** Service được xin token service-to-service. */
+export interface ServiceClientRecord {
+  clientId: string;
+  secretHash: string;
+  allowedAudiences: string[];
+  createdAt: Date;
+  disabledAt: Date | null;
+}
+
+export interface ServiceClientRepository {
+  findById(clientId: string): Promise<ServiceClientRecord | null>;
+  /** Trả null khi clientId đã có. */
+  insert(client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>): Promise<ServiceClientRecord | null>;
+  /** Đặt disabled_at nếu đang bật; trả false khi không có client này. */
+  disable(clientId: string, at: Date): Promise<boolean>;
+}
+
 export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
@@ -87,6 +104,9 @@ export type AuditAction =
   | 'auth.profile_updated'
   | 'auth.password_changed'
   | 'auth.password_change_failed'
+  | 'service.token_failed'
+  | 'service.client_created'
+  | 'service.client_disabled'
   | 'staff.role_granted'
   | 'staff.role_revoked'
   | 'user.locked'
@@ -115,6 +135,7 @@ export interface AccessStore {
   sessions: SessionRepository;
   audit: AuditLog;
   outbox: AccessOutbox;
+  serviceClients: ServiceClientRepository;
 }
 
 export interface PasswordHasher {
@@ -129,6 +150,8 @@ export interface IssuedAccessToken {
 
 export interface TokenIssuer {
   issue(claims: { userId: string; role: Role; sid: string }): Promise<IssuedAccessToken>;
+  /** Token service-to-service: typ=service, sub=clientId, aud=service nhận, sống SERVICE_TOKEN_TTL_SECONDS. */
+  issueServiceToken(claims: { clientId: string; audience: string }): Promise<IssuedAccessToken>;
   /** Khoá công khai cho /.well-known/jwks.json. */
   getJwks(): { keys: JWK[] };
 }

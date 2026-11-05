@@ -414,9 +414,18 @@ importers:
       '@nestjs/core':
         specifier: 'catalog:'
         version: 12.3.2(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.3.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: 'catalog:'
+        version: 12.3.2(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.3.2)
+      '@nestjs/testing':
+        specifier: 'catalog:'
+        version: 12.3.2(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.3.2)(@nestjs/platform-express@12.3.2)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      '@types/supertest':
+        specifier: 'catalog:'
+        version: 7.2.1
       oxlint:
         specifier: 'catalog:'
         version: 1.91.0(oxlint-tsgolint@7.0.2005)
@@ -426,6 +435,9 @@ importers:
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
+      supertest:
+        specifier: 'catalog:'
+        version: 7.3.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

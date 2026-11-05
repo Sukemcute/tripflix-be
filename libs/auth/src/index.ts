@@ -19,3 +19,18 @@ export {
   UNAUTHORIZED_MESSAGE,
 } from './guards.js';
 export { AuthModule, type AuthModuleAsyncOptions, type AuthModuleOptions } from './auth.module.js';
+export {
+  CurrentService,
+  INVALID_SERVICE_TOKEN_MESSAGE,
+  InvalidServiceTokenError,
+  SERVICE_NOT_ALLOWED_MESSAGE,
+  SERVICE_TOKEN_TTL_SECONDS,
+  SERVICE_TOKEN_TYPE,
+  SERVICE_VERIFIER,
+  ServiceOnly,
+  ServiceTokenGuard,
+  createServiceTokenVerifier,
+  type ServiceCaller,
+  type ServiceTokenVerifier,
+  type ServiceTokenVerifierOptions,
+} from './service-token.js';
