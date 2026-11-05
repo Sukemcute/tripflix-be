@@ -16,6 +16,8 @@ x-be-env: &be-env
   AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
   AUTH_JWT_ISSUER: tripflix-core
   AUTH_JWT_AUDIENCE: tripflix
+  # Web (3100), admin (3200) gọi API qua gateway :8080 từ trình duyệt: CORS và cookie refresh token.
+  AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100,http://localhost:3200}
   JWKS_URL: http://core-api:3000/.well-known/jwks.json
   # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.
   SEED_PASSWORD: ${SEED_PASSWORD:-tripflix-dev-123}

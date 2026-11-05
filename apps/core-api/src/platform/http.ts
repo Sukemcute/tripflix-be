@@ -18,10 +18,19 @@ export function buildOpenApiDocument(app: INestApplication) {
   return SwaggerModule.createDocument(app, config);
 }
 
-export function setupHttp(app: INestApplication, { swagger }: { swagger: boolean }) {
+/**
+ * Chỉ web, admin trong AUTH_WEB_ORIGINS gọi được API từ trình duyệt, có gửi cookie (refresh token).
+ * App mobile không bị CORS chặn nên không cần ở đây.
+ */
+export function applyCors(app: INestApplication, webOrigins: string[]) {
+  app.enableCors({ origin: webOrigins, credentials: true, exposedHeaders: ['Retry-After'], maxAge: 600 });
+}
+
+export function setupHttp(app: INestApplication, { swagger, webOrigins }: { swagger: boolean; webOrigins: string[] }) {
   // Đứng sau Traefik: lấy IP người dùng từ X-Forwarded-For (một proxy) để chặn đăng nhập sai theo IP.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set('trust proxy', 1);
   applyGlobalPrefix(app);
+  applyCors(app, webOrigins);
   app.enableShutdownHooks();
   if (swagger) SwaggerModule.setup('docs', app, buildOpenApiDocument(app));
 }
