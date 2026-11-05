@@ -74,6 +74,27 @@ export const auditLogs = accessSchema.table(
 );
 
 /**
+ * Token đặt lại mật khẩu (quên mật khẩu). Chỉ lưu SHA-256 của token; dùng một lần (used_at), sống 30 phút.
+ * Yêu cầu mới thì xoá token chưa dùng của người đó, nên mỗi lúc chỉ có một link còn hiệu lực.
+ */
+export const passwordResets = accessSchema.table(
+  'password_resets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    tokenHash: text('token_hash').notNull().unique('uq_password_resets_token_hash'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAtColumn(),
+  },
+  (t) => [
+    foreignKey({ name: 'fk_password_resets_user_id', columns: [t.userId], foreignColumns: [users.id] }).onDelete('cascade'),
+    index('idx_password_resets_user_id').on(t.userId),
+    index('idx_password_resets_expires_at').on(t.expiresAt),
+  ],
+);
+
+/**
  * Service được xin token service-to-service (docs/10 §3.10). Chỉ lưu bản băm argon2 của secret.
  * allowed_audiences: các service mà client này được gọi (aud của token). disabled_at khác null: không cấp token nữa.
  */
