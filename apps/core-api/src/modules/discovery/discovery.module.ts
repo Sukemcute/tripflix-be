@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { createDb } from '@tripflix/db';
 import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
+import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
+import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
 import { HOTEL_CATALOG, SUGGEST_STORE, type HotelCatalog } from './search/application/ports.js';
@@ -27,12 +29,13 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
  */
 @Module({
   imports: [CommerceModule],
-  controllers: [SuggestController, StaysController],
+  controllers: [SuggestController, StaysController, HomeRecommendationsController],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
     SuggestUseCases,
     StaysUseCases,
+    HomeRecommendationUseCases,
     RebuildSuggestIndexJob,
   ],
 })
