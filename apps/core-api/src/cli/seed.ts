@@ -8,6 +8,7 @@ import { DrizzleAccessStore } from '../modules/access/auth/infra/drizzle-access.
 import { seedCatalog } from '../modules/commerce/db/seed/seed-catalog.js';
 import { CalendarUseCases } from '../modules/commerce/inventory/application/calendar.use-cases.js';
 import { DrizzleCommerceStore } from '../modules/commerce/inventory/infra/drizzle-commerce.store.js';
+import { seedContent } from '../modules/content/db/seed/seed-content.js';
 import { coreEnvSchema } from '../platform/env.js';
 
 // pnpm db:seed: tạo tài khoản mẫu cho 3 vai trò. Chạy lại nhiều lần không tạo trùng. Không chạy ở production.
@@ -51,4 +52,17 @@ try {
   );
 } finally {
   await commercePool.end();
+}
+
+// Content: danh sách bài đăng mẫu, video assets, bình luận, cảm xúc và bookmark. Chạy lại không tạo trùng.
+const contentPool = createPool({ url: env.DATABASE_URL_CONTENT, max: 1, applicationName: 'seed:content' });
+try {
+  const contentDb = createDb(contentPool);
+  const contentStats = await seedContent(contentDb);
+  process.stdout.write(
+    `content: ${contentStats.posts} bài đăng, ${contentStats.comments} bình luận, ` +
+      `${contentStats.reactions} cảm xúc, ${contentStats.bookmarks} bookmark, ${contentStats.mediaAssets} media assets\n`,
+  );
+} finally {
+  await contentPool.end();
 }
