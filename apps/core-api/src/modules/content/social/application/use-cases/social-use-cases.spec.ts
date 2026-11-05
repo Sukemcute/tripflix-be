@@ -192,6 +192,28 @@ describe('Social Application Use Cases', () => {
       expect(mockPostRepo.update).toHaveBeenCalled();
     });
 
+    it('tự động hạ isVerified về false khi cập nhật tripAttachment', async () => {
+      const verifiedPost = samplePostRecord({ isVerified: true, status: 'published' });
+      mockPostRepo.findById.mockResolvedValue(verifiedPost);
+      mockPostRepo.update.mockImplementation((_id: string, updateData: any) => ({
+        ...verifiedPost,
+        ...updateData,
+      }));
+
+      const useCase = new UpdatePostUseCase(mockPostRepo);
+      const result = await useCase.execute({
+        postId,
+        userId: authorId,
+        tripAttachment: { destinationName: 'Hà Giang mới' },
+      });
+
+      expect(result.isVerified).toBe(false);
+      expect(mockPostRepo.update).toHaveBeenCalledWith(
+        postId,
+        expect.objectContaining({ isVerified: false }),
+      );
+    });
+
     it('xóa bài đăng thành công và bắn event content.post.deleted', async () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
@@ -322,6 +344,40 @@ describe('Social Application Use Cases', () => {
           type: 'content.comment.created',
         }),
       );
+    });
+
+    it('từ chối bình luận khi reply vào một reply khác (chặn reply cấp 2)', async () => {
+      const post = samplePostRecord({ status: 'published' });
+      // Bình luận cha này bản thân nó đã là reply của một comment khác (parentCommentId != null)
+      const parentReplyRecord: CommentRecord = {
+        id: 'reply-1',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: 'root-comment-id',
+        body: 'Đây là câu trả lời',
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockCommentRepo.findById.mockResolvedValue(parentReplyRecord);
+
+      const useCase = new AddCommentUseCase(
+        mockPostRepo,
+        mockCommentRepo,
+        mockEventPublisher,
+      );
+
+      await expect(
+        useCase.execute({
+          postId,
+          authorId: otherUserId,
+          body: 'Cố tình reply vào reply',
+          parentCommentId: 'reply-1',
+        }),
+      ).rejects.toThrow(/Chỉ hỗ trợ phản hồi bình luận 1 cấp/);
     });
 
     it('xóa bình luận giảm commentCount của bài viết', async () => {

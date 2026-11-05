@@ -110,8 +110,9 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     {
       provide: COMMERCE_SERVICE_PORT,
       useFactory: (): CommerceServicePort => ({
-        async verifyCompletedBooking(bookingId: string, userId: string): Promise<boolean> {
-          return Boolean(bookingId.trim() && userId.trim());
+        async verifyCompletedBooking(): Promise<boolean> {
+          // Mặc định trả về false khi chưa tích hợp với module Commerce thật (chưa xác thực)
+          return false;
         },
       }),
     },
