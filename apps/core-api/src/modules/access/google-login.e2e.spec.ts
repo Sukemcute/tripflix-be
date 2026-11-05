@@ -198,6 +198,29 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
     expect(store.outboxRows.filter((e) => e.type === 'access.user.guest_merged').length).toBe(before);
   });
 
+  it('email chào mừng: đúng 1 sự kiện khi tạo tài khoản (mật khẩu, Google), không gửi khi đăng nhập lại, liên kết hay đăng ký trùng', async () => {
+    const welcome = (userId: string) =>
+      store.outboxRows.filter((e) => e.type === 'access.user.welcome_email_requested' && e.userId === userId);
+
+    const reg = await http().post('/api/auth/register').send({ email: 'chao@example.com', password: PASSWORD, displayName: 'Chào' }).expect(201);
+    expect(welcome(reg.body.id).map((e) => e.payload)).toEqual([
+      { userId: reg.body.id, email: 'chao@example.com', displayName: 'Chào', provider: 'password' },
+    ]);
+    await http().post('/api/auth/register').send({ email: 'chao@example.com', password: PASSWORD, displayName: 'Trùng' }).expect(409);
+    await http().post('/api/auth/login').send({ email: 'chao@example.com', password: PASSWORD }).expect(200);
+    // Liên kết Google vào tài khoản có sẵn: không phải tài khoản mới, không chào lại.
+    await google(await googleToken({ sub: 'sub-chao-link', email: 'chao@example.com' })).expect(200);
+    expect(welcome(reg.body.id)).toHaveLength(1);
+
+    const first = await google(await googleToken({ sub: 'sub-chao-google', email: 'moi-chao@gmail.com', name: 'Google Mới' })).expect(200);
+    const googleUserId = decodeJwt(first.body.accessToken).sub!;
+    expect(welcome(googleUserId).map((e) => e.payload)).toEqual([
+      { userId: googleUserId, email: 'moi-chao@gmail.com', displayName: 'Google Mới', provider: 'google' },
+    ]);
+    await google(await googleToken({ sub: 'sub-chao-google', email: 'moi-chao@gmail.com' })).expect(200);
+    expect(welcome(googleUserId)).toHaveLength(1);
+  });
+
   it('chế độ web: cookie HttpOnly, body không có refreshToken; Origin lạ 403', async () => {
     const token = await googleToken({ sub: 'sub-web', email: 'web-google@gmail.com' });
     const res = await google(token, { 'X-Tripflix-Client': 'web', Origin: 'http://localhost:3100' }).expect(200);
