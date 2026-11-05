@@ -228,6 +228,51 @@
           "admin"
         ]
       }
+    },
+    "/api/suggest": {
+      "get": {
+        "description": "Dùng cho web OTA (kiểu Traveloka), gọi sau mỗi lần ngừng gõ khoảng 250 ms. Công khai, không cần đăng nhập.\n\n- Tối đa 8 dòng lẫn loại: khoảng 3 địa điểm, 4 khách sạn, 1 sân bay; loại nào thiếu thì lấy thêm loại khác.\n- Khớp không dấu, gõ tắt (`pq`, `hcm`, `sg`), gõ sai nhẹ (`nha trag`, `da nng`). Khớp đầu từ xếp trước khớp gần đúng.\n- Câu ngắn hơn 4 ký tự (sau khi bỏ ký tự lạ) chỉ khớp đầu từ, không tìm gần đúng.\n- Không có giá, không kiểm còn phòng: chọn địa điểm thì gọi `/api/stays?placeId=<refId>` (chưa có), chọn khách sạn thì mở trang chi tiết.\n- Không khớp gì thì `items: []` (không phải lỗi).",
+        "operationId": "SuggestController_suggest",
+        "parameters": [
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Lọc loại: place, hotel, airport",
+            "schema": {
+              "example": "place,hotel"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Chữ người dùng gõ, có dấu hay không đều được (2–100 ký tự)",
+            "schema": {
+              "example": "da lat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` ngắn hơn 2 hoặc dài hơn 100 ký tự, hoặc `types` có loại lạ"
+          }
+        },
+        "summary": "Gợi ý địa điểm, khách sạn, sân bay khi gõ ở ô tìm trang đặt chỗ",
+        "tags": [
+          "discovery"
+        ]
+      }
     }
   },
   "info": {
@@ -376,6 +421,70 @@
         },
         "required": [
           "keys"
+        ]
+      },
+      "SuggestionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "place:da-lat",
+            "description": "`<type>:<refId>`, duy nhất trong danh sách"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "place",
+              "hotel",
+              "airport"
+            ],
+            "description": "place: tỉnh hoặc điểm đến · hotel: khách sạn · airport: sân bay"
+          },
+          "refId": {
+            "type": "string",
+            "example": "da-lat",
+            "description": "place: placeId để gọi /stays · hotel: mã khách sạn của commerce · airport: mã IATA"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Lạt",
+            "description": "Tên hiện ở dòng chính"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Lâm Đồng",
+            "description": "Dòng phụ: tỉnh cha của điểm đến, nơi của khách sạn, \"mã · nơi\" của sân bay; tỉnh thì null"
+          },
+          "placeId": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat",
+            "description": "Địa điểm chứa dòng này"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "refId",
+          "name",
+          "subtitle",
+          "placeId"
+        ]
+      },
+      "SuggestResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Đã xếp theo mức khớp; rỗng khi không khớp gì",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestionDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     }
