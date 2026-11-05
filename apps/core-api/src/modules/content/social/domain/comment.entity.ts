@@ -38,9 +38,9 @@ export class Comment {
   get updatedAt(): Date { return this.props.updatedAt; }
   get deletedAt(): Date | null | undefined { return this.props.deletedAt; }
 
-  static readonly MAX_BODY_LENGTH = 10_000;
+  static readonly MAX_BODY_LENGTH = 2_000;
 
-  /** Kiểm tra tính hợp lệ và độ dài nội dung bình luận (1 - 10.000 ký tự) */
+  /** Kiểm tra tính hợp lệ và độ dài nội dung bình luận (1 - 2.000 ký tự) */
   static validateBody(body: string): string {
     const trimmed = (body ?? '').trim();
     if (!trimmed) {

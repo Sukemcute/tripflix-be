@@ -28,7 +28,7 @@ class ErrorController {
     throw new InvalidPostStatusTransitionException('published', 'published');
   }
   @Get('invalid-comment-body') invalidCommentBody() {
-    throw new InvalidCommentBodyException('Nội dung bình luận không được vượt quá 10,000 ký tự');
+    throw new InvalidCommentBodyException('Nội dung bình luận không được vượt quá 2,000 ký tự');
   }
 }
 let app: INestApplication;
@@ -56,6 +56,6 @@ it('returns 400 for invalid comment body instead of 500', async () => {
   const res = await request(app.getHttpServer()).get('/social-errors/invalid-comment-body').expect(400);
   expect(res.body).toMatchObject({
     statusCode: 400,
-    message: expect.stringContaining('10,000 ký tự'),
+    message: expect.stringContaining('2,000 ký tự'),
   });
 });

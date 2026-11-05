@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   comments,
@@ -91,17 +91,41 @@ export class CommentRepository {
 
   /**
    * Cập nhật số lượt thích của bình luận (Atomic counter với SQL GREATEST).
+   * Không cập nhật updatedAt để tránh làm sai lệch cờ isStale của bản tóm tắt AI.
    */
   async incrementLikeCount(id: string, delta: number): Promise<number> {
     const [updated] = await this.db
       .update(comments)
       .set({
         likeCount: sql<number>`GREATEST(${comments.likeCount} + ${delta}, 0)`,
-        updatedAt: new Date(),
       })
       .where(eq(comments.id, id))
       .returning({ likeCount: comments.likeCount });
     return updated?.likeCount ?? 0;
+  }
+
+  /**
+   * Kiểm tra xem thảo luận có thay đổi (có bình luận mới hoặc bình luận được sửa nội dung)
+   * kể từ thời điểm `since` (thời điểm sinh tóm tắt AI).
+   * Lượt thả tim không làm kích hoạt cờ này vì không làm thay đổi updatedAt của comment.
+   */
+  async hasDiscussionChangedSince(postId: string, since: Date): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postId, postId),
+          isNull(comments.deletedAt),
+          or(
+            gt(comments.createdAt, since),
+            and(eq(comments.isEdited, true), gt(comments.updatedAt, since)),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(row);
   }
 
   /**

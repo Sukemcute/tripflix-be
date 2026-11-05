@@ -1,4 +1,4 @@
-import { PostNotFoundException } from '../../domain/index.js';
+import { PostNotFoundException, InvalidCommentBodyException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { PostSummaryRepository } from '../../infra/post-summary.repository.js';
 import type { PostSummaryRecord } from '../../../db/schema/index.js';
@@ -8,8 +8,8 @@ export interface SavePostSummaryCommand {
   status?: string;
   summary?: string | null;
   keyTakeaways?: string[];
-  content?: unknown;
-  safety?: unknown;
+  content?: Record<string, unknown> | null;
+  safety?: Record<string, unknown> | null;
   inputHash?: string | null;
   commentCount?: number;
   promptVersion?: string | null;
@@ -32,38 +32,25 @@ export class SavePostSummaryUseCase {
     const status = command.status ?? 'ready';
     const summary = (command.summary ?? '').trim();
     if (status === 'ready' && !summary) {
-      throw new Error('Nội dung tóm tắt không được để trống khi trạng thái là ready');
+      throw new InvalidCommentBodyException('Nội dung tóm tắt không được để trống khi trạng thái là ready');
     }
 
-    const existing = await this.postSummaryRepository.findByPostId(command.postId);
-    if (existing) {
-      // 1. Chống worker cũ chạy muộn ghi đè lên kết quả mới hơn (Compare-and-Swap)
-      if (
-        command.generatedAt &&
-        existing.generatedAt &&
-        new Date(command.generatedAt) < new Date(existing.generatedAt)
-      ) {
-        return existing;
-      }
-
-      // 2. Không ghi đè bản ghi thất bại ('failed') lên bản ghi đã 'ready' trước đó
-      if (status === 'failed' && existing.status === 'ready') {
-        return existing;
-      }
+    if (!command.generatedAt || Number.isNaN(command.generatedAt.getTime())) {
+      throw new InvalidCommentBodyException('generatedAt là bắt buộc và phải là thời điểm hợp lệ');
     }
 
-    return this.postSummaryRepository.upsert({
+    return this.postSummaryRepository.saveIfNewer({
       postId: command.postId,
       status,
       summary: summary || null,
       keyTakeaways: command.keyTakeaways ?? [],
-      content: (command.content as any) ?? null,
-      safety: (command.safety as any) ?? null,
+      content: command.content ?? null,
+      safety: command.safety ?? null,
       inputHash: command.inputHash ?? null,
       commentCountAtSummary: command.commentCount ?? 0,
       promptVersion: command.promptVersion ?? null,
       modelName: command.modelName ?? null,
-      generatedAt: command.generatedAt ?? null,
+      generatedAt: command.generatedAt,
     });
   }
 }

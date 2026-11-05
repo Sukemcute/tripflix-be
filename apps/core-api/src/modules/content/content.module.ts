@@ -309,9 +309,9 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: GetPostSummaryUseCase,
-      inject: [PostRepository, PostSummaryRepository],
-      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
-        new GetPostSummaryUseCase(postRepo, postSummaryRepo),
+      inject: [PostRepository, PostSummaryRepository, CommentRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository, commentRepo: CommentRepository) =>
+        new GetPostSummaryUseCase(postRepo, postSummaryRepo, commentRepo),
     },
 
     // 6. Guard cho optional authentication

@@ -26,6 +26,13 @@ export interface ListCommentsResult {
   total: number;
 }
 
+function resolveLimit(raw: number | undefined, max: number): number {
+  if (raw === undefined || !Number.isInteger(raw) || raw < 1) {
+    return Math.min(20, max);
+  }
+  return Math.min(raw, max);
+}
+
 export class ListCommentsUseCase {
   constructor(
     private readonly postRepository: PostRepository,
@@ -45,9 +52,9 @@ export class ListCommentsUseCase {
       throw new PostNotFoundException(query.postId);
     }
 
-    // Khi bật chế độ flat (cho AI / Indexing), cho phép trang tối đa 200 phần tử để giảm I/O
+    // Khi bật chế độ flat (cho AI / Indexing / Web / Mobile), cho phép trang tối đa 200 phần tử để giảm I/O
     const maxLimit = query.flat ? 200 : 50;
-    const limit = Math.min(Math.max(query.limit ?? 20, 1), maxLimit);
+    const limit = resolveLimit(query.limit, maxLimit);
     const decoded = decodeCursor(query.cursor);
 
     const [records, total] = await Promise.all([

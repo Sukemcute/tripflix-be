@@ -1,18 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 
+const TakeawaySchema = z.string().trim().min(1).max(500);
+const SummaryObjectSchema = z.record(z.string().max(64), z.unknown());
+
 export const SavePostSummaryRequestSchema = z
   .object({
     status: z.enum(['no_comments', 'insufficient_data', 'ready', 'failed']).optional().default('ready'),
-    summary: z.string().optional().nullable(),
-    keyTakeaways: z.array(z.string()).optional().default([]),
-    content: z.record(z.string(), z.unknown()).optional().nullable(),
-    safety: z.record(z.string(), z.unknown()).optional().nullable(),
+    summary: z.string().max(8_000).optional().nullable(),
+    keyTakeaways: z.array(TakeawaySchema).max(20).optional().default([]),
+    content: SummaryObjectSchema.optional().nullable(),
+    safety: SummaryObjectSchema.optional().nullable(),
     inputHash: z.string().max(128).optional().nullable(),
-    commentCount: z.number().int().min(0).optional().default(0),
+    commentCount: z.number().int().min(0).max(1_000_000).optional().default(0),
     promptVersion: z.string().max(32).optional().nullable(),
     modelName: z.string().max(64).optional().nullable(),
-    generatedAt: z.string().datetime().optional().nullable(),
+    generatedAt: z.string().datetime().optional().default(() => new Date().toISOString()),
   })
   .refine(
     (data) => {
@@ -37,7 +40,7 @@ export const SavePostSummaryRequestSchema = z
     commentCount: data.commentCount,
     promptVersion: data.promptVersion ?? null,
     modelName: data.modelName ?? null,
-    generatedAt: data.generatedAt ? new Date(data.generatedAt) : null,
+    generatedAt: new Date(data.generatedAt),
   }));
 
 export type SavePostSummaryRequest = z.infer<typeof SavePostSummaryRequestSchema>;
@@ -123,14 +126,6 @@ export class SavePostSummaryDto {
 }
 
 export class PostSummaryResponseDto {
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    example: '018d9f40-0000-7000-8000-000000000001',
-    description: 'Mã định danh bản tóm tắt',
-  })
-  id!: string;
-
   @ApiProperty({
     type: String,
     format: 'uuid',

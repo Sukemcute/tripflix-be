@@ -33,6 +33,7 @@ import {
   ListCommentsUseCase,
   SetCommentReactionUseCase,
 } from '../application/index.js';
+import { CommentReactionRepository } from '../infra/comment-reaction.repository.js';
 
 @ApiTags('Social - Comments')
 @Controller('v1')
@@ -44,6 +45,7 @@ export class CommentsController {
     private readonly deleteCommentUseCase: DeleteCommentUseCase,
     private readonly listCommentsUseCase: ListCommentsUseCase,
     private readonly setCommentReactionUseCase: SetCommentReactionUseCase,
+    private readonly commentReactionRepository?: CommentReactionRepository,
   ) {}
 
   @Post('posts/:postId/comments')
@@ -131,10 +133,13 @@ export class CommentsController {
       userId: user.userId,
       body: dto.body,
     });
+    const reaction = this.commentReactionRepository
+      ? await this.commentReactionRepository.findByCommentAndUser(commentId, user.userId)
+      : null;
     return {
       ...comment,
       likeCount: comment.likeCount ?? 0,
-      isLiked: false,
+      isLiked: Boolean(reaction),
     };
   }
 
