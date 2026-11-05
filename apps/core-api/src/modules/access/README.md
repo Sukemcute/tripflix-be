@@ -156,6 +156,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 | `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
 | `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
+| `access.user.welcome_email_requested` v1 | Tạo tài khoản mới: đăng ký hoặc lần đầu đăng nhập Google (đăng nhập lại, liên kết Google vào tài khoản có sẵn thì không) | `{ userId, email, displayName, provider }`, `provider` là `password` hoặc `google`. Có email vì `notification-service` cần người nhận; chỉ `notification-service` dùng |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 
 ## Job dọn dẹp

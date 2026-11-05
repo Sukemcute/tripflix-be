@@ -24,8 +24,12 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
 
   onApplicationBootstrap(): void {
     if (!this.env.NOTIFICATION_CONSUMER_ENABLED) return;
-    const router = new EventRouter(this.mailer, this.processed, (message, event) =>
-      this.logger.log({ eventId: event.eventId, type: event.type, producer: event.producer }, message),
+    const router = new EventRouter(
+      this.mailer,
+      this.processed,
+      (message, event) =>
+        this.logger.log({ eventId: event.eventId, type: event.type, producer: event.producer }, message),
+      { webAppUrl: this.env.WEB_APP_URL },
     );
     // XREADGROUP BLOCK giữ kết nối, nên dùng kết nối riêng.
     this.connection = this.redis.duplicate();

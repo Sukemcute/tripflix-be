@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
-import type { AccessUserGuestMergedV1, AccessUserRegisteredV1 } from '@tripflix/contracts';
+import type {
+  AccessUserGuestMergedV1,
+  AccessUserRegisteredV1,
+  AccessUserWelcomeEmailRequestedV1,
+} from '@tripflix/contracts';
 import { Transactional } from '@tripflix/db';
 import {
   EMAIL_TAKEN_MESSAGE,
@@ -171,7 +175,10 @@ export class AuthUseCases {
     return created;
   }
 
-  /** Thêm member và phát access.user.registered; gọi trong transaction đang mở. */
+  /**
+   * Thêm member, phát access.user.registered và yêu cầu gửi email chào mừng; gọi trong transaction đang mở,
+   * nên tài khoản không tạo được (email trùng, rollback) thì không có email.
+   */
   private async insertMember(
     input: { email: string; passwordHash: string | null; displayName: string },
     meta: RequestMeta,
@@ -182,6 +189,13 @@ export class AuthUseCases {
     await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
     const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
     await this.store.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
+    const welcome: AccessUserWelcomeEmailRequestedV1 = {
+      userId: created.id,
+      email: created.email,
+      displayName: created.displayName,
+      provider,
+    };
+    await this.store.outbox.add({ type: 'access.user.welcome_email_requested', userId: created.id, payload: welcome });
     return created;
   }
 

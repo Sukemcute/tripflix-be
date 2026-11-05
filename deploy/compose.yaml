@@ -103,6 +103,7 @@ services:
       PORT: 3001
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: Tripflix <no-reply@tripflix.local>
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3100}
     ports: ['3001:3001']
     depends_on:
       migrate: { condition: service_completed_successfully }
