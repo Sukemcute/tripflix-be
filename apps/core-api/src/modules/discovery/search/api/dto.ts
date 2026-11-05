@@ -86,3 +86,73 @@ export class StayPageDto {
   @ApiProperty({ type: String, nullable: true, example: '20', description: 'Gửi lại ở `cursor` để lấy trang sau; null là hết' })
   nextCursor!: string | null;
 }
+
+// ---------------- POST /api/search (tìm khám phá trên app)
+
+export const ExploreRequestSchema = z.object({
+  q: z.string().trim().min(1, 'Nhập điều muốn tìm').max(200),
+  loc: z
+    .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+    .nullish(),
+});
+
+class ExploreLocationDto {
+  @ApiProperty({ example: 10.7769 }) lat!: number;
+  @ApiProperty({ example: 106.7009 }) lng!: number;
+}
+
+export class ExploreRequestDto {
+  @ApiProperty({ example: 'cafe chill đà lạt', description: 'Câu người dùng gõ, có dấu hay không đều được (1–200 ký tự)' }) q!: string;
+  @ApiProperty({
+    type: ExploreLocationDto,
+    required: false,
+    nullable: true,
+    description: 'Vị trí người dùng. Chỉ dùng khi câu không nói nơi: chỗ gần người dùng được xếp lên',
+  })
+  loc?: ExploreLocationDto | null;
+}
+
+export class ExploreItemDto {
+  @ApiProperty({ example: 'hotel:P-h-dl-01', description: '`<loại>:<mã gốc>`, duy nhất' }) id!: string;
+  @ApiProperty({ example: 'stay', description: 'stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)' }) kind!: string;
+  @ApiProperty({ example: 'P-h-dl-01', description: 'stay: mã khách sạn của commerce · plan/post/video: mã bài' }) refId!: string;
+  @ApiProperty({ example: 'Ana Mandara Villas Đà Lạt' }) title!: string;
+  @ApiProperty({ type: String, nullable: true, example: 'Đà Lạt', description: 'Nơi của mục' }) subtitle!: string | null;
+  @ApiProperty({ type: String, nullable: true }) thumbnail!: string | null;
+  @ApiProperty({ example: 'Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm', description: 'Lý do hiện mục này' }) reason!: string;
+  @ApiProperty({ type: Number, nullable: true, description: 'stay: giá từ / đêm · plan: chi phí ước tính / người (VND)' })
+  priceFrom!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Số ngày của lộ trình' }) days!: number | null;
+  @ApiProperty({ type: ExploreLocationDto, nullable: true }) location!: ExploreLocationDto | null;
+}
+
+class ExploreSuggestItemDto extends ExploreItemDto {
+  @ApiProperty({ example: 'Ở đâu', description: 'Tên vùng của mục gợi ý' }) section!: string;
+}
+
+export class ExploreSectionDto {
+  @ApiProperty({ example: 'stay', description: 'food · cafe · see · stay · plan · post · video' }) kind!: string;
+  @ApiProperty({ example: 'Ở đâu' }) label!: string;
+  @ApiProperty({ example: 12, description: 'Số mục khớp; 0 = vùng không có kết quả phù hợp' }) total!: number;
+  @ApiProperty({ type: [ExploreItemDto], description: 'Tối đa 6 mục (3 nếu không phải vùng câu nhắm tới)' }) items!: ExploreItemDto[];
+}
+
+class ExploreUnderstoodDto {
+  @ApiProperty({ type: String, nullable: true, example: 'Đà Lạt' }) place!: string | null;
+  @ApiProperty({ type: [String], example: ['cafe'], description: 'Vùng câu nhắm tới, theo thứ tự trong câu' }) intents!: string[];
+  @ApiProperty({ type: Number, nullable: true, example: 2_000_000, description: 'Ngân sách (VND)' }) budget!: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 3 }) days!: number | null;
+  @ApiProperty({ type: [String], description: 'Tên riêng (đường, chuỗi cửa hàng) phải khớp nguyên cụm' }) names!: string[];
+  @ApiProperty({ type: [String], description: 'Cụm từ dính (mì quảng, cao lầu)' }) phrases!: string[];
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'string' }, example: { trug: 'trung' }, description: 'Từ đã sửa lỗi gõ' })
+  fixed!: Record<string, string>;
+}
+
+export class ExploreResponseDto {
+  @ApiProperty({ type: ExploreUnderstoodDto, description: 'Máy hiểu câu thế nào (hiện dạng chip)' }) understood!: ExploreUnderstoodDto;
+  @ApiProperty({ description: 'true = đã xếp theo vị trí người dùng (câu không nói nơi)' }) nearUser!: boolean;
+  @ApiProperty({ type: [ExploreSectionDto], description: 'Vùng câu nhắm tới đứng đầu, vùng rỗng xuống cuối' }) sections!: ExploreSectionDto[];
+  @ApiProperty({ type: [ExploreSuggestItemDto], description: 'Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp' })
+  suggest!: ExploreSuggestItemDto[];
+  @ApiProperty({ type: [String], example: ['dịp', 'lễ'], description: 'Từ đã bỏ qua để ra gợi ý khác' }) dropped!: string[];
+}
