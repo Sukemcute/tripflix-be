@@ -90,6 +90,11 @@ class DrizzleCatalogRepository implements CatalogRepository {
     return rows.map(mapProperty);
   }
 
+  async findPropertyById(id: string) {
+    const [row] = await this.db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    return row ? mapProperty(row) : null;
+  }
+
   async findRoomTypesByPropertyIds(propertyIds: string[]) {
     if (!propertyIds.length) return [];
     const rows = await this.db.select().from(roomTypes).where(inArray(roomTypes.propertyId, propertyIds)).orderBy(asc(roomTypes.defaultPrice), asc(roomTypes.id));

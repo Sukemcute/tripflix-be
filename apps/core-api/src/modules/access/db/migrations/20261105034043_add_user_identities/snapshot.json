@@ -1,0 +1,257 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e50f51dc-c6a0-4b04-809d-8a3467871659",
+  "prevIds": [
+    "44c685c9-225c-4577-b06a-01651becb864"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "user_identities"
+      ],
+      "writes": [
+        "s|tbl|access.user_identities",
+        "n|tbl|access.user_identities",
+        "e|tbl|access.user_identities",
+        "n|rel|access.user_identities",
+        "n|type|access.user_identities",
+        "n|rel|access.pk_user_identities"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "password_hash"
+      ],
+      "writes": [
+        "s|colprop|access.users.password_hash.notNull"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.password_hash"
+      ],
+      "sqlHash": "87b6f20b2898ddac"
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "user_identities",
+        "idx_user_identities_user_id"
+      ],
+      "writes": [
+        "s|idx|access.idx_user_identities_user_id",
+        "n|idx|access.idx_user_identities_user_id",
+        "e|idx|access.idx_user_identities_user_id",
+        "n|rel|access.idx_user_identities_user_id"
+      ],
+      "reads": [
+        "n|tbl|access.user_identities",
+        "n|sch|access",
+        "n|col|access.user_identities.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "access",
+        "user_identities"
+      ],
+      "writes": [
+        "s|fk|access.user_identities.fk_user_identities_user_id",
+        "n|fk|access.user_identities.fk_user_identities_user_id",
+        "e|fk|access.user_identities.fk_user_identities_user_id",
+        "n|con|access.user_identities.fk_user_identities_user_id"
+      ],
+      "reads": [
+        "n|tbl|access.user_identities",
+        "n|sch|access",
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.user_identities.user_id",
+        "n|col|access.users.id",
+        "e|uniqueness|access.users.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "name": "user_identities",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "provider",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "subject",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "email",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "idx_user_identities_user_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "fk_user_identities_user_id",
+        "nameExplicit": true,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "access",
+        "tableTo": "users",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "pk_user_identities",
+        "columns": [
+          "provider",
+          "subject"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "user_identities",
+        "name": "ck_user_identities_provider",
+        "value": "\"provider\" in ('google')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"access\",\"users\",\"password_hash\"]",
+      "set": {
+        "notNull": false
+      }
+    }
+  ]
+}

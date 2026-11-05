@@ -24,7 +24,7 @@ import type {
   CheckAvailabilityQuery,
   ListCatalogQuery,
 } from './catalog-types.js';
-import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type RoomTypeRecord, type Today } from './ports.js';
+import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type CommerceStore, type FlightRecord, type MediaUrl, type RoomTypeRecord, type Today } from './ports.js';
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
@@ -50,6 +50,7 @@ export class CatalogUseCases {
   constructor(
     @Inject(COMMERCE_STORE) private readonly store: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
+    @Inject(MEDIA_URL) private readonly mediaUrl: MediaUrl = keepMediaKey,
   ) {}
 
   async listCatalog(query: ListCatalogQuery = {}): Promise<CatalogPage> {
@@ -98,8 +99,8 @@ export class CatalogUseCases {
         stars: p.stars,
         brand: p.brand,
         style: p.style,
-        thumbnail: p.thumbnail,
-        images: p.images,
+        thumbnail: p.thumbnail ? this.mediaUrl(p.thumbnail) : null,
+        images: p.images.map(this.mediaUrl),
         priceFrom,
         isAvailable: priceFrom !== null,
         options,

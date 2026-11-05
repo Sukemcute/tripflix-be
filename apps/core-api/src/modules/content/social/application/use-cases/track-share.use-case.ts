@@ -1,7 +1,7 @@
+import { Transactional } from '@tripflix/db';
 import { PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 
 export interface TrackShareCommand {
   postId: string;
@@ -17,9 +17,10 @@ export interface TrackShareResult {
 export class TrackShareUseCase {
   constructor(
     private readonly postRepository: PostRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
   ) {}
 
+  @Transactional('content')
   async execute(command: TrackShareCommand): Promise<TrackShareResult> {
     const post = await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted') {
@@ -30,17 +31,16 @@ export class TrackShareUseCase {
 
     const shareUrl = `https://tripflix.vn/posts/${command.postId}`;
 
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.post.shared',
+    // Ghi sự kiện outbox content.post.shared trong cùng transaction DB
+    await this.outbox.add({
+      type: 'content.post.shared',
+      userId: command.userId ?? null,
+      payload: {
+        postId: command.postId,
         userId: command.userId ?? null,
-        payload: {
-          postId: command.postId,
-          userId: command.userId ?? null,
-          shareUrl,
-        },
-      }),
-    );
+        shareUrl,
+      },
+    });
 
     const updated = await this.postRepository.findById(command.postId);
 

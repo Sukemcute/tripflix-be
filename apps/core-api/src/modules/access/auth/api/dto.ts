@@ -25,6 +25,16 @@ export const RefreshRequestSchema = z.preprocess(
   }),
 );
 
+export const GoogleLoginRequestSchema = z.object({
+  idToken: z.string().min(1).max(4096),
+  deviceName: z.string().trim().max(100).optional(),
+});
+
+export class GoogleLoginDto {
+  @ApiProperty({ description: 'ID token lấy từ Google Sign-In trên app hoặc web (credential)' }) idToken!: string;
+  @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
+}
+
 export class RegisterDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
   @ApiProperty({ minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;

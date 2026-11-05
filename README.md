@@ -36,7 +36,7 @@ Chạy app trên máy: `pnpm stack:infra`, chép `apps/<app>/.env.example` thàn
 
 | Địa chỉ | Là gì |
 |---|---|
-| http://localhost:8080 | Gateway: `/api` → core-api, `/notifications`, `/ws` → notification-service, `/ai` → ai-service |
+| http://localhost:8080 | Gateway: `/api` → core-api, `/notifications`, `/ws` → notification-service, `/ai` → ai-service. Rate limit theo IP (`deploy/traefik/README.md`) |
 | http://localhost:3000/docs | Swagger core-api |
 | http://localhost:3000/health | Kiểm kết nối 5 module tới Postgres và Redis |
 | http://localhost:3100, :3200 | Web, Admin |

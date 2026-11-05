@@ -22,6 +22,6 @@ Chạy lại an toàn. Sau đó tạo access key cho `tripflix-dev-<tên>` trong
 |---|---|---|
 | `cors.json` | Cho `PUT`, `GET`, `HEAD`, trả header `ETag` | Web phải đọc được `ETag` của từng phần để hoàn tất upload |
 | `lifecycle.json` | Xoá upload dở sau 1 ngày, file gốc trong `dev/<tên>/uploads/` sau 7 ngày | Theo docs Feed. Có thành viên mới thì thêm một luật |
-| `bucket-policy.template.json` | CloudFront chỉ đọc `dev/*/videos/*` | File gốc không phát công khai |
+| `bucket-policy.template.json` | CloudFront chỉ đọc `dev/*/videos/*` và `dev/*/images/*` | File gốc không phát công khai. `images/` chứa ảnh công khai như ảnh khách sạn, không để giấy tờ hay chứng từ ở đây |
 | `cloudfront-distribution.template.json` | Chỉ HTTPS, cache theo `Cache-Control` của file, CORS cho web | `master.m3u8` cache 60 giây, còn đoạn video cache 1 năm |
 | `iam-dev-member-policy.template.json` | Ghi và đọc `dev/<tên>/*`, liệt kê bucket | Có `s3:ListBucket` thì file thiếu trả 404 như production, nên `libs/storage` báo đúng lỗi |

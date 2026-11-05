@@ -1,4 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import 'reflect-metadata';
+import { describe, expect, it, vi, beforeEach, beforeAll } from 'vitest';
+import { Test } from '@nestjs/testing';
+import { ClsModule } from 'nestjs-cls';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
 import {
   AddCommentUseCase,
   AdminModeratePostUseCase,
@@ -16,13 +20,20 @@ import {
   UpdatePostUseCase,
 } from '../index.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type {
   PostRecord,
   CommentRecord,
 } from '../../../db/schema/index.js';
 
 describe('Social Application Use Cases', () => {
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() })],
+    }).compile();
+    await moduleRef.init();
+  });
+
   const authorId = '018d9f00-user-7000-8000-000000000001';
   const otherUserId = '018d9f00-user-7000-8000-000000000002';
   const moderatorId = '018d9f00-mod-7000-8000-000000000009';
@@ -33,7 +44,7 @@ describe('Social Application Use Cases', () => {
   let mockReactionRepo: any;
   let mockBookmarkRepo: any;
   let mockModerationRepo: any;
-  let mockEventPublisher: EventPublisherPort;
+  let mockOutbox: ContentOutbox;
   let mockCommerceService: CommerceServicePort;
 
   function samplePostRecord(overrides: Partial<PostRecord> = {}): PostRecord {
@@ -109,8 +120,8 @@ describe('Social Application Use Cases', () => {
       create: vi.fn(),
       findByPostId: vi.fn(),
     };
-    mockEventPublisher = {
-      publish: vi.fn().mockResolvedValue(undefined),
+    mockOutbox = {
+      add: vi.fn().mockResolvedValue('outbox-event-id-123'),
     };
     mockCommerceService = {
       verifyCompletedBooking: vi.fn(),
@@ -149,15 +160,21 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.update.mockResolvedValue({ ...post, status: 'published', isVerified: true });
       (mockCommerceService.verifyCompletedBooking as any).mockResolvedValue(true);
 
-      const useCase = new PublishPostUseCase(mockPostRepo, mockEventPublisher, mockCommerceService);
+      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
       const result = await useCase.execute({ postId, userId: authorId });
 
       expect(result.status).toBe('published');
       expect(result.isVerified).toBe(true);
       expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.published',
+          userId: authorId,
+          payload: expect.objectContaining({
+            postId,
+            authorId,
+            isVerified: true,
+          }),
         }),
       );
     });
@@ -169,7 +186,7 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(post);
       mockPostRepo.update.mockResolvedValue({ ...post, status: 'published', isVerified: false });
 
-      const useCase = new PublishPostUseCase(mockPostRepo, mockEventPublisher, mockCommerceService);
+      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
       const result = await useCase.execute({ postId, userId: authorId });
 
       expect(result.status).toBe('published');
@@ -216,19 +233,24 @@ describe('Social Application Use Cases', () => {
       );
     });
 
-    it('xóa bài đăng thành công và bắn event content.post.deleted', async () => {
+    it('xóa bài đăng thành công và ghi event outbox content.post.deleted', async () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
       mockPostRepo.softDelete.mockResolvedValue(undefined);
 
-      const useCase = new DeletePostUseCase(mockPostRepo, mockEventPublisher);
+      const useCase = new DeletePostUseCase(mockPostRepo, mockOutbox);
       const result = await useCase.execute({ postId, userId: authorId });
 
       expect(result.deleted).toBe(true);
       expect(mockPostRepo.softDelete).toHaveBeenCalledWith(postId);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.deleted',
+          userId: authorId,
+          payload: expect.objectContaining({
+            postId,
+            authorId: post.authorId,
+          }),
         }),
       );
     });
@@ -270,7 +292,7 @@ describe('Social Application Use Cases', () => {
       const useCase = new SetReactionUseCase(
         mockPostRepo,
         mockReactionRepo,
-        mockEventPublisher,
+        mockOutbox,
       );
 
       const result = await useCase.execute({ postId, userId: otherUserId, type: 'like' });
@@ -279,9 +301,15 @@ describe('Social Application Use Cases', () => {
       expect(result.reactionTotal).toBe(1);
       expect(mockReactionRepo.upsert).toHaveBeenCalledWith(postId, otherUserId, 'like');
       expect(mockPostRepo.updateReactionCounts).toHaveBeenCalledWith(postId, { like: 1 }, 1);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.reaction.updated',
+          userId: otherUserId,
+          payload: expect.objectContaining({
+            postId,
+            userId: otherUserId,
+            reactionTotal: 1,
+          }),
         }),
       );
     });
@@ -298,7 +326,7 @@ describe('Social Application Use Cases', () => {
       const useCase = new SetReactionUseCase(
         mockPostRepo,
         mockReactionRepo,
-        mockEventPublisher,
+        mockOutbox,
       );
 
       const result = await useCase.execute({ postId, userId: otherUserId, type: null });
@@ -330,7 +358,7 @@ describe('Social Application Use Cases', () => {
       const useCase = new AddCommentUseCase(
         mockPostRepo,
         mockCommentRepo,
-        mockEventPublisher,
+        mockOutbox,
       );
 
       const result = await useCase.execute({
@@ -341,16 +369,21 @@ describe('Social Application Use Cases', () => {
 
       expect(result.id).toBe('comm-1');
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', 1);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.comment.created',
+          userId: otherUserId,
+          payload: expect.objectContaining({
+            commentId: 'comm-1',
+            postId,
+            authorId: otherUserId,
+          }),
         }),
       );
     });
 
     it('từ chối bình luận khi reply vào một reply khác (chặn reply cấp 2)', async () => {
       const post = samplePostRecord({ status: 'published' });
-      // Bình luận cha này bản thân nó đã là reply của một comment khác (parentCommentId != null)
       const parentReplyRecord: CommentRecord = {
         id: 'reply-1',
         postId,
@@ -369,7 +402,7 @@ describe('Social Application Use Cases', () => {
       const useCase = new AddCommentUseCase(
         mockPostRepo,
         mockCommentRepo,
-        mockEventPublisher,
+        mockOutbox,
       );
 
       await expect(
@@ -424,28 +457,33 @@ describe('Social Application Use Cases', () => {
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'bookmarkCount', 1);
     });
 
-    it('ghi nhận lượt chia sẻ tăng shareCount và trả về deep link', async () => {
+    it('ghi nhận lượt chia sẻ tăng shareCount và ghi outbox content.post.shared', async () => {
       const post = samplePostRecord({ status: 'published', shareCount: 10 });
       mockPostRepo.findById
         .mockResolvedValueOnce(post)
         .mockResolvedValueOnce({ ...post, shareCount: 11 });
 
-      const useCase = new TrackShareUseCase(mockPostRepo, mockEventPublisher);
+      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox);
       const result = await useCase.execute({ postId, userId: otherUserId });
 
       expect(result.shareCount).toBe(11);
       expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'shareCount', 1);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.shared',
+          userId: otherUserId,
+          payload: expect.objectContaining({
+            postId,
+            userId: otherUserId,
+          }),
         }),
       );
     });
   });
 
   describe('AdminModeratePostUseCase', () => {
-    it('ẩn bài đăng, lưu nhật ký kiểm duyệt và phát sự kiện outbox content.post.moderated', async () => {
+    it('ẩn bài đăng, lưu nhật ký kiểm duyệt và ghi sự kiện outbox content.post.moderated', async () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
       mockModerationRepo.create.mockResolvedValue({
@@ -464,7 +502,7 @@ describe('Social Application Use Cases', () => {
       const useCase = new AdminModeratePostUseCase(
         mockPostRepo,
         mockModerationRepo,
-        mockEventPublisher,
+        mockOutbox,
       );
 
       const result = await useCase.execute({
@@ -479,9 +517,16 @@ describe('Social Application Use Cases', () => {
       expect(result.previousStatus).toBe('published');
       expect(result.postStatus).toBe('hidden');
       expect(mockPostRepo.update).toHaveBeenCalledWith(postId, { status: 'hidden' });
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.moderated',
+          userId: moderatorId,
+          payload: expect.objectContaining({
+            actionId: 'action-1',
+            postId,
+            previousStatus: 'published',
+            postStatus: 'hidden',
+          }),
         }),
       );
     });

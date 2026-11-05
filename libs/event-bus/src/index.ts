@@ -41,3 +41,11 @@ export class RedisStreamsEventBus implements EventBus {
     return id;
   }
 }
+
+export {
+  RedisStreamsConsumer,
+  type ConsumerGroup,
+  type DeliveryInfo,
+  type EventHandler,
+  type RedisStreamsConsumerOptions,
+} from './consumer.js';

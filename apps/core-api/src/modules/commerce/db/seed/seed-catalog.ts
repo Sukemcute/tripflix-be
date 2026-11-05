@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Db } from '@tripflix/db';
 import { sql } from 'drizzle-orm';
 import { flights, properties, roomTypes, type RatePlan } from '../schema/index.js';
+import { toHotelImageKey } from './image-keys.js';
 
 /** Dữ liệu giả lập: khách sạn, loại phòng, chuyến bay theo hạng ghế. Lịch trống không nằm ở đây mà do job sinh. */
 interface CatalogSeed {
@@ -52,8 +53,17 @@ function chunk<T>(rows: T[]): T[][] {
  * Nạp danh mục, chạy lại được: sản phẩm đã có thì cập nhật tên, ảnh, giá mặc định; không động vào lịch trống,
  * số đã giữ, đã bán. Một transaction: lỗi giữa chừng thì không có danh mục nửa vời.
  */
-export async function seedCatalog(db: Db, file = CATALOG_SEED_FILE): Promise<{ hotels: number; roomTypes: number; flights: number }> {
+export async function seedCatalog(
+  db: Db,
+  file = CATALOG_SEED_FILE,
+  // Ảnh lưu khoá đầy đủ trên kho media (thêm tiền tố môi trường, như S3ObjectStorage.resolveKey); mặc định giữ khoá tương đối.
+  resolveImageKey: (relativeKey: string) => string = (relativeKey) => relativeKey,
+): Promise<{ hotels: number; roomTypes: number; flights: number }> {
   const seed = JSON.parse(readFileSync(file, 'utf8')) as CatalogSeed;
+  const toImageKey = (sourcePath: string) => {
+    const key = toHotelImageKey(sourcePath);
+    return /^https?:\/\//.test(key) ? key : resolveImageKey(key);
+  };
   const roomTypeRows = seed.hotels.flatMap((h) =>
     h.roomTypes.map((r) => ({
       id: r.id,
@@ -67,7 +77,12 @@ export async function seedCatalog(db: Db, file = CATALOG_SEED_FILE): Promise<{ h
     })),
   );
   await db.transaction(async (tx) => {
-    for (const rows of chunk(seed.hotels.map(({ roomTypes: _roomTypes, basePrice: _basePrice, ...hotel }) => hotel))) {
+    const hotelRows = seed.hotels.map(({ roomTypes: _roomTypes, basePrice: _basePrice, ...hotel }) => ({
+    ...hotel,
+    thumbnail: hotel.thumbnail ? toImageKey(hotel.thumbnail) : null,
+    images: hotel.images.map(toImageKey),
+  }));
+    for (const rows of chunk(hotelRows)) {
       await tx
         .insert(properties)
         .values(rows)
@@ -102,7 +117,18 @@ export async function seedCatalog(db: Db, file = CATALOG_SEED_FILE): Promise<{ h
         .values(rows)
         .onConflictDoUpdate({
           target: flights.id,
-          set: { name: sql`excluded.name`, airline: sql`excluded.airline`, departTime: sql`excluded.depart_time`, arriveTime: sql`excluded.arrive_time`, defaultSeats: sql`excluded.default_seats`, defaultPrice: sql`excluded.default_price`, farePlans: sql`excluded.fare_plans` },
+          set: {
+            name: sql`excluded.name`,
+            airline: sql`excluded.airline`,
+            departTime: sql`excluded.depart_time`,
+            arriveTime: sql`excluded.arrive_time`,
+            // Nơi đến theo cây địa điểm của discovery (sau sáp nhập tỉnh 2025); seed lại thì sửa cả dữ liệu cũ.
+            destinationSlug: sql`excluded.destination_slug`,
+            destinationName: sql`excluded.destination_name`,
+            defaultSeats: sql`excluded.default_seats`,
+            defaultPrice: sql`excluded.default_price`,
+            farePlans: sql`excluded.fare_plans`,
+          },
         });
     }
   });

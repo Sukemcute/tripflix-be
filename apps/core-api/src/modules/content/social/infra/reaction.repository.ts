@@ -7,7 +7,11 @@ import {
 } from '../../db/schema/index.js';
 
 export class ReactionRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
+
+  private get db(): Db {
+    return typeof this.dbOrGetDb === 'function' ? this.dbOrGetDb() : this.dbOrGetDb;
+  }
 
   /**
    * Thêm hoặc đổi cảm xúc (Idempotent Upsert).

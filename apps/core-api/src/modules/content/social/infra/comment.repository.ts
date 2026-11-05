@@ -15,7 +15,11 @@ export interface FindCommentsOptions {
 }
 
 export class CommentRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
+
+  private get db(): Db {
+    return typeof this.dbOrGetDb === 'function' ? this.dbOrGetDb() : this.dbOrGetDb;
+  }
 
   async create(data: NewCommentRecord): Promise<CommentRecord> {
     const [inserted] = await this.db.insert(comments).values(data).returning();
