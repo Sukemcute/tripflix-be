@@ -6,13 +6,19 @@ import { CORE_ENV } from '../../../platform/tokens.js';
 import { MediaUploadController } from './api/media-upload.controller.js';
 import { MediaUploadUseCases } from './application/media-upload.use-cases.js';
 import { MEDIA_ASSET_STORE, MEDIA_CLOCK, OBJECT_STORAGE, type MediaClock } from './application/ports.js';
+import { MediaResultUseCases } from './application/media-result.use-cases.js';
 import { DrizzleMediaAssetStore } from './infra/drizzle-media-asset.store.js';
+import { MediaResultConsumer } from './infra/media-result-consumer.js';
+import { MediaFacade } from './media.facade.js';
 
 /** Phần con media của content. Test thay database và S3 bằng overrideProvider. */
 @Module({
   controllers: [MediaUploadController],
   providers: [
     MediaUploadUseCases,
+    MediaResultUseCases,
+    MediaResultConsumer,
+    MediaFacade,
     { provide: MEDIA_CLOCK, useValue: (() => new Date()) satisfies MediaClock },
     {
       provide: MEDIA_ASSET_STORE,
@@ -32,5 +38,6 @@ import { DrizzleMediaAssetStore } from './infra/drizzle-media-asset.store.js';
         }),
     },
   ],
+  exports: [MediaFacade],
 })
 export class MediaModule {}

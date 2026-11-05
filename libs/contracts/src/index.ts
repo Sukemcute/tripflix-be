@@ -127,6 +127,22 @@ export type AccessPasswordResetRequestedV1 = z.infer<typeof AccessPasswordResetR
 export const AccessUserGuestMergedV1Schema = z.object({ anonId: z.uuid(), userId: z.uuid() });
 export type AccessUserGuestMergedV1 = z.infer<typeof AccessUserGuestMergedV1Schema>;
 
+/** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
+export const ContentMediaReadyV1Schema = z.object({
+  assetId: z.uuid(),
+  ownerId: z.uuid(),
+  durationSec: z.number().int().positive(),
+});
+export type ContentMediaReadyV1 = z.infer<typeof ContentMediaReadyV1Schema>;
+
+/** content.media.failed v1: không tạo được mức 360p, video không phát được. */
+export const ContentMediaFailedV1Schema = z.object({
+  assetId: z.uuid(),
+  ownerId: z.uuid(),
+  reason: z.string().min(1),
+});
+export type ContentMediaFailedV1 = z.infer<typeof ContentMediaFailedV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -138,6 +154,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
   'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
+  'content.media.ready.v1': ContentMediaReadyV1Schema,
+  'content.media.failed.v1': ContentMediaFailedV1Schema,
   'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
   'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,

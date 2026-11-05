@@ -7,3 +7,4 @@ export {
   type ListPostsFacadeQuery,
   type ListPostsFacadeResult,
 } from './content.facade.js';
+export { MediaFacade, type PlaybackInfo } from './media/media.facade.js';
