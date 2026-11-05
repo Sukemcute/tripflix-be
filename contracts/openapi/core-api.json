@@ -744,7 +744,14 @@
         },
         "responses": {
           "201": {
-            "description": "Bản nháp đã được tạo thành công"
+            "description": "Bản nháp đã được tạo thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -822,7 +829,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng kèm next_cursor"
+            "description": "Danh sách bài đăng kèm nextCursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)",
@@ -872,7 +886,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài của người dùng"
+            "description": "Danh sách bài của người dùng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -901,7 +922,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Chi tiết bài đăng kèm lộ trình đã ẩn PII và context"
+            "description": "Chi tiết bài đăng kèm lộ trình đã ẩn PII và context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDetailDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy chi tiết bài đăng theo quyền người xem (FR3, FR4, FR12)",
@@ -933,7 +961,14 @@
         },
         "responses": {
           "200": {
-            "description": "Bài đăng sau khi cập nhật"
+            "description": "Bài đăng sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -960,7 +995,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Xóa bài thành công"
+            "description": "Xóa bài thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedSocialItemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -989,7 +1031,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Bài đăng đã được xuất bản (kèm share_url và dấu xác thực)"
+            "description": "Bài đăng đã được xuất bản (kèm shareUrl và dấu xác thực)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Bài đăng đã được xuất bản",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1018,7 +1077,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Đã ghi nhận chia sẻ và trả về share_url"
+            "description": "Đã ghi nhận chia sẻ và trả về shareUrl",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedPostDto"
+                }
+              }
+            }
           }
         },
         "summary": "Ghi nhận lượt chia sẻ bài viết (FR12)",
@@ -1052,7 +1118,14 @@
         },
         "responses": {
           "200": {
-            "description": "Cập nhật cảm xúc thành công"
+            "description": "Cập nhật cảm xúc thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedPostReactionDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1079,7 +1152,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Cảm xúc hiện tại của user"
+            "description": "Cảm xúc hiện tại của user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostReactionDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1108,7 +1188,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Thống kê tương tác thời gian thực"
+            "description": "Thống kê tương tác thời gian thực",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostStatsDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy tổng số cảm xúc, bình luận, chia sẻ, lưu (FR10)",
@@ -1142,7 +1229,14 @@
         },
         "responses": {
           "201": {
-            "description": "Bình luận được tạo thành công"
+            "description": "Bình luận được tạo thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1197,7 +1291,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bình luận kèm phân trang cursor"
+            "description": "Danh sách bình luận kèm phân trang cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy danh sách bình luận của bài đăng (FR11)",
@@ -1231,7 +1332,14 @@
         },
         "responses": {
           "200": {
-            "description": "Bình luận sau khi cập nhật"
+            "description": "Bình luận sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1258,7 +1366,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Bình luận đã được xóa thành công"
+            "description": "Bình luận đã được xóa thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedSocialItemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1297,7 +1412,14 @@
         },
         "responses": {
           "200": {
-            "description": "Trạng thái lưu bài sau khi cập nhật"
+            "description": "Trạng thái lưu bài sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedBookmarkDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1337,7 +1459,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng đã bookmark"
+            "description": "Danh sách bài đăng đã bookmark",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1402,7 +1531,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng và tổng số"
+            "description": "Danh sách bài đăng và tổng số",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1431,7 +1567,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Chi tiết bài đăng và lịch sử kiểm duyệt"
+            "description": "Chi tiết bài đăng và lịch sử kiểm duyệt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSocialPostDetailDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1470,7 +1613,14 @@
         },
         "responses": {
           "201": {
-            "description": "Ghi nhận hành động kiểm duyệt thành công"
+            "description": "Ghi nhận hành động kiểm duyệt thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialModerationResultDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2670,6 +2820,197 @@
           "title"
         ]
       },
+      "SocialPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "postType": {
+            "type": "string",
+            "enum": [
+              "video",
+              "vlog"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "hidden",
+              "removed",
+              "deleted"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "mediaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tripAttachment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          },
+          "commentCount": {
+            "type": "number"
+          },
+          "shareCount": {
+            "type": "number"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "postType",
+          "title",
+          "body",
+          "hashtags",
+          "status",
+          "visibility",
+          "isVerified",
+          "mediaIds",
+          "coverMediaId",
+          "tripAttachment",
+          "reactionCounts",
+          "reactionTotal",
+          "commentCount",
+          "shareCount",
+          "bookmarkCount",
+          "publishedAt",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "SocialPostPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialPostDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasMore"
+        ]
+      },
+      "PostViewerContextDto": {
+        "type": "object",
+        "properties": {
+          "myReaction": {
+            "type": "string",
+            "enum": [
+              "like",
+              "love",
+              "helpful"
+            ],
+            "nullable": true
+          },
+          "isBookmarked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "myReaction",
+          "isBookmarked"
+        ]
+      },
+      "SocialPostDetailDto": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "$ref": "#/components/schemas/SocialPostDto"
+          },
+          "viewerContext": {
+            "$ref": "#/components/schemas/PostViewerContextDto"
+          },
+          "shareUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "post",
+          "viewerContext",
+          "shareUrl"
+        ]
+      },
       "UpdatePostDto": {
         "type": "object",
         "properties": {
@@ -2722,6 +3063,71 @@
           }
         }
       },
+      "PublishedPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published"
+            ]
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shareUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "isVerified",
+          "publishedAt",
+          "shareUrl"
+        ]
+      },
+      "DeletedSocialItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deleted"
+        ]
+      },
+      "SharedPostDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "shareUrl": {
+            "type": "string"
+          },
+          "shareCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "shareUrl",
+          "shareCount"
+        ]
+      },
       "SetReactionDto": {
         "type": "object",
         "properties": {
@@ -2742,6 +3148,83 @@
           "type"
         ]
       },
+      "UpdatedPostReactionDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "myReaction": {
+            "type": "string",
+            "nullable": true
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "myReaction",
+          "reactionCounts",
+          "reactionTotal"
+        ]
+      },
+      "PostReactionDto": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "post_id",
+          "type"
+        ]
+      },
+      "PostStatsDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          },
+          "commentCount": {
+            "type": "number"
+          },
+          "shareCount": {
+            "type": "number"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "reactionCounts",
+          "reactionTotal",
+          "commentCount",
+          "shareCount",
+          "bookmarkCount"
+        ]
+      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
@@ -2758,6 +3241,76 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "SocialCommentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "parentCommentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "isEdited": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "authorId",
+          "parentCommentId",
+          "body",
+          "isEdited",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "SocialCommentPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialCommentDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
         ]
       },
       "UpdateCommentDto": {
@@ -2784,6 +3337,256 @@
         },
         "required": [
           "is_bookmarked"
+        ]
+      },
+      "UpdatedBookmarkDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "isBookmarked": {
+            "type": "boolean"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "isBookmarked",
+          "bookmarkCount"
+        ]
+      },
+      "SocialAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ]
+      },
+      "AdminSocialPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/SocialAuthorDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "post_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "report_count": {
+            "type": "number"
+          },
+          "reaction_total": {
+            "type": "number"
+          },
+          "comment_count": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "title",
+          "post_type",
+          "status",
+          "visibility",
+          "report_count",
+          "reaction_total",
+          "comment_count",
+          "created_at"
+        ]
+      },
+      "AdminSocialPostPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSocialPostDto"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total"
+        ]
+      },
+      "SocialModerationHistoryDto": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "reason_detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "report_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "moderator_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action_id",
+          "action",
+          "reason_code",
+          "reason_detail",
+          "report_ids",
+          "moderator_id",
+          "created_at"
+        ]
+      },
+      "AdminSocialPostDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "post_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "author": {
+            "$ref": "#/components/schemas/SocialAuthorDto"
+          },
+          "media_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cover_media_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trip_attachment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          },
+          "reaction_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reaction_total": {
+            "type": "number"
+          },
+          "comment_count": {
+            "type": "number"
+          },
+          "share_count": {
+            "type": "number"
+          },
+          "bookmark_count": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "moderation_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialModerationHistoryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "post_type",
+          "status",
+          "visibility",
+          "is_verified",
+          "author",
+          "media_ids",
+          "cover_media_id",
+          "hashtags",
+          "trip_attachment",
+          "reaction_counts",
+          "reaction_total",
+          "comment_count",
+          "share_count",
+          "bookmark_count",
+          "created_at",
+          "updated_at",
+          "moderation_history"
         ]
       },
       "CreateModerationActionDto": {
@@ -2823,6 +3626,38 @@
         "required": [
           "action",
           "reason_code"
+        ]
+      },
+      "SocialModerationResultDto": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "postStatus": {
+            "type": "string"
+          },
+          "moderatorId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "actionId",
+          "postId",
+          "previousStatus",
+          "postStatus",
+          "moderatorId",
+          "createdAt"
         ]
       },
       "CreateUploadDto": {
