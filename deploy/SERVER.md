@@ -80,6 +80,8 @@ dc --profile gateway logs traefik | tail
 
 Xong khi `https://<API_HOST>/api/v1/feed?limit=1` trả 200 với chứng chỉ hợp lệ, và app trên điện thoại dùng mạng di động xem được feed khi API trên laptop đã tắt.
 
+Tường lửa cần một lúc mới có hiệu lực. Nếu log Traefik báo `Timeout during connect`, chờ một phút rồi chạy `docker restart tripflix-server-traefik-1` để xin lại chứng chỉ. Traefik tự gia hạn chứng chỉ, nên không xoá volume `letsencrypt`.
+
 Gateway chỉ mở `/api`; `/health` và `/.well-known/jwks.json` chỉ dùng trong mạng nội bộ. Muốn app dùng địa chỉ này thì đặt `EXPO_PUBLIC_API_URL=https://<API_HOST>` rồi khởi động lại Expo.
 
 ## Vận hành
