@@ -30,7 +30,7 @@
 - `pnpm test:int`: 13/13 task; testing 3/3, idempotency 4/4, event-bus 6/6, notification-service 1/1, core-api 28/28.
 - `pnpm build`: pass.
 
-Sau khi merge `develop` (có TF29 checkout/outbox/idempotency của commerce, #43; video-worker HLS, #42), chạy lại: lint, typecheck, `test:int` (core-api **43/43**, video-worker 6/6, còn lại như trên), build pass. `pnpm test`: core-api 289/289 khi chạy riêng (chạy song song qua turbo có 5 e2e access timeout ~20 s do máy tải nặng, chạy riêng pass). 1 test `video-worker/src/transcode/ffmpeg.spec.ts` fail **chỉ trên Windows** (`path.join` ra `	mpðp\…`), không liên quan PR này, CI Linux không bị; đã báo Phong.
+Sau khi merge `develop` (có TF29 checkout/outbox/idempotency của commerce, #43; video-worker HLS, #42), chạy lại: lint, typecheck, `test:int` (core-api **43/43**, video-worker 6/6, còn lại như trên), build pass. `pnpm test`: core-api 289/289 khi chạy riêng (chạy song song qua turbo có 5 e2e access timeout ~20 s do máy tải nặng, chạy riêng pass). 1 test `video-worker/src/transcode/ffmpeg.spec.ts` fail **chỉ trên Windows** (`path.join` ra `	mpðp\…`), không liên quan PR này, CI Linux không bị; cần báo Phong.
 
 Thử tay trên máy có dữ liệu cũ, theo cách giữ dữ liệu ở dưới: `db:migrate` + `db:seed` đưa 220 khách sạn vào `core.commerce`; `/api/suggest?q=vinpearl` 8 kết quả, `/api/stays?placeId=lam-dong…` 10 khách sạn, `/api/recommendations/home` 8 gợi ý; `tf_access` đọc `commerce.__migrations` bị `permission denied for schema commerce`.
 
