@@ -1,6 +1,8 @@
+import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type {
+  NewPostRecord,
   PostRecord,
   PostVisibility,
   TripAttachmentData,
@@ -21,9 +23,12 @@ export interface UpdatePostCommand {
 export class UpdatePostUseCase {
   constructor(private readonly postRepository: PostRepository) {}
 
+  @Transactional('content')
   async execute(command: UpdatePostCommand): Promise<PostRecord> {
-    const record = await this.postRepository.findById(command.postId);
-    if (!record) {
+    const record = this.postRepository.findByIdForUpdate
+      ? await this.postRepository.findByIdForUpdate(command.postId)
+      : await this.postRepository.findById(command.postId);
+    if (!record || record.deletedAt) {
       throw new PostNotFoundException(command.postId);
     }
 
@@ -61,15 +66,18 @@ export class UpdatePostUseCase {
       tripAttachment: command.tripAttachment,
     });
 
-    return this.postRepository.update(command.postId, {
-      title: domainPost.title,
-      body: domainPost.body,
-      hashtags: domainPost.hashtags,
-      visibility: domainPost.visibility,
-      mediaIds: domainPost.mediaIds,
-      coverMediaId: domainPost.coverMediaId,
-      tripAttachment: domainPost.tripAttachment,
-      isVerified: domainPost.isVerified,
-    });
+    const patch: Partial<NewPostRecord> = {};
+    if (command.title !== undefined) patch.title = domainPost.title;
+    if (command.body !== undefined) patch.body = domainPost.body;
+    if (command.hashtags !== undefined) patch.hashtags = domainPost.hashtags;
+    if (command.visibility !== undefined) patch.visibility = domainPost.visibility;
+    if (command.mediaIds !== undefined) patch.mediaIds = domainPost.mediaIds;
+    if (command.coverMediaId !== undefined) patch.coverMediaId = domainPost.coverMediaId;
+    if (command.tripAttachment !== undefined) {
+      patch.tripAttachment = domainPost.tripAttachment;
+      patch.isVerified = domainPost.isVerified;
+    }
+
+    return this.postRepository.update(command.postId, patch);
   }
 }

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { z } from 'zod';
 import type {
   PostRecord,
   PostStatus,
@@ -7,6 +8,89 @@ import type {
   TripAttachmentData,
   TripItineraryItem,
 } from '../../../db/schema/index.js';
+
+export const ItineraryItemSchema = z.object({
+  day: z.number().int().min(1),
+  title: z.string().trim().min(1).max(200),
+  location: z.string().max(200).optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+export const TripAttachmentSchema = z
+  .object({
+    bookingId: z.string().max(128).optional(),
+    booking_id: z.string().max(128).optional(),
+    hotelName: z.string().max(256).optional(),
+    hotel_name: z.string().max(256).optional(),
+    hotelId: z.string().max(128).optional(),
+    hotel_id: z.string().max(128).optional(),
+    destinationName: z.string().max(256).optional(),
+    destination_name: z.string().max(256).optional(),
+    daysCount: z.number().int().min(1).max(365).optional(),
+    days_count: z.number().int().min(1).max(365).optional(),
+    estimatedCostPerPerson: z.number().min(0).optional(),
+    estimated_cost_per_person: z.number().min(0).optional(),
+    priceDisclaimer: z.string().max(500).optional(),
+    price_disclaimer: z.string().max(500).optional(),
+    items: z.array(ItineraryItemSchema).max(50).optional(),
+  })
+  .transform((data) => ({
+    bookingId: data.bookingId ?? data.booking_id,
+    hotelName: data.hotelName ?? data.hotel_name,
+    hotelId: data.hotelId ?? data.hotel_id,
+    destinationName: data.destinationName ?? data.destination_name,
+    daysCount: data.daysCount ?? data.days_count,
+    estimatedCostPerPerson: data.estimatedCostPerPerson ?? data.estimated_cost_per_person,
+    priceDisclaimer: data.priceDisclaimer ?? data.price_disclaimer,
+    items: data.items,
+  }));
+
+export const CreatePostSchema = z.object({
+  post_type: z.enum(['video', 'vlog'], {
+    message: 'post_type chỉ chấp nhận "video" hoặc "vlog"',
+  }),
+  title: z.string().trim().min(1, 'Tiêu đề không được để trống').max(200, 'Tiêu đề tối đa 200 ký tự'),
+  body: z.string().max(10_000, 'Nội dung bài viết tối đa 10.000 ký tự').optional(),
+  hashtags: z.array(z.string().trim().min(1).max(50)).max(20).optional().default([]),
+  visibility: z
+    .enum(['public', 'private'], {
+      message: 'visibility chỉ chấp nhận "public" hoặc "private"',
+    })
+    .optional()
+    .default('public'),
+  media_ids: z.array(z.string().min(1)).optional().default([]),
+  cover_media_id: z.string().min(1).optional().nullable(),
+  trip_attachment: TripAttachmentSchema.optional().nullable(),
+});
+
+export const UpdatePostSchema = z.object({
+  title: z.string().trim().min(1, 'Tiêu đề không được để trống').max(200, 'Tiêu đề tối đa 200 ký tự').optional(),
+  body: z.string().max(10_000, 'Nội dung bài viết tối đa 10.000 ký tự').optional(),
+  hashtags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+  visibility: z
+    .enum(['public', 'private'], {
+      message: 'visibility chỉ chấp nhận "public" hoặc "private"',
+    })
+    .optional(),
+  media_ids: z.array(z.string().min(1)).optional(),
+  cover_media_id: z.string().min(1).optional().nullable(),
+  trip_attachment: TripAttachmentSchema.optional().nullable(),
+});
+
+export const ListPostsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  cursor: z.string().optional(),
+  author_id: z.string().optional(),
+  post_type: z.enum(['video', 'vlog']).optional(),
+  hashtag: z.string().optional(),
+  keyword: z.string().optional(),
+});
+
+export const ListUserPostsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  cursor: z.string().optional(),
+  status: z.enum(['all', 'draft', 'published']).optional().default('all'),
+});
 
 export class TripItineraryItemDto implements TripItineraryItem {
   @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })

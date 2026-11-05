@@ -23,7 +23,17 @@ import {
   SocialPostDto,
   SocialPostPageDto,
 } from './dto/response.dto.js';
-import { CreatePostDto, ListPostsQueryDto, ListUserPostsQueryDto, UpdatePostDto } from './dto/post.dto.js';
+import {
+  CreatePostDto,
+  CreatePostSchema,
+  ListPostsQueryDto,
+  ListPostsQuerySchema,
+  ListUserPostsQueryDto,
+  ListUserPostsQuerySchema,
+  UpdatePostDto,
+  UpdatePostSchema,
+} from './dto/post.dto.js';
+import { ZodBody, ZodQuery } from './http.js';
 import {
   CreateDraftUseCase,
   DeletePostUseCase,
@@ -55,7 +65,10 @@ export class PostsController {
   @Authenticated()
   @ApiOperation({ summary: 'Tạo bản nháp bài đăng (FR1)' })
   @ApiResponse({ status: 201, description: 'Bản nháp đã được tạo thành công', type: SocialPostDto })
-  async createDraft(@CurrentUser() user: AuthUser, @Body() dto: CreatePostDto) {
+  async createDraft(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(CreatePostSchema)) dto: CreatePostDto,
+  ) {
     return this.createDraftUseCase.execute({
       authorId: user.userId,
       postType: dto.post_type,
@@ -72,7 +85,7 @@ export class PostsController {
   @Get('posts')
   @ApiOperation({ summary: 'Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng kèm nextCursor', type: SocialPostPageDto })
-  async listPublicPosts(@Query() query: ListPostsQueryDto) {
+  async listPublicPosts(@Query(new ZodQuery(ListPostsQuerySchema)) query: ListPostsQueryDto) {
     return this.listPostsUseCase.execute({
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
@@ -88,7 +101,10 @@ export class PostsController {
   @Authenticated()
   @ApiOperation({ summary: 'Lấy danh sách bài đăng và bản nháp của chính mình (FR1)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài của người dùng', type: SocialPostPageDto })
-  async listMyPosts(@CurrentUser() user: AuthUser, @Query() query: ListUserPostsQueryDto) {
+  async listMyPosts(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodQuery(ListUserPostsQuerySchema)) query: ListUserPostsQueryDto,
+  ) {
     return this.listUserPostsUseCase.execute({
       authorId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
@@ -119,7 +135,11 @@ export class PostsController {
   @Authenticated()
   @ApiOperation({ summary: 'Sửa bản nháp hoặc bài đã đăng (FR1, FR5, FR7)' })
   @ApiResponse({ status: 200, description: 'Bài đăng sau khi cập nhật', type: SocialPostDto })
-  async updatePost(@Param('id') postId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdatePostDto) {
+  async updatePost(
+    @Param('id') postId: string,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(UpdatePostSchema)) dto: UpdatePostDto,
+  ) {
     return this.updatePostUseCase.execute({
       postId,
       userId: user.userId,

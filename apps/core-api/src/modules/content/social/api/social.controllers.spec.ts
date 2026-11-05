@@ -9,6 +9,7 @@ import {
   PostsController,
   ReactionsController,
 } from './index.js';
+import { CreatePostSchema, UpdatePostSchema } from './dto/post.dto.js';
 
 describe('Social API Controllers', () => {
   const mockUser: AuthUser = {
@@ -110,6 +111,30 @@ describe('Social API Controllers', () => {
         userId: mockUser.userId,
       });
       expect(res).toEqual({ share_url: 'https://...', share_count: 1 });
+    });
+
+    it('CreatePostSchema chặn visibility PRIVATE hoa và trường sai định dạng', () => {
+      const invalid = CreatePostSchema.safeParse({
+        post_type: 'video',
+        title: 'Title',
+        visibility: 'PRIVATE',
+      });
+      expect(invalid.success).toBe(false);
+
+      const valid = CreatePostSchema.safeParse({
+        post_type: 'video',
+        title: 'Title',
+        visibility: 'private',
+      });
+      expect(valid.success).toBe(true);
+    });
+
+    it('UpdatePostSchema chặn visibility không hợp lệ', () => {
+      const invalid = UpdatePostSchema.safeParse({ visibility: 'HIDDEN' });
+      expect(invalid.success).toBe(false);
+
+      const valid = UpdatePostSchema.safeParse({ visibility: 'public' });
+      expect(valid.success).toBe(true);
     });
   });
 

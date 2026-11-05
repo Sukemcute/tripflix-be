@@ -20,23 +20,35 @@ export class BookmarkRepository {
   }
 
   /**
+   * Thêm bookmark nếu chưa có (Idempotent). Trả về true nếu thực sự thêm mới, false nếu đã tồn tại.
+   */
+  async insertIfAbsent(postId: string, userId: string): Promise<boolean> {
+    const rows = await this.db
+      .insert(bookmarks)
+      .values({ postId, userId })
+      .onConflictDoNothing({
+        target: [bookmarks.postId, bookmarks.userId],
+      })
+      .returning({ id: bookmarks.id });
+    return rows.length > 0;
+  }
+
+  /**
+   * Xóa bookmark nếu tồn tại (Idempotent). Trả về true nếu thực sự xóa, false nếu không tồn tại.
+   */
+  async deleteIfExists(postId: string, userId: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(bookmarks)
+      .where(and(eq(bookmarks.postId, postId), eq(bookmarks.userId, userId)))
+      .returning({ id: bookmarks.id });
+    return rows.length > 0;
+  }
+
+  /**
    * Lưu hoặc huỷ lưu bài viết (Idempotent).
    */
   async setBookmark(postId: string, userId: string, isBookmarked: boolean): Promise<boolean> {
-    if (isBookmarked) {
-      await this.db
-        .insert(bookmarks)
-        .values({ postId, userId })
-        .onConflictDoNothing({
-          target: [bookmarks.postId, bookmarks.userId],
-        });
-      return true;
-    } else {
-      await this.db
-        .delete(bookmarks)
-        .where(and(eq(bookmarks.postId, postId), eq(bookmarks.userId, userId)));
-      return false;
-    }
+    return isBookmarked ? this.insertIfAbsent(postId, userId) : this.deleteIfExists(postId, userId);
   }
 
   async isBookmarked(postId: string, userId: string): Promise<boolean> {

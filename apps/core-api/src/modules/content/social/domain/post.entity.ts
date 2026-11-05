@@ -58,8 +58,11 @@ export class Post {
   private props: PostProps;
 
   constructor(props: PostProps) {
+    const rawVis = (props.visibility as string)?.toLowerCase();
+    const visibility: PostVisibility = rawVis === 'private' ? 'private' : 'public';
     this.props = {
       ...props,
+      visibility,
       reactionCounts: props.reactionCounts ?? {},
       reactionTotal: props.reactionTotal ?? 0,
       commentCount: props.commentCount ?? 0,
@@ -104,7 +107,7 @@ export class Post {
     if (this.props.status === 'draft') {
       return viewerId === this.props.authorId;
     }
-    if (this.props.visibility === 'private') {
+    if (this.props.visibility === 'private' || (this.props.visibility as string)?.toLowerCase() !== 'public') {
       return viewerId === this.props.authorId;
     }
     return true;

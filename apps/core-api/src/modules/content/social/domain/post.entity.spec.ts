@@ -56,6 +56,12 @@ describe('Post Entity Domain Rules', () => {
     expect(privatePost.canBeViewedBy(otherUserId, true)).toBe(true);
   });
 
+  it('bài đăng có visibility PRIVATE hoa hoặc không chuẩn vẫn được bảo vệ không lộ cho người lạ', () => {
+    const post = createTestPost({ status: 'published', visibility: 'PRIVATE' as any });
+    expect(post.canBeViewedBy(otherUserId)).toBe(false);
+    expect(post.canBeViewedBy(authorId)).toBe(true);
+  });
+
   it('bài đăng public published thì ai cũng xem được', () => {
     const publicPost = createTestPost({ status: 'published', visibility: 'public' });
     expect(publicPost.canBeViewedBy(authorId)).toBe(true);

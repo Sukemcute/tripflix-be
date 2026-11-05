@@ -15,11 +15,14 @@ import {
   GetMyReactionUseCase,
   GetPostDetailUseCase,
   ListAdminPostsUseCase,
+  ListBookmarksUseCase,
+  ListPostsUseCase,
   PublishPostUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
   UpdatePostUseCase,
 } from '../index.js';
+import { InvalidPostStatusTransitionException } from '../../domain/index.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type {
@@ -87,6 +90,7 @@ describe('Social Application Use Cases', () => {
     mockPostRepo = {
       create: vi.fn(),
       findById: vi.fn(),
+      findByIdForUpdate: vi.fn().mockImplementation((id: string) => mockPostRepo.findById(id)),
       findByIds: vi.fn(),
       update: vi.fn(),
       softDelete: vi.fn(),
@@ -113,6 +117,8 @@ describe('Social Application Use Cases', () => {
       aggregateReactionCounts: vi.fn(),
     };
     mockBookmarkRepo = {
+      insertIfAbsent: vi.fn(),
+      deleteIfExists: vi.fn(),
       setBookmark: vi.fn(),
       isBookmarked: vi.fn(),
       findUserBookmarks: vi.fn(),
@@ -642,6 +648,7 @@ describe('Social Application Use Cases', () => {
         .mockResolvedValueOnce(post)
         .mockResolvedValueOnce({ ...post, bookmarkCount: 6 });
       mockBookmarkRepo.isBookmarked.mockResolvedValue(false);
+      mockBookmarkRepo.setBookmark.mockResolvedValue(true);
 
       const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
       const result = await useCase.execute({ postId, userId: otherUserId, isBookmarked: true });
@@ -791,6 +798,134 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(null);
       const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo);
       await expect(useCase.execute({ postId: 'non-existent' })).rejects.toThrow();
+    });
+  });
+
+  describe('C2, C4, M6 Concurrency & Privacy Improvements (TF25 Post-Review)', () => {
+    describe('ListBookmarksUseCase', () => {
+      it('loại trừ bài viết chuyển sang private đối với người xem không phải tác giả và che bookingId', async () => {
+        const publicPost = samplePostRecord({ id: 'p1', visibility: 'public', status: 'published' });
+        const privatePost = samplePostRecord({ id: 'p2', authorId, visibility: 'private', status: 'published' });
+
+        mockBookmarkRepo.findUserBookmarks.mockResolvedValue([
+          { id: 'b1', postId: 'p1', userId: otherUserId, createdAt: new Date() },
+          { id: 'b2', postId: 'p2', userId: otherUserId, createdAt: new Date() },
+        ]);
+        mockPostRepo.findByIds.mockResolvedValue([publicPost, privatePost]);
+
+        const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo);
+        const result = await useCase.execute({ userId: otherUserId });
+
+        // Chỉ bài p1 (public) được trả về, bài p2 (private của người khác) bị loại trừ
+        expect(result.items.length).toBe(1);
+        expect(result.items[0]!.id).toBe('p1');
+        // bookingId bị che
+        expect((result.items[0]!.tripAttachment as any)?.bookingId).toBeUndefined();
+      });
+
+      it('cho phép tác giả xem bài viết private của chính mình trong danh sách bookmark', async () => {
+        const myPrivatePost = samplePostRecord({ id: 'p2', authorId, visibility: 'private', status: 'published' });
+
+        mockBookmarkRepo.findUserBookmarks.mockResolvedValue([
+          { id: 'b2', postId: 'p2', userId: authorId, createdAt: new Date() },
+        ]);
+        mockPostRepo.findByIds.mockResolvedValue([myPrivatePost]);
+
+        const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo);
+        const result = await useCase.execute({ userId: authorId });
+
+        expect(result.items.length).toBe(1);
+        expect(result.items[0]!.id).toBe('p2');
+        expect((result.items[0]!.tripAttachment as any)?.bookingId).toBeUndefined();
+      });
+    });
+
+    describe('ListPostsUseCase', () => {
+      it('danh sách bài viết công khai luôn che bookingId', async () => {
+        const publicPost = samplePostRecord({ id: 'p1', visibility: 'public', status: 'published' });
+        mockPostRepo.findPublicPosts.mockResolvedValue([publicPost]);
+
+        const useCase = new ListPostsUseCase(mockPostRepo);
+        const result = await useCase.execute({});
+
+        expect(result.items.length).toBe(1);
+        expect((result.items[0]!.tripAttachment as any)?.bookingId).toBeUndefined();
+      });
+    });
+
+    describe('PublishPostUseCase Concurrency', () => {
+      it('từ chối publish nếu bài viết bị moderator ẩn trong khi kiểm tra booking', async () => {
+        const currentPost = samplePostRecord({ id: postId, status: 'draft' });
+        mockPostRepo.findById.mockResolvedValue(currentPost);
+        // Giả lập moderator ẩn bài trong lúc gọi verifyCompletedBooking
+        mockCommerceService.verifyCompletedBooking = vi.fn().mockImplementation(async () => {
+          currentPost.status = 'hidden';
+          return false;
+        });
+        mockPostRepo.findByIdForUpdate.mockResolvedValue(currentPost);
+
+        const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
+
+        await expect(
+          useCase.execute({ postId, userId: authorId }),
+        ).rejects.toThrow(InvalidPostStatusTransitionException);
+        expect(mockPostRepo.update).not.toHaveBeenCalledWith(postId, expect.objectContaining({ status: 'published' }));
+      });
+    });
+
+    describe('UpdatePostUseCase Concurrency', () => {
+      it('cập nhật chọn lọc từng trường (selective patch) không làm mất dữ liệu khi 2 request chạy song song', async () => {
+        const initial = samplePostRecord({ id: postId, title: 'Old Title', body: 'Old Body' });
+        mockPostRepo.findById.mockResolvedValue(initial);
+        mockPostRepo.findByIdForUpdate.mockResolvedValue(initial);
+        mockPostRepo.update.mockImplementation(async (_id: string, patch: any) => ({
+          ...initial,
+          ...patch,
+        }));
+
+        const useCase = new UpdatePostUseCase(mockPostRepo);
+
+        // Request 1 chỉ sửa title
+        await useCase.execute({ postId, userId: authorId, title: 'New Title' });
+        expect(mockPostRepo.update).toHaveBeenCalledWith(
+          postId,
+          expect.objectContaining({ title: 'New Title' }),
+        );
+        // Xác nhận patch không ghi đè body thành Old Body
+        expect(mockPostRepo.update.mock.calls[0][1].body).toBeUndefined();
+
+        // Request 2 chỉ sửa body
+        await useCase.execute({ postId, userId: authorId, body: 'New Body' });
+        expect(mockPostRepo.update).toHaveBeenCalledWith(
+          postId,
+          expect.objectContaining({ body: 'New Body' }),
+        );
+        // Xác nhận patch không ghi đè title thành Old Title
+        expect(mockPostRepo.update.mock.calls[1][1].title).toBeUndefined();
+      });
+    });
+
+    describe('BookmarkPostUseCase Idempotency', () => {
+      it('chỉ tăng counter 1 lần khi có 2 request bookmark trùng lặp', async () => {
+        const post = samplePostRecord({ id: postId, status: 'published', bookmarkCount: 0 });
+        mockPostRepo.findById.mockResolvedValue(post);
+        mockPostRepo.findByIdForUpdate.mockResolvedValue(post);
+
+        // Request 1: setBookmark trả về true (thêm mới thành công)
+        // Request 2: setBookmark trả về false (đã tồn tại, duplicate)
+        mockBookmarkRepo.setBookmark
+          .mockResolvedValueOnce(true)
+          .mockResolvedValueOnce(false);
+
+        const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
+
+        await useCase.execute({ postId, userId: otherUserId, isBookmarked: true });
+        await useCase.execute({ postId, userId: otherUserId, isBookmarked: true });
+
+        // incrementCounter chỉ được gọi đúng 1 lần
+        expect(mockPostRepo.incrementCounter).toHaveBeenCalledTimes(1);
+        expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'bookmarkCount', 1);
+      });
     });
   });
 });

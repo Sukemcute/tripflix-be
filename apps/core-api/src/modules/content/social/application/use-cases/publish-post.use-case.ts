@@ -1,5 +1,9 @@
 import { Transactional } from '@tripflix/db';
-import { Post, PostNotFoundException } from '../../domain/index.js';
+import {
+  InvalidPostStatusTransitionException,
+  Post,
+  PostNotFoundException,
+} from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
@@ -26,8 +30,11 @@ export class PublishPostUseCase {
 
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
     const record = await this.postRepository.findById(command.postId);
-    if (!record) {
+    if (!record || record.deletedAt) {
       throw new PostNotFoundException(command.postId);
+    }
+    if (record.status !== 'draft') {
+      throw new InvalidPostStatusTransitionException(record.status, 'published');
     }
 
     // Kiểm tra dấu "ĐÃ XÁC THỰC" (Verified Badge - F2/FR3) NGOÀI TRANSACTION để không giữ DB connection
@@ -37,15 +44,23 @@ export class PublishPostUseCase {
       isVerified = await this.commerceService.verifyCompletedBooking(bookingId, command.userId);
     }
 
-    return this.publishInTransaction(record, command.userId, isVerified);
+    return this.publishInTransaction(command.postId, command.userId, isVerified);
   }
 
   @Transactional('content')
   protected async publishInTransaction(
-    record: any,
+    postId: string,
     userId: string,
     isVerified: boolean,
   ): Promise<PublishPostResult> {
+    const record = this.postRepository.findByIdForUpdate
+      ? await this.postRepository.findByIdForUpdate(postId)
+      : await this.postRepository.findById(postId);
+
+    if (!record || record.deletedAt) {
+      throw new PostNotFoundException(postId);
+    }
+
     const domainPost = new Post({
       id: record.id,
       authorId: record.authorId,

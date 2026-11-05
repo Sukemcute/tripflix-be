@@ -1,6 +1,7 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord, PostType } from '../../../db/schema/index.js';
+import { Post } from '../../domain/index.js';
+import type { PostRecord, PostType, TripAttachmentData } from '../../../db/schema/index.js';
 
 export interface ListPostsQuery {
   limit?: number;
@@ -12,7 +13,7 @@ export interface ListPostsQuery {
 }
 
 export interface ListPostsResult {
-  items: PostRecord[];
+  items: Array<Omit<PostRecord, 'tripAttachment'> & { tripAttachment: TripAttachmentData | null }>;
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -36,9 +37,18 @@ export class ListPostsUseCase {
     });
 
     const hasMore = records.length > limit;
-    const items = hasMore ? records.slice(0, limit) : records;
+    const pageRecords = hasMore ? records.slice(0, limit) : records;
 
-    const lastItem = items[items.length - 1];
+    // Mask bookingId cho toàn bộ danh sách bài viết công khai để không lộ PII
+    const items = pageRecords.map((r) => {
+      const domainPost = new Post({ ...r, coverMediaId: r.coverMediaId ?? undefined });
+      return {
+        ...r,
+        tripAttachment: domainPost.getMaskedTripAttachment(),
+      };
+    });
+
+    const lastItem = pageRecords[pageRecords.length - 1];
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id) : null;
 
     return {

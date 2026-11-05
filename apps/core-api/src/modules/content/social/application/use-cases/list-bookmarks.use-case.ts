@@ -1,7 +1,8 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord } from '../../../db/schema/index.js';
+import { Post } from '../../domain/index.js';
+import type { PostRecord, TripAttachmentData } from '../../../db/schema/index.js';
 
 export interface ListBookmarksQuery {
   userId: string;
@@ -10,7 +11,7 @@ export interface ListBookmarksQuery {
 }
 
 export interface ListBookmarksResult {
-  items: PostRecord[];
+  items: Array<Omit<PostRecord, 'tripAttachment'> & { tripAttachment: TripAttachmentData | null }>;
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -38,13 +39,22 @@ export class ListBookmarksUseCase {
     const postIds = pageRecords.map((b) => b.postId);
     const posts = await this.postRepository.findByIds(postIds);
 
-    // Sắp xếp bài post theo đúng thứ tự bookmark vừa lấy
+    // Sắp xếp bài post theo đúng thứ tự bookmark vừa lấy, kiểm tra quyền xem và che PII
     const postMap = new Map(posts.map((p) => [p.id, p]));
-    const items: PostRecord[] = [];
+    const items: Array<Omit<PostRecord, 'tripAttachment'> & { tripAttachment: TripAttachmentData | null }> = [];
     for (const id of postIds) {
       const p = postMap.get(id);
-      if (p && p.status === 'published') {
-        items.push(p);
+      if (p) {
+        const domainPost = new Post({
+          ...p,
+          coverMediaId: p.coverMediaId ?? undefined,
+        });
+        if (domainPost.canBeViewedBy(query.userId)) {
+          items.push({
+            ...p,
+            tripAttachment: domainPost.getMaskedTripAttachment(),
+          });
+        }
       }
     }
 

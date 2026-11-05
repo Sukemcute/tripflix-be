@@ -76,8 +76,8 @@
 - `node tools/check-boundaries.mjs`: Ranh giới module: không có vi phạm.
 - `pnpm lint`: Found 0 errors, 13 packages lint pass.
 - `pnpm typecheck`: 23 successful, 23 total.
-- `pnpm --filter @tripflix/core-api test -- src/modules/content/social`: 9 passed, 117 passed (117).
-- `pnpm --filter @tripflix/core-api test`: 49 passed, 375 passed (375).
+- `pnpm --filter @tripflix/core-api test -- src/modules/content/social`: 9 passed, 126 passed (126).
+- `pnpm --filter @tripflix/core-api test`: 49 passed, 384 passed (384).
 - `pnpm contracts:build`: Đã build thành công OpenAPI và contracts/openapi/core-api.json.
 
 ## Các cải tiến kỹ thuật toàn diện cho Social & Content (Roadmap TF25)
@@ -99,6 +99,14 @@
    - Dọn dẹp trường `id` thừa trong `PostSummaryResponseDto`, phòng thủ `resolveLimit` chống `NaN` trong `ListCommentsUseCase`, và trả `isLiked` thật trong `editComment`.
    - Giữ nguyên trường `summary` linh hoạt (không giới hạn cứng 8.000 ký tự) theo thỏa thuận với worker AI của em Bảo.
    - Cập nhật OpenAPI documentation với `PostSummaryResponseDto`.
+4. **Bảo mật dữ liệu, Concurrency & Validation toàn diện (Giai đoạn 4 - Hậu review Codex)**:
+   - `ListBookmarksUseCase`: Chặn triệt để bài viết đã chuyển sang `private` đối với người xem không phải tác giả; luôn ẩn danh `bookingId` bằng `getMaskedTripAttachment()`.
+   - `ListPostsUseCase`: Che `bookingId` trên toàn bộ danh sách bài viết công khai để bảo vệ thông tin riêng tư (PII).
+   - `PublishPostUseCase`: Khóa bi quan `findByIdForUpdate` và re-check trạng thái bài viết trong transaction; từ chối xuất bản bài viết nếu trong quá trình kiểm tra đơn booking bài viết đã bị kiểm duyệt viên ẩn/gỡ (`hidden`/`removed`), loại bỏ triệt để lỗi hồi sinh bài vi phạm.
+   - `UpdatePostUseCase`: Cập nhật chọn lọc (selective patch) trong `@Transactional('content')` và khóa bi quan, chống ghi đè mất dữ liệu (Lost Update) khi 2 request PATCH cùng lúc.
+   - `BookmarkPostUseCase` & `BookmarkRepository`: Bổ sung `insertIfAbsent` / `deleteIfExists` (atomic INSERT/DELETE RETURNING id); chỉ tăng/giảm `bookmarkCount` khi câu lệnh DB thực sự tác động, đảm bảo Idempotent tuyệt đối khi có request bookmark trùng lặp.
+   - `PostsController` & `post.dto.ts`: Bổ sung Zod Schema validation ở runtime (`CreatePostSchema`, `UpdatePostSchema`, `ListPostsQuerySchema`) và ZodBody/ZodQuery pipe; chặn các giá trị visibility không hợp lệ như `"PRIVATE"` viết hoa hoặc trạng thái lạ.
+   - `Post` domain model: Chuẩn hóa fail-closed cho `visibility`, mặc định chỉ cho xem công khai khi `visibility === 'public'` (case-insensitive).
 
 ## Cách kiểm lại
 1. Chạy migration: `pnpm db:migrate`
