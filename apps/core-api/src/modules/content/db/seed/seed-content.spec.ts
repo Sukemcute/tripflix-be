@@ -41,6 +41,21 @@ describe('Seed Content (TF07)', () => {
     }
   });
 
+  it('video seed đủ thông tin để phát và bài nào cũng trỏ vào video có thật', () => {
+    const data = JSON.parse(readFileSync(seedPath, 'utf8'));
+    const assetIds = new Set(data.mediaAssets.map((asset: any) => asset.id));
+
+    for (const asset of data.mediaAssets) {
+      expect(asset.status).toBe('ready');
+      expect(asset.levels).toContain(360);
+      // Không có dấu / cuối, vì MediaFacade tự ghép thêm khi tạo link.
+      expect(asset.hlsPrefix).toMatch(new RegExp(`^dev/phong/videos/[0-9a-f-]{36}/r1$`));
+    }
+    for (const post of data.posts) {
+      for (const mediaId of post.mediaIds) expect(assetIds.has(mediaId)).toBe(true);
+    }
+  });
+
   it('các bình luận đều trỏ vào bài đăng hợp lệ và reply đúng cấu trúc 1 cấp', () => {
     const data = JSON.parse(readFileSync(seedPath, 'utf8'));
     const postIds = new Set(data.posts.map((p: any) => p.id));
@@ -76,9 +91,9 @@ describe('Seed Content (TF07)', () => {
 
     const result = await seedContent(mockDb as any, seedPath);
 
-    expect(result.posts).toBe(8);
+    expect(result.posts).toBe(10);
     expect(result.comments).toBe(25);
-    expect(result.mediaAssets).toBe(8);
+    expect(result.mediaAssets).toBe(10);
     expect(result.reactions).toBe(10);
     expect(result.bookmarks).toBe(5);
     expect(mockDb.transaction).toHaveBeenCalledTimes(1);
