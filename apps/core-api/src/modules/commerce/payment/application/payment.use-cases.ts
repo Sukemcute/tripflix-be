@@ -225,6 +225,9 @@ export class PaymentUseCases {
           total: payment.amount,
           sourcePostId: order.sourcePostId,
           items: items.map((i) => ({ productType: i.productType, productId: i.productId, date: i.date, nights: i.nights, qty: i.qty })),
+          confirmationCode: codes[0]!.code,
+          contactName: order.contactName,
+          contactEmail: order.contactEmail,
         },
       });
       return { kind: 'paid' };

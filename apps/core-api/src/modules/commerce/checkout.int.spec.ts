@@ -186,7 +186,7 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect(await inventoryOf(checkIn)).toMatchObject({ held: before.held, sold: before.sold + 1 });
     const events = await pool.query(`select type, payload from commerce.outbox_events where type = 'commerce.order.paid' and payload->>'orderId' = $1`, [order.orderId]);
     expect(events.rows).toHaveLength(1);
-    expect(events.rows[0].payload).toMatchObject({ orderId: order.orderId, userId: user.userId, total: order.total });
+    expect(events.rows[0].payload).toMatchObject({ orderId: order.orderId, userId: user.userId, total: order.total, confirmationCode: res.body.confirmationCode, contactName: 'Khách Thử', contactEmail: null });
   });
 
   it('bấm trả 5 lần cùng lúc cùng Idempotency-Key: đúng 1 khoản trừ ở cổng; gửi lại nhận đúng kết quả cũ', async () => {
@@ -400,6 +400,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
 
       const seen = await listTrips(app2);
       expect(seen.status, JSON.stringify(seen.body)).toBe(200);
+      expect(seen.headers['cache-control']).toBe('no-store');
+      expect((await http().get(`/api/checkout/${order.orderId}`).set(app2)).headers['cache-control']).toBe('no-store');
       expect(seen.body.nextCursor).toBeNull();
       expect(seen.body.trips).toHaveLength(1);
       expect(seen.body.trips[0]).toMatchObject({
@@ -479,6 +481,18 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
       expect(new Set(seen).size).toBe(5);
       expect(seen[0]).toBe(ids[4]);
       expect(seen[4]).toBe(ids[0]);
+    });
+
+    it('sự kiện commerce.order.paid mang mã xác nhận và email liên hệ để gửi email xác nhận', async () => {
+      const user = newUser();
+      const held = await holdRoom(user, addDays(TODAY_DATE, 30), 1);
+      expect(held.status, JSON.stringify(held.body)).toBe(201);
+      const guests = await http().put(`/api/checkout/${held.body.orderId}/guests`).set(user.auth).send({ contact: { fullName: 'Người Đặt', phone: '0909000111', email: 'nguoidat@example.com' }, guests: [] });
+      expect(guests.status, JSON.stringify(guests.body)).toBe(200);
+      const paid = await pay(user, held.body);
+      expect(paid.status, JSON.stringify(paid.body)).toBe(200);
+      const events = await pool.query(`select payload from commerce.outbox_events where type = 'commerce.order.paid' and payload->>'orderId' = $1`, [held.body.orderId]);
+      expect(events.rows[0].payload).toMatchObject({ confirmationCode: paid.body.confirmationCode, contactName: 'Người Đặt', contactEmail: 'nguoidat@example.com' });
     });
 
     it('tham số sai trả 400', async () => {

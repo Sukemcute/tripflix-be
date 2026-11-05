@@ -62,6 +62,24 @@
         ],
         "additionalProperties": false
       }
+    },
+    "confirmationCode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contactName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contactEmail": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
