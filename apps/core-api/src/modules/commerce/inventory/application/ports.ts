@@ -117,3 +117,8 @@ export type Today = () => string;
 
 export const COMMERCE_STORE = Symbol('COMMERCE_STORE');
 export const TODAY = Symbol('COMMERCE_TODAY');
+
+/** Đổi khoá ảnh trên kho media thành URL cho web và app (ghép MEDIA_CDN_URL). Chưa cấu hình CDN thì trả nguyên khoá. */
+export type MediaUrl = (key: string) => string;
+export const MEDIA_URL = Symbol('COMMERCE_MEDIA_URL');
+export const keepMediaKey: MediaUrl = (key) => key;

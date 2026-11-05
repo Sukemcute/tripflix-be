@@ -12,7 +12,7 @@ import {
   quoteStay,
   type UnavailableReason,
 } from '../domain/sales-rules.js';
-import { COMMERCE_STORE, TODAY, type CommerceStore, type Today } from './ports.js';
+import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type CommerceStore, type MediaUrl, type Today } from './ports.js';
 
 const DEFAULT_ADULTS = 2;
 const DEFAULT_CALENDAR_DAYS = 14;
@@ -74,6 +74,7 @@ export class HotelDetailUseCases {
   constructor(
     @Inject(COMMERCE_STORE) private readonly store: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
+    @Inject(MEDIA_URL) private readonly mediaUrl: MediaUrl = keepMediaKey,
   ) {}
 
   async getHotelDetail(hotelId: string, query: HotelDetailQuery = {}): Promise<HotelDetail> {
@@ -141,8 +142,8 @@ export class HotelDetailUseCases {
       stars: hotel.stars,
       brand: hotel.brand,
       style: hotel.style,
-      thumbnail: hotel.thumbnail,
-      images: hotel.images,
+      thumbnail: hotel.thumbnail ? this.mediaUrl(hotel.thumbnail) : null,
+      images: hotel.images.map(this.mediaUrl),
       stay: { checkIn, checkOut, nights: countNights(checkIn, checkOut), adults },
       priceFrom: bookablePrices.length ? Math.min(...bookablePrices) : null,
       isAvailable: bookablePrices.length > 0,

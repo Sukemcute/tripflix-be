@@ -20,7 +20,7 @@ const fakeDrizzle = { transaction: async (fn: (tx: unknown) => Promise<unknown>)
 @Global()
 @Module({
   providers: [
-    { provide: CORE_ENV, useValue: { NODE_ENV: 'test', APP_ROLE: 'api' } as CoreEnv },
+    { provide: CORE_ENV, useValue: { NODE_ENV: 'test', APP_ROLE: 'api', MEDIA_CDN_URL: 'https://cdn.test/' } as CoreEnv },
     { provide: DB_POOLS, useValue: {} },
     { provide: REDIS, useValue: {} },
     ...MODULES.map((m) => ({ provide: buildDrizzleToken(m), useValue: fakeDrizzle })),
@@ -41,7 +41,7 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
 
   beforeEach(async () => {
     store = new MemoryCommerceStore();
-    store.properties.push({ id: 'H1', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: 'Đà Nẵng', stars: 4, brand: null, style: null, thumbnail: '/img/a.jpg', images: ['/img/a.jpg', '/img/b.jpg'] });
+    store.properties.push({ id: 'H1', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: 'Đà Nẵng', stars: 4, brand: null, style: null, thumbnail: 'dev/thang/images/hotels/a.jpg', images: ['dev/thang/images/hotels/a.jpg', 'https://other.example/b.jpg'] });
     store.roomTypes.push(
       { id: 'H1--STD', propertyId: 'H1', name: 'Tiêu chuẩn', maxGuests: 2, defaultTotal: 3, defaultPrice: 1_000_000, ratePlans: plans },
       { id: 'H1--FAM', propertyId: 'H1', name: 'Gia đình', maxGuests: 4, defaultTotal: 1, defaultPrice: 2_000_000, ratePlans: plans },
@@ -86,7 +86,9 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
       id: 'H1',
       name: 'Biển Xanh',
       province: { slug: 'da-nang', name: 'Đà Nẵng' },
-      images: ['/img/a.jpg', '/img/b.jpg'],
+      // Khoá trên S3 thành URL CloudFront; URL đầy đủ có sẵn thì giữ nguyên.
+      thumbnail: 'https://cdn.test/dev/thang/images/hotels/a.jpg',
+      images: ['https://cdn.test/dev/thang/images/hotels/a.jpg', 'https://other.example/b.jpg'],
       stay: { checkIn: TODAY_DATE, checkOut: '2026-12-02', nights: 1, adults: 2 },
       priceFrom: 1_000_000,
       isAvailable: true,
