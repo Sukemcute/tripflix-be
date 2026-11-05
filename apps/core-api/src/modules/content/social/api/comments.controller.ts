@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, type RequestUser } from './decorators/current-user.decorator.js';
+import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import {
   CreateCommentDto,
   ListCommentsQueryDto,
@@ -34,16 +34,17 @@ export class CommentsController {
 
   @Post('posts/:postId/comments')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Tạo bình luận mới trên bài đăng (FR11)' })
   @ApiResponse({ status: 201, description: 'Bình luận được tạo thành công' })
   async createComment(
     @Param('postId') postId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Body() dto: CreateCommentDto,
   ) {
     return this.addCommentUseCase.execute({
       postId,
-      authorId: user.id,
+      authorId: user.userId,
       body: dto.body,
       parentCommentId: dto.parent_comment_id,
     });
@@ -66,32 +67,34 @@ export class CommentsController {
 
   @Patch('comments/:commentId')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Chỉnh sửa bình luận của mình (FR11)' })
   @ApiResponse({ status: 200, description: 'Bình luận sau khi cập nhật' })
   async editComment(
     @Param('commentId') commentId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Body() dto: UpdateCommentDto,
   ) {
     return this.editCommentUseCase.execute({
       commentId,
-      userId: user.id,
+      userId: user.userId,
       body: dto.body,
     });
   }
 
   @Delete('comments/:commentId')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Xóa bình luận của mình (FR11)' })
   @ApiResponse({ status: 200, description: 'Bình luận đã được xóa thành công' })
   async deleteComment(
     @Param('commentId') commentId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
   ) {
     const isSuperAdmin = user.role === 'superadmin';
     return this.deleteCommentUseCase.execute({
       commentId,
-      userId: user.id,
+      userId: user.userId,
       isSuperAdmin,
     });
   }

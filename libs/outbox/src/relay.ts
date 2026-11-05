@@ -5,8 +5,11 @@ import type { OutboxStore } from './store.js';
 export interface OutboxRelayOptions {
   store: OutboxStore;
   bus: EventBus;
-  /** Stream của module phát, ví dụ STREAMS.content. */
-  stream: StreamName;
+  /**
+   * Stream của module phát, ví dụ STREAMS.content. Bảng outbox có sự kiện đi nhiều stream thì truyền hàm chọn.
+   * Mỗi sự kiện đi đúng một stream. Hàm ném lỗi (type lạ) được xử lý như gửi lỗi, không có stream mặc định.
+   */
+  stream: StreamName | ((envelope: EventEnvelope) => StreamName);
   batchSize?: number;
   /** Nghỉ giữa hai vòng khi không còn sự kiện chờ. */
   intervalMs?: number;
@@ -42,7 +45,8 @@ export class OutboxRelay {
     let publishedCount = 0;
     for (const { envelope } of claimed) {
       try {
-        await bus.publish(stream, envelope);
+        const targetStream = typeof stream === 'function' ? stream(envelope) : stream;
+        await bus.publish(targetStream, envelope);
       } catch (err) {
         onError?.(err, envelope);
         await store.markFailed(envelope.eventId, err instanceof Error ? err.message : String(err));

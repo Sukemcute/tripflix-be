@@ -7,7 +7,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, type RequestUser } from './decorators/current-user.decorator.js';
+import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { ListBookmarksQueryDto, SetBookmarkDto } from './dto/bookmark.dto.js';
 import {
   BookmarkPostUseCase,
@@ -15,6 +15,8 @@ import {
 } from '../application/index.js';
 
 @ApiTags('Social - Bookmarks')
+@ApiBearerAuth()
+@Authenticated()
 @Controller('v1')
 export class BookmarksController {
   constructor(
@@ -23,31 +25,29 @@ export class BookmarksController {
   ) {}
 
   @Put('posts/:id/bookmark')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lưu hoặc bỏ lưu bài viết (PRD F3)' })
   @ApiResponse({ status: 200, description: 'Trạng thái lưu bài sau khi cập nhật' })
   async setBookmark(
     @Param('id') postId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Body() dto: SetBookmarkDto,
   ) {
     return this.bookmarkPostUseCase.execute({
       postId,
-      userId: user.id,
+      userId: user.userId,
       isBookmarked: dto.is_bookmarked,
     });
   }
 
   @Get('me/bookmarks')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách bài viết đã lưu của tôi' })
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng đã bookmark' })
   async listMyBookmarks(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Query() query: ListBookmarksQueryDto,
   ) {
     return this.listBookmarksUseCase.execute({
-      userId: user.id,
+      userId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
     });
