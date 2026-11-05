@@ -1,3 +1,4 @@
+import type { MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import type { NewOutboxEvent } from '@tripflix/outbox';
 import type { MediaMimeType } from '../domain/upload-rules.js';
 
@@ -27,6 +28,21 @@ export interface UploadTarget {
   s3UploadId: string | null;
 }
 
+export interface ReadyRendition {
+  assetId: string;
+  hlsPrefix: string;
+  durationSec: number;
+  aspect: MediaAspect;
+}
+
+export interface PlaybackAsset {
+  id: string;
+  hlsPrefix: string;
+  durationSec: number;
+  aspect: MediaAspect;
+  levels: MediaQualityLevel[];
+}
+
 export interface MediaOutbox {
   add(event: NewOutboxEvent): Promise<string>;
 }
@@ -42,4 +58,16 @@ export interface MediaAssetStore {
    * Trả null khi video không còn uploading, để hai lần gọi cùng lúc chỉ một lần được giao việc.
    */
   markProcessing(assetId: string): Promise<number | null>;
+  findStatus(assetId: string): Promise<MediaAssetStatus | null>;
+  /** Đã có mức này thì bỏ qua, vì worker có thể báo lại. */
+  insertRendition(assetId: string, level: MediaQualityLevel): Promise<void>;
+  hasRendition(assetId: string, level: MediaQualityLevel): Promise<boolean>;
+  /** Chuyển processing sang ready. Trả về chủ video, hoặc null khi video không còn processing, để chỉ phát sự kiện một lần. */
+  markReady(rendition: ReadyRendition): Promise<string | null>;
+  /** Chuyển processing sang failed. Trả về chủ video, hoặc null khi video không còn processing. */
+  markFailed(assetId: string, reason: string): Promise<string | null>;
+  /** Ghi lỗi để xem lại mà không đổi trạng thái, dùng khi mức cao lỗi nhưng 360p vẫn phát được. */
+  recordError(assetId: string, reason: string): Promise<void>;
+  /** Chỉ trả về video ready; id không có hoặc chưa ready thì không có trong kết quả. */
+  findPlaybackAssets(assetIds: string[]): Promise<PlaybackAsset[]>;
 }
