@@ -1,4 +1,7 @@
-import { UnauthorizedCommentActionException } from './errors.js';
+import {
+  InvalidCommentNestingException,
+  UnauthorizedCommentActionException,
+} from './errors.js';
 
 export interface CommentProps {
   id: string;
@@ -31,6 +34,13 @@ export class Comment {
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
   get deletedAt(): Date | null | undefined { return this.props.deletedAt; }
+
+  /** Kiểm tra tính hợp lệ khi làm reply (chỉ cho phép 1 cấp, không được lồng cấp 2) */
+  static validateParentForReply(parent: { parentCommentId?: string | null }): void {
+    if (parent.parentCommentId) {
+      throw new InvalidCommentNestingException();
+    }
+  }
 
   isOwnedBy(userId: string): boolean {
     return this.props.authorId === userId;
