@@ -51,6 +51,7 @@ export interface NewFlightDay extends Omit<FlightDay, 'held' | 'sold'> {
 export interface CatalogRepository {
   /** Khách sạn theo id tăng dần, sau afterId (phân trang theo con trỏ). */
   listProperties(filter: { provinceSlug?: string; afterId?: string; limit: number }): Promise<PropertyRecord[]>;
+  findPropertyById(id: string): Promise<PropertyRecord | null>;
   findRoomTypesByPropertyIds(propertyIds: string[]): Promise<RoomTypeRecord[]>;
   findRoomTypesByIds(ids: string[]): Promise<RoomTypeRecord[]>;
   /** Các chuyến (theo flight_key tăng dần, sau afterKey) cùng mọi hạng ghế của chuyến đó. */
@@ -116,3 +117,8 @@ export type Today = () => string;
 
 export const COMMERCE_STORE = Symbol('COMMERCE_STORE');
 export const TODAY = Symbol('COMMERCE_TODAY');
+
+/** Đổi khoá ảnh trên kho media thành URL cho web và app (ghép MEDIA_CDN_URL). Chưa cấu hình CDN thì trả nguyên khoá. */
+export type MediaUrl = (key: string) => string;
+export const MEDIA_URL = Symbol('COMMERCE_MEDIA_URL');
+export const keepMediaKey: MediaUrl = (key) => key;

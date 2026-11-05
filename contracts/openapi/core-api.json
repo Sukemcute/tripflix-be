@@ -1804,6 +1804,39 @@
         ]
       }
     },
+    "/api/hotels/{id}": {
+      "get": {
+        "operationId": "HotelsController_getHotel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có khách sạn này"
+          }
+        },
+        "tags": [
+          "hotels"
+        ]
+      }
+    },
     "/api/admin/commerce/room-types/{id}/calendar": {
       "get": {
         "operationId": "AdminCalendarController_getRoomCalendar",
@@ -3103,6 +3136,231 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "ProvinceDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "da-nang"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Nẵng"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "HotelRatePlanQuoteDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "BB"
+          },
+          "name": {
+            "type": "string",
+            "example": "Kèm ăn sáng · huỷ miễn phí"
+          },
+          "meal": {
+            "type": "string",
+            "example": "breakfast"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelDays": {
+            "type": "number",
+            "description": "Huỷ miễn phí trước ngày nhận phòng bao nhiêu ngày"
+          },
+          "totalPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Cả kỳ ở, mọi phòng (VND)"
+          },
+          "pricePerNight": {
+            "type": "number",
+            "nullable": true,
+            "description": "Một đêm một phòng (VND)"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "meal",
+          "isRefundable",
+          "freeCancelDays",
+          "totalPrice",
+          "pricePerNight"
+        ]
+      },
+      "HotelRoomOfferDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-dn-01--DLX",
+            "description": "Mã dùng khi đặt chỗ"
+          },
+          "name": {
+            "type": "string",
+            "example": "Deluxe hướng vườn"
+          },
+          "maxGuests": {
+            "type": "number"
+          },
+          "roomsNeeded": {
+            "type": "number",
+            "description": "Số phòng cần cho số khách đã chọn"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NOT_ON_SALE",
+              "STOP_SELL",
+              "CTA",
+              "CTD",
+              "MIN_LOS",
+              "MAX_LOS",
+              "SOLD_OUT",
+              "NOT_ENOUGH_ROOMS"
+            ],
+            "nullable": true
+          },
+          "remaining": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số phòng thật còn lại suốt kỳ ở"
+          },
+          "ratePlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelRatePlanQuoteDto"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "maxGuests",
+          "roomsNeeded",
+          "isAvailable",
+          "reason",
+          "remaining",
+          "ratePlans"
+        ]
+      },
+      "CalendarDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một đêm rẻ nhất ngày đó (VND)"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "priceFrom",
+          "isAvailable"
+        ]
+      },
+      "HotelDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "P-h-dn-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vinpearl Beach Đà Nẵng"
+          },
+          "province": {
+            "$ref": "#/components/schemas/ProvinceDto"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 5
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "style": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true,
+            "description": "Đường dẫn ảnh đại diện"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stay": {
+            "$ref": "#/components/schemas/StayDto"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một đêm rẻ nhất cho kỳ ở này (VND)"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelRoomOfferDto"
+            }
+          },
+          "calendar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarDayDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "province",
+          "city",
+          "stars",
+          "brand",
+          "style",
+          "thumbnail",
+          "images",
+          "stay",
+          "priceFrom",
+          "isAvailable",
+          "rooms",
+          "calendar"
         ]
       },
       "AdminRoomDayDto": {

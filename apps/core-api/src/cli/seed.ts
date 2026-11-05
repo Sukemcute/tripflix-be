@@ -43,7 +43,8 @@ try {
 const commercePool = createPool({ url: env.DATABASE_URL_COMMERCE, max: 1, applicationName: 'seed:commerce' });
 try {
   const commerceDb = createDb(commercePool);
-  const catalog = await seedCatalog(commerceDb);
+  // Ảnh khách sạn đã tải lên S3 dưới S3_KEY_PREFIX (upload-hotel-images); database lưu khoá đầy đủ.
+  const catalog = await seedCatalog(commerceDb, undefined, (relativeKey) => `${env.S3_KEY_PREFIX}${relativeKey}`);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
   const opened = await new CalendarUseCases(new DrizzleCommerceStore({ tx: commerceDb }), () => today).openCalendarWindow();
   process.stdout.write(
