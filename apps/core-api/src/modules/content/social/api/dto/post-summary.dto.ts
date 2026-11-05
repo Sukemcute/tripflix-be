@@ -7,7 +7,7 @@ const SummaryObjectSchema = z.record(z.string().max(64), z.unknown());
 export const SavePostSummaryRequestSchema = z
   .object({
     status: z.enum(['no_comments', 'insufficient_data', 'ready', 'failed']).optional().default('ready'),
-    summary: z.string().max(8_000).optional().nullable(),
+    summary: z.string().optional().nullable(),
     keyTakeaways: z.array(TakeawaySchema).max(20).optional().default([]),
     content: SummaryObjectSchema.optional().nullable(),
     safety: SummaryObjectSchema.optional().nullable(),

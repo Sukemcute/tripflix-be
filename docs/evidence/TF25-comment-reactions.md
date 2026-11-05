@@ -97,6 +97,7 @@
    - Bổ sung cờ `isStale: boolean` chuẩn xác trong `GetPostSummaryUseCase` và `PostSummaryResponseDto`: Đánh dấu `true` khi số lượng comment hiện tại của bài viết lệch so với `commentCountAtSummary` HOẶC có bình luận mới/chỉnh sửa nội dung sau mốc `generatedAt` (`hasDiscussionChangedSince`).
    - Thao tác thả tim (`incrementLikeCount`) không đụng tới cột `updated_at` của bình luận, tránh làm cờ `isStale` bị kích hoạt sai khi người dùng tương tác.
    - Dọn dẹp trường `id` thừa trong `PostSummaryResponseDto`, phòng thủ `resolveLimit` chống `NaN` trong `ListCommentsUseCase`, và trả `isLiked` thật trong `editComment`.
+   - Giữ nguyên trường `summary` linh hoạt (không giới hạn cứng 8.000 ký tự) theo thỏa thuận với worker AI của em Bảo.
    - Cập nhật OpenAPI documentation với `PostSummaryResponseDto`.
 
 ## Cách kiểm lại
