@@ -227,6 +227,46 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
     });
   });
 
+  it('bắt buộc summary khi status là ready: 400 Bad Request nếu summary rỗng hoặc để trống', async () => {
+    const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+
+    // Trường hợp 1: status = ready nhưng không gửi summary
+    const res1 = await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({
+        status: 'ready',
+      })
+      .expect(400);
+
+    expect(res1.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'summary',
+          message: expect.stringContaining('không được để trống khi trạng thái là ready'),
+        }),
+      ]),
+    );
+
+    // Trường hợp 2: status = ready nhưng summary là chuỗi rỗng
+    const res2 = await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({
+        status: 'ready',
+        summary: '   ',
+      })
+      .expect(400);
+
+    expect(res2.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'summary',
+        }),
+      ]),
+    );
+  });
+
   it('chặn postId sai định dạng UUID bằng ParseUUIDPipe: 400 Bad Request', async () => {
     const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
 
@@ -289,5 +329,25 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
 
     // UUID hợp lệ nhưng chưa có tóm tắt -> 404
     await http().get('/api/v1/posts/018d9f20-0000-7000-8000-000000000099/ai-summary').expect(404);
+  });
+
+  it('cho phép summary để trống khi status là no_comments hoặc insufficient_data: 200 OK', async () => {
+    const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+
+    const res = await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({
+        status: 'insufficient_data',
+        commentCount: 2,
+      })
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      postId: validPostId,
+      status: 'insufficient_data',
+      summary: null,
+      commentCountAtSummary: 2,
+    });
   });
 });

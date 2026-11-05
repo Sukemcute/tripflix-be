@@ -10,17 +10,30 @@ export const SavePostSummaryRequestSchema = z
     safety: z.record(z.string(), z.unknown()).optional().nullable(),
     inputHash: z.string().max(128).optional().nullable(),
     commentCount: z.number().int().min(0).optional().default(0),
-    promptVersion: z.string().max(32).optional().nullable(),
+    promptVersion: z.string().max(64).optional().nullable(),
     modelName: z.string().max(64).optional().nullable(),
     generatedAt: z.string().datetime().optional().nullable(),
-    // Hỗ trợ tương thích ngược nếu client cũ gửi snake_case
+    // Hỗ trợ tương thích ngược nếu worker AI gửi snake_case
     key_takeaways: z.array(z.string()).optional(),
     input_hash: z.string().max(128).optional().nullable(),
     comment_count: z.number().int().min(0).optional(),
   })
+  .refine(
+    (data) => {
+      const status = data.status ?? 'ready';
+      if (status === 'ready') {
+        return typeof data.summary === 'string' && data.summary.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: 'Nội dung tóm tắt (summary) không được để trống khi trạng thái là ready',
+      path: ['summary'],
+    },
+  )
   .transform((data) => ({
     status: data.status,
-    summary: data.summary ?? null,
+    summary: data.summary ? data.summary.trim() : null,
     keyTakeaways: data.keyTakeaways.length > 0 ? data.keyTakeaways : (data.key_takeaways ?? []),
     content: data.content ?? null,
     safety: data.safety ?? null,
@@ -42,46 +55,73 @@ export class SavePostSummaryDto {
   status?: 'no_comments' | 'insufficient_data' | 'ready' | 'failed';
 
   @ApiPropertyOptional({
+    type: String,
+    nullable: true,
     example: 'Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...',
     description: 'Nội dung tóm tắt tiếng Việt sinh từ AI (bắt buộc khi status là ready)',
   })
   summary?: string | null;
 
   @ApiPropertyOptional({
+    type: [String],
     example: ['Nên đi thuyền Tràng An lúc 7h sáng', 'Emeralda Resort có dịch vụ chu đáo'],
     description: 'Các điểm nổi bật đúc kết từ thảo luận cộng đồng',
-    type: [String],
   })
   keyTakeaways?: string[];
 
   @ApiPropertyOptional({
+    type: String,
+    nullable: true,
     example: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     description: 'Bản băm hash của tập bình luận đã dùng để tóm tắt',
   })
   inputHash?: string | null;
 
   @ApiPropertyOptional({
+    type: Number,
     example: 25,
     description: 'Số lượng bình luận tại thời điểm thực hiện tóm tắt',
   })
   commentCount?: number;
 
   @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
     description: 'Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế, trích dẫn commentId',
   })
-  content?: Record<string, unknown>;
+  content?: Record<string, unknown> | null;
 
   @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
     description: 'Cờ và đánh giá an toàn: rủi ro, tin đồn, yêu cầu kiểm duyệt',
   })
-  safety?: Record<string, unknown>;
+  safety?: Record<string, unknown> | null;
 
-  @ApiPropertyOptional({ example: 'v1.0', description: 'Phiên bản prompt' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: 'v1.0',
+    description: 'Phiên bản prompt',
+  })
   promptVersion?: string | null;
 
-  @ApiPropertyOptional({ example: 'gemini-1.5-flash', description: 'Tên mô hình LLM' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: 'gemini-1.5-flash',
+    description: 'Tên mô hình LLM',
+  })
   modelName?: string | null;
 
-  @ApiPropertyOptional({ example: '2026-11-05T14:00:00Z', description: 'Thời điểm sinh kết quả' })
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    example: '2026-11-05T14:00:00.000Z',
+    description: 'Thời điểm sinh kết quả',
+  })
   generatedAt?: string | null;
 }
