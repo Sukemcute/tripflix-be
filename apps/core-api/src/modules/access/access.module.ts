@@ -12,7 +12,9 @@ import { createLocalJWKSet } from 'jose';
 import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, REDIS } from '../../platform/tokens.js';
 import { AccountController } from './account/api/account.controller.js';
+import { PasswordResetController } from './account/api/password-reset.controller.js';
 import { AccountUseCases } from './account/application/account.use-cases.js';
+import { PasswordResetUseCases } from './account/application/password-reset.use-cases.js';
 import { AuthController } from './auth/api/auth.controller.js';
 import { JwksController } from './auth/api/jwks.controller.js';
 import { WebSession } from './auth/api/web-session.js';
@@ -20,6 +22,7 @@ import { AuthUseCases } from './auth/application/auth.use-cases.js';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  ACTION_RATE_LIMITER,
   CLOCK,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
@@ -31,6 +34,7 @@ import { AccessOutboxRelay } from './auth/infra/access-outbox-relay.js';
 import { Argon2PasswordHasher } from './auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from './auth/infra/drizzle-access.store.js';
 import { JoseTokenIssuer } from './auth/infra/jose-token-issuer.js';
+import { RedisActionRateLimiter } from './auth/infra/redis-action-rate-limiter.js';
 import { RedisLoginRateLimiter } from './auth/infra/redis-login-rate-limiter.js';
 import { AccessCleanupJob } from './auth/jobs/access-cleanup.job.js';
 import { ServiceTokenController } from './service/api/service-token.controller.js';
@@ -51,6 +55,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
     },
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
     { provide: LOGIN_RATE_LIMITER, inject: [REDIS], useFactory: (redis: Redis) => new RedisLoginRateLimiter(redis) },
+    { provide: ACTION_RATE_LIMITER, inject: [REDIS], useFactory: (redis: Redis) => new RedisActionRateLimiter(redis) },
     { provide: ACCESS_SID_BLOCKLIST, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
     {
       provide: TOKEN_ISSUER,
@@ -74,7 +79,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
       },
     },
   ],
-  exports: [CLOCK, ACCESS_STORE, PASSWORD_HASHER, LOGIN_RATE_LIMITER, ACCESS_SID_BLOCKLIST, TOKEN_ISSUER],
+  exports: [CLOCK, ACCESS_STORE, PASSWORD_HASHER, LOGIN_RATE_LIMITER, ACTION_RATE_LIMITER, ACCESS_SID_BLOCKLIST, TOKEN_ISSUER],
 })
 export class AccessInfraModule {}
 
@@ -100,7 +105,16 @@ export class AccessInfraModule {}
       },
     }),
   ],
-  controllers: [AuthController, AccountController, ServiceTokenController, JwksController, AdminController],
-  providers: [AuthUseCases, AccountUseCases, StaffUseCases, ServiceTokenUseCases, WebSession, AccessOutboxRelay, AccessCleanupJob],
+  controllers: [AuthController, AccountController, PasswordResetController, ServiceTokenController, JwksController, AdminController],
+  providers: [
+    AuthUseCases,
+    AccountUseCases,
+    PasswordResetUseCases,
+    StaffUseCases,
+    ServiceTokenUseCases,
+    WebSession,
+    AccessOutboxRelay,
+    AccessCleanupJob,
+  ],
 })
 export class AccessModule {}

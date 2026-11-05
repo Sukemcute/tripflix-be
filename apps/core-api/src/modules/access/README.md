@@ -9,10 +9,10 @@
 | Phần | Trạng thái |
 |---|---|
 | `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05); cookie refresh token cho web, admin (TF056) |
-| `account/`: tài khoản của tôi | Có (TF055): đổi tên, đổi mật khẩu, xem và thoát từng thiết bị, thoát mọi thiết bị |
+| `account/`: tài khoản của tôi | Có (TF055): đổi tên, đổi mật khẩu, xem và thoát từng thiết bị, thoát mọi thiết bị. Quên và đặt lại mật khẩu (TF057) |
 | `staff/`: API `/admin/*` cho nhân viên | Có (TF054): tìm người dùng, cấp và thu hồi quyền kiểm duyệt viên, khoá và mở khoá tài khoản |
 | `service/`: token service-to-service | Có (TF058): bảng `service_clients`, CLI tạo và vô hiệu hoá client, `POST /auth/service-token` |
-| Đăng nhập Google, quên mật khẩu | Chưa làm |
+| Đăng nhập Google, gộp gu khách `X-Anon-Id` | Chưa làm (TF059) |
 
 ## API
 
@@ -29,6 +29,8 @@
 | `DELETE /api/auth/sessions/{id}` | Bearer access token | `204`. Thoát thiết bị đó, token của nó nhận `401` ngay. Phiên không phải của mình: `404` |
 | `POST /api/auth/logout-all` | Bearer access token | `204`. Thoát mọi thiết bị, kể cả thiết bị đang gọi. Có cookie thì xoá cookie |
 | `GET /.well-known/jwks.json` | Gateway, service khác | Khoá công khai ES256. Nằm ngoài `/api` |
+| `POST /api/auth/password/forgot` `{ email }` | Ai cũng được | Luôn `202 { message }` cùng một câu, kể cả email không có tài khoản. Tài khoản đang hoạt động thì nhận email có link đặt lại (sống 30 phút). Quá 3 lần mỗi giờ theo email hoặc 20 lần theo IP: `429` |
+| `POST /api/auth/password/reset` `{ token, newPassword }` | Có link trong email | `204`. Đổi mật khẩu, thoát mọi thiết bị. Link sai, đã dùng, hết hạn hoặc tài khoản bị khoá: `400 "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"` |
 | `POST /api/auth/service-token` `{ clientId, clientSecret, audience }` | Service khác (không phải người dùng) | `{ accessToken, tokenType: "Bearer", expiresIn: 300 }`. Sai bất kỳ thông tin nào: `401 "Thông tin service không đúng"`. Xem "Token giữa các service" |
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
@@ -50,6 +52,14 @@ Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền b�
 | Thu hồi ngay | Đăng xuất, thoát thiết bị, đổi mật khẩu hoặc dùng lại token cũ: ghi `auth:revoked-sid:<sid>` vào Redis tới khi access token hết hạn. Mọi service dùng `@tripflix/auth` đều kiểm khoá này |
 | Đăng nhập sai | Sai 5 lần theo email hoặc 20 lần theo IP trong 15 phút: `429` kèm `Retry-After`. Email không tồn tại vẫn chạy argon2 để không lộ email nào có tài khoản. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào giới hạn này |
 | Mật khẩu | argon2id, 8–128 ký tự |
+
+## Quên mật khẩu (TF057)
+
+1. Web gọi `POST /api/auth/password/forgot { email }`, luôn hiện câu trong `message`.
+2. Có tài khoản đang hoạt động: trong một transaction, xoá link cũ chưa dùng, lưu SHA-256 của token mới, ghi `audit_logs`, ghi outbox `access.password_reset_requested`.
+3. Relay gửi sang `stream:core.access`; `notification-service` (consumer group `notification`) gửi email tiếng Việt qua SMTP. Dev: xem ở Mailpit `http://localhost:8025`.
+4. Người dùng mở link `AUTH_PASSWORD_RESET_URL?token=...`, trang web gọi `POST /api/auth/password/reset { token, newPassword }`.
+5. Đúng: đổi mật khẩu, đánh dấu token đã dùng (một lệnh `UPDATE`, hai request cùng lúc chỉ một cái thắng), xoá mọi phiên, chặn `sid` trong Redis.
 
 Giới hạn: chỉ phát hiện dùng lại token **liền trước**. Token cũ hơn bị từ chối `401` nhưng không thu hồi phiên.
 
@@ -121,8 +131,9 @@ Service nhận viết bằng NestJS kiểm token như ở `libs/auth/README.md` 
 | `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked` |
 | `sessions` | `id` là `sid`. `refresh_token_hash`, `previous_token_hash`, `rotated_at`, `expires_at`, thiết bị, IP |
 | `outbox_events` | Sự kiện chờ gửi (`libs/outbox`) |
+| `password_resets` | `token_hash` (SHA-256 của token trên link, duy nhất), `expires_at` (30 phút), `used_at`. Yêu cầu mới xoá token chưa dùng của người đó |
 | `service_clients` | `client_id` (khoá chính), `secret_hash` (argon2), `allowed_audiences text[]`, `disabled_at` |
-| `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout`, `auth.logout_all`, `auth.session_revoked`, `auth.profile_updated`, `auth.password_changed`, `auth.password_change_failed`, `service.token_failed` (lý do trong `meta.reason`), `service.client_created`, `service.client_disabled`, cùng các hành động quản lý nhân viên ở dưới |
+| `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout`, `auth.logout_all`, `auth.session_revoked`, `auth.profile_updated`, `auth.password_changed`, `auth.password_change_failed`, `auth.password_reset_requested`, `auth.password_reset`, `service.token_failed` (lý do trong `meta.reason`), `service.client_created`, `service.client_disabled`, cùng các hành động quản lý nhân viên ở dưới |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate access`. Không sửa migration đã merge.
 
@@ -136,12 +147,14 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.role_changed` v1 | Cấp hoặc thu hồi quyền | `{ userId, oldRole, newRole, changedBy }` |
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 | `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
+| `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 
 ## Job dọn dẹp
 
 `auth/jobs/access-cleanup.job.ts`, chỉ chạy khi `APP_ROLE` là `worker` hoặc `all`: lúc khởi động rồi mỗi 24 giờ (`setInterval`).
 
 - Xoá phiên đã quá `expires_at`.
+- Xoá token đặt lại mật khẩu đã quá `expires_at` (đã dùng hay chưa).
 - Xoá dòng `access.outbox_events` đã gửi (`published_at`) quá 7 ngày. Dòng chưa gửi không bao giờ bị xoá.
 
 Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đều an toàn.
@@ -155,6 +168,7 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_JWT_ISSUER` | `tripflix-core` | Service kiểm token phải đặt giống |
 | `AUTH_JWT_AUDIENCE` | `tripflix` | Service kiểm token phải đặt giống |
 | `AUTH_WEB_ORIGINS` | `http://localhost:3100,http://localhost:3200` | Origin của web, admin: CORS và chống CSRF cho cookie. Mỗi phần tử là origin đầy đủ, không có `/` cuối |
+| `AUTH_PASSWORD_RESET_URL` | `http://localhost:3100/dat-lai-mat-khau` | Trang đặt lại mật khẩu của web. Link trong email là địa chỉ này kèm `?token=...` |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |
 
 ## Chạy trên máy

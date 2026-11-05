@@ -1,10 +1,11 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, count, desc, eq, gt, ilike, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import {
   accessOutboxEvents,
   auditLogs,
+  passwordResets,
   serviceClients,
   sessions,
   users,
@@ -18,6 +19,7 @@ import type {
   AuditEntry,
   AuditLog,
   NewSession,
+  PasswordResetRepository,
   SessionRecord,
   SessionRepository,
   ServiceClientRecord,
@@ -210,6 +212,54 @@ class DrizzleServiceClientRepository implements ServiceClientRepository {
   }
 }
 
+class DrizzlePasswordResetRepository implements PasswordResetRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async insert(reset: { userId: string; tokenHash: string; expiresAt: Date }) {
+    await this.db.insert(passwordResets).values(reset);
+  }
+
+  async deleteUnusedByUser(userId: string) {
+    const rows = await this.db
+      .delete(passwordResets)
+      .where(and(eq(passwordResets.userId, userId), isNull(passwordResets.usedAt)))
+      .returning({ id: passwordResets.id });
+    return rows.length;
+  }
+
+  async findUsable(tokenHash: string, now: Date) {
+    const [row] = await this.db
+      .select({ userId: passwordResets.userId })
+      .from(passwordResets)
+      .where(this.usable(tokenHash, now))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async consume(tokenHash: string, now: Date) {
+    const [row] = await this.db
+      .update(passwordResets)
+      .set({ usedAt: now })
+      .where(this.usable(tokenHash, now))
+      .returning({ userId: passwordResets.userId });
+    return row ?? null;
+  }
+
+  async deleteExpired(before: Date) {
+    const rows = await this.db.delete(passwordResets).where(lt(passwordResets.expiresAt, before)).returning({ id: passwordResets.id });
+    return rows.length;
+  }
+
+  private usable(tokenHash: string, now: Date) {
+    return and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now));
+  }
+}
+
 class DrizzleAuditLog implements AuditLog {
   constructor(private readonly getDb: () => Db) {}
 
@@ -243,6 +293,7 @@ export class DrizzleAccessStore implements AccessStore {
   readonly audit: AuditLog;
   readonly outbox: AccessOutbox;
   readonly serviceClients: ServiceClientRepository;
+  readonly passwordResets: PasswordResetRepository;
 
   constructor(getDb: () => Db) {
     this.users = new DrizzleUserRepository(getDb);
@@ -250,5 +301,6 @@ export class DrizzleAccessStore implements AccessStore {
     this.audit = new DrizzleAuditLog(getDb);
     this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
     this.serviceClients = new DrizzleServiceClientRepository(getDb);
+    this.passwordResets = new DrizzlePasswordResetRepository(getDb);
   }
 }

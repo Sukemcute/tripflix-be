@@ -4,7 +4,14 @@ import { deletePublishedBefore } from '@tripflix/outbox';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV, DB_POOLS, type DbPools } from '../../../../platform/tokens.js';
 import { accessOutboxEvents } from '../../db/schema/index.js';
-import { ACCESS_STORE, CLOCK, type AccessStore, type Clock, type SessionRepository } from '../application/ports.js';
+import {
+  ACCESS_STORE,
+  CLOCK,
+  type AccessStore,
+  type Clock,
+  type PasswordResetRepository,
+  type SessionRepository,
+} from '../application/ports.js';
 
 export const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** Giữ sự kiện đã gửi 7 ngày để còn tra cứu khi consumer báo thiếu. */
@@ -12,22 +19,25 @@ export const PUBLISHED_EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface AccessCleanupResult {
   expiredSessions: number;
+  expiredPasswordResets: number;
   publishedEvents: number;
 }
 
-/** Một lượt dọn: phiên đã hết hạn và dòng outbox đã gửi quá 7 ngày. */
+/** Một lượt dọn: phiên, token đặt lại mật khẩu đã hết hạn và dòng outbox đã gửi quá 7 ngày. */
 export async function runAccessCleanup(deps: {
   sessions: Pick<SessionRepository, 'deleteExpired'>;
+  passwordResets: Pick<PasswordResetRepository, 'deleteExpired'>;
   db: Db;
   now: Date;
 }): Promise<AccessCleanupResult> {
   const expiredSessions = await deps.sessions.deleteExpired(deps.now);
+  const expiredPasswordResets = await deps.passwordResets.deleteExpired(deps.now);
   const publishedEvents = await deletePublishedBefore(
     deps.db,
     accessOutboxEvents,
     new Date(deps.now.getTime() - PUBLISHED_EVENT_RETENTION_MS),
   );
-  return { expiredSessions, publishedEvents };
+  return { expiredSessions, expiredPasswordResets, publishedEvents };
 }
 
 /**
@@ -68,8 +78,13 @@ export class AccessCleanupJob implements OnApplicationBootstrap, OnApplicationSh
 
   private async runOnce(db: Db): Promise<void> {
     try {
-      const result = await runAccessCleanup({ sessions: this.store.sessions, db, now: this.now() });
-      this.logger.log(result, 'Đã dọn phiên hết hạn và sự kiện access đã gửi quá 7 ngày');
+      const result = await runAccessCleanup({
+        sessions: this.store.sessions,
+        passwordResets: this.store.passwordResets,
+        db,
+        now: this.now(),
+      });
+      this.logger.log(result, 'Đã dọn phiên, token đặt lại mật khẩu hết hạn và sự kiện access đã gửi quá 7 ngày');
     } catch (err) {
       this.logger.error({ err }, 'Dọn dữ liệu access lỗi, sẽ thử lại ở lượt sau');
     }
