@@ -1,4 +1,4 @@
-import { PostNotFoundException } from '../../domain/index.js';
+import { Comment, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { createSocialEvent } from '../events/social-events.js';
@@ -30,12 +30,13 @@ export class AddCommentUseCase {
       throw new Error('Nội dung bình luận không được để trống');
     }
 
-    // Nếu là reply, kiểm tra parent comment tồn tại
+    // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
     if (command.parentCommentId) {
       const parent = await this.commentRepository.findById(command.parentCommentId);
       if (!parent || parent.postId !== command.postId) {
         throw new Error('Bình luận gốc không hợp lệ hoặc đã bị xóa');
       }
+      Comment.validateParentForReply(parent);
     }
 
     const comment = await this.commentRepository.create({

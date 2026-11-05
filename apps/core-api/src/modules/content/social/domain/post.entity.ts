@@ -136,7 +136,11 @@ export class Post {
     if (data.visibility !== undefined) this.props.visibility = data.visibility;
     if (data.mediaIds !== undefined) this.props.mediaIds = data.mediaIds;
     if (data.coverMediaId !== undefined) this.props.coverMediaId = data.coverMediaId;
-    if (data.tripAttachment !== undefined) this.props.tripAttachment = data.tripAttachment;
+    if (data.tripAttachment !== undefined) {
+      this.props.tripAttachment = data.tripAttachment;
+      // Khi tác giả sửa đổi lộ trình, dấu xác thực booking cũ bị hủy bỏ để đảm bảo tính xác thực
+      this.props.isVerified = false;
+    }
 
     this.props.updatedAt = new Date();
   }
@@ -170,13 +174,14 @@ export class Post {
   }
 
   /** Thực thi thao tác kiểm duyệt của Admin/Moderator */
-  moderate(action: 'hide' | 'remove' | 'restore'): void {
+  moderate(action: 'hide' | 'remove' | 'restore', targetStatus?: PostStatus): void {
     if (action === 'hide') {
       this.props.status = 'hidden';
     } else if (action === 'remove') {
       this.props.status = 'removed';
     } else if (action === 'restore') {
-      this.props.status = 'published';
+      // Phục hồi về trạng thái hợp lệ: nếu đã từng xuất bản thì về published, nếu chưa thì về draft
+      this.props.status = targetStatus ?? (this.props.publishedAt ? 'published' : 'draft');
     }
     this.props.updatedAt = new Date();
   }
