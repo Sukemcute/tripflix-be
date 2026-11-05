@@ -1,0 +1,377 @@
+import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { Global, type INestApplication, Module } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { AuthModule, InvalidAccessTokenError, MemorySidBlocklist, type AuthUser } from '@tripflix/auth';
+import { MODULES, buildDrizzleToken, createDb, createPool, createTransactionalPlugins, type Db } from '@tripflix/db';
+import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
+import { ClsModule } from 'nestjs-cls';
+import type pg from 'pg';
+import request from 'supertest';
+import type { CoreEnv } from '../../platform/env.js';
+import { applyGlobalPrefix } from '../../platform/http.js';
+import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
+import { CommerceFacade } from './commerce.facade.js';
+import { CommerceModule } from './commerce.module.js';
+import { seedCatalog } from './db/seed/seed-catalog.js';
+import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
+import { TODAY } from './inventory/application/ports.js';
+import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
+import type { ChargeResult } from './payment/application/gateway.port.js';
+import { PAYMENT_GATEWAY } from './payment/application/gateway.port.js';
+import { PaymentUseCases } from './payment/application/payment.use-cases.js';
+import { MockGateway } from './payment/infra/mock-gateway.js';
+import { VNPAY_CONFIG } from './payment/application/vnpay.use-cases.js';
+import { buildSignData } from './payment/domain/vnpay-signature.js';
+import { createHmac } from 'node:crypto';
+
+// TF29 trên Postgres thật (user tf_commerce), qua HTTP: giữ chỗ, trả tiền, trả trùng, thẻ từ chối, mất phản hồi,
+// cổng sập, bù tiền, tranh phòng cuối, 3DS, giá đổi. Cổng là MockGateway bọc thêm chế độ hỏng để giả lập sự cố.
+const TODAY_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const POLICY = '2026-11-03';
+const VISA = '4242424242424242';
+const DECLINED = '4000000000000002';
+const THREE_DS = '4000002500003155';
+
+// Khoá ký giả cho test: ký callback như VNPay để kiểm IPN mà không cần mạng. Không phải khoá thật.
+const VNPAY_TEST_CONFIG = { tmnCode: 'TESTTMN1', hashSecret: 'TEST_SECRET_FOR_SIGNING', paymentUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', returnUrl: 'http://localhost/return' };
+const signVnpay = (params: Record<string, string>) => ({
+  ...params,
+  vnp_SecureHash: createHmac('sha512', VNPAY_TEST_CONFIG.hashSecret).update(buildSignData(params)).digest('hex'),
+});
+
+/** Cổng có thể hỏng theo kịch bản: lost = trừ xong mà mất phản hồi; down = sập trước khi trừ. */
+class FlakyGateway extends MockGateway {
+  mode: 'ok' | 'lost' | 'down' = 'ok';
+  override async charge(input: { amount: number; token: string; gatewayKey: string }): Promise<ChargeResult> {
+    if (this.mode === 'down') throw new Error('gateway down');
+    const result = await super.charge(input);
+    if (this.mode === 'lost') throw new Error('response lost');
+    return result;
+  }
+}
+
+describe('TF29 checkout + thanh toán trên Postgres thật', () => {
+  let postgres: PostgresFixture;
+  let pool: pg.Pool;
+  let db: Db;
+  let app: INestApplication;
+  let gateway: FlakyGateway;
+  let payment: PaymentUseCases;
+  let facade: CommerceFacade;
+  let roomTypeId: string;
+  let flightId: string;
+  const users = new Map<string, AuthUser>();
+
+  const newUser = () => {
+    const token = `token-${randomUUID()}`;
+    users.set(token, { userId: randomUUID(), role: 'member', sid: randomUUID(), exp: 9_999_999_999 });
+    return { auth: { Authorization: `Bearer ${token}` }, userId: users.get(token)!.userId };
+  };
+  const http = () => request(app.getHttpServer());
+  const key = () => ({ 'Idempotency-Key': randomUUID() });
+
+  async function holdRoom(user: { auth: Record<string, string> }, checkIn = addDays(TODAY_DATE, 20), nights = 2) {
+    const res = await http()
+      .post('/api/checkout')
+      .set({ ...user.auth, ...key() })
+      .send({ adults: 2, items: [{ productId: roomTypeId, checkIn, checkOut: addDays(checkIn, nights), qty: 1 }] });
+    return res;
+  }
+  async function ready(user: { auth: Record<string, string> }, checkIn?: string) {
+    const held = await holdRoom(user, checkIn);
+    expect(held.status, JSON.stringify(held.body)).toBe(201);
+    const guests = await http().put(`/api/checkout/${held.body.orderId}/guests`).set(user.auth).send({ contact: { fullName: 'Khách Thử', phone: '0901234567' }, guests: [] });
+    expect(guests.status, JSON.stringify(guests.body)).toBe(200);
+    return held.body as { orderId: string; total: number; items: { date: string; nights: number }[] };
+  }
+  const token = async (card = VISA) => (await http().post('/api/mock-gateway/tokens').send({ cardNumber: card }).expect(200)).body.paymentToken as string;
+  const pay = async (user: { auth: Record<string, string> }, order: { orderId: string; total: number }, card = VISA, headers = key()) => {
+    // Lấy token trước khi tạo request: supertest mở server tạm theo từng request.
+    const paymentToken = await token(card);
+    return http()
+      .post(`/api/checkout/${order.orderId}/pay`)
+      .set({ ...user.auth, ...headers })
+      .send({ paymentToken, expectedTotal: order.total, acceptedPolicyVersion: POLICY });
+  };
+  const inventoryOf = async (date: string) =>
+    (await pool.query<{ total: number; held: number; sold: number }>('select total, held, sold from commerce.room_inventory where room_type_id = $1 and date = $2', [roomTypeId, date])).rows[0]!;
+  const orderStatus = async (id: string) => (await pool.query<{ status: string }>('select status from commerce.orders where id = $1', [id])).rows[0]!.status;
+  const chargesAtGateway = async (orderId: string) =>
+    Number((await pool.query(`select count(*) as n from commerce.mock_gateway_ops where op = 'charge' and status = 'succeeded' and gateway_key like $1`, [`charge:${orderId}:%`])).rows[0].n);
+
+  beforeAll(async () => {
+    postgres = await startPostgres();
+    const url = postgres.buildModuleUrl('commerce');
+    await migrateModule({ url, module: 'commerce', migrationsFolder: fileURLToPath(new URL('./db/migrations', import.meta.url)) });
+    pool = createPool({ url, max: 20, applicationName: 'commerce-checkout-int' });
+    db = createDb(pool);
+    await seedCatalog(db, fileURLToPath(new URL('./db/seed/catalog.json', import.meta.url)));
+    await new CalendarUseCases(new DrizzleCommerceStore({ tx: db }), () => TODAY_DATE).openCalendarWindow(40);
+    // Bỏ ngẫu nhiên của bộ sinh lịch: mọi ngày mở bán bình thường, đủ chỗ.
+    await pool.query('update commerce.room_inventory set stop_sell = false, cta = false, ctd = false, min_los = 1, total = 10');
+    await pool.query('update commerce.flight_inventory set stop_sell = false, total = 10');
+    roomTypeId = (await pool.query<{ id: string }>('select id from commerce.room_types where max_guests >= 2 order by id limit 1')).rows[0]!.id;
+    flightId = (await pool.query<{ id: string }>('select id from commerce.flights order by id limit 1')).rows[0]!.id;
+
+    gateway = new FlakyGateway(db);
+    @Global()
+    @Module({
+      providers: [
+        { provide: CORE_ENV, useValue: { NODE_ENV: 'test', APP_ROLE: 'api' } as CoreEnv },
+        { provide: DB_POOLS, useValue: { commerce: pool } },
+        { provide: REDIS, useValue: {} },
+        ...MODULES.map((m) => ({ provide: buildDrizzleToken(m), useValue: db })),
+      ],
+      exports: [CORE_ENV, DB_POOLS, REDIS, ...MODULES.map((m) => buildDrizzleToken(m))],
+    })
+    class TestPlatformModule {}
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        TestPlatformModule,
+        ClsModule.forRoot({ global: true, plugins: createTransactionalPlugins([TestPlatformModule]) }),
+        AuthModule.forRootAsync({
+          useFactory: () => ({
+            verifier: async (t: string) => {
+              const user = users.get(t);
+              if (!user) throw new InvalidAccessTokenError();
+              return user;
+            },
+            blocklist: new MemorySidBlocklist(),
+          }),
+        }),
+        CommerceModule,
+      ],
+    })
+      .overrideProvider(PAYMENT_GATEWAY)
+      .useValue(gateway)
+      .overrideProvider(TODAY)
+      .useValue(() => TODAY_DATE)
+      .overrideProvider(VNPAY_CONFIG)
+      .useValue(VNPAY_TEST_CONFIG)
+      .compile();
+    app = moduleRef.createNestApplication();
+    applyGlobalPrefix(app);
+    await app.init();
+    payment = moduleRef.get(PaymentUseCases);
+    facade = moduleRef.get(CommerceFacade);
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    await pool?.end();
+    await postgres?.stop();
+  });
+
+  beforeEach(() => {
+    gateway.mode = 'ok';
+  });
+
+  it('đầu cuối: giữ chỗ → thông tin khách → trả tiền; held → sold; mã xác nhận; sự kiện commerce.order.paid trong outbox', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 10);
+    const before = await inventoryOf(checkIn);
+    const order = await ready(user, checkIn);
+    expect((await inventoryOf(checkIn)).held).toBe(before.held + 1);
+
+    const res = await pay(user, order);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toMatchObject({ outcome: 'paid', confirmationCode: expect.stringMatching(/^TF-[A-Z2-9]{6}$/) });
+    expect(await inventoryOf(checkIn)).toMatchObject({ held: before.held, sold: before.sold + 1 });
+    const events = await pool.query(`select type, payload from commerce.outbox_events where type = 'commerce.order.paid' and payload->>'orderId' = $1`, [order.orderId]);
+    expect(events.rows).toHaveLength(1);
+    expect(events.rows[0].payload).toMatchObject({ orderId: order.orderId, userId: user.userId, total: order.total });
+  });
+
+  it('bấm trả 5 lần cùng lúc cùng Idempotency-Key: đúng 1 khoản trừ ở cổng; gửi lại nhận đúng kết quả cũ', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    const paymentToken = await token();
+    const headers = key();
+    const send = () => http().post(`/api/checkout/${order.orderId}/pay`).set({ ...user.auth, ...headers }).send({ paymentToken, expectedTotal: order.total, acceptedPolicyVersion: POLICY });
+    const results = await Promise.all(Array.from({ length: 5 }, send));
+    expect(results.filter((r) => r.status === 200)).not.toHaveLength(0);
+    expect(results.every((r) => [200, 409].includes(r.status))).toBe(true);
+    const replay = await send();
+    expect(replay.status).toBe(200);
+    expect(replay.headers['idempotency-replayed']).toBe('true');
+    expect(await chargesAtGateway(order.orderId)).toBe(1);
+  });
+
+  it('thẻ bị từ chối: 402, chỗ vẫn giữ, đơn về pending; đổi thẻ trả được, khoá cổng mới', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    const declined = await pay(user, order, DECLINED);
+    expect(declined.status).toBe(402);
+    expect(declined.body.declineCode).toBe('card_declined');
+    expect(await orderStatus(order.orderId)).toBe('pending');
+    const ok = await pay(user, order, VISA);
+    expect(ok.body.outcome).toBe('paid');
+    const keys = (await pool.query('select gateway_key, status from commerce.payments where order_id = $1 order by created_at', [order.orderId])).rows;
+    expect(keys.map((k) => k.status)).toEqual(['failed', 'succeeded']);
+    expect(keys[0].gateway_key).not.toBe(keys[1].gateway_key);
+  });
+
+  it('cổng trừ tiền xong mà mất phản hồi: 202, đơn không bị nhả; đối soát hỏi lại cổng và chốt đúng 1 lần', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    gateway.mode = 'lost';
+    const res = await pay(user, order);
+    expect(res.status).toBe(202);
+    expect(res.body.outcome).toBe('pending');
+    expect(await orderStatus(order.orderId)).toBe('paying');
+    gateway.mode = 'ok';
+    await payment.reconcile(0);
+    expect(await orderStatus(order.orderId)).toBe('paid');
+    await payment.reconcile(0);
+    expect(await chargesAtGateway(order.orderId)).toBe(1);
+  });
+
+  it('cổng sập trước khi trừ: đối soát huỷ lệnh ở cổng, coi là thất bại, đơn về pending để trả lại', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    gateway.mode = 'down';
+    expect((await pay(user, order)).status).toBe(202);
+    gateway.mode = 'ok';
+    await payment.reconcile(0);
+    expect(await orderStatus(order.orderId)).toBe('pending');
+    expect((await pool.query(`select code from commerce.mock_gateway_ops where gateway_key = $1`, [`charge:${order.orderId}:1`])).rows[0].code).toBe('voided');
+    expect((await pay(user, order)).body.outcome).toBe('paid');
+  });
+
+  it('tiền về khi đơn đã hết hạn: không chốt đơn, tự hoàn tiền (bù), chỗ không bị bán', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 12);
+    const order = await ready(user, checkIn);
+    gateway.mode = 'lost';
+    await pay(user, order);
+    // Giả lập job nhả chỗ (TF30) đã chạy trong lúc chờ cổng.
+    await pool.query(`update commerce.orders set status = 'expired' where id = $1`, [order.orderId]);
+    gateway.mode = 'ok';
+    await payment.reconcile(0);
+    expect(await orderStatus(order.orderId)).toBe('expired');
+    const refunds = (await pool.query('select status, amount from commerce.refunds where order_id = $1', [order.orderId])).rows;
+    expect(refunds).toEqual([{ status: 'succeeded', amount: String(order.total) }]);
+  });
+
+  it('2 người tranh phòng cuối cùng lúc: đúng 1 người giữ được, người kia 409, không giữ quá số phòng', async () => {
+    const checkIn = addDays(TODAY_DATE, 25);
+    await pool.query('update commerce.room_inventory set total = held + sold + 1 where room_type_id = $1 and date in ($2, $3)', [roomTypeId, checkIn, addDays(checkIn, 1)]);
+    const [a, b] = await Promise.all([holdRoom(newUser(), checkIn), holdRoom(newUser(), checkIn)]);
+    expect([a.status, b.status].sort((x, y) => x - y)).toEqual([201, 409]);
+    const cell = await inventoryOf(checkIn);
+    expect(cell.held + cell.sold).toBeLessThanOrEqual(cell.total);
+  });
+
+  it('giữ giỏ thiếu một mục thì không giữ gì; giỏ mới thay giỏ cũ và trả chỗ cũ về kho', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 30);
+    await pool.query('update commerce.flight_inventory set total = held + sold where flight_id = $1 and date = $2', [flightId, checkIn]);
+    const before = await inventoryOf(checkIn);
+    const failed = await http()
+      .post('/api/checkout')
+      .set({ ...user.auth, ...key() })
+      .send({ adults: 2, items: [{ productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 }, { productId: flightId, checkIn }] });
+    expect(failed.status).toBe(409);
+    expect((await inventoryOf(checkIn)).held).toBe(before.held);
+
+    const first = (await holdRoom(user, checkIn, 1)).body;
+    const second = (await holdRoom(user, addDays(checkIn, 3), 1)).body;
+    expect(await orderStatus(first.orderId)).toBe('cancelled');
+    expect(await orderStatus(second.orderId)).toBe('pending');
+    expect((await inventoryOf(checkIn)).held).toBe(before.held);
+  });
+
+  it('3D Secure: sai OTP thì 402, chỗ vẫn giữ; thẻ khác đúng OTP thì chốt', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    const challenge = await pay(user, order, THREE_DS);
+    expect(challenge.body.outcome).toBe('requires_action');
+    const wrong = await http().post(`/api/checkout/${order.orderId}/3ds`).set({ ...user.auth, ...key() }).send({ challengeId: challenge.body.challengeId, otp: '000000' });
+    expect(wrong.status).toBe(402);
+    expect(await orderStatus(order.orderId)).toBe('pending');
+    const again = await pay(user, order, THREE_DS);
+    const right = await http().post(`/api/checkout/${order.orderId}/3ds`).set({ ...user.auth, ...key() }).send({ challengeId: again.body.challengeId, otp: '123456' });
+    expect(right.body.outcome, JSON.stringify(right.body)).toBe('paid');
+  });
+
+  it('giá đổi trong lúc giữ chỗ: 409 PRICE_CHANGED, chưa trừ tiền; xác nhận giá mới thì trả được', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 15);
+    const order = await ready(user, checkIn);
+    await pool.query('update commerce.room_rates set price = price + 500000 where room_type_id = $1 and date = $2', [roomTypeId, checkIn]);
+    const res = await pay(user, order);
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ reason: 'PRICE_CHANGED', oldTotal: order.total });
+    expect(await chargesAtGateway(order.orderId)).toBe(0);
+    expect((await pay(user, { orderId: order.orderId, total: res.body.newTotal })).body.outcome).toBe('paid');
+  });
+
+  it('đơn của người khác thì 404; thiếu Idempotency-Key thì 400; chưa đủ thông tin khách thì 400', async () => {
+    const owner = newUser();
+    const order = await ready(owner);
+    await http().get(`/api/checkout/${order.orderId}`).set(newUser().auth).expect(404);
+    await http().post(`/api/checkout/${order.orderId}/pay`).set(owner.auth).send({ paymentToken: 'x', expectedTotal: 1, acceptedPolicyVersion: POLICY }).expect(400);
+    const other = newUser();
+    const held = (await holdRoom(other)).body;
+    expect((await pay(other, held)).status).toBe(400);
+  });
+
+  it('CommerceFacade.verifyCompletedBooking: đơn đã trả nhưng chưa tới ngày trả phòng thì false; đúng người mới true', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    await pay(user, order);
+    expect(await facade.verifyCompletedBooking(order.orderId, user.userId)).toBe(false);
+    await pool.query(`update commerce.order_items set date = $2 where order_id = $1`, [order.orderId, addDays(TODAY_DATE, -5)]);
+    expect(await facade.verifyCompletedBooking(order.orderId, user.userId)).toBe(true);
+    expect(await facade.verifyCompletedBooking(order.orderId, randomUUID())).toBe(false);
+    expect(await facade.verifyCompletedBooking('khong-phai-uuid', user.userId)).toBe(false);
+  });
+
+  it('VNPay: tạo URL đã ký; IPN đúng chữ ký thì chốt đơn; gửi lại IPN trả 02; sai chữ ký 97; sai số tiền 04', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    const start = await http().post(`/api/checkout/${order.orderId}/pay-vnpay`).set({ ...user.auth, ...key() }).send({ expectedTotal: order.total, acceptedPolicyVersion: POLICY });
+    expect(start.status, JSON.stringify(start.body)).toBe(200);
+    const sent = Object.fromEntries(new URL(start.body.paymentUrl).searchParams);
+    expect(sent).toMatchObject({ vnp_TmnCode: 'TESTTMN1', vnp_Amount: String(order.total * 100), vnp_Command: 'pay' });
+    expect(await orderStatus(order.orderId)).toBe('paying');
+
+    const callback = { vnp_TxnRef: sent.vnp_TxnRef!, vnp_Amount: sent.vnp_Amount!, vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '14000001', vnp_TmnCode: 'TESTTMN1' };
+    expect((await http().get('/api/payments/vnpay/ipn').query({ ...signVnpay(callback), vnp_Amount: '1' })).body.RspCode).toBe('97');
+    expect((await http().get('/api/payments/vnpay/ipn').query(signVnpay({ ...callback, vnp_Amount: '100' }))).body.RspCode).toBe('04');
+    expect((await http().get('/api/payments/vnpay/ipn').query(signVnpay(callback))).body).toEqual({ RspCode: '00', Message: 'Confirm Success' });
+    expect(await orderStatus(order.orderId)).toBe('paid');
+    expect((await http().get('/api/payments/vnpay/ipn').query(signVnpay(callback))).body.RspCode).toBe('02');
+    const back = await http().get('/api/payments/vnpay/return').query(signVnpay(callback));
+    expect(back.body).toEqual({ orderId: order.orderId, isValidSignature: true, isSuccess: true });
+  });
+
+  it('VNPay: khách huỷ trên trang VNPay (mã 24) thì đơn về pending để trả lại', async () => {
+    const user = newUser();
+    const order = await ready(user);
+    const start = await http().post(`/api/checkout/${order.orderId}/pay-vnpay`).set({ ...user.auth, ...key() }).send({ expectedTotal: order.total, acceptedPolicyVersion: POLICY });
+    const sent = Object.fromEntries(new URL(start.body.paymentUrl).searchParams);
+    const res = await http().get('/api/payments/vnpay/return').query(signVnpay({ vnp_TxnRef: sent.vnp_TxnRef!, vnp_Amount: sent.vnp_Amount!, vnp_ResponseCode: '24', vnp_TransactionStatus: '02' }));
+    expect(res.body.isSuccess).toBe(false);
+    expect(await orderStatus(order.orderId)).toBe('pending');
+  });
+
+  it('VNPay: khách bỏ ngang trang VNPay rồi trả lại thì tạo lần trả mới, không kẹt ở paying', async () => {
+    const user = newUser();
+    const order = await ready(user, addDays(TODAY_DATE, 33));
+    const start = () => http().post(`/api/checkout/${order.orderId}/pay-vnpay`).set({ ...user.auth, ...key() }).send({ expectedTotal: order.total, acceptedPolicyVersion: POLICY });
+    const first = Object.fromEntries(new URL((await start()).body.paymentUrl).searchParams);
+    const again = await start();
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    const second = Object.fromEntries(new URL(again.body.paymentUrl).searchParams);
+    expect(second.vnp_TxnRef).not.toBe(first.vnp_TxnRef);
+    const rows = (await pool.query('select status, failure_code from commerce.payments where order_id = $1 order by created_at', [order.orderId])).rows;
+    expect(rows).toEqual([{ status: 'failed', failure_code: 'vnpay_abandoned' }, { status: 'initiated', failure_code: null }]);
+    const paid = await http().get('/api/payments/vnpay/ipn').query(signVnpay({ vnp_TxnRef: second.vnp_TxnRef!, vnp_Amount: second.vnp_Amount!, vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '14000002' }));
+    expect(paid.body.RspCode).toBe('00');
+    expect(await orderStatus(order.orderId)).toBe('paid');
+  });
+});
