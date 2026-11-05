@@ -79,7 +79,7 @@ sed -e "s|@BUCKET@|$BUCKET|g" \
   -e "s|@DISTRIBUTION_ARN@|arn:aws:cloudfront::$ACCOUNT_ID:distribution/$DISTRIBUTION_ID|g" \
   "$DIR/bucket-policy.template.json" >"$TMP/bucket-policy.json"
 aws s3api put-bucket-policy --bucket "$BUCKET" --policy "file://$TMP/bucket-policy.json"
-echo "Đã cho CloudFront đọc dev/*/videos/*"
+echo "Đã cho CloudFront đọc dev/*/videos/* và dev/*/images/*"
 
 echo
 echo "Ghi vào deploy/.env của từng người:"

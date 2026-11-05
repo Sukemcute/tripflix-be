@@ -1,8 +1,8 @@
+import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 
 export interface PublishPostCommand {
   postId: string;
@@ -20,10 +20,11 @@ export interface PublishPostResult {
 export class PublishPostUseCase {
   constructor(
     private readonly postRepository: PostRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
     private readonly commerceService?: CommerceServicePort,
   ) {}
 
+  @Transactional('content')
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
@@ -73,22 +74,20 @@ export class PublishPostUseCase {
 
     const shareUrl = `https://tripflix.vn/posts/${command.postId}`;
 
-    // Phát sự kiện outbox content.post.published
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.post.published',
-        userId: command.userId,
-        payload: {
-          postId: command.postId,
-          authorId: command.userId,
-          postType: domainPost.postType,
-          title: domainPost.title,
-          isVerified: domainPost.isVerified,
-          publishedAt: publishedAt.toISOString(),
-          shareUrl,
-        },
-      }),
-    );
+    // Ghi sự kiện vào content.outbox_events trong cùng transaction DB
+    await this.outbox.add({
+      type: 'content.post.published',
+      userId: command.userId,
+      payload: {
+        postId: command.postId,
+        authorId: command.userId,
+        postType: domainPost.postType,
+        title: domainPost.title,
+        isVerified: domainPost.isVerified,
+        publishedAt: publishedAt.toISOString(),
+        shareUrl,
+      },
+    });
 
     return {
       id: command.postId,

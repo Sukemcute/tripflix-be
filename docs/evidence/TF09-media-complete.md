@@ -10,7 +10,7 @@ PR này là một phần của TF09. Chưa phát được video: còn `video-wor
 - Kiểm request có đủ mọi phần trước khi gọi S3, vì S3 sẽ ghép thiếu rồi xoá phiên upload, khiến app không tải tiếp được.
 - Gọi lại an toàn: `UPDATE ... WHERE status = 'uploading'` nên nhiều lần gọi chỉ một lần được giao việc. S3 báo mất phiên thì xem file gốc trước khi trả 410, vì lần trước có thể đã ghép xong nhưng ghi database lỗi.
 - `revision` lấy từ `transcode_attempts` sau khi tăng, bắt đầu từ 1.
-- Thêm bảng `content.outbox_events` và relay `ContentOutboxRelay` với hàm chọn stream của PR #21. Relay đặt trong `media/infra` để không sửa provider của `social`.
+- Dùng chung bảng `content.outbox_events` và `ContentOutboxRelay` của Thành (PR #25). Relay đó thêm một điều kiện để `content.media.transcode_requested` đi `stream:media`, vì worker chỉ đọc stream này.
 - Thêm schema `ContentMediaTranscodeRequestedV1Schema` vào `libs/contracts`.
 
 ## Đối chiếu kế hoạch
@@ -27,16 +27,15 @@ PR này là một phần của TF09. Chưa phát được video: còn `video-wor
 Chạy đủ các bước của CI, tất cả thoát mã 0:
 - `pnpm lint` (có kiểm ranh giới module): 22/22 task.
 - `pnpm typecheck`: 22/22 task.
-- `pnpm test`: 22/22 task; core-api 238/238 test.
-- `pnpm test:int`: 12/12 task; core-api 21/21 test.
+- `pnpm test`: 22/22 task; core-api 263/263 test.
+- `pnpm test:int`: 14/14 task; core-api 27/27 test.
 - `pnpm build`: 13/13 task.
 - `pnpm contracts:build`: thêm route `complete` và schema sự kiện mới, đã commit.
 
-Thử thật với core-api chạy `APP_ROLE=all`, S3 `dev/phong/`, Postgres và Redis local: 16/16 đạt, đã dọn dữ liệu thử. S3 thật từ chối ETag sai và trả đúng lỗi khi phiên upload đã huỷ.
+Kết quả trên chạy sau khi gộp `develop` và dùng relay của Thành. Thử thật với core-api chạy `APP_ROLE=all`, S3 `dev/phong/`, Postgres và Redis local: 16/16 đạt, đã dọn dữ liệu thử. S3 thật từ chối ETag sai và trả đúng lỗi khi phiên upload đã huỷ.
 
-## Chưa làm, cần chốt
-- **`pnpm db:generate content` đang lỗi từ trước PR này:** `init_media` và `plain_captain_cross` đều là snapshot gốc. Cách sửa cần đổi snapshot của migration đã merge nên chưa làm ở đây. Migration chạy bình thường vì migrator chỉ đọc SQL.
-- **`Idempotency-Key`:** API này chưa nhận header, vì đã an toàn khi gọi lại nhờ kiểm trạng thái. `RULES.md` mục 10 yêu cầu nhận header với lệnh ghi có thể bị gửi lại, nên cần Dũng xác nhận. `POST /media/uploads` cũng chưa nhận header.
+## Chưa làm
+- **`Idempotency-Key`:** không thêm, Dũng đồng ý bỏ qua nếu tốn nhiều công. Việc này cần thêm bảng, migration, module, và header bắt buộc làm app phải đổi, trong khi gọi lại đã an toàn nhờ kiểm trạng thái. `POST /media/uploads` cũng chưa nhận header.
 - Dung lượng sai sau khi đã ghép thì video giữ `uploading`, app phải tạo upload mới; file gốc tự xoá sau 7 ngày.
 
 ## Cách kiểm lại
@@ -48,6 +47,6 @@ Thử thật với core-api chạy `APP_ROLE=all`, S3 `dev/phong/`, Postgres và
 - Không đổi giao diện.
 
 ## Ảnh hưởng tới phần của người khác
-- Có: `content/db` (chung với Thành, Trang) thêm bảng `outbox_events`; không đổi bảng có sẵn.
+- Có: `social/infra/content-outbox-relay.ts` và spec của Thành thêm một điều kiện chọn stream cho `content.media.transcode_requested`; sự kiện của `social` không đổi. Phong đồng ý sửa, cần Thành xem lại trong PR.
 - Có: `libs/contracts` của Dũng thêm một schema, tương thích ngược.
 - Có: hợp đồng API với mobile của Trang: `complete` có thể trả `status: 'ready'` khi gọi lại và thêm lỗi `409 MEDIA_UPLOAD_NOT_ACTIVE`.

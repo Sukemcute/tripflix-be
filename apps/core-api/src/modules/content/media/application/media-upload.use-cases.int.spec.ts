@@ -13,15 +13,15 @@ import {
   type Db,
   type ModuleTransactionHost,
 } from '@tripflix/db';
-import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
-import { DrizzleOutboxStore, OutboxRelay } from '@tripflix/outbox';
+import { STREAMS } from '@tripflix/event-bus';
 import { InMemoryObjectStorage } from '@tripflix/storage';
 import { migrateModule, startPostgres, startRedis, type PostgresFixture, type RedisFixture } from '@tripflix/testing';
 import { Redis } from 'ioredis';
 import { ClsModule } from 'nestjs-cls';
 import type pg from 'pg';
-import { contentOutboxEvents } from '../../db/schema/index.js';
-import { selectContentStream } from '../infra/content-outbox-relay.js';
+import type { CoreEnv } from '../../../../platform/env.js';
+import type { DbPools } from '../../../../platform/tokens.js';
+import { ContentOutboxRelay } from '../../social/infra/content-outbox-relay.js';
 import { DrizzleMediaAssetStore } from '../infra/drizzle-media-asset.store.js';
 import { MediaUploadUseCases } from './media-upload.use-cases.js';
 import { MEDIA_ASSET_STORE, MEDIA_CLOCK, OBJECT_STORAGE, type MediaAssetStore } from './ports.js';
@@ -164,14 +164,19 @@ describe('MediaUploadUseCases.completeUpload trên Postgres, Redis thật', () =
   it('relay đưa việc chuyển mã vào stream:media, đúng hợp đồng, rồi đánh dấu đã gửi', async () => {
     const { assetId, sourceKey, parts } = await createCompletableUpload();
     await useCases.completeUpload(OWNER_ID, assetId, parts);
-    const relay = new OutboxRelay({
-      store: new DrizzleOutboxStore(db, contentOutboxEvents),
-      bus: new RedisStreamsEventBus(redis),
-      stream: selectContentStream,
-    });
-
-    // Các test trước cũng để lại sự kiện trong outbox, nên chạy tới khi hết.
-    for (let round = 0; round < 5; round += 1) await relay.publishPending();
+    // Chạy relay thật của module content. Các test trước cũng để lại sự kiện, nên chờ tới khi gửi hết.
+    const relay = new ContentOutboxRelay({ APP_ROLE: 'all' } as CoreEnv, { content: pool } as DbPools, redis);
+    relay.onApplicationBootstrap();
+    await vi.waitFor(
+      async () => {
+        const pending = await pool.query<{ n: number }>(
+          'select count(*)::int as n from content.outbox_events where published_at is null',
+        );
+        expect(pending.rows[0]!.n).toBe(0);
+      },
+      { timeout: 10_000, interval: 100 },
+    );
+    await relay.onApplicationShutdown();
 
     const entries = await redis.xrange(STREAMS.media, '-', '+');
     const envelopes = entries.map(([, fields]) => eventEnvelopeSchema.parse(JSON.parse(fields[1]!)));
@@ -179,10 +184,5 @@ describe('MediaUploadUseCases.completeUpload trên Postgres, Redis thật', () =
     expect(envelope).toMatchObject({ type: 'content.media.transcode_requested', userId: OWNER_ID });
     expect(ContentMediaTranscodeRequestedV1Schema.parse(envelope?.payload)).toEqual({ assetId, sourceKey, revision: 1 });
     expect(await redis.xlen(STREAMS.content)).toBe(0);
-
-    const unpublished = await pool.query<{ n: number }>(
-      'select count(*)::int as n from content.outbox_events where published_at is null',
-    );
-    expect(unpublished.rows[0]!.n).toBe(0);
   });
 });

@@ -62,6 +62,19 @@ export const ContentMediaTranscodeRequestedV1Schema = z.object({
 });
 export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
 
+/**
+ * Payload của access.password_reset_requested v1: notification-service gửi email đặt lại mật khẩu.
+ * Có email vì bên gửi cần người nhận (docs/10 §3.5); resetUrl đã gồm token dùng một lần, sống 30 phút.
+ */
+export const AccessPasswordResetRequestedV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  resetUrl: z.url(),
+  expiresAt: z.iso.datetime(),
+});
+export type AccessPasswordResetRequestedV1 = z.infer<typeof AccessPasswordResetRequestedV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -72,4 +85,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
+  'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
 };

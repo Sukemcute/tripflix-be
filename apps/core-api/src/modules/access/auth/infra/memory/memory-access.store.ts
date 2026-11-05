@@ -6,6 +6,7 @@ import type {
   AuditEntry,
   NewSession,
   SessionRecord,
+  ServiceClientRecord,
   SessionRotation,
   SessionSummary,
   UserRecord,
@@ -91,6 +92,51 @@ export class MemoryAccessStore implements AccessStore {
       this.auditRows.push(entry);
     },
   };
+
+  readonly serviceClientRows = new Map<string, ServiceClientRecord>();
+
+  readonly serviceClients = {
+    findById: async (clientId: string) => this.serviceClientRows.get(clientId) ?? null,
+    insert: async (client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>) => {
+      if (this.serviceClientRows.has(client.clientId)) return null;
+      const row: ServiceClientRecord = { ...client, createdAt: new Date(), disabledAt: null };
+      this.serviceClientRows.set(row.clientId, row);
+      return row;
+    },
+    disable: async (clientId: string, at: Date) => {
+      const row = this.serviceClientRows.get(clientId);
+      if (!row) return false;
+      this.serviceClientRows.set(clientId, { ...row, disabledAt: row.disabledAt ?? at });
+      return true;
+    },
+  };
+
+  readonly passwordResetRows: { userId: string; tokenHash: string; expiresAt: Date; usedAt: Date | null }[] = [];
+
+  readonly passwordResets = {
+    insert: async (reset: { userId: string; tokenHash: string; expiresAt: Date }) => {
+      this.passwordResetRows.push({ ...reset, usedAt: null });
+    },
+    deleteUnusedByUser: async (userId: string) => this.removeResets((r) => r.userId === userId && !r.usedAt),
+    findUsable: async (tokenHash: string, now: Date) => {
+      const row = this.passwordResetRows.find((r) => r.tokenHash === tokenHash && !r.usedAt && r.expiresAt > now);
+      return row ? { userId: row.userId } : null;
+    },
+    consume: async (tokenHash: string, now: Date) => {
+      const row = this.passwordResetRows.find((r) => r.tokenHash === tokenHash && !r.usedAt && r.expiresAt > now);
+      if (!row) return null;
+      row.usedAt = now;
+      return { userId: row.userId };
+    },
+    deleteExpired: async (before: Date) => this.removeResets((r) => r.expiresAt < before),
+  };
+
+  private removeResets(match: (r: { userId: string; usedAt: Date | null; expiresAt: Date }) => boolean): number {
+    const kept = this.passwordResetRows.filter((r) => !match(r));
+    const removed = this.passwordResetRows.length - kept.length;
+    this.passwordResetRows.splice(0, this.passwordResetRows.length, ...kept);
+    return removed;
+  }
 
   readonly outboxRows: EventEnvelope[] = [];
 
