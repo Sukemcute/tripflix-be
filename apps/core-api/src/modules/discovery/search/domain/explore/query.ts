@@ -97,6 +97,8 @@ export function parse(q: string, fix?: ReadonlyMap<string, string>): Understood 
 
 // ---------------- Sửa lỗi gõ
 const RARE = 2; // từ có trong <= RARE tài liệu là "lạ"
+/** Dạng âm tiết tiếng Việt (đã bỏ dấu): phụ âm đầu? + nguyên âm + phụ âm cuối hợp lệ. */
+const SYLLABLE = /^(ngh|ng|nh|ch|gh|gi|kh|ph|qu|th|tr|[bcdghklmnpqrstvx])?[aeiouy]{1,3}(ch|ng|nh|[cmnpt])?$/;
 export const ALPHA = 0.7; // câu đã sửa nặng ALPHA, câu gốc nặng 1 - ALPHA
 
 /** Độ giống như difflib.SequenceMatcher.ratio (Ratcliff/Obershelp): 2·M / (|a| + |b|). */
@@ -179,7 +181,10 @@ export async function understand(q: string, st: Stats): Promise<[Understood, Und
   const u0 = parse(q);
   await st.loadSeq(u0.seq);
   const keep = new Set(nameSegment(u0.seq, (ph) => st.isName(ph)).filter((g) => g.length > 1).flat()); // chữ thuộc tên riêng: không sửa
-  const fix = await typoFix(u0.terms.filter((w) => !w.includes(' ') && !keep.has(w)), st);
+  // Từ gõ có dấu và đúng dạng âm tiết là người dùng cố ý gõ ('dịp' không phải gõ sai của 'đi'), dù dữ liệu chưa có từ đó:
+  // không sửa. Có dấu nhưng sai dạng ('trứg') vẫn sửa.
+  const typed = (w: string) => Object.hasOwn(u0.accents, w) && SYLLABLE.test(w);
+  const fix = await typoFix(u0.terms.filter((w) => !w.includes(' ') && !keep.has(w) && !typed(w)), st);
   const u = fix.size ? parse(q, fix) : u0;
   u.fixed = Object.fromEntries(fix);
   await st.loadSeq(u.seq);

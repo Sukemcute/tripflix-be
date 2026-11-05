@@ -182,6 +182,12 @@ describe('tìm', () => {
     const fixed = await searchExplore(src(big), 'cafe trug');
     expect(fixed.sections[0]!.items.map((i) => i.obj.id)).toEqual(same.sections[0]!.items.map((i) => i.obj.id));
     expect([fixed.understood.fixed, same.understood.fixed]).toEqual([{ trug: 'trung' }, {}]);
+    // Gõ có dấu là cố ý: 'dịp' không bị sửa thành 'đi' dù dữ liệu không có 'dịp'.
+    const trips = Array.from({ length: 20 }, (_, i) => o({ id: `d${i}`, kind: 'see', title: `Đi chơi ${i}`, place: 'Hội An' }));
+    expect((await searchExplore(src(trips), 'hội an dịp lễ')).understood.fixed).toEqual({});
+    expect((await searchExplore(src(trips), 'hội an dip le')).understood.fixed).toEqual({ dip: 'di' });
+    // Có dấu nhưng không phải âm tiết ('trứg') thì vẫn là gõ sai.
+    expect((await searchExplore(src(big), 'cafe trứg')).understood.fixed).toEqual({ trug: 'trung' });
   });
 
   it('cùng phủ đủ thì chất lượng quyết định; chỉ khớp từ bổ nghĩa thì loại', async () => {
