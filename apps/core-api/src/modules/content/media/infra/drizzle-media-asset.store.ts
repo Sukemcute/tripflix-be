@@ -114,13 +114,20 @@ export class DrizzleMediaAssetStore implements MediaAssetStore {
       .from(renditions)
       .where(inArray(renditions.assetId, assets.map((asset) => asset.id)))
       .orderBy(renditions.level);
-    return assets.map((asset) => ({
-      id: asset.id,
-      // Ràng buộc ck_media_assets_ready_has_playback bảo đảm video ready có đủ hai cột này.
-      hlsPrefix: asset.hlsPrefix!,
-      aspect: asset.aspect as MediaAspect,
-      durationSec: asset.durationSec,
-      levels: levelRows.filter((row) => row.assetId === asset.id).map((row) => row.level as MediaQualityLevel),
-    }));
+    return assets.flatMap((asset) => {
+      const levels = levelRows.filter((row) => row.assetId === asset.id).map((row) => row.level as MediaQualityLevel);
+      // Video do worker làm luôn có mức 360p. Không có mức nào nghĩa là dữ liệu nạp tay, chưa chắc có file trên CDN.
+      if (levels.length === 0) return [];
+      return [
+        {
+          id: asset.id,
+          // Ràng buộc ck_media_assets_ready_has_playback bảo đảm video ready có đủ hai cột này.
+          hlsPrefix: asset.hlsPrefix!,
+          aspect: asset.aspect as MediaAspect,
+          durationSec: asset.durationSec,
+          levels,
+        },
+      ];
+    });
   }
 }

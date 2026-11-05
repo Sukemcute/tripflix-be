@@ -1820,6 +1820,61 @@
         ]
       }
     },
+    "/api/v1/feed": {
+      "get": {
+        "operationId": "FeedController_getFeed",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Tối đa 20",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tab",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "for_you"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "tab, limit hoặc cursor không hợp lệ"
+          }
+        },
+        "summary": "Bảng tin video: chỉ gồm bài phát được, mới nhất trước. Khách cũng xem được.",
+        "tags": [
+          "feed"
+        ]
+      }
+    },
     "/api/suggest": {
       "get": {
         "description": "Dùng cho web OTA (kiểu Traveloka), gọi sau mỗi lần ngừng gõ khoảng 250 ms. Công khai, không cần đăng nhập.\n\n- Tối đa 8 dòng lẫn loại: khoảng 3 địa điểm, 4 khách sạn, 1 sân bay; loại nào thiếu thì lấy thêm loại khác.\n- Khớp không dấu, gõ tắt (`pq`, `hcm`, `sg`), gõ sai nhẹ (`nha trag`, `da nng`). Khớp đầu từ xếp trước khớp gần đúng.\n- Câu ngắn hơn 4 ký tự (sau khi bỏ ký tự lạ) chỉ khớp đầu từ, không tìm gần đúng.\n- Không có giá, không kiểm còn phòng: chọn địa điểm thì gọi `/api/stays?placeId=<refId>` (chưa có), chọn khách sạn thì mở trang chi tiết.\n- Không khớp gì thì `items: []` (không phải lỗi).",
@@ -4300,6 +4355,248 @@
         "required": [
           "assetId",
           "status"
+        ]
+      },
+      "FeedAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "isKol": {
+            "type": "boolean",
+            "description": "Chưa có dữ liệu, hiện luôn là false"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl",
+          "isKol"
+        ]
+      },
+      "FeedPostersDto": {
+        "type": "object",
+        "properties": {
+          "w360": {
+            "type": "string"
+          },
+          "w540": {
+            "type": "string"
+          },
+          "w720": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "w360",
+          "w540",
+          "w720"
+        ]
+      },
+      "FeedVideoDto": {
+        "type": "object",
+        "properties": {
+          "hlsUrl": {
+            "type": "string",
+            "description": "master.m3u8 trên CloudFront"
+          },
+          "posters": {
+            "description": "Chọn cỡ nhỏ nhất không nhỏ hơn chiều rộng hiển thị",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedPostersDto"
+              }
+            ]
+          },
+          "durationSec": {
+            "type": "number"
+          },
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1"
+            ]
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "enum": [
+                360,
+                540,
+                720
+              ]
+            }
+          }
+        },
+        "required": [
+          "hlsUrl",
+          "posters",
+          "durationSec",
+          "aspect",
+          "levels"
+        ]
+      },
+      "FeedCountsDto": {
+        "type": "object",
+        "properties": {
+          "likes": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "number"
+          },
+          "saves": {
+            "type": "number"
+          },
+          "shares": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "likes",
+          "comments",
+          "saves",
+          "shares"
+        ]
+      },
+      "FeedViewerStateDto": {
+        "type": "object",
+        "properties": {
+          "liked": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "liked",
+          "saved"
+        ]
+      },
+      "FeedReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "FeedCardDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author": {
+            "$ref": "#/components/schemas/FeedAuthorDto"
+          },
+          "video": {
+            "$ref": "#/components/schemas/FeedVideoDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "linkedProductIds": {
+            "description": "Chưa có dữ liệu, hiện luôn rỗng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/FeedCountsDto"
+          },
+          "viewerState": {
+            "nullable": true,
+            "description": "null với khách",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedViewerStateDto"
+              }
+            ]
+          },
+          "reason": {
+            "nullable": true,
+            "description": "Chưa xếp hạng, hiện luôn là null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedReasonDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "postId",
+          "author",
+          "video",
+          "title",
+          "caption",
+          "region",
+          "tags",
+          "linkedProductIds",
+          "counts",
+          "viewerState",
+          "reason"
+        ]
+      },
+      "FeedPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedCardDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "null nghĩa là hết bài"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "SuggestionDto": {
