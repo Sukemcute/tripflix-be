@@ -54,6 +54,24 @@ export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
+/** commerce.order.paid v1: đơn đã thanh toán, chỗ đã bán. Không mang thông tin liên hệ của khách. */
+export const CommerceOrderPaidV1Schema = z.object({
+  orderId: z.uuid(),
+  userId: z.uuid(),
+  total: z.number().int().positive(),
+  sourcePostId: z.string().nullable(),
+  items: z.array(
+    z.object({
+      productType: z.enum(['room', 'flight']),
+      productId: z.string().min(1),
+      date: z.string(),
+      nights: z.number().int().positive(),
+      qty: z.number().int().positive(),
+    }),
+  ),
+});
+export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
+
 /** content.media.transcode_requested v1: file gốc đã ghép xong, video-worker chuyển mã và ghi vào videos/{assetId}/r{revision}/. */
 export const ContentMediaTranscodeRequestedV1Schema = z.object({
   assetId: z.uuid(),
@@ -61,6 +79,33 @@ export const ContentMediaTranscodeRequestedV1Schema = z.object({
   revision: z.number().int().positive(),
 });
 export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
+
+export const MEDIA_QUALITY_LEVELS = [360, 540, 720] as const;
+export const mediaQualityLevelSchema = z.literal(MEDIA_QUALITY_LEVELS);
+export type MediaQualityLevel = z.infer<typeof mediaQualityLevelSchema>;
+
+export const MEDIA_ASPECTS = ['9:16', '16:9', '1:1'] as const;
+export const mediaAspectSchema = z.enum(MEDIA_ASPECTS);
+export type MediaAspect = z.infer<typeof mediaAspectSchema>;
+
+/** media.rendition.completed v1: video-worker xong một mức chất lượng. Có thể gửi lại, bên nhận loại trùng theo (assetId, level). */
+export const MediaRenditionCompletedV1Schema = z.object({
+  assetId: z.uuid(),
+  level: mediaQualityLevelSchema,
+  hlsPrefix: z.string().min(1),
+  durationSec: z.number().int().positive(),
+  aspect: mediaAspectSchema,
+});
+export type MediaRenditionCompletedV1 = z.infer<typeof MediaRenditionCompletedV1Schema>;
+
+/** media.transcode.failed v1: một mức chất lượng lỗi quá số lần thử. Mức 360 lỗi thì video không phát được. */
+export const MediaTranscodeFailedV1Schema = z.object({
+  assetId: z.uuid(),
+  level: mediaQualityLevelSchema,
+  reason: z.string().min(1),
+  attempts: z.number().int().positive(),
+});
+export type MediaTranscodeFailedV1 = z.infer<typeof MediaTranscodeFailedV1Schema>;
 
 /** content.comment.created v1: có bình luận mới dưới bài viết (hỗ trợ thông báo và AI worker tổng hợp). */
 export const ContentCommentCreatedV1Schema = z.object({
@@ -117,6 +162,22 @@ export type AccessPasswordResetRequestedV1 = z.infer<typeof AccessPasswordResetR
 export const AccessUserGuestMergedV1Schema = z.object({ anonId: z.uuid(), userId: z.uuid() });
 export type AccessUserGuestMergedV1 = z.infer<typeof AccessUserGuestMergedV1Schema>;
 
+/** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
+export const ContentMediaReadyV1Schema = z.object({
+  assetId: z.uuid(),
+  ownerId: z.uuid(),
+  durationSec: z.number().int().positive(),
+});
+export type ContentMediaReadyV1 = z.infer<typeof ContentMediaReadyV1Schema>;
+
+/** content.media.failed v1: không tạo được mức 360p, video không phát được. */
+export const ContentMediaFailedV1Schema = z.object({
+  assetId: z.uuid(),
+  ownerId: z.uuid(),
+  reason: z.string().min(1),
+});
+export type ContentMediaFailedV1 = z.infer<typeof ContentMediaFailedV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -126,7 +187,12 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.locked.v1': AccessUserLockedV1Schema,
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
+  'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
+  'content.media.ready.v1': ContentMediaReadyV1Schema,
+  'content.media.failed.v1': ContentMediaFailedV1Schema,
+  'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
+  'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
   'content.comment.created.v1': ContentCommentCreatedV1Schema,
   'content.comment.updated.v1': ContentCommentUpdatedV1Schema,
   'content.comment.deleted.v1': ContentCommentDeletedV1Schema,

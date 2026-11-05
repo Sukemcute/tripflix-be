@@ -7,6 +7,7 @@ import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
+import { FeedModule } from './feed/feed.module.js';
 import { MediaModule } from './media/media.module.js';
 import {
   AdminPostsController,
@@ -65,7 +66,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, FeedModule],
   controllers: [
     PostsController,
     ReactionsController,
@@ -303,6 +304,6 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     // 8. Facade cho các module khác
     ContentFacade,
   ],
-  exports: [ContentFacade],
+  exports: [ContentFacade, MediaModule],
 })
 export class ContentModule {}

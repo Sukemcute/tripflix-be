@@ -1,13 +1,22 @@
-import type { EventEnvelope } from '@tripflix/contracts';
+import type { EventEnvelope, MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import { buildEventEnvelope, type NewOutboxEvent } from '@tripflix/outbox';
 import type {
   MediaAssetStatus,
   MediaAssetStore,
   NewUploadingAsset,
+  PlaybackAsset,
+  ReadyRendition,
   UploadTarget,
 } from '../../application/ports.js';
 
-type StoredAsset = NewUploadingAsset & { status: MediaAssetStatus; transcodeAttempts: number };
+type StoredAsset = NewUploadingAsset & {
+  status: MediaAssetStatus;
+  transcodeAttempts: number;
+  hlsPrefix?: string;
+  aspect?: MediaAspect;
+  error?: string;
+  levels: Set<MediaQualityLevel>;
+};
 
 /** Cùng quy tắc với DrizzleMediaAssetStore, lưu trong bộ nhớ, dùng cho test. Không có rollback. */
 export class MemoryMediaAssetStore implements MediaAssetStore {
@@ -23,7 +32,7 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
   };
 
   insertUploadingAsset(asset: NewUploadingAsset): Promise<void> {
-    this.assets.set(asset.id, { ...asset, status: 'uploading', transcodeAttempts: 0 });
+    this.assets.set(asset.id, { ...asset, status: 'uploading', transcodeAttempts: 0, levels: new Set() });
     return Promise.resolve();
   }
 
@@ -45,5 +54,54 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
     asset.status = 'processing';
     asset.transcodeAttempts += 1;
     return Promise.resolve(asset.transcodeAttempts);
+  }
+
+  findStatus(assetId: string): Promise<MediaAssetStatus | null> {
+    return Promise.resolve(this.assets.get(assetId)?.status ?? null);
+  }
+
+  insertRendition(assetId: string, level: MediaQualityLevel): Promise<void> {
+    this.assets.get(assetId)?.levels.add(level);
+    return Promise.resolve();
+  }
+
+  hasRendition(assetId: string, level: MediaQualityLevel): Promise<boolean> {
+    return Promise.resolve(this.assets.get(assetId)?.levels.has(level) ?? false);
+  }
+
+  markReady({ assetId, hlsPrefix, durationSec, aspect }: ReadyRendition): Promise<string | null> {
+    const asset = this.assets.get(assetId);
+    if (asset?.status !== 'processing') return Promise.resolve(null);
+    Object.assign(asset, { status: 'ready', hlsPrefix, durationSec, aspect });
+    return Promise.resolve(asset.ownerId);
+  }
+
+  markFailed(assetId: string, reason: string): Promise<string | null> {
+    const asset = this.assets.get(assetId);
+    if (asset?.status !== 'processing') return Promise.resolve(null);
+    Object.assign(asset, { status: 'failed', error: reason });
+    return Promise.resolve(asset.ownerId);
+  }
+
+  recordError(assetId: string, reason: string): Promise<void> {
+    const asset = this.assets.get(assetId);
+    if (asset) asset.error = reason;
+    return Promise.resolve();
+  }
+
+  findPlaybackAssets(assetIds: string[]): Promise<PlaybackAsset[]> {
+    const readyAssets = assetIds.flatMap((id) => {
+      const asset = this.assets.get(id);
+      return asset?.status === 'ready' && asset.levels.size > 0 ? [asset] : [];
+    });
+    return Promise.resolve(
+      readyAssets.map((asset) => ({
+        id: asset.id,
+        hlsPrefix: asset.hlsPrefix!,
+        durationSec: asset.durationSec,
+        aspect: asset.aspect!,
+        levels: [...asset.levels].sort((a, b) => a - b),
+      })),
+    );
   }
 }

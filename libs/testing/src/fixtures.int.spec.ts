@@ -27,12 +27,14 @@ describe('libs/testing: Postgres, Redis thật', () => {
 
   it('chạy deploy/postgres/init: đủ database, schema và extension', async () => {
     const dbs = await queryAs(postgres.buildAdminUrl('core'), 'select datname from pg_database order by 1');
-    expect(dbs.rows.map((r) => r.datname)).toEqual(expect.arrayContaining(['core', 'commerce', 'notification']));
+    const names = dbs.rows.map((r) => r.datname);
+    expect(names).toEqual(expect.arrayContaining(['core', 'notification']));
+    expect(names).not.toContain('commerce');
     const schemas = await queryAs(
       postgres.buildAdminUrl('core'),
-      "select nspname from pg_namespace where nspname in ('access','content','discovery','analytics') order by 1",
+      "select nspname from pg_namespace where nspname in ('access','content','discovery','analytics','commerce') order by 1",
     );
-    expect(schemas.rows.map((r) => r.nspname)).toEqual(['access', 'analytics', 'content', 'discovery']);
+    expect(schemas.rows.map((r) => r.nspname)).toEqual(['access', 'analytics', 'commerce', 'content', 'discovery']);
     const ext = await queryAs(postgres.buildAdminUrl('core'), "select extname from pg_extension where extname = 'vector'");
     expect(ext.rowCount).toBe(1);
   });
@@ -42,8 +44,15 @@ describe('libs/testing: Postgres, Redis thật', () => {
     await expect(queryAs(postgres.buildModuleUrl('access'), 'create table content.t1 (id int)')).rejects.toThrow(
       /permission denied/,
     );
-    await expect(queryAs(postgres.buildModuleUrl('commerce'), 'select 1')).resolves.toBeDefined();
-    await expect(queryAs(postgres.buildModuleUrl('access').replace('/core', '/commerce'), 'select 1')).rejects.toThrow(
+    // commerce ở chung database core nhưng vẫn cách ly theo schema, theo cả hai chiều.
+    await expect(queryAs(postgres.buildModuleUrl('commerce'), 'create table commerce.t1 (id int)')).resolves.toBeDefined();
+    await expect(queryAs(postgres.buildModuleUrl('access'), 'select * from commerce.t1')).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(queryAs(postgres.buildModuleUrl('access'), 'create table commerce.t2 (id int)')).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(queryAs(postgres.buildModuleUrl('commerce'), 'select * from access.t1')).rejects.toThrow(
       /permission denied/,
     );
   });

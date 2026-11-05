@@ -37,6 +37,14 @@ describe('ContentOutboxRelay', () => {
     expect(streamFn({ type: 'content.comment.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.reaction.updated' } as any)).toBe(STREAMS.content);
 
+    // Báo lỗi nếu gặp loại sự kiện lạ không thuộc content outbox (theo yêu cầu anh Dũng)
+    expect(() => streamFn({ type: 'access.user.registered' } as any)).toThrow(
+      'Loại sự kiện không hợp lệ cho content outbox relay: access.user.registered',
+    );
+    expect(() => streamFn({ type: 'unknown.custom_event' } as any)).toThrow(
+      'Loại sự kiện không hợp lệ cho content outbox relay: unknown.custom_event',
+    );
+
     await relay.onApplicationShutdown();
   });
 });

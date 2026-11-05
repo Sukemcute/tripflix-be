@@ -1,0 +1,171 @@
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { createDb, createPool } from '@tripflix/db';
+import { InMemoryObjectStorage } from '@tripflix/storage';
+import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
+import type pg from 'pg';
+import { DrizzleMediaAssetStore } from '../../media/infra/drizzle-media-asset.store.js';
+import { MediaFacade } from '../../media/media.facade.js';
+import { decodeFeedCursor } from '../domain/feed-cursor.js';
+import { DrizzleFeedStore } from '../infra/drizzle-feed.store.js';
+import { FeedUseCases } from './feed.use-cases.js';
+
+const OWNER_ID = '11111111-1111-4111-8111-111111111111';
+const VIEWER_ID = '22222222-2222-4222-8222-222222222222';
+
+/** Câu truy vấn của feed trên Postgres thật, gồm cả điều kiện lọc jsonb và so sánh cursor. */
+describe('Feed trên Postgres thật', () => {
+  let postgres: PostgresFixture;
+  let pool: pg.Pool;
+  let feed: FeedUseCases;
+
+  async function insertAsset(status: string, levels: number[] = []): Promise<string> {
+    const id = randomUUID();
+    const ready = status === 'ready';
+    await pool.query(
+      `insert into content.media_assets (id, owner_id, status, mime_type, file_size_bytes, source_key, hls_prefix, aspect, duration_sec)
+       values ($1, $2, $3, 'video/mp4', 1, $4, $5, $6, 40)`,
+      [id, OWNER_ID, status, `dev/test/uploads/${id}/original.mp4`, ready ? `dev/test/videos/${id}/r1` : null, ready ? '9:16' : null],
+    );
+    for (const level of levels) {
+      await pool.query('insert into content.renditions (asset_id, level) values ($1, $2)', [id, level]);
+    }
+    return id;
+  }
+
+  async function insertPost(mediaIds: string[], options: { status?: string; visibility?: string; createdAt?: string; deleted?: boolean } = {}) {
+    const id = randomUUID();
+    await pool.query(
+      `insert into content.posts (id, author_id, post_type, title, status, visibility, media_ids, created_at, deleted_at)
+       values ($1, $2, 'video', 'Bài', $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz)`,
+      [
+        id,
+        OWNER_ID,
+        options.status ?? 'published',
+        options.visibility ?? 'public',
+        JSON.stringify(mediaIds),
+        options.createdAt ?? new Date().toISOString(),
+        options.deleted ? new Date().toISOString() : null,
+      ],
+    );
+    return id;
+  }
+
+  async function readAllPages(limit: number, viewerId: string | null = null) {
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const after = cursor ? decodeFeedCursor(cursor) : null;
+      const page = await feed.getPage({ limit, after, viewerId });
+      ids.push(...page.items.map((item) => item.postId));
+      cursor = page.nextCursor;
+    } while (cursor);
+    return ids;
+  }
+
+  beforeAll(async () => {
+    postgres = await startPostgres();
+    const url = postgres.buildModuleUrl('content');
+    await migrateModule({
+      url,
+      module: 'content',
+      migrationsFolder: fileURLToPath(new URL('../../db/migrations', import.meta.url)),
+    });
+    pool = createPool({ url, max: 3, applicationName: 'feed-int-test' });
+    const db = createDb(pool);
+    feed = new FeedUseCases(
+      new DrizzleFeedStore(() => db),
+      new MediaFacade(new DrizzleMediaAssetStore(() => db), new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' })),
+    );
+  }, 120_000);
+
+  beforeEach(async () => {
+    await pool.query('truncate content.posts, content.media_assets cascade');
+  });
+
+  afterAll(async () => {
+    await pool?.end();
+    await postgres?.stop();
+  });
+
+  it('chỉ trả bài công khai đã đăng có video phát được', async () => {
+    const playable = await insertAsset('ready', [360]);
+    const expected = await insertPost([playable]);
+    await insertPost([await insertAsset('processing')]);
+    await insertPost([await insertAsset('failed')]);
+    // Giống seed cũ: ghi ready nhưng chưa có mức nào, file trên CDN chưa chắc tồn tại.
+    await insertPost([await insertAsset('ready')]);
+    await insertPost([randomUUID()]);
+    await insertPost([]);
+    await insertPost([playable], { status: 'draft' });
+    await insertPost([playable], { status: 'hidden' });
+    await insertPost([playable], { visibility: 'private' });
+    await insertPost([playable], { deleted: true });
+
+    const page = await feed.getPage({ limit: 20, after: null, viewerId: null });
+
+    expect(page.items.map((item) => item.postId)).toEqual([expected]);
+    expect(page.items[0]?.video.hlsUrl).toBe(`https://cdn.test/dev/test/videos/${playable}/r1/master.m3u8`);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('bài nhiều media thì lấy video đầu tiên phát được', async () => {
+    const processing = await insertAsset('processing');
+    const playable = await insertAsset('ready', [360, 540]);
+    await insertPost([processing, playable]);
+
+    const { items } = await feed.getPage({ limit: 20, after: null, viewerId: null });
+
+    expect(items[0]?.video.hlsUrl).toContain(playable);
+    expect(items[0]?.video.levels).toEqual([360, 540]);
+  });
+
+  it('xếp mới nhất trước', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const oldest = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
+    const newest = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
+    const middle = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
+
+    await expect(readAllPages(20)).resolves.toEqual([newest, middle, oldest]);
+  });
+
+  it('sang trang không lặp, không rớt bài khi nhiều bài trùng thời điểm tới micro-giây', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const createdAt = '2026-11-05T10:00:00.123456Z';
+    const sameTime = [
+      await insertPost([asset], { createdAt }),
+      await insertPost([asset], { createdAt }),
+      await insertPost([asset], { createdAt }),
+    ];
+    // Cùng mili-giây nhưng khác micro-giây: cursor chỉ giữ mili-giây sẽ làm rớt bài này.
+    const sameMillisecond = await insertPost([asset], { createdAt: '2026-11-05T10:00:00.123001Z' });
+
+    const ids = await readAllPages(1);
+
+    expect(ids.slice(0, 3).sort()).toEqual([...sameTime].sort());
+    expect(ids[3]).toBe(sameMillisecond);
+    expect(ids).toHaveLength(4);
+  });
+
+  it('trả trạng thái thích, lưu đúng người xem; khách nhận null', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const liked = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
+    const saved = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
+    await pool.query(`insert into content.reactions (post_id, user_id, type) values ($1, $2, 'like')`, [liked, VIEWER_ID]);
+    await pool.query('insert into content.bookmarks (post_id, user_id) values ($1, $2)', [saved, VIEWER_ID]);
+
+    const viewerPage = await feed.getPage({ limit: 20, after: null, viewerId: VIEWER_ID });
+    const otherPage = await feed.getPage({ limit: 20, after: null, viewerId: OWNER_ID });
+    const guestPage = await feed.getPage({ limit: 20, after: null, viewerId: null });
+
+    expect(viewerPage.items.map((item) => item.viewerState)).toEqual([
+      { liked: true, saved: false },
+      { liked: false, saved: true },
+    ]);
+    expect(otherPage.items.map((item) => item.viewerState)).toEqual([
+      { liked: false, saved: false },
+      { liked: false, saved: false },
+    ]);
+    expect(guestPage.items.map((item) => item.viewerState)).toEqual([null, null]);
+  });
+});

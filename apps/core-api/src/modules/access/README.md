@@ -193,7 +193,7 @@ pnpm db:seed      # superadmin@, moderator@, member@tripflix.local, mật khẩu
 Máy đã chạy `pnpm stack:infra` **trước** commit `fix(deploy): cấp quyền CREATE...` thì chạy một lần, không mất dữ liệu:
 
 ```sh
-docker exec tripflix-postgres-1 psql -U postgres -c "GRANT CREATE ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics" -c "GRANT CREATE ON DATABASE commerce TO tf_commerce" -c "GRANT CREATE ON DATABASE notification TO tf_notification"
+docker exec tripflix-postgres-1 psql -U postgres -c "GRANT CREATE ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics, tf_commerce" -c "GRANT CREATE ON DATABASE notification TO tf_notification"
 ```
 
 ## Khuôn thư mục
