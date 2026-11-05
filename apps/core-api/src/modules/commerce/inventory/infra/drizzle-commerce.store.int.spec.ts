@@ -90,6 +90,30 @@ describe('DrizzleCommerceStore trên Postgres thật', () => {
     expect(result!.unitPrice).toBe(3_330_000);
   });
 
+  it('đánh giá: seed nạp dữ liệu demo; thống kê, lọc tag (jsonb), sắp xếp, phân trang chạy đúng trên Postgres', async () => {
+    const store = new DrizzleCommerceStore({ tx: db });
+    const { rows } = await pool.query<{ id: string; n: number; avg: number }>(
+      'select property_id as id, count(*)::int as n, avg(rating)::float8 as avg from commerce.reviews where is_seeded group by property_id order by n desc limit 1',
+    );
+    const hotel = rows[0]!;
+    const stats = await store.reviews.getReviewStats(hotel.id, 3);
+    expect(stats.count).toBe(hotel.n);
+    expect(stats.average).toBeCloseTo(hotel.avg, 6);
+    expect(stats.distribution.reduce((a, b) => a + b, 0)).toBe(hotel.n);
+    expect(stats.tags.length).toBeLessThanOrEqual(3);
+    const topTag = stats.tags[0]!;
+    const byTag = await store.reviews.listReviews({ propertyId: hotel.id, tag: topTag.tag, sort: 'highest', offset: 0, limit: 50 });
+    expect(byTag.total).toBe(topTag.count);
+    expect(byTag.items.every((r) => r.tags.includes(topTag.tag))).toBe(true);
+    expect(byTag.items.map((r) => r.rating)).toEqual(byTag.items.map((r) => r.rating).sort((a, b) => b - a));
+    const page2 = await store.reviews.listReviews({ propertyId: hotel.id, sort: 'newest', offset: 5, limit: 5 });
+    expect(page2).toMatchObject({ total: hotel.n });
+    expect(page2.items).toHaveLength(5);
+
+    await pool.query(`update commerce.reviews set status = 'hidden' where id = $1`, [page2.items[0]!.id]);
+    expect((await store.reviews.getReviewStats(hotel.id, 3)).count).toBe(hotel.n - 1);
+  });
+
   it('giảm số phòng dưới held + sold ở một ngày: rollback cả khoảng, giá cũng không đổi, không ghi audit', async () => {
     await pool.query('update commerce.room_inventory set sold = 2 where room_type_id = $1 and date = $2', [roomTypeId, '2026-12-21']);
     const before = await pool.query('select date::text, total from commerce.room_inventory where room_type_id = $1 and date between $2 and $3 order by date', [roomTypeId, '2026-12-20', '2026-12-22']);

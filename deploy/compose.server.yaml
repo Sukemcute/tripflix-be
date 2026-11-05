@@ -1,0 +1,167 @@
+# Chạy Tripflix trên một máy server. Khác compose.yaml (máy dev): dùng image production trên GHCR,
+# mật khẩu riêng trong .env.server, Postgres và Redis không mở cổng, API chỉ nghe trên 127.0.0.1.
+# Cách dùng: xem deploy/SERVER.md.
+name: tripflix-server
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '3' }
+
+x-core-env: &core-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  REDIS_URL: redis://redis:6379
+  DATABASE_URL_ACCESS: postgres://tf_access:${DB_PASS_ACCESS:?}@postgres:5432/core
+  DATABASE_URL_CONTENT: postgres://tf_content:${DB_PASS_CONTENT:?}@postgres:5432/core
+  DATABASE_URL_DISCOVERY: postgres://tf_discovery:${DB_PASS_DISCOVERY:?}@postgres:5432/core
+  DATABASE_URL_ANALYTICS: postgres://tf_analytics:${DB_PASS_ANALYTICS:?}@postgres:5432/core
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:${DB_PASS_COMMERCE:?}@postgres:5432/core
+  AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:?}
+  AUTH_JWT_ISSUER: tripflix-core
+  AUTH_JWT_AUDIENCE: tripflix
+  AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100}
+  AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
+  S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
+  MEDIA_CDN_URL: ${MEDIA_CDN_URL:?}
+
+services:
+  # ---------- Giai đoạn 1: database, Redis ----------
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      DB_PASS_ACCESS: ${DB_PASS_ACCESS:?}
+      DB_PASS_CONTENT: ${DB_PASS_CONTENT:?}
+      DB_PASS_DISCOVERY: ${DB_PASS_DISCOVERY:?}
+      DB_PASS_ANALYTICS: ${DB_PASS_ANALYTICS:?}
+      DB_PASS_COMMERCE: ${DB_PASS_COMMERCE:?}
+      DB_PASS_NOTIFICATION: ${DB_PASS_NOTIFICATION:?}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      # Chạy theo tên file, một lần khi volume còn trống. File 90 thay mật khẩu dev của file 02.
+      - ./postgres/init/01-databases.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+      - ./postgres/init/02-roles-schemas.sql:/docker-entrypoint-initdb.d/02-roles-schemas.sql:ro
+      - ./postgres/init/03-extensions.sql:/docker-entrypoint-initdb.d/03-extensions.sql:ro
+      - ./postgres/server/90-passwords.sh:/docker-entrypoint-initdb.d/90-passwords.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d core']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.8-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  # ---------- Giai đoạn 2: core-api ----------
+  migrate:
+    profiles: [api]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${IMAGE_TAG:-develop}
+    logging: *logging
+    command: ['node', 'dist/cli/migrate.js']
+    environment: *core-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  core-api:
+    profiles: [api]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${IMAGE_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *core-env
+      APP_ROLE: all
+      PORT: 3000
+    ports: ['127.0.0.1:${API_PORT:-3000}:3000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # Dữ liệu mẫu, chạy tay một lần. Image production không có file seed và cli/seed chặn NODE_ENV=production,
+  # nên service này build stage dev từ mã nguồn trên server.
+  seed:
+    profiles: [seed]
+    build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
+    logging: *logging
+    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:seed']
+    environment:
+      <<: *core-env
+      NODE_ENV: development
+      SEED_PASSWORD: ${SEED_PASSWORD:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # ---------- Giai đoạn 3: HTTPS ----------
+  traefik:
+    profiles: [gateway]
+    image: traefik:v3.7
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/server.yml
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --ping=true
+    environment:
+      API_HOST: ${API_HOST:?}
+      WEB_HOST: ${WEB_HOST:?}
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./traefik/server.yml:/etc/traefik/server.yml:ro
+      - letsencrypt:/letsencrypt
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Build trên server vì Next gắn địa chỉ API vào bundle lúc build, image trên GHCR không có địa chỉ này.
+  web:
+    profiles: [gateway]
+    # Mặc định dùng image build trên máy; deploy-web.sh đặt 2 biến này trong .env.web để dùng image từ GHCR.
+    image: ${WEB_IMAGE:-tripflix-server-web}:${WEB_TAG:-latest}
+    build:
+      context: ${FE_REPO:-../../tripflix-fe}
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_HOST:?}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  pg-data:
+  redis-data:
+  letsencrypt:

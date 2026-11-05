@@ -118,8 +118,54 @@ export interface CalendarAdminRepository {
   insertAuditLog(entry: { actorUserId: string; action: string; entityType: 'room_type' | 'flight'; entityId: string; changes: Record<string, unknown> }): Promise<void>;
 }
 
+/** Đánh giá đã công khai (status = published). createdAt dạng ISO. */
+export interface ReviewRecord {
+  id: string;
+  propertyId: string;
+  roomTypeId: string | null;
+  authorName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  tags: string[];
+  images: string[];
+  travelerType: string | null;
+  stayMonth: string | null;
+  helpfulCount: number;
+  createdAt: string;
+}
+
+export type ReviewSort = 'newest' | 'highest' | 'lowest' | 'helpful';
+
+export interface ReviewFilter {
+  propertyId: string;
+  rating?: number;
+  tag?: string;
+  travelerType?: string;
+  sort: ReviewSort;
+  offset: number;
+  limit: number;
+}
+
+export interface ReviewStats {
+  count: number;
+  average: number | null;
+  /** Số đánh giá theo mức sao: phần tử 0 là 1 sao, phần tử 4 là 5 sao. */
+  distribution: number[];
+  /** Tag nhiều nhất trước. */
+  tags: { tag: string; count: number }[];
+}
+
+export interface ReviewRepository {
+  /** Một trang đánh giá công khai theo bộ lọc, kèm tổng số khớp bộ lọc. */
+  listReviews(filter: ReviewFilter): Promise<{ items: ReviewRecord[]; total: number }>;
+  /** Thống kê trên mọi đánh giá công khai của khách sạn (không theo bộ lọc). */
+  getReviewStats(propertyId: string, tagLimit: number): Promise<ReviewStats>;
+}
+
 export interface CommerceStore {
   catalog: CatalogRepository;
+  reviews: ReviewRepository;
   calendar: CalendarRepository;
   admin: CalendarAdminRepository;
 }

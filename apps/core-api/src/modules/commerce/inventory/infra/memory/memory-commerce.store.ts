@@ -8,6 +8,8 @@ import type {
   NewFlightDay,
   NewRoomDay,
   PropertyRecord,
+  ReviewRecord,
+  ReviewRepository,
   RoomCalendarPatch,
   RoomTypeRecord,
 } from '../../application/ports.js';
@@ -20,6 +22,35 @@ export class MemoryCommerceStore implements CommerceStore {
   readonly flights: FlightRecord[] = [];
   readonly roomDays = new Map<string, RoomDay>();
   readonly flightDays = new Map<string, FlightDay>();
+  /** Đánh giá; status khác published thì không trả ra (giống bản Postgres). */
+  readonly reviewRows: (ReviewRecord & { status?: string })[] = [];
+
+  readonly reviews: ReviewRepository = {
+    listReviews: async ({ propertyId, rating, tag, travelerType, sort, offset, limit }) => {
+      const byNewest = (a: ReviewRecord, b: ReviewRecord) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id);
+      const compare = {
+        newest: byNewest,
+        highest: (a: ReviewRecord, b: ReviewRecord) => b.rating - a.rating || byNewest(a, b),
+        lowest: (a: ReviewRecord, b: ReviewRecord) => a.rating - b.rating || byNewest(a, b),
+        helpful: (a: ReviewRecord, b: ReviewRecord) => b.helpfulCount - a.helpfulCount || byNewest(a, b),
+      }[sort];
+      const matched = this.publishedReviews(propertyId)
+        .filter((r) => (rating === undefined || r.rating === rating) && (!travelerType || r.travelerType === travelerType) && (!tag || r.tags.includes(tag)))
+        .sort(compare);
+      return { items: matched.slice(offset, offset + limit), total: matched.length };
+    },
+    getReviewStats: async (propertyId, tagLimit) => {
+      const rows = this.publishedReviews(propertyId);
+      const tagCounts = new Map<string, number>();
+      for (const tag of rows.flatMap((r) => r.tags)) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+      return {
+        count: rows.length,
+        average: rows.length ? rows.reduce((sum, r) => sum + r.rating, 0) / rows.length : null,
+        distribution: [1, 2, 3, 4, 5].map((star) => rows.filter((r) => r.rating === star).length),
+        tags: [...tagCounts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)).slice(0, tagLimit),
+      };
+    },
+  };
 
   readonly catalog: CatalogRepository = {
     listProperties: async ({ provinceSlug, afterId, limit }) =>
@@ -87,6 +118,10 @@ export class MemoryCommerceStore implements CommerceStore {
       this.auditLogs.push(entry);
     },
   };
+
+  private publishedReviews(propertyId: string) {
+    return this.reviewRows.filter((r) => r.propertyId === propertyId && (r.status ?? 'published') === 'published');
+  }
 
   /** Sửa một ngày đã mở (test giả lập đã bán, ngừng bán…). */
   patchRoomDay(roomTypeId: string, date: string, patch: Partial<RoomDay>) {
