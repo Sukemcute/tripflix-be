@@ -11,7 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, type RequestUser } from './decorators/current-user.decorator.js';
+import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import {
   CreatePostDto,
   ListPostsQueryDto,
@@ -45,14 +46,15 @@ export class PostsController {
 
   @Post('posts')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Tạo bản nháp bài đăng (FR1)' })
   @ApiResponse({ status: 201, description: 'Bản nháp đã được tạo thành công' })
   async createDraft(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Body() dto: CreatePostDto,
   ) {
     return this.createDraftUseCase.execute({
-      authorId: user.id,
+      authorId: user.userId,
       postType: dto.post_type,
       title: dto.title,
       body: dto.body,
@@ -80,14 +82,15 @@ export class PostsController {
 
   @Get('me/posts')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Lấy danh sách bài đăng và bản nháp của chính mình (FR1)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài của người dùng' })
   async listMyPosts(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Query() query: ListUserPostsQueryDto,
   ) {
     return this.listUserPostsUseCase.execute({
-      authorId: user.id,
+      authorId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       status: query.status,
@@ -95,32 +98,34 @@ export class PostsController {
   }
 
   @Get('posts/:id')
+  @OptionalAuthenticated()
   @ApiOperation({ summary: 'Lấy chi tiết bài đăng theo quyền người xem (FR3, FR4, FR12)' })
   @ApiResponse({ status: 200, description: 'Chi tiết bài đăng kèm lộ trình đã ẩn PII và context' })
   async getPostDetail(
     @Param('id') postId: string,
-    @CurrentUser({ required: false }) user: RequestUser | null,
+    @OptionalCurrentUser() user?: AuthUser,
   ) {
     const isStaff = user?.role === 'moderator' || user?.role === 'superadmin';
     return this.getPostDetailUseCase.execute({
       postId,
-      viewerId: user?.id,
+      viewerId: user?.userId,
       isStaff,
     });
   }
 
   @Patch('posts/:id')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Sửa bản nháp hoặc bài đã đăng (FR1, FR5, FR7)' })
   @ApiResponse({ status: 200, description: 'Bài đăng sau khi cập nhật' })
   async updatePost(
     @Param('id') postId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
     @Body() dto: UpdatePostDto,
   ) {
     return this.updatePostUseCase.execute({
       postId,
-      userId: user.id,
+      userId: user.userId,
       title: dto.title,
       body: dto.body,
       hashtags: dto.hashtags,
@@ -133,45 +138,48 @@ export class PostsController {
 
   @Post('posts/:id/publish')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Xuất bản bản nháp thành bài đăng công khai (FR2, FR3)' })
   @ApiResponse({ status: 200, description: 'Bài đăng đã được xuất bản (kèm share_url và dấu xác thực)' })
   async publishPost(
     @Param('id') postId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
   ) {
     return this.publishPostUseCase.execute({
       postId,
-      userId: user.id,
+      userId: user.userId,
     });
   }
 
   @Delete('posts/:id')
   @ApiBearerAuth()
+  @Authenticated()
   @ApiOperation({ summary: 'Xóa bài đăng của mình (FR6)' })
   @ApiResponse({ status: 200, description: 'Xóa bài thành công' })
   async deletePost(
     @Param('id') postId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: AuthUser,
   ) {
     const isSuperAdmin = user.role === 'superadmin';
     return this.deletePostUseCase.execute({
       postId,
-      userId: user.id,
+      userId: user.userId,
       isSuperAdmin,
     });
   }
 
   @Post('posts/:id/shares')
   @HttpCode(HttpStatus.OK)
+  @OptionalAuthenticated()
   @ApiOperation({ summary: 'Ghi nhận lượt chia sẻ bài viết (FR12)' })
   @ApiResponse({ status: 200, description: 'Đã ghi nhận chia sẻ và trả về share_url' })
   async trackShare(
     @Param('id') postId: string,
-    @CurrentUser({ required: false }) user: RequestUser | null,
+    @OptionalCurrentUser() user?: AuthUser,
   ) {
     return this.trackShareUseCase.execute({
       postId,
-      userId: user?.id,
+      userId: user?.userId,
     });
   }
 }

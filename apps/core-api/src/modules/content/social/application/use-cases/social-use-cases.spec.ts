@@ -6,10 +6,10 @@ import {
   CreateDraftUseCase,
   DeleteCommentUseCase,
   DeletePostUseCase,
-  EditCommentUseCase,
+  GetAdminPostDetailUseCase,
+  GetMyReactionUseCase,
   GetPostDetailUseCase,
-  ListCommentsUseCase,
-  ListPostsUseCase,
+  ListAdminPostsUseCase,
   PublishPostUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
@@ -80,6 +80,8 @@ describe('Social Application Use Cases', () => {
       softDelete: vi.fn(),
       findPublicPosts: vi.fn(),
       findUserPosts: vi.fn(),
+      findAdminPosts: vi.fn(),
+      countAdminPosts: vi.fn(),
       incrementCounter: vi.fn(),
       updateReactionCounts: vi.fn(),
     };
@@ -482,6 +484,73 @@ describe('Social Application Use Cases', () => {
           type: 'content.post.moderated',
         }),
       );
+    });
+  });
+
+  describe('GetMyReactionUseCase', () => {
+    it('trả về cảm xúc hiện tại của user trên bài viết', async () => {
+      mockReactionRepo.findByPostAndUser.mockResolvedValue({ type: 'heart' });
+      const useCase = new GetMyReactionUseCase(mockReactionRepo);
+      const res = await useCase.execute({ postId, userId: authorId });
+      expect(res).toEqual({ postId, type: 'heart' });
+      expect(mockReactionRepo.findByPostAndUser).toHaveBeenCalledWith(postId, authorId);
+    });
+
+    it('trả về null nếu user chưa tương tác cảm xúc', async () => {
+      mockReactionRepo.findByPostAndUser.mockResolvedValue(null);
+      const useCase = new GetMyReactionUseCase(mockReactionRepo);
+      const res = await useCase.execute({ postId, userId: authorId });
+      expect(res).toEqual({ postId, type: null });
+    });
+  });
+
+  describe('ListAdminPostsUseCase', () => {
+    it('lấy danh sách bài đăng admin kèm phân trang và tổng số', async () => {
+      const post = samplePostRecord({ status: 'published' });
+      mockPostRepo.findAdminPosts.mockResolvedValue([post]);
+      mockPostRepo.countAdminPosts.mockResolvedValue(1);
+
+      const useCase = new ListAdminPostsUseCase(mockPostRepo);
+      const res = await useCase.execute({ limit: 10, status: 'published' });
+
+      expect(res.items.length).toBe(1);
+      expect(res.total).toBe(1);
+      expect(res.items[0]!.id).toBe(postId);
+      expect(mockPostRepo.findAdminPosts).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 11, status: 'published' }),
+      );
+    });
+  });
+
+  describe('GetAdminPostDetailUseCase', () => {
+    it('lấy chi tiết bài đăng kèm lịch sử kiểm duyệt', async () => {
+      const post = samplePostRecord({ status: 'published' });
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockModerationRepo.findByPostId.mockResolvedValue([
+        {
+          id: 'action-1',
+          postId,
+          moderatorId,
+          action: 'hide',
+          reasonCode: 'SPAM',
+          reasonDetail: null,
+          reportIds: [],
+          createdAt: new Date('2026-11-04T08:30:00Z'),
+        },
+      ]);
+
+      const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo);
+      const res = await useCase.execute({ postId });
+
+      expect(res.id).toBe(postId);
+      expect(res.moderation_history.length).toBe(1);
+      expect(res.moderation_history[0]!.action).toBe('hide');
+    });
+
+    it('ném lỗi PostNotFoundException khi không tìm thấy bài viết', async () => {
+      mockPostRepo.findById.mockResolvedValue(null);
+      const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo);
+      await expect(useCase.execute({ postId: 'non-existent' })).rejects.toThrow();
     });
   });
 });
