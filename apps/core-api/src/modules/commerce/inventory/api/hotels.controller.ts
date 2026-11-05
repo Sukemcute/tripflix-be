@@ -1,0 +1,21 @@
+import { Controller, Get, Inject, Param, Query, UseFilters } from '@nestjs/common';
+import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import type { z } from 'zod';
+import { HotelDetailUseCases } from '../application/hotel-detail.use-cases.js';
+import { HotelDetailDto, HotelDetailQueryDto, HotelDetailQuerySchema } from './dto.js';
+import { CommerceErrorFilter, ZodQuery } from './http.js';
+
+/** Trang chi tiết khách sạn cho web và app. Công khai, không cần đăng nhập; chỉ đọc. */
+@ApiTags('hotels')
+@Controller('hotels')
+@UseFilters(CommerceErrorFilter)
+export class HotelsController {
+  constructor(@Inject(HotelDetailUseCases) private readonly hotels: HotelDetailUseCases) {}
+
+  @Get(':id')
+  @ApiOkResponse({ type: HotelDetailDto })
+  @ApiNotFoundResponse({ description: 'Không có khách sạn này' })
+  getHotel(@Param('id') id: string, @Query(new ZodQuery(HotelDetailQuerySchema)) query: HotelDetailQueryDto & z.infer<typeof HotelDetailQuerySchema>) {
+    return this.hotels.getHotelDetail(id, query);
+  }
+}

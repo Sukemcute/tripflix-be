@@ -18,6 +18,7 @@ const hasher: PasswordHasher = {
 };
 const issuer: TokenIssuer = {
   issue: async ({ sid }) => ({ token: `access-for-${sid}`, expiresIn: 900 }),
+  issueServiceToken: async ({ clientId }) => ({ token: `service-for-${clientId}`, expiresIn: 300 }),
   getJwks: () => ({ keys: [] }),
 };
 
@@ -34,7 +35,8 @@ async function setup() {
   const clock = () => new Date(nowMs);
   const store = new MemoryAccessStore();
   const blocklist = new MemorySidBlocklist(() => nowMs);
-  const auth = new AuthUseCases(store, hasher, issuer, new MemoryLoginRateLimiter(() => nowMs), blocklist, clock);
+  const google = { verify: async () => Promise.reject(new Error('không dùng trong test này')) };
+  const auth = new AuthUseCases(store, hasher, issuer, new MemoryLoginRateLimiter(() => nowMs), blocklist, clock, google);
   await auth.register({ email: 'An@Example.com', password: 'mat-khau-1', displayName: 'An' }, meta);
   const first = await auth.login({ email: 'an@example.com', password: 'mat-khau-1' }, meta);
   const sid = [...store.sessionRows.keys()][0]!;
