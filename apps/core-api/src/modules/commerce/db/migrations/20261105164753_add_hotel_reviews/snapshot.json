@@ -1,0 +1,554 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3a863899-8ada-42e7-87fe-bfd2630e0338",
+  "prevIds": [
+    "59eba8ac-7847-466e-ad8e-c77262b569e0"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "reviews"
+      ],
+      "writes": [
+        "s|tbl|commerce.reviews",
+        "n|tbl|commerce.reviews",
+        "e|tbl|commerce.reviews",
+        "n|rel|commerce.reviews",
+        "n|type|commerce.reviews",
+        "n|rel|commerce.reviews_pkey"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "reviews",
+        "idx_reviews_property_id_created_at"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_reviews_property_id_created_at",
+        "n|idx|commerce.idx_reviews_property_id_created_at",
+        "e|idx|commerce.idx_reviews_property_id_created_at",
+        "n|rel|commerce.idx_reviews_property_id_created_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.reviews",
+        "n|sch|commerce",
+        "n|col|commerce.reviews.property_id",
+        "n|col|commerce.reviews.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "reviews",
+        "uq_reviews_booking_id"
+      ],
+      "writes": [
+        "s|idx|commerce.uq_reviews_booking_id",
+        "n|idx|commerce.uq_reviews_booking_id",
+        "e|idx|commerce.uq_reviews_booking_id",
+        "n|rel|commerce.uq_reviews_booking_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.reviews",
+        "n|sch|commerce",
+        "n|col|commerce.reviews.booking_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "reviews"
+      ],
+      "writes": [
+        "s|fk|commerce.reviews.fk_reviews_property_id",
+        "n|fk|commerce.reviews.fk_reviews_property_id",
+        "e|fk|commerce.reviews.fk_reviews_property_id",
+        "n|con|commerce.reviews.fk_reviews_property_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.reviews",
+        "n|sch|commerce",
+        "n|tbl|commerce.properties",
+        "n|sch|commerce",
+        "n|col|commerce.reviews.property_id",
+        "n|col|commerce.properties.id",
+        "e|uniqueness|commerce.properties.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "reviews"
+      ],
+      "writes": [
+        "s|fk|commerce.reviews.fk_reviews_room_type_id",
+        "n|fk|commerce.reviews.fk_reviews_room_type_id",
+        "e|fk|commerce.reviews.fk_reviews_room_type_id",
+        "n|con|commerce.reviews.fk_reviews_room_type_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.reviews",
+        "n|sch|commerce",
+        "n|tbl|commerce.room_types",
+        "n|sch|commerce",
+        "n|col|commerce.reviews.room_type_id",
+        "n|col|commerce.room_types.id",
+        "e|uniqueness|commerce.room_types.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "name": "reviews",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "property_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "room_type_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "booking_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "author_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "rating",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "title",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "body",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "tags",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "images",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "traveler_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "stay_month",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "helpful_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'published'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "is_seeded",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "idx_reviews_property_id_created_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "property_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "uq_reviews_booking_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "booking_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "fk_reviews_property_id",
+        "nameExplicit": true,
+        "columns": [
+          "property_id"
+        ],
+        "schemaTo": "commerce",
+        "tableTo": "properties",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "fk_reviews_room_type_id",
+        "nameExplicit": true,
+        "columns": [
+          "room_type_id"
+        ],
+        "schemaTo": "commerce",
+        "tableTo": "room_types",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "reviews_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "ck_reviews_rating",
+        "value": "\"rating\" between 1 and 5",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "ck_reviews_status",
+        "value": "\"status\" in ('published', 'hidden')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "reviews",
+        "name": "ck_reviews_helpful_count",
+        "value": "\"helpful_count\" >= 0",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
