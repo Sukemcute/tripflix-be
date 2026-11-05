@@ -7,8 +7,11 @@ export {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
   LOGIN_RATE_LIMITER,
+  PASSWORD_HASHER,
   type AccessStore,
   type LoginRateLimiter,
+  type PasswordHasher,
 } from './auth/application/ports.js';
 export { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 export { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
+export { registerServiceClient } from './service/application/service-token.use-cases.js';

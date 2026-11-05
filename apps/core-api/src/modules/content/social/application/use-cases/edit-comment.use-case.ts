@@ -1,5 +1,7 @@
+import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord } from '../../../db/schema/index.js';
 
 export interface EditCommentCommand {
@@ -9,8 +11,12 @@ export interface EditCommentCommand {
 }
 
 export class EditCommentUseCase {
-  constructor(private readonly commentRepository: CommentRepository) {}
+  constructor(
+    private readonly commentRepository: CommentRepository,
+    private readonly outbox: ContentOutbox,
+  ) {}
 
+  @Transactional('content')
   async execute(command: EditCommentCommand): Promise<CommentRecord> {
     const record = await this.commentRepository.findById(command.commentId);
     if (!record) {
@@ -31,9 +37,24 @@ export class EditCommentUseCase {
 
     domainComment.updateBody(command.userId, command.body);
 
-    return this.commentRepository.update(command.commentId, {
+    const updated = await this.commentRepository.update(command.commentId, {
       body: domainComment.body,
       isEdited: true,
     });
+
+    await this.outbox.add({
+      type: 'content.comment.updated',
+      userId: command.userId,
+      payload: {
+        commentId: updated.id,
+        postId: updated.postId,
+        authorId: updated.authorId,
+        parentCommentId: updated.parentCommentId ?? null,
+        body: updated.body,
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    });
+
+    return updated;
   }
 }

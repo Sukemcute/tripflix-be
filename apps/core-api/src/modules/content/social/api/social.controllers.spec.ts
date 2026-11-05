@@ -201,6 +201,7 @@ describe('Social API Controllers', () => {
         limit: 15,
         cursor: undefined,
         parentCommentId: undefined,
+        flat: false,
       });
     });
   });

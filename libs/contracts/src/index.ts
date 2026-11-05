@@ -114,6 +114,41 @@ export const MediaTranscodeFailedV1Schema = z.object({
 });
 export type MediaTranscodeFailedV1 = z.infer<typeof MediaTranscodeFailedV1Schema>;
 
+/** content.comment.created v1: có bình luận mới dưới bài viết (hỗ trợ thông báo và AI worker tổng hợp). */
+export const ContentCommentCreatedV1Schema = z.object({
+  commentId: z.uuid(),
+  postId: z.uuid(),
+  postAuthorId: z.uuid(),
+  authorId: z.uuid(),
+  parentCommentId: z.uuid().nullable(),
+  body: z.string().min(1).max(10_000),
+  createdAt: z.iso.datetime(),
+});
+export type ContentCommentCreatedV1 = z.infer<typeof ContentCommentCreatedV1Schema>;
+
+/** content.comment.updated v1: bình luận được chỉnh sửa nội dung. */
+export const ContentCommentUpdatedV1Schema = z.object({
+  commentId: z.uuid(),
+  postId: z.uuid(),
+  authorId: z.uuid(),
+  parentCommentId: z.uuid().nullable(),
+  body: z.string().min(1).max(10_000),
+  updatedAt: z.iso.datetime(),
+});
+export type ContentCommentUpdatedV1 = z.infer<typeof ContentCommentUpdatedV1Schema>;
+
+/** content.comment.deleted v1: bình luận bị xoá (bởi tác giả hoặc superadmin). */
+export const ContentCommentDeletedV1Schema = z.object({
+  commentId: z.uuid(),
+  postId: z.uuid(),
+  authorId: z.uuid(),
+  parentCommentId: z.uuid().nullable(),
+  deletedBy: z.uuid(),
+  isSuperAdmin: z.boolean(),
+  deletedAt: z.iso.datetime(),
+});
+export type ContentCommentDeletedV1 = z.infer<typeof ContentCommentDeletedV1Schema>;
+
 /**
  * Payload của access.password_reset_requested v1: notification-service gửi email đặt lại mật khẩu.
  * Có email vì bên gửi cần người nhận (docs/10 §3.5); resetUrl đã gồm token dùng một lần, sống 30 phút.
@@ -165,6 +200,9 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.media.failed.v1': ContentMediaFailedV1Schema,
   'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
   'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
+  'content.comment.created.v1': ContentCommentCreatedV1Schema,
+  'content.comment.updated.v1': ContentCommentUpdatedV1Schema,
+  'content.comment.deleted.v1': ContentCommentDeletedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
 };

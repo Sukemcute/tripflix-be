@@ -47,12 +47,17 @@ export class CommentsController {
     description: 'Danh sách bình luận kèm phân trang cursor',
     type: SocialCommentPageDto,
   })
-  async listComments(@Param('postId') postId: string, @Query() query: ListCommentsQueryDto) {
+  async listComments(
+    @Param('postId') postId: string,
+    @Query() query: ListCommentsQueryDto,
+  ) {
+    const isFlat = query.flat === true || (query.flat as unknown) === 'true';
     return this.listCommentsUseCase.execute({
       postId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       parentCommentId: query.parent_comment_id,
+      flat: isFlat,
     });
   }
 

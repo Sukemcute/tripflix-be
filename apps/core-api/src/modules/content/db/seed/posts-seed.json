@@ -5,88 +5,150 @@
       "ownerId": "018d9f00-0000-7000-8000-000000000001",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 18450000,
-      "sourceKey": "dev/phong/videos/danang-mykhe.mp4",
-      "hlsPrefix": "dev/phong/videos/danang-mykhe/r1/",
-      "durationSec": 35,
-      "aspect": "9:16"
+      "fileSizeBytes": 11198242,
+      "sourceKey": "dev/phong/uploads/3eb374ae-b17b-4495-9c1a-b092acac6781/original.mp4",
+      "hlsPrefix": "dev/phong/videos/3eb374ae-b17b-4495-9c1a-b092acac6781/r1",
+      "durationSec": 39,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000002",
       "ownerId": "018d9f00-0000-7000-8000-000000000002",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 14200000,
-      "sourceKey": "dev/phong/videos/hoian-night.mp4",
-      "hlsPrefix": "dev/phong/videos/hoian-night/r1/",
-      "durationSec": 28,
-      "aspect": "9:16"
+      "fileSizeBytes": 11940443,
+      "sourceKey": "dev/phong/uploads/8290694e-47d5-43ba-99d7-165731bc353c/original.mp4",
+      "hlsPrefix": "dev/phong/videos/8290694e-47d5-43ba-99d7-165731bc353c/r1",
+      "durationSec": 53,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000003",
       "ownerId": "018d9f00-0000-7000-8000-000000000003",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 25600000,
-      "sourceKey": "dev/phong/videos/phuquoc-island.mp4",
-      "hlsPrefix": "dev/phong/videos/phuquoc-island/r1/",
-      "durationSec": 45,
-      "aspect": "16:9"
+      "fileSizeBytes": 20161103,
+      "sourceKey": "dev/phong/uploads/251c2494-79a2-4940-9bf8-ccfa1b173123/original.mp4",
+      "hlsPrefix": "dev/phong/videos/251c2494-79a2-4940-9bf8-ccfa1b173123/r1",
+      "durationSec": 63,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000004",
       "ownerId": "018d9f00-0000-7000-8000-000000000004",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 16800000,
-      "sourceKey": "dev/phong/videos/dalat-cloud.mp4",
-      "hlsPrefix": "dev/phong/videos/dalat-cloud/r1/",
-      "durationSec": 30,
-      "aspect": "9:16"
+      "fileSizeBytes": 12268517,
+      "sourceKey": "dev/phong/uploads/d6f19dd4-83b3-4246-bc3b-c58071c5b5cd/original.mp4",
+      "hlsPrefix": "dev/phong/videos/d6f19dd4-83b3-4246-bc3b-c58071c5b5cd/r1",
+      "durationSec": 56,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000005",
       "ownerId": "018d9f00-0000-7000-8000-000000000001",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 21000000,
-      "sourceKey": "dev/phong/videos/nhatrang-bay.mp4",
-      "hlsPrefix": "dev/phong/videos/nhatrang-bay/r1/",
-      "durationSec": 40,
-      "aspect": "16:9"
+      "fileSizeBytes": 9161118,
+      "sourceKey": "dev/phong/uploads/13436594-5b27-4038-b929-fad6f6814fe0/original.mp4",
+      "hlsPrefix": "dev/phong/videos/13436594-5b27-4038-b929-fad6f6814fe0/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000006",
       "ownerId": "018d9f00-0000-7000-8000-000000000002",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 15900000,
-      "sourceKey": "dev/phong/videos/halong-cruise.mp4",
-      "hlsPrefix": "dev/phong/videos/halong-cruise/r1/",
-      "durationSec": 32,
-      "aspect": "9:16"
+      "fileSizeBytes": 11790659,
+      "sourceKey": "dev/phong/uploads/1a288072-66ac-4c8c-8d61-6bc2984a4f86/original.mp4",
+      "hlsPrefix": "dev/phong/videos/1a288072-66ac-4c8c-8d61-6bc2984a4f86/r1",
+      "durationSec": 79,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000007",
       "ownerId": "018d9f00-0000-7000-8000-000000000003",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 28400000,
-      "sourceKey": "dev/phong/videos/sapa-fansipan.mp4",
-      "hlsPrefix": "dev/phong/videos/sapa-fansipan/r1/",
-      "durationSec": 48,
-      "aspect": "16:9"
+      "fileSizeBytes": 6045997,
+      "sourceKey": "dev/phong/uploads/01018e18-cdda-437c-b71e-be286c1861ac/original.mp4",
+      "hlsPrefix": "dev/phong/videos/01018e18-cdda-437c-b71e-be286c1861ac/r1",
+      "durationSec": 25,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     },
     {
       "id": "018d9f10-0000-7000-8000-000000000008",
       "ownerId": "018d9f00-0000-7000-8000-000000000005",
       "status": "ready",
       "mimeType": "video/mp4",
-      "fileSizeBytes": 17200000,
-      "sourceKey": "dev/phong/videos/ninhbinh-boat.mp4",
-      "hlsPrefix": "dev/phong/videos/ninhbinh-boat/r1/",
-      "durationSec": 33,
-      "aspect": "9:16"
+      "fileSizeBytes": 19532852,
+      "sourceKey": "dev/phong/uploads/afa4f471-5644-4747-99f8-8d5f960cc43c/original.mp4",
+      "hlsPrefix": "dev/phong/videos/afa4f471-5644-4747-99f8-8d5f960cc43c/r1",
+      "durationSec": 71,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
+    },
+    {
+      "id": "018d9f10-0000-7000-8000-000000000009",
+      "ownerId": "018d9f00-0000-7000-8000-000000000004",
+      "mimeType": "video/mp4",
+      "status": "ready",
+      "fileSizeBytes": 21578440,
+      "sourceKey": "dev/phong/uploads/c7b8be64-4d6e-45ac-aff1-3b671a5cf2f0/original.mp4",
+      "hlsPrefix": "dev/phong/videos/c7b8be64-4d6e-45ac-aff1-3b671a5cf2f0/r1",
+      "durationSec": 43,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
+    },
+    {
+      "id": "018d9f10-0000-7000-8000-00000000000a",
+      "ownerId": "018d9f00-0000-7000-8000-000000000005",
+      "mimeType": "video/mp4",
+      "status": "ready",
+      "fileSizeBytes": 5051862,
+      "sourceKey": "dev/phong/uploads/e33f9839-70a7-4b42-844d-151a470c554f/original.mp4",
+      "hlsPrefix": "dev/phong/videos/e33f9839-70a7-4b42-844d-151a470c554f/r1",
+      "durationSec": 22,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540
+      ]
     }
   ],
   "posts": [
@@ -365,6 +427,84 @@
       "publishedAt": "2026-11-04T15:00:00.000Z",
       "createdAt": "2026-11-04T15:00:00.000Z",
       "updatedAt": "2026-11-04T15:00:00.000Z"
+    },
+    {
+      "id": "018d9f20-0000-7000-8000-000000000009",
+      "authorId": "018d9f00-0000-7000-8000-000000000004",
+      "postType": "video",
+      "title": "Thử thách tàu lượn siêu tốc giữa đồi xanh ở VinWonders Nha Trang",
+      "body": "Cú rơi đầu tiên làm cả nhóm hét không ngừng! Tàu lượn chạy giữa đồi xanh, nhìn từ trên cao thấy cả khu vui chơi. Nên đi vào buổi sáng ngày thường để đỡ phải xếp hàng.",
+      "hashtags": [
+        "nhatrang",
+        "vinwonders",
+        "tauluon",
+        "giaitri",
+        "bienvietnam"
+      ],
+      "status": "published",
+      "visibility": "public",
+      "isVerified": false,
+      "mediaIds": [
+        "018d9f10-0000-7000-8000-000000000009"
+      ],
+      "coverMediaId": null,
+      "tripAttachment": {
+        "hotelId": "P-h-nt-01",
+        "hotelName": "Vinpearl Beach Nha Trang",
+        "destinationName": "Nha Trang",
+        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo"
+      },
+      "reactionCounts": {
+        "like": 28,
+        "love": 14,
+        "helpful": 6
+      },
+      "reactionTotal": 48,
+      "commentCount": 0,
+      "shareCount": 5,
+      "bookmarkCount": 11,
+      "publishedAt": "2026-11-04T16:00:00.000Z",
+      "createdAt": "2026-11-04T16:00:00.000Z",
+      "updatedAt": "2026-11-04T16:00:00.000Z"
+    },
+    {
+      "id": "018d9f20-0000-7000-8000-00000000000a",
+      "authorId": "018d9f00-0000-7000-8000-000000000005",
+      "postType": "video",
+      "title": "Cáp treo vượt biển sang đảo Hòn Tre, Nha Trang",
+      "body": "Ngồi cáp treo vượt biển ngắm toàn cảnh đảo Hòn Tre, nhìn từ xa như một thành phố nhỏ trên mặt nước. Nên đi lúc hoàng hôn để có màu trời đẹp nhất.",
+      "hashtags": [
+        "nhatrang",
+        "captreo",
+        "vinpearl",
+        "travelgram",
+        "bienvietnam"
+      ],
+      "status": "published",
+      "visibility": "public",
+      "isVerified": false,
+      "mediaIds": [
+        "018d9f10-0000-7000-8000-00000000000a"
+      ],
+      "coverMediaId": null,
+      "tripAttachment": {
+        "hotelId": "P-h-nt-01",
+        "hotelName": "Vinpearl Beach Nha Trang",
+        "destinationName": "Nha Trang",
+        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo"
+      },
+      "reactionCounts": {
+        "like": 33,
+        "love": 17,
+        "helpful": 9
+      },
+      "reactionTotal": 59,
+      "commentCount": 0,
+      "shareCount": 7,
+      "bookmarkCount": 18,
+      "publishedAt": "2026-11-04T17:00:00.000Z",
+      "createdAt": "2026-11-04T17:00:00.000Z",
+      "updatedAt": "2026-11-04T17:00:00.000Z"
     }
   ],
   "comments": [
