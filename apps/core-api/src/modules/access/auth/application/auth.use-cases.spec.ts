@@ -1,4 +1,8 @@
+import 'reflect-metadata';
+import { Test } from '@nestjs/testing';
 import { MemorySidBlocklist } from '@tripflix/auth';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
+import { ClsModule } from 'nestjs-cls';
 import { AccessError } from '../domain/errors.js';
 import { REFRESH_GRACE_MS } from '../domain/refresh-rotation.js';
 import { MemoryAccessStore } from '../infra/memory/memory-access.store.js';
@@ -16,6 +20,14 @@ const issuer: TokenIssuer = {
   issue: async ({ sid }) => ({ token: `access-for-${sid}`, expiresIn: 900 }),
   getJwks: () => ({ keys: [] }),
 };
+
+// Khởi tạo TransactionHost (plugin no-op) một lần để @Transactional('access') chạy được khi tạo use case trực tiếp.
+beforeAll(async () => {
+  const moduleRef = await Test.createTestingModule({
+    imports: [ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() })],
+  }).compile();
+  await moduleRef.init();
+});
 
 async function setup() {
   let nowMs = Date.parse('2026-11-04T10:00:00Z');

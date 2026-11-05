@@ -27,7 +27,8 @@ const ACCOUNTS: { email: string; displayName: string; role: Role }[] = [
 
 const pool = createPool({ url: env.DATABASE_URL_ACCESS, max: 1, applicationName: 'seed:access' });
 try {
-  const store = new DrizzleAccessStore(createDb(pool));
+  const db = createDb(pool);
+  const store = new DrizzleAccessStore(() => db);
   const passwordHash = await new Argon2PasswordHasher().hash(env.SEED_PASSWORD);
   for (const account of ACCOUNTS) {
     const created = await store.users.insert({ ...account, passwordHash });
@@ -43,7 +44,7 @@ try {
   const commerceDb = createDb(commercePool);
   const catalog = await seedCatalog(commerceDb);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
-  const opened = await new CalendarUseCases(new DrizzleCommerceStore(commerceDb), () => today).openCalendarWindow();
+  const opened = await new CalendarUseCases(new DrizzleCommerceStore({ tx: commerceDb }), () => today).openCalendarWindow();
   process.stdout.write(
     `commerce: ${catalog.hotels} khách sạn, ${catalog.roomTypes} loại phòng, ${catalog.flights} hạng ghế; ` +
       `mở thêm ${opened.roomDays} ngày phòng, ${opened.flightDays} ngày bay\n`,

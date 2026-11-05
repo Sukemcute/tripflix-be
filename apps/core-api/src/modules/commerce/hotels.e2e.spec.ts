@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { AuthModule, InvalidAccessTokenError, MemorySidBlocklist } from '@tripflix/auth';
+import { MODULES, buildDrizzleToken, createTransactionalPlugins, type Db } from '@tripflix/db';
+import { ClsModule } from 'nestjs-cls';
 import request from 'supertest';
 import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
@@ -11,14 +14,18 @@ import { COMMERCE_STORE, TODAY } from './inventory/application/ports.js';
 import { MemoryCommerceStore } from './inventory/infra/memory/memory-commerce.store.js';
 
 // E2E chạy app Nest thật (controller, filter, kiểm query), chỉ thay database bằng bản bộ nhớ.
+// Module commerce có cả API admin (guard đăng nhập, @Transactional) nên cần đủ CLS và AuthModule, dù API này công khai.
+const fakeDrizzle = { transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({}) } as unknown as Db;
+
 @Global()
 @Module({
   providers: [
     { provide: CORE_ENV, useValue: { NODE_ENV: 'test', APP_ROLE: 'api' } as CoreEnv },
     { provide: DB_POOLS, useValue: {} },
     { provide: REDIS, useValue: {} },
+    ...MODULES.map((m) => ({ provide: buildDrizzleToken(m), useValue: fakeDrizzle })),
   ],
-  exports: [CORE_ENV, DB_POOLS, REDIS],
+  exports: [CORE_ENV, DB_POOLS, REDIS, ...MODULES.map((m) => buildDrizzleToken(m))],
 })
 class FakePlatformModule {}
 
@@ -44,7 +51,21 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
       const [id, date] = key.split('|') as [string, string];
       store.patchRoomDay(id, date, { isStopSell: false, isClosedToArrival: false, isClosedToDeparture: false, minLos: 1, price: id === 'H1--STD' ? 1_000_000 : 2_000_000 });
     }
-    const moduleRef = await Test.createTestingModule({ imports: [FakePlatformModule, CommerceModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        FakePlatformModule,
+        ClsModule.forRoot({ global: true, plugins: createTransactionalPlugins([FakePlatformModule]) }),
+        AuthModule.forRootAsync({
+          useFactory: () => ({
+            verifier: async () => {
+              throw new InvalidAccessTokenError();
+            },
+            blocklist: new MemorySidBlocklist(),
+          }),
+        }),
+        CommerceModule,
+      ],
+    })
       .overrideProvider(COMMERCE_STORE)
       .useValue(store)
       .overrideProvider(TODAY)
