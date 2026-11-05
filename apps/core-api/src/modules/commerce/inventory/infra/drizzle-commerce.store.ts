@@ -33,6 +33,15 @@ const mapProperty = (row: PropertyRow): PropertyRecord => ({
   style: row.style,
   thumbnail: row.thumbnail,
   images: row.images,
+  address: row.address,
+  lat: row.lat,
+  lng: row.lng,
+  ratingAvg: row.ratingAvg,
+  reviewCount: row.reviewCount,
+  ratingSource: row.ratingSource,
+  checkInTime: row.checkInTime,
+  checkOutTime: row.checkOutTime,
+  details: row.details,
 });
 
 const mapRoomType = (row: RoomTypeRow): RoomTypeRecord => ({
@@ -43,6 +52,7 @@ const mapRoomType = (row: RoomTypeRow): RoomTypeRecord => ({
   defaultTotal: row.defaultTotal,
   defaultPrice: row.defaultPrice,
   ratePlans: row.ratePlans,
+  details: row.details,
 });
 
 const mapFlight = (row: FlightRow): FlightRecord => ({

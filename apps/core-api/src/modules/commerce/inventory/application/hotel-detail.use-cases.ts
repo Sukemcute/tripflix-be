@@ -12,6 +12,7 @@ import {
   quoteStay,
   type UnavailableReason,
 } from '../domain/sales-rules.js';
+import type { HotelAmenity } from '../../db/schema/index.js';
 import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type CommerceStore, type MediaUrl, type Today } from './ports.js';
 
 const DEFAULT_ADULTS = 2;
@@ -35,12 +36,21 @@ export interface HotelRatePlanQuote {
   totalPrice: number | null;
   /** Một đêm một phòng. */
   pricePerNight: number | null;
+  /** Giá gạch một đêm một phòng (giá niêm yết trước giảm); null khi gói không giảm hoặc không đặt được. */
+  listPricePerNight: number | null;
+  discountPct: number | null;
+  perks: string[];
 }
 
 export interface HotelRoomOffer {
   productId: string;
   name: string;
   maxGuests: number;
+  bedType: string | null;
+  areaM2: number | null;
+  view: string | null;
+  images: string[];
+  amenities: string[];
   roomsNeeded: number;
   isAvailable: boolean;
   reason: UnavailableReason | null;
@@ -59,6 +69,18 @@ export interface HotelDetail {
   style: string | null;
   thumbnail: string | null;
   images: string[];
+  address: string | null;
+  location: { lat: number; lng: number } | null;
+  rating: { average: number; count: number; source: string | null } | null;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  description: string | null;
+  highlights: { icon: string; text: string }[];
+  nearby: { name: string; distanceKm: number }[];
+  amenities: HotelAmenity[];
+  languages: string[];
+  facts: { voltage: string | null; floors: number | null; openedAt: string | null; roomCount: number | null; restaurants: number | null; bars: number | null };
+  policies: { child: string | null; extraBed: string | null; deposit: string | null; depositAmount: number | null; stay: string | null };
   stay: { checkIn: string; checkOut: string; nights: number; adults: number };
   /** Giá một đêm rẻ nhất trong các loại phòng đặt được cho kỳ ở này. */
   priceFrom: number | null;
@@ -67,6 +89,10 @@ export interface HotelDetail {
   /** Giá một đêm rẻ nhất của từng ngày tới, để vẽ lịch giá. */
   calendar: { date: string; priceFrom: number | null; isAvailable: boolean }[];
 }
+
+/** Giá gạch: giá bán chia (1 − % giảm), làm tròn lên 10.000đ. Chỉ hiển thị, không phải giá khách trả. */
+const toListPrice = (price: number, discountPct?: number) =>
+  discountPct && discountPct > 0 && discountPct < 100 ? Math.ceil(price / (1 - discountPct / 100) / 10_000) * 10_000 : null;
 
 /** Trang chi tiết khách sạn: ảnh, giá cho kỳ ở đang chọn, còn phòng thật, lịch giá vài tuần tới. Chỉ đọc. */
 @Injectable()
@@ -109,6 +135,11 @@ export class HotelDetailUseCases {
         productId: r.id,
         name: r.name,
         maxGuests: r.maxGuests,
+        bedType: r.details?.bedType ?? null,
+        areaM2: r.details?.areaM2 ?? null,
+        view: r.details?.view ?? null,
+        images: (r.details?.images ?? []).map(this.mediaUrl),
+        amenities: r.details?.amenities ?? [],
         roomsNeeded,
         isAvailable: first?.isAvailable ?? false,
         reason: first && !first.isAvailable ? first.reason : null,
@@ -121,6 +152,9 @@ export class HotelDetailUseCases {
           freeCancelDays: plan.freeCancelDays,
           totalPrice: quote.isAvailable ? quote.totalPrice : null,
           pricePerNight: quote.isAvailable ? quote.pricePerNight : null,
+          listPricePerNight: quote.isAvailable ? toListPrice(quote.pricePerNight, plan.discountPct) : null,
+          discountPct: plan.discountPct ? plan.discountPct : null,
+          perks: plan.perks ?? [],
         })),
       };
     });
@@ -134,6 +168,7 @@ export class HotelDetailUseCases {
       return { date, priceFrom: prices.length ? Math.min(...prices) : null, isAvailable: prices.length > 0 };
     });
 
+    const d = hotel.details ?? {};
     return {
       id: hotel.id,
       name: hotel.name,
@@ -144,6 +179,31 @@ export class HotelDetailUseCases {
       style: hotel.style,
       thumbnail: hotel.thumbnail ? this.mediaUrl(hotel.thumbnail) : null,
       images: hotel.images.map(this.mediaUrl),
+      address: hotel.address ?? null,
+      location: hotel.lat != null && hotel.lng != null ? { lat: hotel.lat, lng: hotel.lng } : null,
+      rating: hotel.ratingAvg != null ? { average: hotel.ratingAvg, count: hotel.reviewCount ?? 0, source: hotel.ratingSource ?? null } : null,
+      checkInTime: hotel.checkInTime ?? null,
+      checkOutTime: hotel.checkOutTime ?? null,
+      description: d.description ?? null,
+      highlights: d.highlights ?? [],
+      nearby: d.nearby ?? [],
+      amenities: d.amenities ?? [],
+      languages: d.languages ?? [],
+      facts: {
+        voltage: d.facts?.voltage ?? null,
+        floors: d.facts?.floors ?? null,
+        openedAt: d.facts?.openedAt ?? null,
+        roomCount: d.facts?.roomCount ?? null,
+        restaurants: d.facts?.restaurants ?? null,
+        bars: d.facts?.bars ?? null,
+      },
+      policies: {
+        child: d.policies?.child ?? null,
+        extraBed: d.policies?.extraBed ?? null,
+        deposit: d.policies?.deposit ?? null,
+        depositAmount: d.policies?.depositAmount ?? null,
+        stay: d.policies?.stay ?? null,
+      },
       stay: { checkIn, checkOut, nights: countNights(checkIn, checkOut), adults },
       priceFrom: bookablePrices.length ? Math.min(...bookablePrices) : null,
       isAvailable: bookablePrices.length > 0,

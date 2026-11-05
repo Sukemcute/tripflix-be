@@ -34,17 +34,70 @@ class HotelRatePlanQuoteDto {
   @ApiProperty({ description: 'Huỷ miễn phí trước ngày nhận phòng bao nhiêu ngày' }) freeCancelDays!: number;
   @ApiProperty({ type: Number, nullable: true, description: 'Cả kỳ ở, mọi phòng (VND)' }) totalPrice!: number | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Một đêm một phòng (VND)' }) pricePerNight!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Giá gạch một đêm một phòng (VND), chỉ để hiển thị' }) listPricePerNight!: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 35, description: '% giảm so với giá gạch' }) discountPct!: number | null;
+  @ApiProperty({ type: [String], example: ['Bữa sáng buffet cho 2 người'] }) perks!: string[];
 }
 
 class HotelRoomOfferDto {
   @ApiProperty({ example: 'P-h-dn-01--DLX', description: 'Mã dùng khi đặt chỗ' }) productId!: string;
   @ApiProperty({ example: 'Deluxe hướng vườn' }) name!: string;
   @ApiProperty() maxGuests!: number;
+  @ApiProperty({ type: String, nullable: true, example: '1 giường siêu lớn' }) bedType!: string | null;
+  @ApiProperty({ type: Number, nullable: true, example: 42 }) areaM2!: number | null;
+  @ApiProperty({ type: String, nullable: true, example: 'city', description: 'city | sea | garden | mountain | pool | river' }) view!: string | null;
+  @ApiProperty({ type: [String], description: 'URL ảnh phòng' }) images!: string[];
+  @ApiProperty({ type: [String], example: ['Ghế sofa', 'Điều hoà không khí'] }) amenities!: string[];
   @ApiProperty({ description: 'Số phòng cần cho số khách đã chọn' }) roomsNeeded!: number;
   @ApiProperty() isAvailable!: boolean;
   @ApiProperty({ type: String, enum: UNAVAILABLE_REASONS, nullable: true }) reason!: string | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Số phòng thật còn lại suốt kỳ ở' }) remaining!: number | null;
   @ApiProperty({ type: [HotelRatePlanQuoteDto] }) ratePlans!: HotelRatePlanQuoteDto[];
+}
+
+class LocationDto {
+  @ApiProperty({ example: 12.2388 }) lat!: number;
+  @ApiProperty({ example: 109.1967 }) lng!: number;
+}
+
+class RatingDto {
+  @ApiProperty({ example: 4.9 }) average!: number;
+  @ApiProperty({ example: 2200 }) count!: number;
+  @ApiProperty({ type: String, nullable: true, example: 'tripadvisor' }) source!: string | null;
+}
+
+class HighlightDto {
+  @ApiProperty({ example: 'pool' }) icon!: string;
+  @ApiProperty({ example: 'Hồ bơi vô cực toàn cảnh' }) text!: string;
+}
+
+class NearbyDto {
+  @ApiProperty({ example: 'Chùa Long Sơn' }) name!: string;
+  @ApiProperty({ example: 3.1 }) distanceKm!: number;
+}
+
+class AmenityDto {
+  @ApiProperty({ example: 'wellness', description: 'dining | sports | wellness | kids | general' }) group!: string;
+  @ApiProperty({ example: 'Spa' }) name!: string;
+  @ApiProperty({ example: 'spa' }) icon!: string;
+  @ApiProperty({ description: 'Hiện ở mục Tiện ích nổi bật' }) featured!: boolean;
+}
+
+class FactsDto {
+  @ApiProperty({ type: String, nullable: true, example: '110V / 220V' }) voltage!: string | null;
+  @ApiProperty({ type: Number, nullable: true, example: 41 }) floors!: number | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date' }) openedAt!: string | null;
+  @ApiProperty({ type: Number, nullable: true, example: 895 }) roomCount!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) restaurants!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) bars!: number | null;
+}
+
+class PoliciesDto {
+  @ApiProperty({ type: String, nullable: true }) child!: string | null;
+  @ApiProperty({ type: String, nullable: true }) extraBed!: string | null;
+  @ApiProperty({ type: String, nullable: true }) deposit!: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'VND/phòng/đêm' }) depositAmount!: number | null;
+  @ApiProperty({ type: String, nullable: true }) stay!: string | null;
 }
 
 class CalendarDayDto {
@@ -63,6 +116,18 @@ export class HotelDetailDto {
   @ApiProperty({ type: String, nullable: true }) style!: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Đường dẫn ảnh đại diện' }) thumbnail!: string | null;
   @ApiProperty({ type: [String] }) images!: string[];
+  @ApiProperty({ type: String, nullable: true }) address!: string | null;
+  @ApiProperty({ type: LocationDto, nullable: true }) location!: LocationDto | null;
+  @ApiProperty({ type: RatingDto, nullable: true }) rating!: RatingDto | null;
+  @ApiProperty({ type: String, nullable: true, example: '15:00' }) checkInTime!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '12:00' }) checkOutTime!: string | null;
+  @ApiProperty({ type: String, nullable: true }) description!: string | null;
+  @ApiProperty({ type: [HighlightDto] }) highlights!: HighlightDto[];
+  @ApiProperty({ type: [NearbyDto] }) nearby!: NearbyDto[];
+  @ApiProperty({ type: [AmenityDto] }) amenities!: AmenityDto[];
+  @ApiProperty({ type: [String], example: ['vi', 'en'] }) languages!: string[];
+  @ApiProperty({ type: FactsDto }) facts!: FactsDto;
+  @ApiProperty({ type: PoliciesDto }) policies!: PoliciesDto;
   @ApiProperty({ type: StayDto }) stay!: StayDto;
   @ApiProperty({ type: Number, nullable: true, description: 'Giá một đêm rẻ nhất cho kỳ ở này (VND)' }) priceFrom!: number | null;
   @ApiProperty() isAvailable!: boolean;

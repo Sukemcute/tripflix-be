@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Db } from '@tripflix/db';
 import { sql } from 'drizzle-orm';
-import { flights, properties, roomTypes, type RatePlan } from '../schema/index.js';
+import { flights, properties, roomTypes, type HotelDetails, type RatePlan, type RoomTypeDetails } from '../schema/index.js';
 import { toHotelImageKey } from './image-keys.js';
 
 /** Dữ liệu giả lập: khách sạn, loại phòng, chuyến bay theo hạng ghế. Lịch trống không nằm ở đây mà do job sinh. */
@@ -18,7 +18,26 @@ interface CatalogSeed {
     thumbnail: string | null;
     images: string[];
     basePrice: number;
-    roomTypes: { id: string; code: string; name: string; maxGuests: number; defaultTotal: number; priceFactor: number; ratePlans: RatePlan[] }[];
+    // Thông tin trang chi tiết (TF10); file seed cũ có thể chưa có.
+    address?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    ratingAvg?: number | null;
+    reviewCount?: number;
+    ratingSource?: string | null;
+    checkInTime?: string | null;
+    checkOutTime?: string | null;
+    details?: HotelDetails;
+    roomTypes: {
+      id: string;
+      code: string;
+      name: string;
+      maxGuests: number;
+      defaultTotal: number;
+      priceFactor: number;
+      ratePlans: RatePlan[];
+      details?: RoomTypeDetails;
+    }[];
   }[];
   flights: {
     id: string;
@@ -74,6 +93,7 @@ export async function seedCatalog(
       defaultTotal: r.defaultTotal,
       defaultPrice: roundToTenThousand(h.basePrice * r.priceFactor),
       ratePlans: r.ratePlans,
+      details: r.details ? { ...r.details, images: r.details.images?.map(toImageKey) } : {},
     })),
   );
   await db.transaction(async (tx) => {
@@ -81,6 +101,8 @@ export async function seedCatalog(
     ...hotel,
     thumbnail: hotel.thumbnail ? toImageKey(hotel.thumbnail) : null,
     images: hotel.images.map(toImageKey),
+    reviewCount: hotel.reviewCount ?? 0,
+    details: hotel.details ?? {},
   }));
     for (const rows of chunk(hotelRows)) {
       await tx
@@ -98,6 +120,15 @@ export async function seedCatalog(
             style: sql`excluded.style`,
             thumbnail: sql`excluded.thumbnail`,
             images: sql`excluded.images`,
+            address: sql`excluded.address`,
+            lat: sql`excluded.lat`,
+            lng: sql`excluded.lng`,
+            ratingAvg: sql`excluded.rating_avg`,
+            reviewCount: sql`excluded.review_count`,
+            ratingSource: sql`excluded.rating_source`,
+            checkInTime: sql`excluded.check_in_time`,
+            checkOutTime: sql`excluded.check_out_time`,
+            details: sql`excluded.details`,
             updatedAt: sql`now()`,
           },
         });
@@ -108,7 +139,7 @@ export async function seedCatalog(
         .values(rows)
         .onConflictDoUpdate({
           target: roomTypes.id,
-          set: { name: sql`excluded.name`, maxGuests: sql`excluded.max_guests`, defaultTotal: sql`excluded.default_total`, defaultPrice: sql`excluded.default_price`, ratePlans: sql`excluded.rate_plans` },
+          set: { name: sql`excluded.name`, maxGuests: sql`excluded.max_guests`, defaultTotal: sql`excluded.default_total`, defaultPrice: sql`excluded.default_price`, ratePlans: sql`excluded.rate_plans`, details: sql`excluded.details` },
         });
     }
     for (const rows of chunk(seed.flights.map(({ basePrice, ...f }) => ({ ...f, defaultPrice: roundToTenThousand(basePrice) })))) {

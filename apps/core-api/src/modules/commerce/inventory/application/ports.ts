@@ -1,3 +1,4 @@
+import type { HotelDetails, RoomTypeDetails } from '../../db/schema/index.js';
 import type { FlightDay, PricePlan, RoomDay } from '../domain/sales-rules.js';
 
 export interface PropertyRecord {
@@ -11,6 +12,16 @@ export interface PropertyRecord {
   style: string | null;
   thumbnail: string | null;
   images: string[];
+  // Thông tin trang chi tiết (TF10). Không bắt buộc: dữ liệu cũ và test dựng tay có thể chưa có.
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  ratingAvg?: number | null;
+  reviewCount?: number;
+  ratingSource?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  details?: HotelDetails;
 }
 
 export interface RoomTypeRecord {
@@ -21,6 +32,7 @@ export interface RoomTypeRecord {
   defaultTotal: number;
   defaultPrice: number;
   ratePlans: PricePlan[];
+  details?: RoomTypeDetails;
 }
 
 export interface FlightRecord {
