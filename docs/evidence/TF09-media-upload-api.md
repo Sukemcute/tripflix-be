@@ -31,7 +31,8 @@ PR này là một phần của TF09, nên chưa đạt hết tiêu chí của ta
 
 ## Kết quả kiểm tra
 - `pnpm turbo run lint typecheck test build --affected`: 40/40 task đạt. Core-api 54/54 test đạt, trong đó có 36 test mới cho media; storage 18/18, auth 14/14, notification-service 4/4, config 2/2, contracts 2/2.
-- Thử thật với core-api, Postgres local, S3 dev: 11/11 đạt; file 11 MB hoàn tất trên S3 có dung lượng khớp với lúc xin link. Bước hoàn tất gọi trực tiếp `libs/storage`, vì API `complete` chưa có. Đã xoá user, video thử.
+- Sau khi gộp `develop` (có `@Transactional` của Dũng), chạy đủ các bước của CI, tất cả thoát mã 0: `pnpm lint` (có kiểm ranh giới module), `pnpm typecheck`, `pnpm test` (core-api 64/64), `pnpm test:int` (core-api 9/9), `pnpm build`, `pnpm contracts:build` (`contracts/` không đổi). E2E của media import `access` qua `access/index.ts` (Dũng export ở PR #15), đúng ranh giới module.
+- Thử thật với core-api, Postgres local, S3 dev (trước khi gộp `develop`, chưa chạy lại): 11/11 đạt; file 11 MB hoàn tất trên S3 có dung lượng khớp với lúc xin link. Bước hoàn tất gọi trực tiếp `libs/storage`, vì API `complete` chưa có. Đã xoá user, video thử.
 - Chưa có test tự động cho `DrizzleMediaAssetStore`; repository này mới được kiểm qua lần thử thật.
 
 ## Cách kiểm lại
