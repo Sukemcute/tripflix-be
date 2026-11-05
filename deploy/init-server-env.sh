@@ -31,8 +31,11 @@ S3_MEDIA_BUCKET=tripflix-media-dev
 S3_KEY_PREFIX=dev/phong/
 MEDIA_CDN_URL=https://d399hxccn6y84z.cloudfront.net
 
-# Địa chỉ API công khai cho HTTPS. Chưa có tên miền thì dùng <IP nối bằng dấu ->.sslip.io.
+# Địa chỉ công khai. DNS của cả hai, và của www.<WEB_HOST>, phải trỏ về máy này trước khi bật gateway.
 API_HOST=
+WEB_HOST=
+AUTH_WEB_ORIGINS=
+AUTH_PASSWORD_RESET_URL=
 
 # Tag image trên GHCR; nên đổi sang sha-<7 ký tự> để biết chính xác bản đang chạy.
 IMAGE_TAG=develop

@@ -20,6 +20,7 @@ x-core-env: &core-env
   AUTH_JWT_ISSUER: tripflix-core
   AUTH_JWT_AUDIENCE: tripflix
   AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100}
+  AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
   AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
@@ -127,6 +128,7 @@ services:
       - --ping=true
     environment:
       API_HOST: ${API_HOST:?}
+      WEB_HOST: ${WEB_HOST:?}
     ports:
       - '${HTTP_PORT:-80}:80'
       - '${HTTPS_PORT:-443}:443'
@@ -138,6 +140,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  # Build trên server vì Next gắn địa chỉ API vào bundle lúc build, image trên GHCR không có địa chỉ này.
+  web:
+    profiles: [gateway]
+    image: tripflix-server-web
+    build:
+      context: ${FE_REPO:-../../tripflix-fe}
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_HOST:?}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 volumes:
   pg-data:

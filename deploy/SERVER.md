@@ -2,7 +2,7 @@
 
 `compose.server.yaml` chạy image production trên một máy. Postgres và Redis không mở cổng, API chỉ nghe trên `127.0.0.1`. `compose.yaml` vẫn chỉ dùng cho máy dev.
 
-Đã làm: giai đoạn 1, 2 và 3. Chưa làm: `video-worker`, `notification-service`, backup, deploy từ CI.
+Đã làm: giai đoạn 1, 2 và 3 (gồm website). Chưa làm: `video-worker`, `notification-service`, backup, deploy từ CI.
 
 ## Chuẩn bị máy
 
@@ -59,30 +59,36 @@ Xem từ laptop qua SSH, không cần mở cổng:
 gcloud compute ssh tripflix-staging --zone=asia-southeast1-b -- -L 3000:127.0.0.1:3000
 ```
 
-## Giai đoạn 3: HTTPS
+## Giai đoạn 3: HTTPS và website
 
-Traefik nhận cổng 80 và 443, lấy chứng chỉ Let's Encrypt và chuyển `/api` tới `core-api`. Chưa có tên miền thì dùng `<IP nối bằng dấu ->.sslip.io`.
+Traefik nhận cổng 80 và 443, lấy chứng chỉ Let's Encrypt, chuyển API tới `core-api` và website tới `web`. Tên miền hiện tại là `tripflix.io.vn`, DNS quản lý ở Tenten.
 
-Trên laptop, giữ IP hiện tại làm IP tĩnh và mở cổng web:
+DNS: `tripflix.io.vn`, `www.tripflix.io.vn` và `api.tripflix.io.vn` phải có bản ghi `A` trỏ về IP của máy.
+
+Trên laptop, giữ IP hiện tại làm IP tĩnh, mở cổng web và chép code web lên máy:
 
 ```bash
 gcloud compute addresses create tripflix-staging-ip --region=asia-southeast1 --addresses=<IP>
 gcloud compute firewall-rules create tripflix-allow-web --allow=tcp:80,tcp:443 --target-tags=tripflix-web --source-ranges=0.0.0.0/0
 gcloud compute instances add-tags tripflix-staging --zone=asia-southeast1-b --tags=tripflix-web
+git -C <tripflix-fe> archive <nhánh> | gcloud compute ssh tripflix-staging --zone=asia-southeast1-b -- 'mkdir -p ~/tripflix-fe && tar -x -C ~/tripflix-fe'
 ```
 
-Trên server, đặt `API_HOST` trong `.env.server` rồi chạy:
+Trên server, điền `API_HOST`, `WEB_HOST`, `AUTH_WEB_ORIGINS`, `AUTH_PASSWORD_RESET_URL` trong `.env.server`, rồi chạy:
 
 ```bash
+dc --profile api --profile gateway build web
 dc --profile api --profile gateway up -d --wait
 dc --profile gateway logs traefik | tail
 ```
 
-Xong khi `https://<API_HOST>/api/v1/feed?limit=1` trả 200 với chứng chỉ hợp lệ, và app trên điện thoại dùng mạng di động xem được feed khi API trên laptop đã tắt.
+- Web build trên máy vì Next gắn địa chỉ API vào bundle lúc build. Đổi `API_HOST` thì phải build lại web.
+- `AUTH_WEB_ORIGINS` phải chứa địa chỉ web, nếu không trình duyệt không gọi được API.
+- Chỉ mở `/api` của API; `/health` và `/.well-known/jwks.json` chỉ dùng trong mạng nội bộ.
+- App điện thoại dùng `EXPO_PUBLIC_API_URL=https://<API_HOST>`.
+- Tường lửa cần một lúc mới có hiệu lực. Nếu log Traefik báo `Timeout during connect`, chờ một phút rồi chạy `docker restart tripflix-server-traefik-1`. Traefik tự gia hạn chứng chỉ, nên không xoá volume `letsencrypt`.
 
-Tường lửa cần một lúc mới có hiệu lực. Nếu log Traefik báo `Timeout during connect`, chờ một phút rồi chạy `docker restart tripflix-server-traefik-1` để xin lại chứng chỉ. Traefik tự gia hạn chứng chỉ, nên không xoá volume `letsencrypt`.
-
-Gateway chỉ mở `/api`; `/health` và `/.well-known/jwks.json` chỉ dùng trong mạng nội bộ. Muốn app dùng địa chỉ này thì đặt `EXPO_PUBLIC_API_URL=https://<API_HOST>` rồi khởi động lại Expo.
+Xong khi website mở được với chứng chỉ hợp lệ, đăng nhập được trên trình duyệt, và app điện thoại xem được feed khi API trên laptop đã tắt.
 
 ## Vận hành
 

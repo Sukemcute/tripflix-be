@@ -14,6 +14,12 @@ http:
         period: 1m
         burst: 10
 
+    redirect-to-apex:
+      redirectRegex:
+        regex: ^https://www\.(.+)
+        replacement: https://${1}
+        permanent: true
+
   routers:
     core-api-auth:
       rule: >-
@@ -34,8 +40,27 @@ http:
       tls:
         certResolver: letsencrypt
 
+    web:
+      rule: Host(`{{ env "WEB_HOST" }}`)
+      service: web
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+    web-www:
+      rule: Host(`www.{{ env "WEB_HOST" }}`)
+      service: web
+      entryPoints: [websecure]
+      middlewares: [redirect-to-apex]
+      tls:
+        certResolver: letsencrypt
+
   services:
     core-api:
       loadBalancer:
         servers:
           - url: http://core-api:3000
+    web:
+      loadBalancer:
+        servers:
+          - url: http://web:3100
