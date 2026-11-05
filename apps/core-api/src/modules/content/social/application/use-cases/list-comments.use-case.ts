@@ -9,6 +9,7 @@ export interface ListCommentsQuery {
   limit?: number;
   cursor?: string;
   parentCommentId?: string;
+  flat?: boolean;
 }
 
 export interface ListCommentsResult {
@@ -29,7 +30,9 @@ export class ListCommentsUseCase {
       throw new PostNotFoundException(query.postId);
     }
 
-    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    // Khi bật chế độ flat (cho AI / Indexing), cho phép trang tối đa 200 phần tử để giảm I/O
+    const maxLimit = query.flat ? 200 : 50;
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), maxLimit);
     const decoded = decodeCursor(query.cursor);
 
     const [records, total] = await Promise.all([
@@ -39,8 +42,12 @@ export class ListCommentsUseCase {
         cursorCreatedAt: decoded?.createdAt,
         cursorId: decoded?.id,
         parentCommentId: query.parentCommentId,
+        flat: query.flat,
       }),
-      this.commentRepository.countByPostId(query.postId),
+      this.commentRepository.countByPostId(query.postId, {
+        flat: query.flat,
+        parentCommentId: query.parentCommentId,
+      }),
     ]);
 
     const hasMore = records.length > limit;

@@ -14,6 +14,7 @@ import {
   BookmarksController,
   CommentsController,
   OptionalAuthGuard,
+  PostSummaryController,
   PostsController,
   ReactionsController,
 } from './social/api/index.js';
@@ -32,12 +33,14 @@ import {
   GetMyReactionUseCase,
   GetPostDetailUseCase,
   GetPostStatsUseCase,
+  GetPostSummaryUseCase,
   ListAdminPostsUseCase,
   ListBookmarksUseCase,
   ListCommentsUseCase,
   ListPostsUseCase,
   ListUserPostsUseCase,
   PublishPostUseCase,
+  SavePostSummaryUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
   UpdatePostUseCase,
@@ -51,6 +54,7 @@ import {
   ContentOutboxRelay,
   ModerationActionRepository,
   PostRepository,
+  PostSummaryRepository,
   ReactionRepository,
 } from './social/infra/index.js';
 
@@ -69,6 +73,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     CommentsController,
     BookmarksController,
     AdminPostsController,
+    PostSummaryController,
   ],
   providers: [
     // 1. Drizzle DB Client cho schema 'content' (kết nối trực tiếp khi không ở trong transaction)
@@ -103,6 +108,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       provide: ModerationActionRepository,
       inject: [buildTransactionHostToken('content')],
       useFactory: (txHost: ModuleTransactionHost) => new ModerationActionRepository(() => txHost.tx),
+    },
+    {
+      provide: PostSummaryRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new PostSummaryRepository(() => txHost.tx),
     },
 
     // 3. Transactional Outbox Writer (ghi vào content.outbox_events trong transaction đang mở)
@@ -206,16 +216,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository],
-      useFactory: (commentRepo: CommentRepository) => new EditCommentUseCase(commentRepo),
+      inject: [CommentRepository, CONTENT_OUTBOX],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox) =>
+        new EditCommentUseCase(commentRepo, outbox),
     },
     {
       provide: DeleteCommentUseCase,
-      inject: [CommentRepository, PostRepository],
+      inject: [CommentRepository, PostRepository, CONTENT_OUTBOX],
       useFactory: (
         commentRepo: CommentRepository,
         postRepo: PostRepository,
-      ) => new DeleteCommentUseCase(commentRepo, postRepo),
+        outbox: ContentOutbox,
+      ) => new DeleteCommentUseCase(commentRepo, postRepo, outbox),
     },
     {
       provide: ListCommentsUseCase,
@@ -269,6 +281,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
         postRepo: PostRepository,
         modRepo: ModerationActionRepository,
       ) => new GetAdminPostDetailUseCase(postRepo, modRepo),
+    },
+    {
+      provide: SavePostSummaryUseCase,
+      inject: [PostRepository, PostSummaryRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
+        new SavePostSummaryUseCase(postRepo, postSummaryRepo),
+    },
+    {
+      provide: GetPostSummaryUseCase,
+      inject: [PostRepository, PostSummaryRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
+        new GetPostSummaryUseCase(postRepo, postSummaryRepo),
     },
 
     // 6. Guard cho optional authentication
