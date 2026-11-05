@@ -12,6 +12,8 @@ export const envSchema = baseEnvSchema.extend({
   // Email (out-app): dev đi qua Mailpit, xem ở http://localhost:8025.
   SMTP_URL: z.string().default('smtp://localhost:1025'),
   MAIL_FROM: z.string().default('Tripflix <no-reply@tripflix.local>'),
+  // Trang web mở từ nút trong email chào mừng.
+  WEB_APP_URL: z.url().default('http://localhost:3100'),
   // Tắt khi chạy test không có Redis; mỗi replica một tên để Redis chia việc (mặc định hostname).
   NOTIFICATION_CONSUMER_ENABLED: z
     .enum(['true', 'false'])

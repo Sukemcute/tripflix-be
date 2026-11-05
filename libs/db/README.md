@@ -12,7 +12,7 @@ Pool Postgres và Drizzle theo module, và transaction theo module bằng `@Tran
 | `content` | `core` | `tf_content` | 10 |
 | `discovery` | `core` | `tf_discovery` | 5 |
 | `analytics` | `core` | `tf_analytics` | 3 |
-| `commerce` | `commerce` | `tf_commerce` | 10 |
+| `commerce` | `core` | `tf_commerce` | 10 |
 
 User của module chỉ có quyền trên schema của mình, nên query chéo schema lỗi ngay. `apps/core-api/src/platform/platform.module.ts` tạo pool, instance Drizzle (`buildDrizzleToken(module)`) và đăng ký `ClsModule` với `createTransactionalPlugins()`.
 

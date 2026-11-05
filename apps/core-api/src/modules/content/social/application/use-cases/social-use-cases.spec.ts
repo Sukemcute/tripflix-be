@@ -10,6 +10,7 @@ import {
   CreateDraftUseCase,
   DeleteCommentUseCase,
   DeletePostUseCase,
+  EditCommentUseCase,
   GetAdminPostDetailUseCase,
   GetMyReactionUseCase,
   GetPostDetailUseCase,
@@ -101,6 +102,7 @@ describe('Social Application Use Cases', () => {
       findById: vi.fn(),
       update: vi.fn(),
       softDelete: vi.fn(),
+      softDeleteWithReplies: vi.fn(),
       findByPostId: vi.fn(),
       countByPostId: vi.fn(),
     };
@@ -346,6 +348,7 @@ describe('Social Application Use Cases', () => {
         authorId: otherUserId,
         parentCommentId: null,
         body: 'Bài viết hay quá!',
+        likeCount: 0,
         isEdited: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -382,6 +385,52 @@ describe('Social Application Use Cases', () => {
       );
     });
 
+    it('từ chối bình luận vào bài viết private hoặc draft của người khác (trả về PostNotFoundException)', async () => {
+      const privatePost = samplePostRecord({ status: 'published', visibility: 'private', authorId });
+      mockPostRepo.findById.mockResolvedValue(privatePost);
+
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+
+      await expect(
+        useCase.execute({
+          postId,
+          authorId: otherUserId, // Người lạ cố tình comment vào bài private
+          body: 'Bình luận lén',
+        }),
+      ).rejects.toThrow();
+      expect(mockCommentRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('cho phép tác giả bài viết bình luận vào bài private của chính mình', async () => {
+      const privatePost = samplePostRecord({ status: 'published', visibility: 'private', authorId });
+      const commentRecord: CommentRecord = {
+        id: 'comm-own',
+        postId,
+        authorId,
+        parentCommentId: null,
+        body: 'Tác giả tự bình luận',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      mockPostRepo.findById.mockResolvedValue(privatePost);
+      mockCommentRepo.create.mockResolvedValue(commentRecord);
+
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+
+      const result = await useCase.execute({
+        postId,
+        authorId, // Chính tác giả
+        body: 'Tác giả tự bình luận',
+      });
+
+      expect(result.id).toBe('comm-own');
+      expect(mockCommentRepo.create).toHaveBeenCalled();
+    });
+
     it('từ chối bình luận khi reply vào một reply khác (chặn reply cấp 2)', async () => {
       const post = samplePostRecord({ status: 'published' });
       const parentReplyRecord: CommentRecord = {
@@ -390,6 +439,7 @@ describe('Social Application Use Cases', () => {
         authorId: otherUserId,
         parentCommentId: 'root-comment-id',
         body: 'Đây là câu trả lời',
+        likeCount: 0,
         isEdited: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -415,13 +465,65 @@ describe('Social Application Use Cases', () => {
       ).rejects.toThrow(/Chỉ hỗ trợ phản hồi bình luận 1 cấp/);
     });
 
-    it('xóa bình luận giảm commentCount của bài viết', async () => {
+    it('sửa bình luận cập nhật nội dung và phát sự kiện outbox content.comment.updated', async () => {
+      const commentRecord: CommentRecord = {
+        id: 'comm-1',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: null,
+        body: 'Nội dung ban đầu',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      const updatedRecord: CommentRecord = {
+        ...commentRecord,
+        body: 'Nội dung sau khi sửa',
+        isEdited: true,
+        updatedAt: new Date(),
+      };
+
+      mockCommentRepo.findById.mockResolvedValue(commentRecord);
+      mockCommentRepo.update.mockResolvedValue(updatedRecord);
+
+      const useCase = new EditCommentUseCase(mockCommentRepo, mockOutbox);
+      const result = await useCase.execute({
+        commentId: 'comm-1',
+        userId: otherUserId,
+        body: 'Nội dung sau khi sửa',
+      });
+
+      expect(result.body).toBe('Nội dung sau khi sửa');
+      expect(result.isEdited).toBe(true);
+      expect(mockCommentRepo.update).toHaveBeenCalledWith('comm-1', {
+        body: 'Nội dung sau khi sửa',
+        isEdited: true,
+      });
+      expect(mockOutbox.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'content.comment.updated',
+          userId: otherUserId,
+          payload: expect.objectContaining({
+            commentId: 'comm-1',
+            postId,
+            authorId: otherUserId,
+            body: 'Nội dung sau khi sửa',
+          }),
+        }),
+      );
+    });
+
+    it('xóa bình luận giảm commentCount của bài viết và phát sự kiện outbox content.comment.deleted', async () => {
       const commentRecord: CommentRecord = {
         id: 'comm-1',
         postId,
         authorId: otherUserId,
         parentCommentId: null,
         body: 'Bình luận sắp xóa',
+        likeCount: 0,
         isEdited: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -429,14 +531,107 @@ describe('Social Application Use Cases', () => {
       };
 
       mockCommentRepo.findById.mockResolvedValue(commentRecord);
-      mockCommentRepo.softDelete.mockResolvedValue(undefined);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([commentRecord]);
 
-      const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo);
+      const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
       const result = await useCase.execute({ commentId: 'comm-1', userId: otherUserId });
 
       expect(result.deleted).toBe(true);
-      expect(mockCommentRepo.softDelete).toHaveBeenCalledWith('comm-1');
+      expect(mockCommentRepo.softDeleteWithReplies).toHaveBeenCalledWith('comm-1');
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', -1);
+      expect(mockOutbox.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'content.comment.deleted',
+          userId: otherUserId,
+          payload: expect.objectContaining({
+            commentId: 'comm-1',
+            postId,
+            authorId: otherUserId,
+            deletedBy: otherUserId,
+            isSuperAdmin: false,
+          }),
+        }),
+      );
+    });
+
+    it('xóa bình luận gốc cascade xóa các reply con và giảm commentCount đúng tổng số dòng bị xóa', async () => {
+      const rootCommentRecord: CommentRecord = {
+        id: 'comm-root',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: null,
+        body: 'Bình luận gốc có phản hồi',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      const childReply1: CommentRecord = {
+        id: 'reply-1',
+        postId,
+        authorId: authorId,
+        parentCommentId: 'comm-root',
+        body: 'Phản hồi 1',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      const childReply2: CommentRecord = {
+        id: 'reply-2',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: 'comm-root',
+        body: 'Phản hồi 2',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      mockCommentRepo.findById.mockResolvedValue(rootCommentRecord);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([
+        rootCommentRecord,
+        childReply1,
+        childReply2,
+      ]);
+
+      const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
+      const result = await useCase.execute({ commentId: 'comm-root', userId: otherUserId });
+
+      expect(result.deleted).toBe(true);
+      expect(mockCommentRepo.softDeleteWithReplies).toHaveBeenCalledWith('comm-root');
+      expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', -3);
+      expect(mockOutbox.add).toHaveBeenCalledTimes(3);
+    });
+
+    it('ném CommentNotFoundException khi xóa comment đã bị xóa hoặc không khớp (softDeleteWithReplies trả rỗng)', async () => {
+      const commentRecord: CommentRecord = {
+        id: 'comm-race',
+        postId,
+        authorId: otherUserId,
+        parentCommentId: null,
+        body: 'Bình luận sắp xóa',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      mockCommentRepo.findById.mockResolvedValue(commentRecord);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([]); // Đua lệnh: request khác đã xóa trước
+
+      const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
+      await expect(
+        useCase.execute({ commentId: 'comm-race', userId: otherUserId }),
+      ).rejects.toThrow();
+      expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
     });
   });
 

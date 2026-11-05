@@ -1,5 +1,5 @@
 import { Transactional } from '@tripflix/db';
-import { Comment, PostNotFoundException } from '../../domain/index.js';
+import { Comment, CommentNotFoundException, Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
@@ -22,20 +22,23 @@ export class AddCommentUseCase {
   @Transactional('content')
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
     const post = await this.postRepository.findById(command.postId);
-    if (!post || post.status === 'deleted' || post.status === 'hidden') {
+    if (!post) {
       throw new PostNotFoundException(command.postId);
     }
 
-    const body = command.body.trim();
-    if (!body) {
-      throw new Error('Nội dung bình luận không được để trống');
+    // Người dùng chỉ có thể bình luận vào bài viết mà mình có quyền xem (chặn draft, private, removed, hidden)
+    const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+    if (!domainPost.canBeViewedBy(command.authorId)) {
+      throw new PostNotFoundException(command.postId);
     }
+
+    const body = Comment.validateBody(command.body);
 
     // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
     if (command.parentCommentId) {
       const parent = await this.commentRepository.findById(command.parentCommentId);
-      if (!parent || parent.postId !== command.postId) {
-        throw new Error('Bình luận gốc không hợp lệ hoặc đã bị xóa');
+      if (!parent || parent.postId !== command.postId || parent.deletedAt) {
+        throw new CommentNotFoundException(command.parentCommentId);
       }
       Comment.validateParentForReply(parent);
     }

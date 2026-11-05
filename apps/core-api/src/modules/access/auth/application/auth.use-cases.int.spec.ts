@@ -27,6 +27,7 @@ import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
   CLOCK,
+  GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
   TOKEN_ISSUER,
@@ -81,6 +82,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
         { provide: LOGIN_RATE_LIMITER, useValue: new MemoryLoginRateLimiter() },
         { provide: ACCESS_SID_BLOCKLIST, useValue: new MemorySidBlocklist() },
         { provide: CLOCK, useValue: () => new Date() },
+        { provide: GOOGLE_VERIFIER, useValue: { verify: async () => Promise.reject(new Error('không dùng trong test này')) } },
       ],
     }).compile();
     await moduleRef.init();
@@ -114,7 +116,8 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
     const user = await auth.register({ email: 'commit@example.com', password: 'mat-khau-1', displayName: 'commit@example.com' }, meta);
     expect(user.email).toBe('commit@example.com');
     expect(await countRows('users', 'commit@example.com')).toBe(1);
-    expect(await countRows('outbox_events', 'commit@example.com')).toBe(1);
+    // access.user.registered và access.user.welcome_email_requested, cùng commit với user.
+    expect(await countRows('outbox_events', 'commit@example.com')).toBe(2);
   });
 
   it('ghi outbox lỗi thì rollback cả user: không có người dùng nửa vời', async () => {
@@ -152,7 +155,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
     await auth.register({ email: 'unsent@example.com', password: 'mat-khau-1', displayName: 'unsent@example.com' }, meta);
     expect(await deletePublishedBefore(db, accessOutboxEvents, new Date(Date.now() - 60_000))).toBe(0);
     expect(await deletePublishedBefore(db, accessOutboxEvents, new Date(Date.now() + 60_000))).toBeGreaterThanOrEqual(1);
-    // Sự kiện chưa gửi vẫn còn.
-    expect(await countRows('outbox_events', 'unsent@example.com')).toBe(1);
+    // Sự kiện chưa gửi vẫn còn (registered và welcome_email_requested).
+    expect(await countRows('outbox_events', 'unsent@example.com')).toBe(2);
   });
 });

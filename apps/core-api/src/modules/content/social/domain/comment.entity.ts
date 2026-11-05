@@ -1,4 +1,5 @@
 import {
+  InvalidCommentBodyException,
   InvalidCommentNestingException,
   UnauthorizedCommentActionException,
 } from './errors.js';
@@ -9,6 +10,7 @@ export interface CommentProps {
   authorId: string;
   parentCommentId?: string | null;
   body: string;
+  likeCount?: number;
   isEdited: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -30,10 +32,25 @@ export class Comment {
   get authorId(): string { return this.props.authorId; }
   get parentCommentId(): string | null | undefined { return this.props.parentCommentId; }
   get body(): string { return this.props.body; }
+  get likeCount(): number { return this.props.likeCount ?? 0; }
   get isEdited(): boolean { return this.props.isEdited; }
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
   get deletedAt(): Date | null | undefined { return this.props.deletedAt; }
+
+  static readonly MAX_BODY_LENGTH = 2_000;
+
+  /** Kiểm tra tính hợp lệ và độ dài nội dung bình luận (1 - 2.000 ký tự) */
+  static validateBody(body: string): string {
+    const trimmed = (body ?? '').trim();
+    if (!trimmed) {
+      throw new InvalidCommentBodyException('Nội dung bình luận không được để trống');
+    }
+    if (trimmed.length > Comment.MAX_BODY_LENGTH) {
+      throw new InvalidCommentBodyException(`Nội dung bình luận không được vượt quá ${Comment.MAX_BODY_LENGTH.toLocaleString()} ký tự`);
+    }
+    return trimmed;
+  }
 
   /** Kiểm tra tính hợp lệ khi làm reply (chỉ cho phép 1 cấp, không được lồng cấp 2) */
   static validateParentForReply(parent: { parentCommentId?: string | null }): void {
@@ -50,11 +67,7 @@ export class Comment {
     if (!this.isOwnedBy(userId)) {
       throw new UnauthorizedCommentActionException('chỉnh sửa', this.id);
     }
-    const trimmed = newBody.trim();
-    if (!trimmed) {
-      throw new Error('Nội dung bình luận không được để trống');
-    }
-    this.props.body = trimmed;
+    this.props.body = Comment.validateBody(newBody);
     this.props.isEdited = true;
     this.props.updatedAt = new Date();
   }

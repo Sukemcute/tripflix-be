@@ -1,7 +1,7 @@
 # Module `commerce`
 
 - Chủ: Thắng (backup Bảo)
-- Database: `commerce`, schema `commerce`, user Postgres `tf_commerce`
+- Database: `core`, schema `commerce`, user Postgres `tf_commerce`
 - Bảng chính dự kiến: `properties`, `room_types`, `room_inventory`, `room_rates`, `flights`, `flight_inventory`, `orders`, `order_items`, `payments`, `refunds`
 
 ## Phần con
@@ -10,7 +10,7 @@
 - booking: đơn, giữ chỗ 30 phút, job hết hạn mỗi phút
 - payment: cổng giả lập, đối soát, hoàn huỷ
 
-Database riêng `commerce`. Không module nào kết nối thẳng database này; module khác gọi qua `CommerceModule` export trong `index.ts`.
+Schema `commerce` trong database `core` (từ 05/11, trước đó là database riêng). User `tf_commerce` chỉ có quyền trên schema này, module khác không đọc được bảng của commerce; module khác gọi qua `CommerceModule` export trong `index.ts`.
 
 ## Khuôn thư mục
 

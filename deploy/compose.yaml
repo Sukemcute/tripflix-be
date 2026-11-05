@@ -10,7 +10,7 @@ x-be-env: &be-env
   DATABASE_URL_CONTENT: postgres://tf_content:tf_content_dev@postgres:5432/core
   DATABASE_URL_DISCOVERY: postgres://tf_discovery:tf_discovery_dev@postgres:5432/core
   DATABASE_URL_ANALYTICS: postgres://tf_analytics:tf_analytics_dev@postgres:5432/core
-  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/commerce
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/core
   DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
   # Access token: core-api ký (bỏ trống khoá ở dev thì tự sinh khoá tạm), service khác kiểm qua JWKS.
   AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
@@ -19,6 +19,7 @@ x-be-env: &be-env
   # Web (3100), admin (3200) gọi API qua gateway :8080 từ trình duyệt: CORS và cookie refresh token.
   AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100,http://localhost:3200}
   AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
   JWKS_URL: http://core-api:3000/.well-known/jwks.json
   # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.
   SEED_PASSWORD: ${SEED_PASSWORD:-tripflix-dev-123}
@@ -102,6 +103,7 @@ services:
       PORT: 3001
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: Tripflix <no-reply@tripflix.local>
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3100}
     ports: ['3001:3001']
     depends_on:
       migrate: { condition: service_completed_successfully }

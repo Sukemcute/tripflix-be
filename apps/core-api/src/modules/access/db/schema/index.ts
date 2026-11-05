@@ -1,6 +1,6 @@
 import { createOutboxTable } from '@tripflix/outbox';
 import { sql } from 'drizzle-orm';
-import { bigint, check, foreignKey, index, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, check, foreignKey, index, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** Mọi bảng của module access khai báo trong schema này. */
 export const accessSchema = pgSchema('access');
@@ -15,7 +15,8 @@ export const users = accessSchema.table(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull().unique('uq_users_email'),
-    passwordHash: text('password_hash').notNull(),
+    // Trống với tài khoản chỉ đăng nhập bằng Google (TF059); đăng nhập bằng mật khẩu vào tài khoản này luôn lỗi chung.
+    passwordHash: text('password_hash'),
     displayName: text('display_name').notNull(),
     role: text('role').notNull().default('member'),
     status: text('status').notNull().default('active'),
@@ -71,6 +72,24 @@ export const auditLogs = accessSchema.table(
     createdAt: createdAtColumn(),
   },
   (t) => [index('idx_audit_logs_actor_user_id_created_at').on(t.actorUserId, t.createdAt)],
+);
+
+/** Tài khoản đăng nhập ngoài (Google). (provider, subject) là mã của người dùng bên đó, không đổi khi đổi email. */
+export const userIdentities = accessSchema.table(
+  'user_identities',
+  {
+    provider: text('provider').notNull(),
+    subject: text('subject').notNull(),
+    userId: uuid('user_id').notNull(),
+    email: text('email').notNull(),
+    createdAt: createdAtColumn(),
+  },
+  (t) => [
+    primaryKey({ name: 'pk_user_identities', columns: [t.provider, t.subject] }),
+    foreignKey({ name: 'fk_user_identities_user_id', columns: [t.userId], foreignColumns: [users.id] }).onDelete('cascade'),
+    index('idx_user_identities_user_id').on(t.userId),
+    check('ck_user_identities_provider', sql`${t.provider} in ('google')`),
+  ],
 );
 
 /**

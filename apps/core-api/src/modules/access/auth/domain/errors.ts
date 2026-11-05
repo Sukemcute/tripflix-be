@@ -10,7 +10,9 @@ export class AccessError extends Error {
       | 'not_found'
       | 'staff_rule'
       | 'wrong_password'
-      | 'invalid_reset_token',
+      | 'invalid_reset_token'
+      | 'google_invalid'
+      | 'google_not_configured',
     message: string,
     readonly retryAfterSeconds?: number,
   ) {

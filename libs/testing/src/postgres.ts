@@ -13,17 +13,16 @@ export type DatabaseUser = ModuleName | 'notification';
 export interface PostgresFixture {
   container: StartedPostgreSqlContainer;
   /** Kết nối superuser postgres tới database chỉ định; chỉ dùng để chuẩn bị hoặc kiểm dữ liệu trong test. */
-  buildAdminUrl(database: 'core' | 'commerce' | 'notification'): string;
+  buildAdminUrl(database: 'core' | 'notification'): string;
   /** Kết nối bằng user của module (tf_<module>), chỉ có quyền trên schema của module đó. */
   buildModuleUrl(module: DatabaseUser): string;
   stop(): Promise<void>;
 }
 
-const databaseOf = (module: DatabaseUser) =>
-  module === 'commerce' ? 'commerce' : module === 'notification' ? 'notification' : 'core';
+const databaseOf = (module: DatabaseUser) => (module === 'notification' ? 'notification' : 'core');
 
 /**
- * Bật Postgres thật trong Docker và chạy deploy/postgres/init/*.sql: 3 database, user và schema theo module,
+ * Bật Postgres thật trong Docker và chạy deploy/postgres/init/*.sql: 2 database (`core` gồm 5 schema module, `notification`), user và schema theo module,
  * extension. Mật khẩu user module giống bản dev (tf_<module>_dev).
  */
 export async function startPostgres(): Promise<PostgresFixture> {

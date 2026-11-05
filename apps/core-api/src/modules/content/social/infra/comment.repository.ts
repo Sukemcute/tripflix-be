@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   comments,
@@ -11,6 +11,12 @@ export interface FindCommentsOptions {
   limit: number;
   cursorCreatedAt?: Date;
   cursorId?: string;
+  parentCommentId?: string;
+  flat?: boolean;
+}
+
+export interface CountCommentsOptions {
+  flat?: boolean;
   parentCommentId?: string;
 }
 
@@ -60,7 +66,72 @@ export class CommentRepository {
   }
 
   /**
+   * Xóa mềm bình luận gốc cùng tất cả các phản hồi con (nếu có) trong cùng một thao tác.
+   * Chỉ cập nhật những bản ghi có deletedAt IS NULL.
+   * Trả về danh sách tất cả bản ghi vừa bị soft-delete để use case cập nhật counter và phát outbox events.
+   */
+  async softDeleteWithReplies(id: string): Promise<CommentRecord[]> {
+    const now = new Date();
+    const deletedRecords = await this.db
+      .update(comments)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          or(eq(comments.id, id), eq(comments.parentCommentId, id)),
+          isNull(comments.deletedAt),
+        ),
+      )
+      .returning();
+
+    return deletedRecords;
+  }
+
+  /**
+   * Cập nhật số lượt thích của bình luận (Atomic counter với SQL GREATEST).
+   * Không cập nhật updatedAt để tránh làm sai lệch cờ isStale của bản tóm tắt AI.
+   */
+  async incrementLikeCount(id: string, delta: number): Promise<number> {
+    const [updated] = await this.db
+      .update(comments)
+      .set({
+        likeCount: sql<number>`GREATEST(${comments.likeCount} + ${delta}, 0)`,
+      })
+      .where(eq(comments.id, id))
+      .returning({ likeCount: comments.likeCount });
+    return updated?.likeCount ?? 0;
+  }
+
+  /**
+   * Kiểm tra xem thảo luận có thay đổi (có bình luận mới hoặc bình luận được sửa nội dung)
+   * kể từ thời điểm `since` (thời điểm sinh tóm tắt AI).
+   * Lượt thả tim không làm kích hoạt cờ này vì không làm thay đổi updatedAt của comment.
+   */
+  async hasDiscussionChangedSince(postId: string, since: Date): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postId, postId),
+          isNull(comments.deletedAt),
+          or(
+            gt(comments.createdAt, since),
+            and(eq(comments.isEdited, true), gt(comments.updatedAt, since)),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(row);
+  }
+
+  /**
    * Lấy danh sách bình luận theo bài đăng với Keyset Cursor Pagination.
+   * Nếu options.flat = true: trả về mọi cấp bình luận (cả gốc và phản hồi),
+   * mỗi phần tử có sẵn parentCommentId phục vụ AI tóm tắt hoặc xây dựng cây bình luận.
    */
   async findByPostId(options: FindCommentsOptions): Promise<CommentRecord[]> {
     const conditions = [
@@ -68,10 +139,12 @@ export class CommentRepository {
       isNull(comments.deletedAt),
     ];
 
-    if (options.parentCommentId) {
-      conditions.push(eq(comments.parentCommentId, options.parentCommentId));
-    } else {
-      conditions.push(isNull(comments.parentCommentId));
+    if (!options.flat) {
+      if (options.parentCommentId) {
+        conditions.push(eq(comments.parentCommentId, options.parentCommentId));
+      } else {
+        conditions.push(isNull(comments.parentCommentId));
+      }
     }
 
     if (options.cursorCreatedAt && options.cursorId) {
@@ -91,11 +164,30 @@ export class CommentRepository {
       .limit(options.limit);
   }
 
-  async countByPostId(postId: string): Promise<number> {
+  /**
+   * Đếm số lượng bình luận phù hợp theo điều kiện phân trang.
+   * - flat = true: đếm toàn bộ bình luận của bài (gốc + phản hồi).
+   * - parentCommentId: đếm số phản hồi con của bình luận cha.
+   * - Mặc định: đếm số bình luận gốc (parentCommentId IS NULL).
+   */
+  async countByPostId(postId: string, options?: CountCommentsOptions): Promise<number> {
+    const conditions = [
+      eq(comments.postId, postId),
+      isNull(comments.deletedAt),
+    ];
+
+    if (!options?.flat) {
+      if (options?.parentCommentId) {
+        conditions.push(eq(comments.parentCommentId, options.parentCommentId));
+      } else {
+        conditions.push(isNull(comments.parentCommentId));
+      }
+    }
+
     const [result] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(comments)
-      .where(and(eq(comments.postId, postId), isNull(comments.deletedAt)));
+      .where(and(...conditions));
     return result?.count ?? 0;
   }
 }

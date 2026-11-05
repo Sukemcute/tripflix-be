@@ -29,10 +29,21 @@ describe('ContentOutboxRelay', () => {
 
     expect(streamFn({ type: 'media.asset_uploaded' } as any)).toBe(STREAMS.media);
     expect(streamFn({ type: 'media.transcode_completed' } as any)).toBe(STREAMS.media);
+    expect(streamFn({ type: 'content.media.transcode_requested' } as any)).toBe(STREAMS.media);
     expect(streamFn({ type: 'content.post.published' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.post.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.comment.created' } as any)).toBe(STREAMS.content);
+    expect(streamFn({ type: 'content.comment.updated' } as any)).toBe(STREAMS.content);
+    expect(streamFn({ type: 'content.comment.deleted' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.reaction.updated' } as any)).toBe(STREAMS.content);
+
+    // Báo lỗi nếu gặp loại sự kiện lạ không thuộc content outbox (theo yêu cầu anh Dũng)
+    expect(() => streamFn({ type: 'access.user.registered' } as any)).toThrow(
+      'Loại sự kiện không hợp lệ cho content outbox relay: access.user.registered',
+    );
+    expect(() => streamFn({ type: 'unknown.custom_event' } as any)).toThrow(
+      'Loại sự kiện không hợp lệ cho content outbox relay: unknown.custom_event',
+    );
 
     await relay.onApplicationShutdown();
   });

@@ -7,12 +7,14 @@ import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
+import { FeedModule } from './feed/feed.module.js';
 import { MediaModule } from './media/media.module.js';
 import {
   AdminPostsController,
   BookmarksController,
   CommentsController,
   OptionalAuthGuard,
+  PostSummaryController,
   PostsController,
   ReactionsController,
 } from './social/api/index.js';
@@ -31,12 +33,15 @@ import {
   GetMyReactionUseCase,
   GetPostDetailUseCase,
   GetPostStatsUseCase,
+  GetPostSummaryUseCase,
   ListAdminPostsUseCase,
   ListBookmarksUseCase,
   ListCommentsUseCase,
   ListPostsUseCase,
   ListUserPostsUseCase,
   PublishPostUseCase,
+  SavePostSummaryUseCase,
+  SetCommentReactionUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
   UpdatePostUseCase,
@@ -46,10 +51,12 @@ import {
 } from './social/application/index.js';
 import {
   BookmarkRepository,
+  CommentReactionRepository,
   CommentRepository,
   ContentOutboxRelay,
   ModerationActionRepository,
   PostRepository,
+  PostSummaryRepository,
   ReactionRepository,
 } from './social/infra/index.js';
 
@@ -61,13 +68,14 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, FeedModule],
   controllers: [
     PostsController,
     ReactionsController,
     CommentsController,
     BookmarksController,
     AdminPostsController,
+    PostSummaryController,
   ],
   providers: [
     // 1. Drizzle DB Client cho schema 'content' (kết nối trực tiếp khi không ở trong transaction)
@@ -89,6 +97,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       useFactory: (txHost: ModuleTransactionHost) => new CommentRepository(() => txHost.tx),
     },
     {
+      provide: CommentReactionRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new CommentReactionRepository(() => txHost.tx),
+    },
+    {
       provide: ReactionRepository,
       inject: [buildTransactionHostToken('content')],
       useFactory: (txHost: ModuleTransactionHost) => new ReactionRepository(() => txHost.tx),
@@ -102,6 +115,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       provide: ModerationActionRepository,
       inject: [buildTransactionHostToken('content')],
       useFactory: (txHost: ModuleTransactionHost) => new ModerationActionRepository(() => txHost.tx),
+    },
+    {
+      provide: PostSummaryRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new PostSummaryRepository(() => txHost.tx),
     },
 
     // 3. Transactional Outbox Writer (ghi vào content.outbox_events trong transaction đang mở)
@@ -205,22 +223,36 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository],
-      useFactory: (commentRepo: CommentRepository) => new EditCommentUseCase(commentRepo),
+      inject: [CommentRepository, CONTENT_OUTBOX],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox) =>
+        new EditCommentUseCase(commentRepo, outbox),
     },
     {
       provide: DeleteCommentUseCase,
-      inject: [CommentRepository, PostRepository],
+      inject: [CommentRepository, PostRepository, CONTENT_OUTBOX],
       useFactory: (
         commentRepo: CommentRepository,
         postRepo: PostRepository,
-      ) => new DeleteCommentUseCase(commentRepo, postRepo),
+        outbox: ContentOutbox,
+      ) => new DeleteCommentUseCase(commentRepo, postRepo, outbox),
     },
     {
       provide: ListCommentsUseCase,
-      inject: [PostRepository, CommentRepository],
-      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository) =>
-        new ListCommentsUseCase(postRepo, commentRepo),
+      inject: [PostRepository, CommentRepository, CommentReactionRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        commentRepo: CommentRepository,
+        commentReactionRepo: CommentReactionRepository,
+      ) => new ListCommentsUseCase(postRepo, commentRepo, commentReactionRepo),
+    },
+    {
+      provide: SetCommentReactionUseCase,
+      inject: [CommentRepository, CommentReactionRepository, CONTENT_OUTBOX],
+      useFactory: (
+        commentRepo: CommentRepository,
+        commentReactionRepo: CommentReactionRepository,
+        outbox: ContentOutbox,
+      ) => new SetCommentReactionUseCase(commentRepo, commentReactionRepo, outbox),
     },
     {
       provide: BookmarkPostUseCase,
@@ -269,6 +301,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
         modRepo: ModerationActionRepository,
       ) => new GetAdminPostDetailUseCase(postRepo, modRepo),
     },
+    {
+      provide: SavePostSummaryUseCase,
+      inject: [PostRepository, PostSummaryRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
+        new SavePostSummaryUseCase(postRepo, postSummaryRepo),
+    },
+    {
+      provide: GetPostSummaryUseCase,
+      inject: [PostRepository, PostSummaryRepository, CommentRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository, commentRepo: CommentRepository) =>
+        new GetPostSummaryUseCase(postRepo, postSummaryRepo, commentRepo),
+    },
 
     // 6. Guard cho optional authentication
     OptionalAuthGuard,
@@ -279,6 +323,6 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     // 8. Facade cho các module khác
     ContentFacade,
   ],
-  exports: [ContentFacade],
+  exports: [ContentFacade, MediaModule],
 })
 export class ContentModule {}

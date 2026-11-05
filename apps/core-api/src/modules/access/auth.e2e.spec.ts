@@ -93,9 +93,10 @@ describe('access E2E', () => {
     expect(reg.body).toMatchObject({ email: 'khang@example.com', role: 'member' });
     expect(reg.body).not.toHaveProperty('passwordHash');
     expect(store.userRows.get(reg.body.id)!.passwordHash).toMatch(/^\$argon2id\$/);
-    // Đăng ký ghi đúng một sự kiện vào outbox, payload không có email.
+    // Đăng ký ghi đúng 2 sự kiện: access.user.registered (cho mọi module, không có email) và yêu cầu gửi email
+    // chào mừng (chỉ notification-service dùng, có email vì cần người nhận).
     const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
-    expect(events).toHaveLength(1);
+    expect(events.map((e) => e.type)).toEqual(['access.user.registered', 'access.user.welcome_email_requested']);
     expect(events[0]).toMatchObject({
       type: 'access.user.registered',
       version: 1,
@@ -103,6 +104,7 @@ describe('access E2E', () => {
       payload: { userId: reg.body.id, displayName: 'Khang' },
     });
     expect(JSON.stringify(events[0]!.payload)).not.toContain('@');
+    expect(events[1]!.payload).toEqual({ userId: reg.body.id, email: 'khang@example.com', displayName: 'Khang', provider: 'password' });
 
     const login = await http().post('/api/auth/login').send({ email: 'khang@example.com', password: PASSWORD }).expect(200);
     expect(login.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });

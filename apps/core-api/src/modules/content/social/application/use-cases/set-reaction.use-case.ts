@@ -27,7 +27,10 @@ export class SetReactionUseCase {
 
   @Transactional('content')
   async execute(command: SetReactionCommand): Promise<SetReactionResult> {
-    const post = await this.postRepository.findById(command.postId);
+    // Khóa bi quan hàng post để tuần tự hóa các lượt reaction đồng thời, loại bỏ triệt để lost update
+    const post = this.postRepository.findByIdForUpdate
+      ? await this.postRepository.findByIdForUpdate(command.postId)
+      : await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted') {
       throw new PostNotFoundException(command.postId);
     }

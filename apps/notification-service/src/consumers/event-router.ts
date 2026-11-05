@@ -1,7 +1,15 @@
-import { AccessPasswordResetRequestedV1Schema, type EventEnvelope } from '@tripflix/contracts';
+import {
+  AccessPasswordResetRequestedV1Schema,
+  AccessUserWelcomeEmailRequestedV1Schema,
+  type EventEnvelope,
+} from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
 import type { Mailer } from '../outapp/mailer.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
+import { buildWelcomeEmail } from '../outapp/welcome.email.js';
+
+/** Trang web mở từ nút "Khám phá ngay" trong email chào mừng khi chưa cấu hình WEB_APP_URL. */
+export const DEFAULT_WEB_APP_URL = 'http://localhost:3100';
 
 /** Đánh dấu sự kiện đã xử lý để không gửi trùng (Redis Streams giao ít nhất một lần). */
 export interface ProcessedEvents {
@@ -46,6 +54,7 @@ export class EventRouter {
     private readonly mailer: Mailer,
     private readonly processed: ProcessedEvents,
     private readonly log: (message: string, event: EventEnvelope) => void,
+    private readonly links: { webAppUrl: string } = { webAppUrl: DEFAULT_WEB_APP_URL },
   ) {}
 
   async route(event: EventEnvelope): Promise<RouteResult> {
@@ -54,6 +63,10 @@ export class EventRouter {
     if (event.type === 'access.password_reset_requested') {
       const payload = AccessPasswordResetRequestedV1Schema.parse(event.payload);
       await this.mailer.send(buildPasswordResetEmail(payload));
+      result = 'handled';
+    } else if (event.type === 'access.user.welcome_email_requested') {
+      const payload = AccessUserWelcomeEmailRequestedV1Schema.parse(event.payload);
+      await this.mailer.send(buildWelcomeEmail(payload, this.links.webAppUrl));
       result = 'handled';
     }
     this.log(result === 'handled' ? 'Đã xử lý sự kiện' : 'Đã nhận sự kiện', event);

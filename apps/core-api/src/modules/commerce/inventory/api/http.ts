@@ -1,4 +1,4 @@
-import { type ArgumentsHost, BadRequestException, Catch, ConflictException, type ExceptionFilter, type HttpException, NotFoundException, type PipeTransform } from '@nestjs/common';
+import { type ArgumentsHost, BadRequestException, Catch, ConflictException, type ExceptionFilter, HttpException, HttpStatus, NotFoundException, type PipeTransform } from '@nestjs/common';
 import type { Response } from 'express';
 import type { z } from 'zod';
 import { CommerceError } from '../domain/errors.js';
@@ -31,9 +31,25 @@ export class CommerceErrorFilter implements ExceptionFilter {
       case 'conflict':
         http = new ConflictException({ message: err.message, errors, ...err.details });
         break;
+      case 'gone':
+        http = new HttpException({ statusCode: HttpStatus.GONE, message: err.message, error: 'Gone' }, HttpStatus.GONE);
+        break;
+      case 'rate_limited':
+        http = new HttpException({ statusCode: HttpStatus.TOO_MANY_REQUESTS, message: err.message, error: 'Too Many Requests' }, HttpStatus.TOO_MANY_REQUESTS);
+        break;
+      case 'payment_failed':
+        http = new HttpException({ statusCode: HttpStatus.PAYMENT_REQUIRED, message: err.message, errors, ...err.details }, HttpStatus.PAYMENT_REQUIRED);
+        break;
       default:
         http = new BadRequestException({ message: err.message, errors });
     }
     res.status(http.getStatus()).json(http.getResponse());
   }
 }
+
+/** Khai báo header Idempotency-Key cho Swagger / OpenAPI (libs/idempotency đọc header này). */
+export const IDEMPOTENCY_KEY_HEADER = {
+  name: 'Idempotency-Key',
+  required: true,
+  description: 'Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần',
+};

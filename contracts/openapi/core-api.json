@@ -93,6 +93,59 @@
         ]
       }
     },
+    "/api/auth/google": {
+      "post": {
+        "operationId": "AuthController_loginWithGoogle",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Đăng nhập bằng Google không thành công"
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          },
+          "503": {
+            "description": "Đăng nhập bằng Google chưa được bật"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -691,7 +744,14 @@
         },
         "responses": {
           "201": {
-            "description": "Bản nháp đã được tạo thành công"
+            "description": "Bản nháp đã được tạo thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -769,7 +829,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng kèm next_cursor"
+            "description": "Danh sách bài đăng kèm nextCursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)",
@@ -819,7 +886,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài của người dùng"
+            "description": "Danh sách bài của người dùng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -848,7 +922,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Chi tiết bài đăng kèm lộ trình đã ẩn PII và context"
+            "description": "Chi tiết bài đăng kèm lộ trình đã ẩn PII và context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDetailDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy chi tiết bài đăng theo quyền người xem (FR3, FR4, FR12)",
@@ -880,7 +961,14 @@
         },
         "responses": {
           "200": {
-            "description": "Bài đăng sau khi cập nhật"
+            "description": "Bài đăng sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -907,7 +995,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Xóa bài thành công"
+            "description": "Xóa bài thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedSocialItemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -936,7 +1031,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Bài đăng đã được xuất bản (kèm share_url và dấu xác thực)"
+            "description": "Bài đăng đã được xuất bản (kèm shareUrl và dấu xác thực)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Bài đăng đã được xuất bản",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -965,7 +1077,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Đã ghi nhận chia sẻ và trả về share_url"
+            "description": "Đã ghi nhận chia sẻ và trả về shareUrl",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedPostDto"
+                }
+              }
+            }
           }
         },
         "summary": "Ghi nhận lượt chia sẻ bài viết (FR12)",
@@ -999,7 +1118,14 @@
         },
         "responses": {
           "200": {
-            "description": "Cập nhật cảm xúc thành công"
+            "description": "Cập nhật cảm xúc thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedPostReactionDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1026,7 +1152,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Cảm xúc hiện tại của user"
+            "description": "Cảm xúc hiện tại của user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostReactionDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1055,7 +1188,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Thống kê tương tác thời gian thực"
+            "description": "Thống kê tương tác thời gian thực",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostStatsDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy tổng số cảm xúc, bình luận, chia sẻ, lưu (FR10)",
@@ -1089,7 +1229,14 @@
         },
         "responses": {
           "201": {
-            "description": "Bình luận được tạo thành công"
+            "description": "Bình luận được tạo thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1117,7 +1264,7 @@
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Số lượng bình luận",
+            "description": "Số lượng bình luận (mặc định tối đa 50, chế độ phẳng tối đa 200)",
             "schema": {
               "default": 20,
               "type": "number"
@@ -1140,14 +1287,77 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "flat",
+            "required": false,
+            "in": "query",
+            "description": "Chế độ trả phẳng toàn bộ bình luận và phản hồi mọi cấp (dành cho AI / Indexing)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bình luận kèm phân trang cursor"
+            "description": "Danh sách bình luận kèm phân trang cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Lấy danh sách bình luận của bài đăng (FR11)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
+    "/api/v1/comments/{commentId}/reaction": {
+      "put": {
+        "operationId": "CommentsController_setCommentReaction",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommentReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cập nhật trạng thái thả tim thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedCommentReactionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thả tim hoặc hủy thả tim cho bình luận (FR11 - Idempotent)",
         "tags": [
           "Social - Comments"
         ]
@@ -1178,7 +1388,14 @@
         },
         "responses": {
           "200": {
-            "description": "Bình luận sau khi cập nhật"
+            "description": "Bình luận sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialCommentDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1205,7 +1422,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Bình luận đã được xóa thành công"
+            "description": "Bình luận đã được xóa thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedSocialItemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1244,7 +1468,14 @@
         },
         "responses": {
           "200": {
-            "description": "Trạng thái lưu bài sau khi cập nhật"
+            "description": "Trạng thái lưu bài sau khi cập nhật",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedBookmarkDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1284,7 +1515,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng đã bookmark"
+            "description": "Danh sách bài đăng đã bookmark",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1349,7 +1587,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Danh sách bài đăng và tổng số"
+            "description": "Danh sách bài đăng và tổng số",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSocialPostPageDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1378,7 +1623,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Chi tiết bài đăng và lịch sử kiểm duyệt"
+            "description": "Chi tiết bài đăng và lịch sử kiểm duyệt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSocialPostDetailDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1417,7 +1669,14 @@
         },
         "responses": {
           "201": {
-            "description": "Ghi nhận hành động kiểm duyệt thành công"
+            "description": "Ghi nhận hành động kiểm duyệt thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialModerationResultDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1428,6 +1687,94 @@
         "summary": "Xử lý kiểm duyệt bài viết (FR13)",
         "tags": [
           "Social - Admin Moderation"
+        ]
+      }
+    },
+    "/api/v1/posts/{postId}/ai-summary": {
+      "put": {
+        "description": "Chỉ cho phép ai-service với Service Token hợp lệ gọi để callback lưu kết quả tóm tắt sau khi phân tích.",
+        "operationId": "PostSummaryController_saveSummary",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePostSummaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đã lưu tóm tắt thành công"
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ hoặc postId sai định dạng UUID"
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu hoặc cập nhật kết quả tóm tắt bài viết từ AI Service (Nội bộ)",
+        "tags": [
+          "Social - AI Summary"
+        ]
+      },
+      "get": {
+        "description": "Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).",
+        "operationId": "PostSummaryController_getSummary",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thông tin tóm tắt bài viết",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSummaryResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "postId sai định dạng UUID"
+          },
+          "404": {
+            "description": "Bài viết chưa có bản tóm tắt hoặc không có quyền xem"
+          }
+        },
+        "summary": "Lấy kết quả tóm tắt cộng đồng của bài viết",
+        "tags": [
+          "Social - AI Summary"
         ]
       }
     },
@@ -1539,6 +1886,136 @@
         ],
         "tags": [
           "media"
+        ]
+      }
+    },
+    "/api/media/uploads/{assetId}/complete": {
+      "post": {
+        "operationId": "MediaUploadController_completeUpload",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedUploadDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MEDIA_UPLOAD_INCOMPLETE, MEDIA_UPLOAD_NOT_ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "MEDIA_UPLOAD_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/v1/feed": {
+      "get": {
+        "operationId": "FeedController_getFeed",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Tối đa 20",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tab",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "for_you"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "tab, limit hoặc cursor không hợp lệ"
+          }
+        },
+        "summary": "Bảng tin video: chỉ gồm bài phát được, mới nhất trước. Khách cũng xem được.",
+        "tags": [
+          "feed"
         ]
       }
     },
@@ -1761,6 +2238,49 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Mặc định hôm nay",
+            "required": false,
+            "name": "checkIn",
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mặc định ngày nhận phòng + 1",
+            "required": false,
+            "name": "checkOut",
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "adults",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 2,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Số ngày của lịch giá, tính từ hôm nay",
+            "required": false,
+            "name": "calendarDays",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 60,
+              "default": 14,
+              "type": "number"
             }
           }
         ],
@@ -2026,6 +2546,453 @@
           "admin-commerce"
         ]
       }
+    },
+    "/api/checkout": {
+      "post": {
+        "operationId": "CheckoutController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      },
+      "get": {
+        "operationId": "CheckoutController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}": {
+      "get": {
+        "operationId": "CheckoutController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/guests": {
+      "put": {
+        "operationId": "CheckoutController_setGuests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGuestsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetGuestsResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/pay": {
+      "post": {
+        "operationId": "CheckoutController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "outcome = pending: chưa rõ kết quả từ cổng, đừng trả lại; gọi GET /checkout/:id sau ít giây",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/3ds": {
+      "post": {
+        "operationId": "CheckoutController_confirm3ds",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmThreeDsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/cancel": {
+      "post": {
+        "operationId": "CheckoutController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelHoldResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/pay-vnpay": {
+      "post": {
+        "operationId": "VnpayCheckoutController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartVnpayRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartVnpayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/payments/vnpay/ipn": {
+      "get": {
+        "operationId": "VnpayCallbackController_ipn",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/payments/vnpay/return": {
+      "get": {
+        "operationId": "VnpayCallbackController_return",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VnpayReturnResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/mock-gateway/tokens": {
+      "post": {
+        "operationId": "MockGatewayController_createToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mock-gateway"
+        ]
+      }
+    },
+    "/api/mock-gateway/test-cards": {
+      "get": {
+        "operationId": "MockGatewayController_listTestCards",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mock-gateway"
+        ]
+      }
     }
   },
   "info": {
@@ -2149,6 +3116,22 @@
           "accessToken",
           "tokenType",
           "expiresIn"
+        ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "ID token lấy từ Google Sign-In trên app hoặc web (credential)"
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "Pixel 8"
+          }
+        },
+        "required": [
+          "idToken"
         ]
       },
       "RefreshDto": {
@@ -2559,6 +3542,197 @@
           "title"
         ]
       },
+      "SocialPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "postType": {
+            "type": "string",
+            "enum": [
+              "video",
+              "vlog"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "hidden",
+              "removed",
+              "deleted"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "mediaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tripAttachment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          },
+          "commentCount": {
+            "type": "number"
+          },
+          "shareCount": {
+            "type": "number"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "postType",
+          "title",
+          "body",
+          "hashtags",
+          "status",
+          "visibility",
+          "isVerified",
+          "mediaIds",
+          "coverMediaId",
+          "tripAttachment",
+          "reactionCounts",
+          "reactionTotal",
+          "commentCount",
+          "shareCount",
+          "bookmarkCount",
+          "publishedAt",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "SocialPostPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialPostDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasMore"
+        ]
+      },
+      "PostViewerContextDto": {
+        "type": "object",
+        "properties": {
+          "myReaction": {
+            "type": "string",
+            "enum": [
+              "like",
+              "love",
+              "helpful"
+            ],
+            "nullable": true
+          },
+          "isBookmarked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "myReaction",
+          "isBookmarked"
+        ]
+      },
+      "SocialPostDetailDto": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "$ref": "#/components/schemas/SocialPostDto"
+          },
+          "viewerContext": {
+            "$ref": "#/components/schemas/PostViewerContextDto"
+          },
+          "shareUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "post",
+          "viewerContext",
+          "shareUrl"
+        ]
+      },
       "UpdatePostDto": {
         "type": "object",
         "properties": {
@@ -2611,6 +3785,71 @@
           }
         }
       },
+      "PublishedPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published"
+            ]
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shareUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "isVerified",
+          "publishedAt",
+          "shareUrl"
+        ]
+      },
+      "DeletedSocialItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deleted"
+        ]
+      },
+      "SharedPostDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "shareUrl": {
+            "type": "string"
+          },
+          "shareCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "shareUrl",
+          "shareCount"
+        ]
+      },
       "SetReactionDto": {
         "type": "object",
         "properties": {
@@ -2631,13 +3870,91 @@
           "type"
         ]
       },
+      "UpdatedPostReactionDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "myReaction": {
+            "type": "string",
+            "nullable": true
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "myReaction",
+          "reactionCounts",
+          "reactionTotal"
+        ]
+      },
+      "PostReactionDto": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "post_id",
+          "type"
+        ]
+      },
+      "PostStatsDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "reactionCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reactionTotal": {
+            "type": "number"
+          },
+          "commentCount": {
+            "type": "number"
+          },
+          "shareCount": {
+            "type": "number"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "reactionCounts",
+          "reactionTotal",
+          "commentCount",
+          "shareCount",
+          "bookmarkCount"
+        ]
+      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
           "body": {
             "type": "string",
             "example": "Bài viết chia sẻ rất chi tiết!",
-            "description": "Nội dung bình luận"
+            "description": "Nội dung bình luận (tối đa 2.000 ký tự)",
+            "maxLength": 2000
           },
           "parent_comment_id": {
             "type": "string",
@@ -2649,13 +3966,130 @@
           "body"
         ]
       },
+      "SocialCommentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "parentCommentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "isEdited": {
+            "type": "boolean"
+          },
+          "likeCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số lượt thích bình luận"
+          },
+          "isLiked": {
+            "type": "boolean",
+            "example": false,
+            "description": "Người xem hiện tại đã thích bình luận hay chưa"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "authorId",
+          "parentCommentId",
+          "body",
+          "isEdited",
+          "likeCount",
+          "isLiked",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "SocialCommentPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialCommentDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "SetCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "like",
+              null
+            ],
+            "nullable": true,
+            "example": "like",
+            "description": "Loại cảm xúc (\"like\" để thích, null để hủy thích, để trống để toggle)"
+          }
+        }
+      },
+      "UpdatedCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string"
+          },
+          "isLiked": {
+            "type": "boolean"
+          },
+          "likeCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "commentId",
+          "isLiked",
+          "likeCount"
+        ]
+      },
       "UpdateCommentDto": {
         "type": "object",
         "properties": {
           "body": {
             "type": "string",
             "example": "Nội dung bình luận đã chỉnh sửa...",
-            "description": "Nội dung mới"
+            "description": "Nội dung mới (tối đa 2.000 ký tự)",
+            "maxLength": 2000
           }
         },
         "required": [
@@ -2673,6 +4107,256 @@
         },
         "required": [
           "is_bookmarked"
+        ]
+      },
+      "UpdatedBookmarkDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "isBookmarked": {
+            "type": "boolean"
+          },
+          "bookmarkCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "postId",
+          "isBookmarked",
+          "bookmarkCount"
+        ]
+      },
+      "SocialAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ]
+      },
+      "AdminSocialPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/SocialAuthorDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "post_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "report_count": {
+            "type": "number"
+          },
+          "reaction_total": {
+            "type": "number"
+          },
+          "comment_count": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "title",
+          "post_type",
+          "status",
+          "visibility",
+          "report_count",
+          "reaction_total",
+          "comment_count",
+          "created_at"
+        ]
+      },
+      "AdminSocialPostPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSocialPostDto"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total"
+        ]
+      },
+      "SocialModerationHistoryDto": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "reason_detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "report_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "moderator_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action_id",
+          "action",
+          "reason_code",
+          "reason_detail",
+          "report_ids",
+          "moderator_id",
+          "created_at"
+        ]
+      },
+      "AdminSocialPostDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "post_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "author": {
+            "$ref": "#/components/schemas/SocialAuthorDto"
+          },
+          "media_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cover_media_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trip_attachment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
+          },
+          "reaction_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "reaction_total": {
+            "type": "number"
+          },
+          "comment_count": {
+            "type": "number"
+          },
+          "share_count": {
+            "type": "number"
+          },
+          "bookmark_count": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "moderation_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialModerationHistoryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "post_type",
+          "status",
+          "visibility",
+          "is_verified",
+          "author",
+          "media_ids",
+          "cover_media_id",
+          "hashtags",
+          "trip_attachment",
+          "reaction_counts",
+          "reaction_total",
+          "comment_count",
+          "share_count",
+          "bookmark_count",
+          "created_at",
+          "updated_at",
+          "moderation_history"
         ]
       },
       "CreateModerationActionDto": {
@@ -2712,6 +4396,219 @@
         "required": [
           "action",
           "reason_code"
+        ]
+      },
+      "SocialModerationResultDto": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "postStatus": {
+            "type": "string"
+          },
+          "moderatorId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "actionId",
+          "postId",
+          "previousStatus",
+          "postStatus",
+          "moderatorId",
+          "createdAt"
+        ]
+      },
+      "SavePostSummaryDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "no_comments",
+              "insufficient_data",
+              "ready",
+              "failed"
+            ],
+            "default": "ready",
+            "description": "Trạng thái tóm tắt bài viết"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...",
+            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI (bắt buộc khi status là ready)"
+          },
+          "keyTakeaways": {
+            "example": [
+              "Nên đi thuyền Tràng An lúc 7h sáng",
+              "Emeralda Resort có dịch vụ chu đáo"
+            ],
+            "description": "Các điểm nổi bật đúc kết từ thảo luận cộng đồng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inputHash": {
+            "type": "string",
+            "nullable": true,
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Bản băm hash của tập bình luận đã dùng để tóm tắt"
+          },
+          "commentCount": {
+            "type": "number",
+            "example": 25,
+            "description": "Số lượng bình luận tại thời điểm thực hiện tóm tắt"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế, trích dẫn commentId"
+          },
+          "safety": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Cờ và đánh giá an toàn: rủi ro, tin đồn, yêu cầu kiểm duyệt"
+          },
+          "promptVersion": {
+            "type": "string",
+            "nullable": true,
+            "example": "v1.0",
+            "description": "Phiên bản prompt"
+          },
+          "modelName": {
+            "type": "string",
+            "nullable": true,
+            "example": "gemini-1.5-flash",
+            "description": "Tên mô hình LLM"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm sinh kết quả"
+          }
+        }
+      },
+      "PostSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "018d9f20-0000-7000-8000-000000000001",
+            "description": "Mã bài đăng"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "no_comments",
+              "insufficient_data",
+              "ready",
+              "failed"
+            ],
+            "example": "ready",
+            "description": "Trạng thái tóm tắt"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình...",
+            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI"
+          },
+          "keyTakeaways": {
+            "example": [
+              "Nên đi thuyền Tràng An lúc 7h sáng"
+            ],
+            "description": "Các điểm nổi bật từ thảo luận cộng đồng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế"
+          },
+          "safety": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Cờ và đánh giá an toàn"
+          },
+          "inputHash": {
+            "type": "string",
+            "nullable": true,
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Bản băm của tập bình luận dùng để tóm tắt"
+          },
+          "commentCountAtSummary": {
+            "type": "number",
+            "example": 25,
+            "description": "Số lượng bình luận tại thời điểm tóm tắt"
+          },
+          "promptVersion": {
+            "type": "string",
+            "nullable": true,
+            "example": "v1.0",
+            "description": "Phiên bản prompt"
+          },
+          "modelName": {
+            "type": "string",
+            "nullable": true,
+            "example": "gemini-1.5-flash",
+            "description": "Tên mô hình LLM"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm sinh kết quả"
+          },
+          "isStale": {
+            "type": "boolean",
+            "example": false,
+            "description": "Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm tạo bản tóm tắt"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm cập nhật bản tóm tắt"
+          }
+        },
+        "required": [
+          "postId",
+          "status",
+          "keyTakeaways",
+          "commentCountAtSummary",
+          "isStale",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CreateUploadDto": {
@@ -2836,6 +4733,300 @@
         "required": [
           "parts",
           "expiresAt"
+        ]
+      },
+      "UploadedPartDto": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "number"
+          },
+          "etag": {
+            "type": "string",
+            "description": "Giá trị header ETag S3 trả về khi PUT phần này, giữ nguyên dấu ngoặc kép."
+          }
+        },
+        "required": [
+          "partNumber",
+          "etag"
+        ]
+      },
+      "CompleteUploadDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "description": "Đủ mọi phần của file, mỗi phần một lần.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadedPartDto"
+            }
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "CompletedUploadDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "ready"
+            ],
+            "description": "ready khi gọi lại lúc video đã chuyển mã xong."
+          }
+        },
+        "required": [
+          "assetId",
+          "status"
+        ]
+      },
+      "FeedAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "isKol": {
+            "type": "boolean",
+            "description": "Chưa có dữ liệu, hiện luôn là false"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl",
+          "isKol"
+        ]
+      },
+      "FeedPostersDto": {
+        "type": "object",
+        "properties": {
+          "w360": {
+            "type": "string"
+          },
+          "w540": {
+            "type": "string"
+          },
+          "w720": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "w360",
+          "w540",
+          "w720"
+        ]
+      },
+      "FeedVideoDto": {
+        "type": "object",
+        "properties": {
+          "hlsUrl": {
+            "type": "string",
+            "description": "master.m3u8 trên CloudFront"
+          },
+          "posters": {
+            "description": "Chọn cỡ nhỏ nhất không nhỏ hơn chiều rộng hiển thị",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedPostersDto"
+              }
+            ]
+          },
+          "durationSec": {
+            "type": "number"
+          },
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1"
+            ]
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "enum": [
+                360,
+                540,
+                720
+              ]
+            }
+          }
+        },
+        "required": [
+          "hlsUrl",
+          "posters",
+          "durationSec",
+          "aspect",
+          "levels"
+        ]
+      },
+      "FeedCountsDto": {
+        "type": "object",
+        "properties": {
+          "likes": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "number"
+          },
+          "saves": {
+            "type": "number"
+          },
+          "shares": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "likes",
+          "comments",
+          "saves",
+          "shares"
+        ]
+      },
+      "FeedViewerStateDto": {
+        "type": "object",
+        "properties": {
+          "liked": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "liked",
+          "saved"
+        ]
+      },
+      "FeedReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "FeedCardDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author": {
+            "$ref": "#/components/schemas/FeedAuthorDto"
+          },
+          "video": {
+            "$ref": "#/components/schemas/FeedVideoDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "linkedProductIds": {
+            "description": "Chưa có dữ liệu, hiện luôn rỗng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/FeedCountsDto"
+          },
+          "viewerState": {
+            "nullable": true,
+            "description": "null với khách",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedViewerStateDto"
+              }
+            ]
+          },
+          "reason": {
+            "nullable": true,
+            "description": "Chưa xếp hạng, hiện luôn là null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeedReasonDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "postId",
+          "author",
+          "video",
+          "title",
+          "caption",
+          "region",
+          "tags",
+          "linkedProductIds",
+          "counts",
+          "viewerState",
+          "reason"
+        ]
+      },
+      "FeedPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedCardDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "null nghĩa là hết bài"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "SuggestionDto": {
@@ -4039,6 +6230,572 @@
         "required": [
           "from",
           "to"
+        ]
+      },
+      "CheckoutItemRequestDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-dn-01--DLX",
+            "description": "Mã loại phòng hoặc mã hạng ghế"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date",
+            "description": "Ngày nhận phòng / ngày bay"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date",
+            "description": "Ngày trả phòng (bắt buộc với phòng)"
+          },
+          "qty": {
+            "type": "number",
+            "description": "Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số khách"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Mặc định gói đầu tiên"
+          }
+        },
+        "required": [
+          "productId",
+          "checkIn"
+        ]
+      },
+      "CheckoutRequestDto": {
+        "type": "object",
+        "properties": {
+          "adults": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 9
+          },
+          "sourcePostId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bài đăng dẫn tới đơn này (Đặt y chang)"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemRequestDto"
+            }
+          }
+        },
+        "required": [
+          "adults",
+          "items"
+        ]
+      },
+      "CheckoutItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "room",
+              "flight"
+            ]
+          },
+          "productId": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "nights": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "Một đêm một phòng / một vé (VND)"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "ratePlanCode": {
+            "type": "string"
+          },
+          "ratePlanName": {
+            "type": "string"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelUntil": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "productType",
+          "productId",
+          "productName",
+          "date",
+          "dateTo",
+          "nights",
+          "qty",
+          "unitPrice",
+          "lineTotal",
+          "ratePlanCode",
+          "ratePlanName",
+          "isRefundable",
+          "freeCancelUntil",
+          "confirmationCode"
+        ]
+      },
+      "CheckoutDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paying",
+              "paid",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "number"
+          },
+          "adults": {
+            "type": "number"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemDto"
+            }
+          },
+          "isGuestInfoComplete": {
+            "type": "boolean"
+          },
+          "passengersRequired": {
+            "type": "number",
+            "description": "Số hành khách cần nhập (0 khi không có vé bay)"
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "holdExpiresAt",
+          "total",
+          "adults",
+          "confirmationCode",
+          "cancelReason",
+          "items",
+          "isGuestInfoComplete",
+          "passengersRequired",
+          "policyVersion"
+        ]
+      },
+      "TripDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paying",
+              "paid",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "adults": {
+            "type": "number"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Lúc đặt"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Ngày đi sớm nhất trong đơn"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Ngày về / trả phòng muộn nhất trong đơn"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemDto"
+            }
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "total",
+          "adults",
+          "confirmationCode",
+          "cancelReason",
+          "holdExpiresAt",
+          "createdAt",
+          "paidAt",
+          "startDate",
+          "endDate",
+          "items"
+        ]
+      },
+      "TripPageDto": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "description": "Mới đặt trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Gửi lại làm cursor để lấy trang sau; null là hết"
+          }
+        },
+        "required": [
+          "trips",
+          "nextCursor"
+        ]
+      },
+      "ContactDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0901234567"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "fullName",
+          "phone"
+        ]
+      },
+      "GuestDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Họ tên theo giấy tờ"
+          },
+          "birthdate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Bắt buộc khi có vé bay"
+          }
+        },
+        "required": [
+          "fullName"
+        ]
+      },
+      "SetGuestsRequestDto": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/ContactDto"
+          },
+          "guests": {
+            "description": "Có vé bay thì cần đủ số khách",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestDto"
+            }
+          }
+        },
+        "required": [
+          "contact",
+          "guests"
+        ]
+      },
+      "SetGuestsResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isGuestInfoComplete": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "isGuestInfoComplete"
+        ]
+      },
+      "PayRequestDto": {
+        "type": "object",
+        "properties": {
+          "paymentToken": {
+            "type": "string",
+            "description": "Token thẻ do cổng cấp (mock: POST /api/mock-gateway/tokens)"
+          },
+          "expectedTotal": {
+            "type": "number",
+            "description": "Tổng tiền khách đang thấy; khác giá hiện tại thì 409 PRICE_CHANGED, chưa trừ tiền"
+          },
+          "acceptedPolicyVersion": {
+            "type": "string",
+            "example": "2026-11-03"
+          }
+        },
+        "required": [
+          "paymentToken",
+          "expectedTotal",
+          "acceptedPolicyVersion"
+        ]
+      },
+      "PayResultDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "requires_action",
+              "pending"
+            ]
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "description": "Khi outcome = requires_action: gửi kèm OTP tới /3ds"
+          },
+          "message": {
+            "type": "string",
+            "description": "Khi outcome = pending: chưa rõ kết quả, gọi lại GET /checkout/:id sau ít giây"
+          },
+          "checkout": {
+            "$ref": "#/components/schemas/CheckoutDto"
+          }
+        },
+        "required": [
+          "outcome",
+          "orderId"
+        ]
+      },
+      "ConfirmThreeDsRequestDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "challengeId",
+          "otp"
+        ]
+      },
+      "CancelHoldResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
+        ]
+      },
+      "StartVnpayRequestDto": {
+        "type": "object",
+        "properties": {
+          "expectedTotal": {
+            "type": "number",
+            "description": "Tổng tiền khách đang thấy; khác giá hiện tại thì 409 PRICE_CHANGED"
+          },
+          "acceptedPolicyVersion": {
+            "type": "string",
+            "example": "2026-11-03"
+          },
+          "bankCode": {
+            "type": "string",
+            "enum": [
+              "VNPAYQR",
+              "VNBANK",
+              "INTCARD"
+            ],
+            "description": "Bỏ trống: khách tự chọn trên trang VNPay. VNPAYQR: vào thẳng màn mã QR"
+          }
+        },
+        "required": [
+          "expectedTotal",
+          "acceptedPolicyVersion"
+        ]
+      },
+      "StartVnpayResultDto": {
+        "type": "object",
+        "properties": {
+          "paymentUrl": {
+            "type": "string",
+            "description": "Chuyển trình duyệt / WebView tới URL này"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "paymentUrl",
+          "expiresAt"
+        ]
+      },
+      "VnpayReturnResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isValidSignature": {
+            "type": "boolean"
+          },
+          "isSuccess": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "orderId",
+          "isValidSignature",
+          "isSuccess"
+        ]
+      },
+      "CreateTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "cardNumber": {
+            "type": "string",
+            "example": "4242424242424242",
+            "description": "Chỉ thẻ test"
+          }
+        },
+        "required": [
+          "cardNumber"
+        ]
+      },
+      "TokenDto": {
+        "type": "object",
+        "properties": {
+          "paymentToken": {
+            "type": "string"
+          },
+          "last4": {
+            "type": "string"
+          },
+          "isTestCard": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paymentToken",
+          "last4",
+          "isTestCard"
         ]
       }
     }

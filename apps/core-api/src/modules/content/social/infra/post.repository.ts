@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   posts,
@@ -7,6 +7,13 @@ import {
   type PostStatus,
   type PostType,
 } from '../../db/schema/index.js';
+
+export interface FindPostsForSyncOptions {
+  limit: number;
+  updatedAfter?: Date;
+  cursorUpdatedAt?: Date;
+  cursorId?: string;
+}
 
 export interface FindPublicPostsOptions {
   limit: number;
@@ -53,6 +60,14 @@ export class PostRepository {
 
   async findById(id: string): Promise<PostRecord | null> {
     const [record] = await this.db.select().from(posts).where(eq(posts.id, id)).limit(1);
+    return record ?? null;
+  }
+
+  /**
+   * Khóa bi quan dòng post (SELECT ... FOR UPDATE) để tuần tự hóa các cập nhật tương tác đồng thời.
+   */
+  async findByIdForUpdate(id: string): Promise<PostRecord | null> {
+    const [record] = await this.db.select().from(posts).where(eq(posts.id, id)).for('update');
     return record ?? null;
   }
 
@@ -239,5 +254,37 @@ export class PostRepository {
         updatedAt: new Date(),
       })
       .where(eq(posts.id, id));
+  }
+
+  /**
+   * Truy vấn danh sách bài viết công khai phục vụ đồng bộ dữ liệu (Sync / Indexing)
+   * theo thứ tự updatedAt ASC, id ASC với keyset cursor.
+   */
+  async findPostsForSync(options: FindPostsForSyncOptions): Promise<PostRecord[]> {
+    const conditions = [
+      eq(posts.status, 'published'),
+      eq(posts.visibility, 'public'),
+      sql`${posts.deletedAt} IS NULL`,
+    ];
+
+    if (options.updatedAfter) {
+      conditions.push(gte(posts.updatedAt, options.updatedAfter));
+    }
+
+    if (options.cursorUpdatedAt && options.cursorId) {
+      conditions.push(
+        or(
+          gt(posts.updatedAt, options.cursorUpdatedAt),
+          and(eq(posts.updatedAt, options.cursorUpdatedAt), gt(posts.id, options.cursorId)),
+        )!,
+      );
+    }
+
+    return this.db
+      .select()
+      .from(posts)
+      .where(and(...conditions))
+      .orderBy(asc(posts.updatedAt), asc(posts.id))
+      .limit(options.limit);
   }
 }

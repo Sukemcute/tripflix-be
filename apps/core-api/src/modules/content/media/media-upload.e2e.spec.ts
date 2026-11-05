@@ -49,6 +49,7 @@ interface CreatedUploadBody {
 describe('media upload E2E', () => {
   let app: INestApplication;
   let mediaStore: MemoryMediaAssetStore;
+  let objectStorage: InMemoryObjectStorage;
   let ownerToken: string;
   let otherToken: string;
   const http = () => request(app.getHttpServer());
@@ -70,6 +71,7 @@ describe('media upload E2E', () => {
 
   beforeAll(async () => {
     mediaStore = new MemoryMediaAssetStore();
+    objectStorage = new InMemoryObjectStorage({ keyPrefix: 'dev/test/' });
     const moduleRef = await Test.createTestingModule({
       imports: [
         FakePlatformModule,
@@ -88,7 +90,7 @@ describe('media upload E2E', () => {
       .overrideProvider(MEDIA_ASSET_STORE)
       .useValue(mediaStore)
       .overrideProvider(OBJECT_STORAGE)
-      .useValue(new InMemoryObjectStorage({ keyPrefix: 'dev/test/' }))
+      .useValue(objectStorage)
       .overrideProvider(MEDIA_CLOCK)
       .useValue(() => NOW)
       .compile();
@@ -201,6 +203,87 @@ describe('media upload E2E', () => {
 
     it('trả 400 khi assetId không phải uuid', async () => {
       await resignParts(ownerToken, 'khong-phai-uuid', [1]).expect(400);
+    });
+  });
+
+  describe('POST /api/media/uploads/:assetId/complete', () => {
+    const BODY = Buffer.from('hello world');
+
+    const completeUpload = (token: string, assetId: string, parts: unknown) =>
+      http().post(`/api/media/uploads/${assetId}/complete`).set('Authorization', `Bearer ${token}`).send({ parts });
+
+    async function createUploadedAsset() {
+      const created = await createUpload(ownerToken, {
+        mimeType: 'video/mp4',
+        fileSizeBytes: BODY.byteLength,
+        durationSec: 5,
+      }).expect(201);
+      const assetId = (created.body as CreatedUploadBody).assetId;
+      const asset = mediaStore.assets.get(assetId)!;
+      const etag = objectStorage.uploadPartForTest(asset.s3UploadId, 1, BODY);
+      return { assetId, asset, parts: [{ partNumber: 1, etag }] };
+    }
+
+    it('trả 202 processing, ghép file và ghi đúng một việc chuyển mã khi gọi lại', async () => {
+      const { assetId, asset, parts } = await createUploadedAsset();
+
+      const first = await completeUpload(ownerToken, assetId, parts).expect(202);
+      const second = await completeUpload(ownerToken, assetId, parts).expect(202);
+
+      expect(first.body).toEqual({ assetId, status: 'processing' });
+      expect(second.body).toEqual({ assetId, status: 'processing' });
+      expect(objectStorage.getStoredObjectForTest(asset.sourceKey)?.body).toEqual(BODY);
+      const events = mediaStore.outboxRows.filter((event) => event.payload.assetId === assetId);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: 'content.media.transcode_requested',
+        payload: { assetId, sourceKey: asset.sourceKey, revision: 1 },
+      });
+    });
+
+    it('trả 401 khi chưa đăng nhập', async () => {
+      const { assetId, parts } = await createUploadedAsset();
+      await http().post(`/api/media/uploads/${assetId}/complete`).send({ parts }).expect(401);
+    });
+
+    it('trả 404 khi video là của người khác', async () => {
+      const { assetId, parts } = await createUploadedAsset();
+      const response = await completeUpload(otherToken, assetId, parts).expect(404);
+      expect(response.body).toMatchObject({ code: 'MEDIA_NOT_FOUND' });
+    });
+
+    it('trả 409 MEDIA_UPLOAD_INCOMPLETE khi ETag sai', async () => {
+      const { assetId } = await createUploadedAsset();
+      const response = await completeUpload(ownerToken, assetId, [{ partNumber: 1, etag: '"sai"' }]).expect(409);
+      expect(response.body).toMatchObject({ code: 'MEDIA_UPLOAD_INCOMPLETE' });
+    });
+
+    it('trả 409 MEDIA_UPLOAD_INCOMPLETE khi thiếu phần', async () => {
+      const created = await createUpload(ownerToken).expect(201);
+      const assetId = (created.body as CreatedUploadBody).assetId;
+      const response = await completeUpload(ownerToken, assetId, [{ partNumber: 1, etag: '"a"' }]).expect(409);
+      expect(response.body).toMatchObject({ code: 'MEDIA_UPLOAD_INCOMPLETE' });
+    });
+
+    it('trả 410 MEDIA_UPLOAD_EXPIRED khi phiên upload đã bị xoá', async () => {
+      const { assetId, asset, parts } = await createUploadedAsset();
+      objectStorage.expireUploadForTest(asset.s3UploadId);
+      const response = await completeUpload(ownerToken, assetId, parts).expect(410);
+      expect(response.body).toMatchObject({ code: 'MEDIA_UPLOAD_EXPIRED' });
+    });
+
+    it.each([
+      ['danh sách rỗng', []],
+      ['thiếu ETag', [{ partNumber: 1 }]],
+      ['ETag rỗng', [{ partNumber: 1, etag: '' }]],
+      ['số phần bằng 0', [{ partNumber: 0, etag: '"a"' }]],
+    ])('trả 400 khi %s', async (_label, parts) => {
+      const { assetId } = await createUploadedAsset();
+      await completeUpload(ownerToken, assetId, parts).expect(400);
+    });
+
+    it('trả 400 khi assetId không phải uuid', async () => {
+      await completeUpload(ownerToken, 'khong-phai-uuid', [{ partNumber: 1, etag: '"a"' }]).expect(400);
     });
   });
 });

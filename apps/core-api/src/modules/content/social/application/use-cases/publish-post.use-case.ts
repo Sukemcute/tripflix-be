@@ -24,13 +24,28 @@ export class PublishPostUseCase {
     private readonly commerceService?: CommerceServicePort,
   ) {}
 
-  @Transactional('content')
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
       throw new PostNotFoundException(command.postId);
     }
 
+    // Kiểm tra dấu "ĐÃ XÁC THỰC" (Verified Badge - F2/FR3) NGOÀI TRANSACTION để không giữ DB connection
+    let isVerified = false;
+    const bookingId = record.tripAttachment?.bookingId;
+    if (bookingId && this.commerceService) {
+      isVerified = await this.commerceService.verifyCompletedBooking(bookingId, command.userId);
+    }
+
+    return this.publishInTransaction(record, command.userId, isVerified);
+  }
+
+  @Transactional('content')
+  protected async publishInTransaction(
+    record: any,
+    userId: string,
+    isVerified: boolean,
+  ): Promise<PublishPostResult> {
     const domainPost = new Post({
       id: record.id,
       authorId: record.authorId,
@@ -55,32 +70,25 @@ export class PublishPostUseCase {
       deletedAt: record.deletedAt,
     });
 
-    // Kiểm tra dấu "ĐÃ XÁC THỰC" (Verified Badge - F2/FR3)
-    let isVerified = false;
-    const bookingId = domainPost.tripAttachment?.bookingId;
-    if (bookingId && this.commerceService) {
-      isVerified = await this.commerceService.verifyCompletedBooking(bookingId, command.userId);
-    }
-
-    domainPost.publish(command.userId, { isVerified });
+    domainPost.publish(userId, { isVerified });
 
     const publishedAt = domainPost.publishedAt ?? new Date();
 
-    await this.postRepository.update(command.postId, {
+    await this.postRepository.update(record.id, {
       status: 'published',
       isVerified: domainPost.isVerified,
       publishedAt,
     });
 
-    const shareUrl = `https://tripflix.vn/posts/${command.postId}`;
+    const shareUrl = `https://tripflix.vn/posts/${record.id}`;
 
     // Ghi sự kiện vào content.outbox_events trong cùng transaction DB
     await this.outbox.add({
       type: 'content.post.published',
-      userId: command.userId,
+      userId,
       payload: {
-        postId: command.postId,
-        authorId: command.userId,
+        postId: record.id,
+        authorId: userId,
         postType: domainPost.postType,
         title: domainPost.title,
         isVerified: domainPost.isVerified,
@@ -90,7 +98,7 @@ export class PublishPostUseCase {
     });
 
     return {
-      id: command.postId,
+      id: record.id,
       status: 'published',
       isVerified: domainPost.isVerified,
       publishedAt,

@@ -31,8 +31,13 @@ export class ContentOutboxRelay implements OnApplicationBootstrap, OnApplication
       store: new DrizzleOutboxStore(createDb(this.pools.content), contentOutboxEvents),
       bus: new RedisStreamsEventBus(this.redis),
       stream: (envelope) => {
-        if (envelope.type.startsWith('media.')) return STREAMS.media;
-        return STREAMS.content;
+        if (envelope.type === 'content.media.transcode_requested' || envelope.type.startsWith('media.')) {
+          return STREAMS.media;
+        }
+        if (envelope.type.startsWith('content.')) {
+          return STREAMS.content;
+        }
+        throw new Error(`Loại sự kiện không hợp lệ cho content outbox relay: ${envelope.type}`);
       },
       onError: (err, envelope) =>
         this.logger.error(

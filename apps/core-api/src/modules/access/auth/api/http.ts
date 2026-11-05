@@ -8,6 +8,7 @@ import {
   HttpStatus,
   NotFoundException,
   type PipeTransform,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -51,6 +52,9 @@ export class AccessErrorFilter implements ExceptionFilter {
         // 400, không phải 401: client hiểu 401 là token hết hạn rồi tự làm mới hoặc đăng xuất.
         http = new BadRequestException(err.message);
         break;
+      case 'google_not_configured':
+        http = new ServiceUnavailableException(err.message);
+        break;
       case 'too_many_attempts':
         if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
         http = new HttpException(
@@ -65,6 +69,16 @@ export class AccessErrorFilter implements ExceptionFilter {
   }
 }
 
+/** Header của app (mobile, web) mang mã khách vãng lai, để gộp gu khi đăng ký hoặc đăng nhập. */
+export const ANON_ID_HEADER = 'x-anon-id';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function readRequestMeta(req: Request): RequestMeta {
-  return { ip: req.ip ?? 'unknown', userAgent: req.get('user-agent') ?? null };
+  // X-Anon-Id sai dạng thì bỏ qua (không gộp), không làm hỏng đăng nhập.
+  const anonId = req.get(ANON_ID_HEADER)?.trim();
+  return {
+    ip: req.ip ?? 'unknown',
+    userAgent: req.get('user-agent') ?? null,
+    anonId: anonId && UUID_PATTERN.test(anonId) ? anonId.toLowerCase() : null,
+  };
 }
