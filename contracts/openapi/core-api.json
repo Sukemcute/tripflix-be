@@ -1579,6 +1579,51 @@
         ]
       }
     },
+    "/api/recommendations/home": {
+      "get": {
+        "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi, mỗi nơi 2 khách sạn: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do \"Rẻ hơn X% so với …\".\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
+        "operationId": "HomeRecommendationsController_recommendForHome",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 8",
+            "schema": {
+              "example": 8
+            }
+          },
+          {
+            "name": "recentPlaceIds",
+            "required": false,
+            "in": "query",
+            "description": "CSV, tối đa 10; nơi lạ bị bỏ qua",
+            "schema": {
+              "example": "da-lat,phu-quoc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeRecommendationsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`limit` ngoài 1–20 hoặc quá 10 nơi"
+          }
+        },
+        "summary": "Gợi ý khách sạn cho trang chủ web, mỗi gợi ý kèm lý do ngắn",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/admin/commerce/room-types/{id}/calendar": {
       "get": {
         "operationId": "AdminCalendarController_getRoomCalendar",
@@ -2671,6 +2716,110 @@
           "items",
           "total",
           "nextCursor"
+        ]
+      },
+      "HomeProvinceDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "da-lat"
+          },
+          "name": {
+            "type": "string",
+            "example": "Đà Lạt"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "HomeReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "recent_place",
+              "good_deal"
+            ],
+            "description": "recent_place: nơi vừa tìm · good_deal: rẻ hơn trung vị cùng hạng sao"
+          },
+          "text": {
+            "type": "string",
+            "example": "Vì bạn vừa tìm Đà Lạt",
+            "description": "Câu hiện dưới thẻ, tiếng Việt"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "HomePickDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-3",
+            "description": "Mã khách sạn của commerce; mở trang chi tiết bằng mã này"
+          },
+          "name": {
+            "type": "string",
+            "example": "Swiss-Belresort Tuyền Lâm"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "example": 5
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true,
+            "example": "Mường Thanh",
+            "description": "Chuỗi khách sạn; null nếu độc lập"
+          },
+          "province": {
+            "$ref": "#/components/schemas/HomeProvinceDto"
+          },
+          "priceFrom": {
+            "type": "number",
+            "example": 2750000,
+            "description": "Giá thấp nhất một đêm một phòng trong 30 ngày tới (VND), hiện \"từ X/đêm\""
+          },
+          "reason": {
+            "$ref": "#/components/schemas/HomeReasonDto"
+          }
+        },
+        "required": [
+          "hotelId",
+          "name",
+          "thumbnail",
+          "stars",
+          "brand",
+          "province",
+          "priceFrom",
+          "reason"
+        ]
+      },
+      "HomeRecommendationsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Có thể rỗng: chưa có nơi vừa tìm và không có khách sạn nào giá tốt",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomePickDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "AdminRoomDayDto": {
