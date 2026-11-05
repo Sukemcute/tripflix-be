@@ -324,6 +324,40 @@
         ]
       }
     },
+    "/api/auth/service-token": {
+      "post": {
+        "operationId": "ServiceTokenController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTokenDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thông tin service không đúng"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/.well-known/jwks.json": {
       "get": {
         "operationId": "JwksController_getJwks",
@@ -2020,6 +2054,53 @@
           "createdAt",
           "lastUsedAt",
           "isCurrent"
+        ]
+      },
+      "ServiceTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "example": "ai-service"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Secret in ra một lần khi tạo client (auth:create-service-client)"
+          },
+          "audience": {
+            "type": "string",
+            "example": "core-api",
+            "description": "Service sẽ nhận token (claim aud)"
+          }
+        },
+        "required": [
+          "clientId",
+          "clientSecret",
+          "audience"
+        ]
+      },
+      "ServiceTokenDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Số giây token còn dùng được"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn"
         ]
       },
       "JwksDto": {

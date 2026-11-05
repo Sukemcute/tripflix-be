@@ -18,6 +18,7 @@ const hasher: PasswordHasher = {
 };
 const issuer: TokenIssuer = {
   issue: async ({ sid }) => ({ token: `access-for-${sid}`, expiresIn: 900 }),
+  issueServiceToken: async ({ clientId }) => ({ token: `service-for-${clientId}`, expiresIn: 300 }),
   getJwks: () => ({ keys: [] }),
 };
 

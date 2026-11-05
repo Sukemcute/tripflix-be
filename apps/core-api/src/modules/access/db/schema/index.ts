@@ -73,8 +73,28 @@ export const auditLogs = accessSchema.table(
   (t) => [index('idx_audit_logs_actor_user_id_created_at').on(t.actorUserId, t.createdAt)],
 );
 
+/**
+ * Service được xin token service-to-service (docs/10 §3.10). Chỉ lưu bản băm argon2 của secret.
+ * allowed_audiences: các service mà client này được gọi (aud của token). disabled_at khác null: không cấp token nữa.
+ */
+export const serviceClients = accessSchema.table(
+  'service_clients',
+  {
+    clientId: text('client_id').primaryKey(),
+    secretHash: text('secret_hash').notNull(),
+    allowedAudiences: text('allowed_audiences').array().notNull(),
+    createdAt: createdAtColumn(),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+  },
+  (t) => [
+    check('ck_service_clients_client_id_format', sql`${t.clientId} ~ '^[a-z][a-z0-9-]{1,49}$'`),
+    check('ck_service_clients_allowed_audiences_not_empty', sql`cardinality(${t.allowedAudiences}) > 0`),
+  ],
+);
+
 /** Sự kiện của access chờ relay gửi sang stream:core.access (libs/outbox). */
 export const accessOutboxEvents = createOutboxTable(accessSchema);
 
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
+export type ServiceClientRow = typeof serviceClients.$inferSelect;

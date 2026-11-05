@@ -178,6 +178,28 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await runAccessCleanup({ sessions: store.sessions, db, now })).toEqual({ expiredSessions: 0, publishedEvents: 0 });
   });
 
+  it('TF058: service_clients lưu mảng audience, trùng clientId trả null, disable giữ mốc đầu tiên', async () => {
+    const created = await store.serviceClients.insert({
+      clientId: 'ai-service',
+      secretHash: '$argon2id$x',
+      allowedAudiences: ['core-api', 'notification-service'],
+    });
+    expect(created).toMatchObject({ clientId: 'ai-service', allowedAudiences: ['core-api', 'notification-service'], disabledAt: null });
+    expect(await store.serviceClients.insert({ clientId: 'ai-service', secretHash: 'y', allowedAudiences: ['core-api'] })).toBeNull();
+
+    const first = new Date('2026-11-05T01:00:00Z');
+    expect(await store.serviceClients.disable('ai-service', first)).toBe(true);
+    expect(await store.serviceClients.disable('ai-service', new Date('2026-11-06T01:00:00Z'))).toBe(true);
+    expect((await store.serviceClients.findById('ai-service'))?.disabledAt?.toISOString()).toBe(first.toISOString());
+    expect(await store.serviceClients.disable('khong-co', first)).toBe(false);
+    expect(await store.serviceClients.findById('khong-co')).toBeNull();
+  });
+
+  it('TF058: ràng buộc database chặn clientId sai dạng và danh sách audience rỗng', async () => {
+    await expect(store.serviceClients.insert({ clientId: 'AI Service', secretHash: 'x', allowedAudiences: ['core-api'] })).rejects.toThrow();
+    await expect(store.serviceClients.insert({ clientId: 'empty-aud', secretHash: 'x', allowedAudiences: [] })).rejects.toThrow();
+  });
+
   it('email trùng thì insert trả null, không ném lỗi', async () => {
     await store.users.insert({ email: 'dup@example.com', passwordHash: 'x', displayName: 'A', role: 'member' });
     expect(
