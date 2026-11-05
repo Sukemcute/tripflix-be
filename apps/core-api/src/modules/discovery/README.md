@@ -31,10 +31,11 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | Bảng `search_entities` | `db/schema/search-entities.ts` | Bản chép dựng lại được; GIN `pg_trgm` trên `search_text` |
 | Cây địa điểm v1 | `search/domain/places.ts` | 34 tỉnh + điểm đến mà commerce dùng làm `provinceSlug` (Đà Lạt ⊂ Lâm Đồng…). Chưa có xã/phường, toạ độ |
 | Dựng lại chỉ mục | `search/jobs/rebuild-suggest-index.job.ts` | Mỗi lần khởi động khi `APP_ROLE` là `worker` hoặc `all` |
+| `GET /api/stays` | `search/api/stays.controller.ts` | Trang kết quả web OTA: khách sạn còn phòng ở một nơi cho ngày đã chọn, giá thật từ commerce; lọc sao, giá; sắp giá hoặc sao |
 
 ## Giao tiếp
 
-- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục khách sạn) — **chưa nối**, chờ TF06 merge; hiện dùng danh mục rỗng trong `discovery.module.ts`.
+- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`) và `CommerceFacade.checkAvailability` (`/stays`). `DiscoveryModule` import `CommerceModule`.
 - Nghe sự kiện: **không, ở v1** (05/11). Search không bao giờ chờ sự kiện: request chỉ đọc bảng của discovery hoặc gọi hàm module khác trong tiến trình. Bản chép được làm mới bằng job nền (xem bảng 1, 3, 4). **Không nghe `commerce.ari.updated`**: discovery không giữ giá hay còn phòng thật (`/stays` gọi thẳng commerce), nên không có gì để cập nhật. Danh mục khách sạn v1 là seed, nạp lại lúc worker khởi động hoặc qua lệnh reindex. Cần cập nhật ngay thì thêm `commerce.catalog.updated { productIds }` (chỉ mang id, discovery tự gọi `listCatalog`).
 - Cho module khác: không export hàm nào (content, commerce bị discovery gọi nên không được gọi ngược).
 
@@ -58,12 +59,12 @@ Có hai nhóm:
 
 Chọn địa điểm thì web gọi `/stays?placeId=<refId>`. Chọn khách sạn thì web mở trang chi tiết của commerce.
 
-### 2. `GET /api/stays` — web, chưa code (chờ TF06)
+### 2. `GET /api/stays` — web, **đã có**
 
 | | |
 |---|---|
-| Vào | `placeId`, `checkIn`, `checkOut`, `adults`, `rooms?`, `stars?`, `priceMin?`, `priceMax?`, `sort=price\|stars`, `cursor?` |
-| Ra | `{ items: [{ hotelId, name, stars, thumbnail, province, unitPrice, totalPrice }], nextCursor }`. Chỉ khách sạn còn phòng cho ngày đã chọn |
+| Vào | `placeId`, `checkIn`, `checkOut`, `adults`, `rooms?`, `minStars?`, `priceMin?`, `priceMax?` (giá một đêm một phòng), `sort=price|stars`, `cursor?`, `limit?` (1–50, mặc định 20) ||stars`, `cursor?` |
+| Ra | `{ items: [{ hotelId, name, stars, thumbnail, province, unitPrice, totalPrice }], total, nextCursor }`. Nơi lạ, ngày sai (commerce trả `invalid_query`) thì 400. Chỉ khách sạn còn phòng cho ngày đã chọn |
 | Luồng | 1. Đổi `placeId` thành danh sách `provinceSlug` theo cây địa điểm: chọn tỉnh thì lấy tỉnh đó cùng các điểm đến con (Lâm Đồng → `lam-dong`, `da-lat`); chọn điểm đến thì chỉ lấy điểm đến đó.<br>2. `commerce.listCatalog({ type: 'hotel', provinceSlug })` cho từng slug: lấy danh sách khách sạn của nơi đó (vài chục đến vài trăm).<br>3. `commerce.checkAvailability({ productIds, checkIn, checkOut, adults, rooms })` theo lô ≤ 100 id: lấy còn phòng và giá thật.<br>4. Bỏ khách sạn hết phòng, lọc, sắp xếp, phân trang |
 | Không làm | Không giữ bản sao khách sạn trong discovery cho luồng này: tập dữ liệu có hạn theo nơi, gọi thẳng commerce thì giá và phòng luôn mới. Không trả `remaining` ra API |
 
