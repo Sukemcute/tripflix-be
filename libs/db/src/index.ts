@@ -1,9 +1,9 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
-/** 4 module trên database `core` và module `commerce` trên database riêng. */
-export const CORE_MODULES = ['access', 'content', 'discovery', 'analytics'] as const;
-export const MODULES = [...CORE_MODULES, 'commerce'] as const;
+/** 5 module trên database `core`, mỗi module một schema và một user Postgres riêng. */
+export const CORE_MODULES = ['access', 'content', 'discovery', 'analytics', 'commerce'] as const;
+export const MODULES = CORE_MODULES;
 export type ModuleName = (typeof MODULES)[number];
 
 /** Số kết nối gợi ý cho mỗi module (docs/architecture/11 §3.3). */

@@ -21,7 +21,7 @@ import { migrateModule, startPostgres, startRedis, type PostgresFixture } from '
 
 let postgres: PostgresFixture;
 beforeAll(async () => {
-  postgres = await startPostgres(); // chạy deploy/postgres/init/*.sql: 3 database, user tf_<module>, schema, extension
+  postgres = await startPostgres(); // chạy deploy/postgres/init/*.sql: database core (5 schema module) + notification, user tf_<module>, schema, extension
   await migrateModule({
     url: postgres.buildModuleUrl('commerce'),
     module: 'commerce',
@@ -33,7 +33,7 @@ afterAll(() => postgres.stop());
 
 | Hàm | Trả về |
 |---|---|
-| `startPostgres()` | `buildModuleUrl(module)`: kết nối bằng `tf_<module>`, chỉ có quyền trên schema của module. `buildAdminUrl(db)`: superuser, chỉ để chuẩn bị hoặc kiểm dữ liệu |
+| `startPostgres()` | `buildModuleUrl(module)`: kết nối bằng `tf_<module>`, chỉ có quyền trên schema của module. `buildAdminUrl(db)` (`'core'` hoặc `'notification'`): superuser, chỉ để chuẩn bị hoặc kiểm dữ liệu |
 | `startRedis()` | `url` |
 | `migrateModule({ url, module, migrationsFolder })` | Chạy migration như `pnpm db:migrate` |
 

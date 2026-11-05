@@ -61,7 +61,7 @@ pnpm build && pnpm db:migrate && pnpm db:seed
 
 | Có gì | Chi tiết |
 |---|---|
-| Database | `core` (schema `access`, `content`, `discovery`, `analytics`), `commerce`, `notification` |
+| Database | `core` (schema `access`, `content`, `discovery`, `analytics`, `commerce`), `notification` |
 | User Postgres | Mỗi module một user (`tf_access`...), chỉ đọc, ghi được schema của mình; mật khẩu dev trong `apps/core-api/.env.example` |
 | Tài khoản mẫu (`pnpm db:seed`) | `superadmin@tripflix.local`, `moderator@tripflix.local`, `member@tripflix.local`, mật khẩu `SEED_PASSWORD` trong `.env` (mặc định `tripflix-dev-123`) |
 | Xem dữ liệu | `pnpm stack:tools` rồi mở Adminer http://localhost:8090 (server `postgres`, user `postgres`/`postgres`) |
@@ -69,7 +69,7 @@ pnpm build && pnpm db:migrate && pnpm db:seed
 Đã chạy `pnpm stack:infra` **trước** khi pull TF05 thì chạy một lần (không mất dữ liệu), nếu không `pnpm db:migrate` báo `permission denied for database`:
 
 ```sh
-docker exec tripflix-postgres-1 psql -U postgres -c "GRANT CREATE ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics" -c "GRANT CREATE ON DATABASE commerce TO tf_commerce" -c "GRANT CREATE ON DATABASE notification TO tf_notification"
+docker exec tripflix-postgres-1 psql -U postgres -c "GRANT CREATE ON DATABASE core TO tf_access, tf_content, tf_discovery, tf_analytics, tf_commerce" -c "GRANT CREATE ON DATABASE notification TO tf_notification"
 ```
 
 Đăng nhập, phân quyền, cách dùng `@Roles(...)`: `apps/core-api/src/modules/access/README.md`, `libs/auth/README.md`.

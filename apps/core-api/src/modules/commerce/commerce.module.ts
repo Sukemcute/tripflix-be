@@ -25,7 +25,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
 /**
  * Module commerce. Chủ: Thắng (backup Bảo). Xem README.md cùng thư mục.
  * Module khác chỉ dùng những gì được export trong index.ts: CommerceModule và CommerceFacade.
- * Database riêng commerce, user Postgres tf_commerce. Store đọc kết nối qua TransactionHost của commerce, nên
+ * Schema commerce trong database core, user Postgres tf_commerce. Store đọc kết nối qua TransactionHost của commerce, nên
  * use case có @Transactional('commerce') ghi mọi thứ trong cùng một transaction. Test thay store bằng overrideProvider(COMMERCE_STORE).
  */
 @Module({
