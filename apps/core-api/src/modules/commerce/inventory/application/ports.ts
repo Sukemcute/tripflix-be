@@ -73,9 +73,42 @@ export interface CalendarRepository {
   listAllFlights(): Promise<FlightRecord[]>;
 }
 
+/** Các trường admin được sửa trên lịch phòng; trường bỏ trống thì giữ nguyên. */
+export interface RoomCalendarPatch {
+  total?: number;
+  price?: number;
+  isStopSell?: boolean;
+  isClosedToArrival?: boolean;
+  isClosedToDeparture?: boolean;
+  minLos?: number;
+  maxLos?: number;
+}
+export interface FlightCalendarPatch {
+  total?: number;
+  price?: number;
+  isStopSell?: boolean;
+}
+
+export interface CalendarAdminRepository {
+  /** Số ngày đã mở bán trong khoảng, để biết lệnh sửa có phủ đủ không. */
+  countRoomDays(roomTypeId: string, from: string, toInclusive: string): Promise<number>;
+  countFlightDays(flightId: string, from: string, toInclusive: string): Promise<number>;
+  /**
+   * Cập nhật có điều kiện cả khoảng ngày (UPDATE ... WHERE), không đọc rồi ghi. Đổi total thì chỉ cập nhật ngày
+   * có held + sold <= total mới. Trả số ngày đã cập nhật; ít hơn số ngày trong khoảng nghĩa là có ngày vi phạm.
+   */
+  updateRoomDays(roomTypeId: string, from: string, toInclusive: string, patch: RoomCalendarPatch): Promise<number>;
+  updateFlightDays(flightId: string, from: string, toInclusive: string, patch: FlightCalendarPatch): Promise<number>;
+  /** Ngày có held + sold > total đề xuất: để báo admin vì sao không giảm được. */
+  findOverbookedRoomDates(roomTypeId: string, from: string, toInclusive: string, total: number): Promise<string[]>;
+  findOverbookedFlightDates(flightId: string, from: string, toInclusive: string, total: number): Promise<string[]>;
+  insertAuditLog(entry: { actorUserId: string; action: string; entityType: 'room_type' | 'flight'; entityId: string; changes: Record<string, unknown> }): Promise<void>;
+}
+
 export interface CommerceStore {
   catalog: CatalogRepository;
   calendar: CalendarRepository;
+  admin: CalendarAdminRepository;
 }
 
 /** Ngày hôm nay theo giờ Việt Nam, dạng YYYY-MM-DD. */

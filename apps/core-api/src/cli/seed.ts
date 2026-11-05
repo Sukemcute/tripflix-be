@@ -43,7 +43,7 @@ try {
   const commerceDb = createDb(commercePool);
   const catalog = await seedCatalog(commerceDb);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
-  const opened = await new CalendarUseCases(new DrizzleCommerceStore(commerceDb), () => today).openCalendarWindow();
+  const opened = await new CalendarUseCases(new DrizzleCommerceStore({ tx: commerceDb }), () => today).openCalendarWindow();
   process.stdout.write(
     `commerce: ${catalog.hotels} khách sạn, ${catalog.roomTypes} loại phòng, ${catalog.flights} hạng ghế; ` +
       `mở thêm ${opened.roomDays} ngày phòng, ${opened.flightDays} ngày bay\n`,

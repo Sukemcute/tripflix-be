@@ -1,11 +1,14 @@
 import type {
+  CalendarAdminRepository,
   CalendarRepository,
   CatalogRepository,
   CommerceStore,
+  FlightCalendarPatch,
   FlightRecord,
   NewFlightDay,
   NewRoomDay,
   PropertyRecord,
+  RoomCalendarPatch,
   RoomTypeRecord,
 } from '../../application/ports.js';
 import type { FlightDay, RoomDay } from '../../domain/sales-rules.js';
@@ -45,6 +48,43 @@ export class MemoryCommerceStore implements CommerceStore {
     insertFlightDays: async (days: NewFlightDay[]) => this.insertDays(this.flightDays, days.map(({ flightId, ...d }) => [flightId, { ...d, held: 0, sold: 0 }] as const)),
     listAllRoomTypes: async () => this.roomTypes.map((r) => ({ ...r, stars: this.properties.find((p) => p.id === r.propertyId)?.stars ?? null })),
     listAllFlights: async () => [...this.flights],
+  };
+
+  readonly auditLogs: { actorUserId: string; action: string; entityType: string; entityId: string; changes: Record<string, unknown> }[] = [];
+
+  // Bản Postgres là một câu UPDATE có điều kiện; ở đây kiểm hết rồi mới ghi để giống "hoặc tất cả, hoặc không ngày nào".
+  readonly admin: CalendarAdminRepository = {
+    countRoomDays: async (id, from, to) => (this.loadDays(this.roomDays, [id], from, to).get(id) ?? []).length,
+    countFlightDays: async (id, from, to) => (this.loadDays(this.flightDays, [id], from, to).get(id) ?? []).length,
+    updateRoomDays: async (id, from, to, patch: RoomCalendarPatch) => {
+      const days = this.loadDays(this.roomDays, [id], from, to).get(id) ?? [];
+      const allowed = days.filter((d) => patch.total === undefined || d.held + d.sold <= patch.total);
+      for (const d of allowed) {
+        this.patchRoomDay(id, d.date, {
+          ...(patch.total !== undefined && { total: patch.total }),
+          ...(patch.price !== undefined && { price: patch.price }),
+          ...(patch.isStopSell !== undefined && { isStopSell: patch.isStopSell }),
+          ...(patch.isClosedToArrival !== undefined && { isClosedToArrival: patch.isClosedToArrival }),
+          ...(patch.isClosedToDeparture !== undefined && { isClosedToDeparture: patch.isClosedToDeparture }),
+          ...(patch.minLos !== undefined && { minLos: patch.minLos }),
+          ...(patch.maxLos !== undefined && { maxLos: patch.maxLos }),
+        });
+      }
+      return allowed.length;
+    },
+    updateFlightDays: async (id, from, to, patch: FlightCalendarPatch) => {
+      const days = this.loadDays(this.flightDays, [id], from, to).get(id) ?? [];
+      const allowed = days.filter((d) => patch.total === undefined || d.held + d.sold <= patch.total);
+      for (const d of allowed) this.flightDays.set(`${id}|${d.date}`, { ...d, ...patch });
+      return allowed.length;
+    },
+    findOverbookedRoomDates: async (id, from, to, total) =>
+      (this.loadDays(this.roomDays, [id], from, to).get(id) ?? []).filter((d) => d.held + d.sold > total).map((d) => d.date),
+    findOverbookedFlightDates: async (id, from, to, total) =>
+      (this.loadDays(this.flightDays, [id], from, to).get(id) ?? []).filter((d) => d.held + d.sold > total).map((d) => d.date),
+    insertAuditLog: async (entry) => {
+      this.auditLogs.push(entry);
+    },
   };
 
   /** Sửa một ngày đã mở (test giả lập đã bán, ngừng bán…). */

@@ -228,6 +228,216 @@
           "admin"
         ]
       }
+    },
+    "/api/admin/commerce/room-types/{id}/calendar": {
+      "get": {
+        "operationId": "AdminCalendarController_getRoomCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Tính cả ngày này; tối đa 93 ngày",
+            "schema": {
+              "format": "date",
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminRoomDayDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminCalendarController_updateRoomCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoomCalendarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCalendarResultDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Có ngày chưa mở bán, hoặc giảm số phòng dưới số đã giữ + đã bán (kèm danh sách ngày)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/flights/{id}/calendar": {
+      "get": {
+        "operationId": "AdminCalendarController_getFlightCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Tính cả ngày này; tối đa 93 ngày",
+            "schema": {
+              "format": "date",
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminFlightDayDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminCalendarController_updateFlightCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFlightCalendarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCalendarResultDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Có ngày chưa mở bán, hoặc giảm số ghế dưới số đã giữ + đã bán (kèm danh sách ngày)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
     }
   },
   "info": {
@@ -376,6 +586,189 @@
         },
         "required": [
           "keys"
+        ]
+      },
+      "AdminRoomDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "number"
+          },
+          "held": {
+            "type": "number"
+          },
+          "sold": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number",
+            "description": "total - held - sold"
+          },
+          "price": {
+            "type": "number",
+            "description": "Giá gốc một đêm (VND)"
+          },
+          "isStopSell": {
+            "type": "boolean"
+          },
+          "isClosedToArrival": {
+            "type": "boolean"
+          },
+          "isClosedToDeparture": {
+            "type": "boolean"
+          },
+          "minLos": {
+            "type": "number"
+          },
+          "maxLos": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "total",
+          "held",
+          "sold",
+          "remaining",
+          "price",
+          "isStopSell",
+          "isClosedToArrival",
+          "isClosedToDeparture",
+          "minLos",
+          "maxLos"
+        ]
+      },
+      "UpdateRoomCalendarDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-01"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-31",
+            "description": "Tính cả ngày này; tối đa 93 ngày"
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số phòng mỗi ngày; không được nhỏ hơn số đã giữ + đã bán"
+          },
+          "price": {
+            "type": "number",
+            "description": "Giá gốc một đêm (VND), trước hệ số của gói giá"
+          },
+          "isStopSell": {
+            "type": "boolean"
+          },
+          "isClosedToArrival": {
+            "type": "boolean",
+            "description": "Không nhận phòng vào ngày này"
+          },
+          "isClosedToDeparture": {
+            "type": "boolean",
+            "description": "Không trả phòng vào ngày này"
+          },
+          "minLos": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 14
+          },
+          "maxLos": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 14
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "UpdateCalendarResultDto": {
+        "type": "object",
+        "properties": {
+          "updatedDays": {
+            "type": "number",
+            "example": 31
+          }
+        },
+        "required": [
+          "updatedDays"
+        ]
+      },
+      "AdminFlightDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "number"
+          },
+          "held": {
+            "type": "number"
+          },
+          "sold": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          },
+          "price": {
+            "type": "number",
+            "description": "Giá một vé (VND)"
+          },
+          "isStopSell": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "total",
+          "held",
+          "sold",
+          "remaining",
+          "price",
+          "isStopSell"
+        ]
+      },
+      "UpdateFlightCalendarDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-01"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-31",
+            "description": "Tính cả ngày này; tối đa 93 ngày"
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số ghế mỗi ngày; không được nhỏ hơn số đã giữ + đã bán"
+          },
+          "price": {
+            "type": "number",
+            "description": "Giá một vé (VND), trước hệ số của gói giá"
+          },
+          "isStopSell": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to"
         ]
       }
     }

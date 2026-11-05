@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { createDb } from '@tripflix/db';
-import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade } from './commerce.facade.js';
+import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
+import { CalendarAdminUseCases } from './inventory/application/calendar-admin.use-cases.js';
 import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
 import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
 import { COMMERCE_STORE, TODAY, type Today } from './inventory/application/ports.js';
@@ -14,14 +14,17 @@ const todayInVietnam: Today = () => new Intl.DateTimeFormat('en-CA', { timeZone:
 /**
  * Module commerce. Chủ: Thắng (backup Bảo). Xem README.md cùng thư mục.
  * Module khác chỉ dùng những gì được export trong index.ts: CommerceModule và CommerceFacade.
- * Database riêng commerce, user Postgres tf_commerce; test thay store bằng overrideProvider(COMMERCE_STORE).
+ * Database riêng commerce, user Postgres tf_commerce. Store đọc kết nối qua TransactionHost của commerce, nên
+ * use case có @Transactional('commerce') ghi mọi thứ trong cùng một transaction. Test thay store bằng overrideProvider(COMMERCE_STORE).
  */
 @Module({
+  controllers: [AdminCalendarController],
   providers: [
-    { provide: COMMERCE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleCommerceStore(createDb(pools.commerce)) },
+    { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     { provide: TODAY, useValue: todayInVietnam },
     CatalogUseCases,
     CalendarUseCases,
+    CalendarAdminUseCases,
     OpenCalendarJob,
     CommerceFacade,
   ],
