@@ -9,6 +9,7 @@ import { AccountController } from './account/api/account.controller.js';
 import { AccountUseCases } from './account/application/account.use-cases.js';
 import { AuthController } from './auth/api/auth.controller.js';
 import { JwksController } from './auth/api/jwks.controller.js';
+import { WebSession } from './auth/api/web-session.js';
 import { AuthUseCases } from './auth/application/auth.use-cases.js';
 import {
   ACCESS_SID_BLOCKLIST,
@@ -90,6 +91,6 @@ export class AccessInfraModule {}
     }),
   ],
   controllers: [AuthController, AccountController, JwksController, AdminController],
-  providers: [AuthUseCases, AccountUseCases, StaffUseCases, AccessOutboxRelay, AccessCleanupJob],
+  providers: [AuthUseCases, AccountUseCases, StaffUseCases, WebSession, AccessOutboxRelay, AccessCleanupJob],
 })
 export class AccessModule {}
