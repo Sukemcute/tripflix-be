@@ -1,8 +1,8 @@
+import { Transactional } from '@tripflix/db';
 import { Comment, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord } from '../../../db/schema/index.js';
 
 export interface AddCommentCommand {
@@ -16,9 +16,10 @@ export class AddCommentUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly commentRepository: CommentRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
   ) {}
 
+  @Transactional('content')
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
     const post = await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted' || post.status === 'hidden') {
@@ -50,22 +51,20 @@ export class AddCommentUseCase {
     // Tăng bộ đếm bình luận của bài viết
     await this.postRepository.incrementCounter(command.postId, 'commentCount', 1);
 
-    // Ghi sự kiện outbox content.comment.created (phục vụ notification)
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.comment.created',
-        userId: command.authorId,
-        payload: {
-          commentId: comment.id,
-          postId: command.postId,
-          postAuthorId: post.authorId,
-          authorId: command.authorId,
-          parentCommentId: command.parentCommentId ?? null,
-          body: comment.body,
-          createdAt: comment.createdAt.toISOString(),
-        },
-      }),
-    );
+    // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
+    await this.outbox.add({
+      type: 'content.comment.created',
+      userId: command.authorId,
+      payload: {
+        commentId: comment.id,
+        postId: command.postId,
+        postAuthorId: post.authorId,
+        authorId: command.authorId,
+        parentCommentId: command.parentCommentId ?? null,
+        body: comment.body,
+        createdAt: comment.createdAt.toISOString(),
+      },
+    });
 
     return comment;
   }

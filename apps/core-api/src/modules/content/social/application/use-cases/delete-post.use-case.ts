@@ -1,7 +1,7 @@
+import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { createSocialEvent } from '../events/social-events.js';
-import type { EventPublisherPort } from '../ports/event-publisher.port.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 
 export interface DeletePostCommand {
   postId: string;
@@ -17,9 +17,10 @@ export interface DeletePostResult {
 export class DeletePostUseCase {
   constructor(
     private readonly postRepository: PostRepository,
-    private readonly eventPublisher: EventPublisherPort,
+    private readonly outbox: ContentOutbox,
   ) {}
 
+  @Transactional('content')
   async execute(command: DeletePostCommand): Promise<DeletePostResult> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
@@ -55,17 +56,15 @@ export class DeletePostUseCase {
     await this.postRepository.softDelete(command.postId);
 
     // Ghi sự kiện outbox content.post.deleted để Discovery và Feed xóa khỏi index
-    await this.eventPublisher.publish(
-      createSocialEvent({
-        type: 'content.post.deleted',
-        userId: command.userId,
-        payload: {
-          postId: command.postId,
-          authorId: record.authorId,
-          deletedAt: new Date().toISOString(),
-        },
-      }),
-    );
+    await this.outbox.add({
+      type: 'content.post.deleted',
+      userId: command.userId,
+      payload: {
+        postId: command.postId,
+        authorId: record.authorId,
+        deletedAt: new Date().toISOString(),
+      },
+    });
 
     return {
       id: command.postId,

@@ -5,3 +5,4 @@ export * from './comments.js';
 export * from './reactions.js';
 export * from './bookmarks.js';
 export * from './moderation-actions.js';
+export * from './outbox.js';
