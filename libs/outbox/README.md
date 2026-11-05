@@ -3,7 +3,25 @@
 Ghi sự kiện vào bảng `outbox_events` **trong cùng transaction** với thay đổi nghiệp vụ, rồi relay gửi sang Redis Streams qua `@tripflix/event-bus` (docs/architecture/10 §3.3). Thay đổi rollback thì sự kiện cũng không đi.
 
 - Phụ trách: Dũng (backup Duy)
-- Chưa có: `@Transactional` (đang truyền `tx` tay), dead-letter khi gửi lỗi nhiều lần, job dọn dòng đã gửi.
+- Chưa có: dead-letter khi gửi lỗi nhiều lần.
+
+## Dùng với `@Transactional` (khuyên dùng)
+
+```ts
+// provider: OutboxWriter lấy transaction đang mở của module
+new OutboxWriter(() => txHost.tx, contentOutboxEvents, 'core-api/content');
+
+// use case
+@Transactional('content')
+private async markUploaded(mediaId: string) {
+  await this.media.markUploaded(mediaId);
+  await this.outbox.add({ type: 'media.transcode_requested', payload: { mediaId } }); // không cần truyền tx
+}
+```
+
+Mẫu thật: `DrizzleAccessStore` trong `apps/core-api/src/modules/access/auth/infra/drizzle-access.store.ts`. Dọn dòng đã gửi: `deletePublishedBefore(db, table, date)`.
+
+Cách truyền `tx` tay bên dưới vẫn dùng được.
 
 ## Dùng trong module (ví dụ `content`)
 
@@ -47,6 +65,19 @@ new OutboxRelay({
   onError: (err, envelope) => logger.error({ err, eventId: envelope?.eventId }, 'Gửi sự kiện lỗi'),
 }).start();
 ```
+
+Bảng outbox có sự kiện đi nhiều stream thì truyền hàm chọn cho `stream`:
+
+```ts
+stream: (envelope) => {
+  if (envelope.type === 'content.media.transcode_requested') return STREAMS.media;
+  if (envelope.type.startsWith('content.')) return STREAMS.content;
+  throw new Error(`Chưa khai báo stream cho ${envelope.type}`);
+},
+```
+
+- Mỗi sự kiện đi đúng một stream. Có sự kiện cần đi nhiều stream thì báo Dũng trước.
+- Không có stream mặc định. Hàm ném lỗi thì xử lý như gửi lỗi: gọi `onError`, ghi lỗi, dừng lô, sự kiện sau chưa gửi.
 
 ## Relay làm gì
 

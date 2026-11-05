@@ -87,6 +87,72 @@ describe('OutboxRelay', () => {
     expect(published.map((e) => e.payload.order)).toEqual([0, 1, 2, 3, 4]);
   });
 
+  describe('hàm chọn stream', () => {
+    const MEDIA_TYPE = 'content.media.transcode_requested';
+    const CONTENT_TYPE = 'content.media.ready';
+
+    function createEvent(type: string, order: number): EventEnvelope {
+      return buildEventEnvelope({ type, payload: { order } }, 'core-api/content', new Date(Date.UTC(2026, 10, 4, 10, 0, order)));
+    }
+
+    function createRoutingBus() {
+      const publishedByStream = new Map<StreamName, unknown[]>();
+      const bus: EventBus = {
+        publish: async (stream, event) => {
+          publishedByStream.set(stream, [...(publishedByStream.get(stream) ?? []), event.payload.order]);
+          return '1-0';
+        },
+      };
+      return { bus, publishedByStream };
+    }
+
+    function selectStream(envelope: EventEnvelope): StreamName {
+      if (envelope.type === MEDIA_TYPE) return 'stream:media';
+      if (envelope.type === CONTENT_TYPE) return 'stream:core.content';
+      throw new Error(`Chưa khai báo stream cho ${envelope.type}`);
+    }
+
+    it('chia đúng 2 stream, giữ thứ tự trong từng stream, mỗi sự kiện đi một stream', async () => {
+      const store = new MemoryOutboxStore();
+      const events = [
+        createEvent(MEDIA_TYPE, 0),
+        createEvent(CONTENT_TYPE, 1),
+        createEvent(MEDIA_TYPE, 2),
+        createEvent(CONTENT_TYPE, 3),
+      ];
+      for (const e of [...events].reverse()) store.add(e);
+      const { bus, publishedByStream } = createRoutingBus();
+
+      const result = await new OutboxRelay({ store, bus, stream: selectStream }).publishPending();
+
+      expect(result).toEqual({ publishedCount: 4, failedCount: 0 });
+      expect(publishedByStream.get('stream:media')).toEqual([0, 2]);
+      expect(publishedByStream.get('stream:core.content')).toEqual([1, 3]);
+      expect([...publishedByStream.keys()]).toHaveLength(2);
+    });
+
+    it('hàm ném lỗi thì báo onError, markFailed, sự kiện sau chưa gửi, không có stream mặc định', async () => {
+      const store = new MemoryOutboxStore();
+      const events = [createEvent(MEDIA_TYPE, 0), createEvent('content.unknown.happened', 1), createEvent(MEDIA_TYPE, 2)];
+      for (const e of events) store.add(e);
+      const { bus, publishedByStream } = createRoutingBus();
+      const onError = vi.fn();
+
+      const result = await new OutboxRelay({ store, bus, stream: selectStream, onError }).publishPending();
+
+      expect(result).toEqual({ publishedCount: 1, failedCount: 1 });
+      expect(publishedByStream.get('stream:media')).toEqual([0]);
+      expect([...publishedByStream.keys()]).toEqual(['stream:media']);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), events[1]);
+      expect(store.rows.get(events[1]!.eventId)).toMatchObject({
+        publishedAt: null,
+        attempts: 1,
+        lastError: 'Chưa khai báo stream cho content.unknown.happened',
+      });
+      expect(store.rows.get(events[2]!.eventId)).toMatchObject({ publishedAt: null, attempts: 0 });
+    });
+  });
+
   it('start chạy vòng lặp, stop dừng hẳn', async () => {
     const store = new MemoryOutboxStore();
     for (const e of createEvents(2)) store.add(e);
