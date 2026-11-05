@@ -52,6 +52,7 @@ describe('notification-service kiểm access token qua JWKS', () => {
       AUTH_JWT_AUDIENCE: 'tripflix',
       SMTP_URL: 'smtp://127.0.0.1:1025',
       MAIL_FROM: 'Tripflix <no-reply@tripflix.local>',
+      WEB_APP_URL: 'http://localhost:3100',
       // Test này chỉ kiểm JWKS, không có Redis nên tắt consumer.
       NOTIFICATION_CONSUMER_ENABLED: false,
       NOTIFICATION_CONSUMER_NAME: undefined,
