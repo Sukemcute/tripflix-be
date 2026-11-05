@@ -1170,7 +1170,7 @@
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Số lượng bình luận",
+            "description": "Số lượng bình luận (mặc định tối đa 50, chế độ phẳng tối đa 200)",
             "schema": {
               "default": 20,
               "type": "number"
@@ -1192,6 +1192,16 @@
             "description": "ID bình luận cha nếu muốn xem phản hồi con",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "flat",
+            "required": false,
+            "in": "query",
+            "description": "Chế độ trả phẳng toàn bộ bình luận và phản hồi mọi cấp (dành cho AI / Indexing)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -1481,6 +1491,78 @@
         "summary": "Xử lý kiểm duyệt bài viết (FR13)",
         "tags": [
           "Social - Admin Moderation"
+        ]
+      }
+    },
+    "/api/v1/posts/{postId}/ai-summary": {
+      "put": {
+        "description": "Chỉ cho phép ai-service với Service Token hợp lệ gọi để callback lưu kết quả tóm tắt sau khi phân tích.",
+        "operationId": "PostSummaryController_saveSummary",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePostSummaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đã lưu tóm tắt thành công"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu hoặc cập nhật kết quả tóm tắt bài viết từ AI Service (Nội bộ)",
+        "tags": [
+          "Social - AI Summary"
+        ]
+      },
+      "get": {
+        "description": "Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).",
+        "operationId": "PostSummaryController_getSummary",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thông tin tóm tắt bài viết"
+          },
+          "404": {
+            "description": "Bài viết chưa có bản tóm tắt"
+          }
+        },
+        "summary": "Lấy kết quả tóm tắt cộng đồng của bài viết",
+        "tags": [
+          "Social - AI Summary"
         ]
       }
     },
@@ -2748,7 +2830,8 @@
           "body": {
             "type": "string",
             "example": "Bài viết chia sẻ rất chi tiết!",
-            "description": "Nội dung bình luận"
+            "description": "Nội dung bình luận (tối đa 10.000 ký tự)",
+            "maxLength": 10000
           },
           "parent_comment_id": {
             "type": "string",
@@ -2766,7 +2849,8 @@
           "body": {
             "type": "string",
             "example": "Nội dung bình luận đã chỉnh sửa...",
-            "description": "Nội dung mới"
+            "description": "Nội dung mới (tối đa 10.000 ký tự)",
+            "maxLength": 10000
           }
         },
         "required": [
@@ -2823,6 +2907,40 @@
         "required": [
           "action",
           "reason_code"
+        ]
+      },
+      "SavePostSummaryDto": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình với nhiều mẹo thực tế...",
+            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI"
+          },
+          "key_takeaways": {
+            "example": [
+              "Nên đi thuyền Tràng An lúc 7h sáng",
+              "Emeralda Resort có dịch vụ chu đáo"
+            ],
+            "description": "Các điểm nổi bật đúc kết từ thảo luận cộng đồng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "input_hash": {
+            "type": "string",
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Bản băm hash của tập bình luận đã dùng để tóm tắt"
+          },
+          "comment_count": {
+            "type": "number",
+            "example": 25,
+            "description": "Số lượng bình luận tại thời điểm thực hiện tóm tắt"
+          }
+        },
+        "required": [
+          "summary"
         ]
       },
       "CreateUploadDto": {

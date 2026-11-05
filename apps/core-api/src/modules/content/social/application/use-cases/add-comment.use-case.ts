@@ -26,10 +26,7 @@ export class AddCommentUseCase {
       throw new PostNotFoundException(command.postId);
     }
 
-    const body = command.body.trim();
-    if (!body) {
-      throw new Error('Nội dung bình luận không được để trống');
-    }
+    const body = Comment.validateBody(command.body);
 
     // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
     if (command.parentCommentId) {

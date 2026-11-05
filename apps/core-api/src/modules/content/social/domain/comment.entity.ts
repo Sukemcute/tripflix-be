@@ -35,6 +35,20 @@ export class Comment {
   get updatedAt(): Date { return this.props.updatedAt; }
   get deletedAt(): Date | null | undefined { return this.props.deletedAt; }
 
+  static readonly MAX_BODY_LENGTH = 10_000;
+
+  /** Kiểm tra tính hợp lệ và độ dài nội dung bình luận (1 - 10.000 ký tự) */
+  static validateBody(body: string): string {
+    const trimmed = (body ?? '').trim();
+    if (!trimmed) {
+      throw new Error('Nội dung bình luận không được để trống');
+    }
+    if (trimmed.length > Comment.MAX_BODY_LENGTH) {
+      throw new Error(`Nội dung bình luận không được vượt quá ${Comment.MAX_BODY_LENGTH.toLocaleString()} ký tự`);
+    }
+    return trimmed;
+  }
+
   /** Kiểm tra tính hợp lệ khi làm reply (chỉ cho phép 1 cấp, không được lồng cấp 2) */
   static validateParentForReply(parent: { parentCommentId?: string | null }): void {
     if (parent.parentCommentId) {
@@ -50,11 +64,7 @@ export class Comment {
     if (!this.isOwnedBy(userId)) {
       throw new UnauthorizedCommentActionException('chỉnh sửa', this.id);
     }
-    const trimmed = newBody.trim();
-    if (!trimmed) {
-      throw new Error('Nội dung bình luận không được để trống');
-    }
-    this.props.body = trimmed;
+    this.props.body = Comment.validateBody(newBody);
     this.props.isEdited = true;
     this.props.updatedAt = new Date();
   }

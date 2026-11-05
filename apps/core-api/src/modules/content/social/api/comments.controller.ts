@@ -57,11 +57,13 @@ export class CommentsController {
     @Param('postId') postId: string,
     @Query() query: ListCommentsQueryDto,
   ) {
+    const isFlat = query.flat === true || (query.flat as unknown) === 'true';
     return this.listCommentsUseCase.execute({
       postId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       parentCommentId: query.parent_comment_id,
+      flat: isFlat,
     });
   }
 
