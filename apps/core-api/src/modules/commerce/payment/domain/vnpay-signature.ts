@@ -4,6 +4,10 @@
 
 export type HmacSha512Hex = (secret: string, data: string) => string;
 
+export const VNPAY_GATEWAY = 'vnpay';
+/** Hạn của trang thanh toán VNPay (vnp_ExpireDate), tính từ lúc tạo URL. */
+export const VNPAY_PAYMENT_WINDOW_MINUTES = 15;
+
 const encodeFormValue = (value: string) => encodeURIComponent(value).replace(/%20/g, '+');
 
 export function buildSignData(params: Record<string, string>): string {

@@ -7,8 +7,10 @@ import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CheckoutController } from './booking/api/checkout.controller.js';
 import { CheckoutUseCases } from './booking/application/checkout.use-cases.js';
+import { ExpireHoldsUseCases } from './booking/application/expire-holds.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/ports.js';
 import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
+import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
 import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
@@ -92,7 +94,9 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     CheckoutUseCases,
     PaymentUseCases,
     VnpayUseCases,
+    ExpireHoldsUseCases,
     OpenCalendarJob,
+    ExpireHoldsJob,
     PaymentJobs,
     CommerceFacade,
   ],

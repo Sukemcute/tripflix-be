@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { ORDER_STORE, type OrderStore } from '../../booking/application/ports.js';
+import { ORDER_STORE, type OrderStore, type PaymentRecord } from '../../booking/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
-import { buildSignedUrl, buildVnpayTxnRef, formatVnpayDate, isValidSignature, isVnpaySuccess } from '../domain/vnpay-signature.js';
+import { VNPAY_GATEWAY, VNPAY_PAYMENT_WINDOW_MINUTES, buildSignedUrl, buildVnpayTxnRef, formatVnpayDate, isValidSignature, isVnpaySuccess } from '../domain/vnpay-signature.js';
 import { PaymentUseCases } from './payment.use-cases.js';
 
 export const VNPAY_CONFIG = Symbol('COMMERCE_VNPAY_CONFIG');
@@ -16,8 +16,9 @@ export interface VnpayConfig {
 }
 
 const hmacSha512 = (secret: string, data: string) => createHmac('sha512', secret).update(Buffer.from(data, 'utf8')).digest('hex');
-const PAYMENT_WINDOW_MINUTES = 15;
-const GATEWAY_NAME = 'vnpay';
+
+/** Còn phải ghi callback này không: khoản chưa có kết quả, hoặc tiền về muộn cho khoản đã failed (phải hoàn). */
+const shouldApplyCallback = (payment: PaymentRecord, params: Record<string, string>) => payment.status === 'initiated' || (payment.status === 'failed' && isVnpaySuccess(params));
 
 /** Phản hồi IPN theo đúng quy ước của VNPay. */
 export interface VnpayIpnResponse {
@@ -40,11 +41,11 @@ export class VnpayUseCases {
 
   async startPayment(userId: string, orderId: string, input: { expectedTotal: number; acceptedPolicyVersion: string; clientIp: string; bankCode?: string }): Promise<{ paymentUrl: string; expiresAt: string }> {
     const config = this.requireConfig();
-    const method = { gatewayName: GATEWAY_NAME, buildKey: buildVnpayTxnRef };
+    const method = { gatewayName: VNPAY_GATEWAY, buildKey: buildVnpayTxnRef };
     let prepared = await this.payment.prepareCharge(userId, orderId, input, method);
     // Lần trả VNPay trước chưa có kết quả (khách đóng trang, đổi cách trả): coi là bỏ ngang để trả lại được.
-    // Nếu sau đó VNPay vẫn báo lần cũ thành công, TX2 thấy đơn không còn chờ trả và chuyển hoàn tiền (bù), không trừ hai lần.
-    if (prepared.kind === 'replay' && prepared.payment.gateway === GATEWAY_NAME && prepared.payment.status === 'initiated') {
+    // Nếu sau đó VNPay vẫn báo lần cũ thành công, TX2 tạo khoản hoàn riêng cho lần đó và chuyển người xử lý.
+    if (prepared.kind === 'replay' && prepared.payment.gateway === VNPAY_GATEWAY && prepared.payment.status === 'initiated') {
       await this.payment.applyResult(prepared.payment.gatewayKey, { status: 'failed', code: 'vnpay_abandoned' });
       prepared = await this.payment.prepareCharge(userId, orderId, input, method);
     }
@@ -53,7 +54,7 @@ export class VnpayUseCases {
     }
     if (prepared.kind === 'replay') throw new CommerceError('conflict', 'Đơn này đang có một lần thanh toán chưa xong.');
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + PAYMENT_WINDOW_MINUTES * 60_000);
+    const expiresAt = new Date(now.getTime() + VNPAY_PAYMENT_WINDOW_MINUTES * 60_000);
     const params: Record<string, string> = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
@@ -79,9 +80,9 @@ export class VnpayUseCases {
     const config = this.config;
     if (!config || !isValidSignature(params, config.hashSecret, hmacSha512)) return { RspCode: '97', Message: 'Invalid signature' };
     const payment = (await this.orders.findPaymentsByKey(params.vnp_TxnRef ?? ''))[0];
-    if (!payment || payment.gateway !== GATEWAY_NAME) return { RspCode: '01', Message: 'Order not found' };
+    if (!payment || payment.gateway !== VNPAY_GATEWAY) return { RspCode: '01', Message: 'Order not found' };
     if (Number(params.vnp_Amount) !== payment.amount * 100) return { RspCode: '04', Message: 'Invalid amount' };
-    if (payment.status !== 'initiated') return { RspCode: '02', Message: 'Order already confirmed' };
+    if (!shouldApplyCallback(payment, params)) return { RspCode: '02', Message: 'Order already confirmed' };
     await this.applyCallback(params);
     return { RspCode: '00', Message: 'Confirm Success' };
   }
@@ -91,9 +92,12 @@ export class VnpayUseCases {
     const config = this.requireConfig();
     if (!isValidSignature(params, config.hashSecret, hmacSha512)) return { orderId: null, isValidSignature: false, isSuccess: false };
     const payment = (await this.orders.findPaymentsByKey(params.vnp_TxnRef ?? ''))[0];
-    if (!payment || payment.gateway !== GATEWAY_NAME || Number(params.vnp_Amount) !== payment.amount * 100) return { orderId: null, isValidSignature: true, isSuccess: false };
-    if (payment.status === 'initiated') await this.applyCallback(params);
-    return { orderId: payment.orderId, isValidSignature: true, isSuccess: isVnpaySuccess(params) };
+    if (!payment || payment.gateway !== VNPAY_GATEWAY || Number(params.vnp_Amount) !== payment.amount * 100) return { orderId: null, isValidSignature: true, isSuccess: false };
+    if (shouldApplyCallback(payment, params)) await this.applyCallback(params);
+    // VNPay báo thành công chưa đủ: tiền về muộn thì đang chờ hoàn, trang kết quả không được báo đặt thành công.
+    const settled = (await this.orders.findPaymentsByKey(payment.gatewayKey))[0]!;
+    const order = await this.orders.findOrder(payment.orderId);
+    return { orderId: payment.orderId, isValidSignature: true, isSuccess: isVnpaySuccess(params) && settled.status === 'succeeded' && order?.status === 'paid' };
   }
 
   private async applyCallback(params: Record<string, string>) {

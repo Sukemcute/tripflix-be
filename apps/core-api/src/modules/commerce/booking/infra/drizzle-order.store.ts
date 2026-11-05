@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
-import { and, asc, count, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, exists, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, refunds, roomInventory, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
 import type { OrderStatus } from '../domain/order-rules.js';
 import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
@@ -42,6 +42,7 @@ const mapPayment = (row: PaymentRow): PaymentRecord => ({
   cardLast4: row.cardLast4,
   challengeId: row.challengeId,
   checkAttempts: row.checkAttempts,
+  createdAt: row.createdAt,
 });
 
 @Injectable()
@@ -74,6 +75,36 @@ export class DrizzleOrderStore implements OrderStore {
   async lockOrdersOfUser(userId: string, statuses: OrderStatus[]) {
     const rows = await this.db.select().from(orders).where(and(eq(orders.userId, userId), inArray(orders.status, statuses))).for('update');
     return rows.map(mapOrder);
+  }
+
+  async findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }) {
+    // Lọc ngay trong câu truy vấn: đơn thẻ chờ đối soát có thể nằm rất lâu, không được chiếm chỗ trong lô.
+    const abandonedCharges = this.db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.orderId, orders.id),
+          or(eq(payments.status, 'requires_action'), and(eq(payments.status, 'initiated'), eq(payments.gateway, input.redirectGateway), lte(payments.createdAt, input.redirectStartedBefore))),
+        ),
+      );
+    const rows = await this.db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(lte(orders.holdExpiresAt, input.now), or(eq(orders.status, 'pending'), and(eq(orders.status, 'paying'), exists(abandonedCharges)))))
+      .orderBy(asc(orders.holdExpiresAt))
+      .limit(input.limit);
+    return rows.map((r) => r.id);
+  }
+
+  async lockOrderSkipLocked(orderId: string) {
+    const [row] = await this.db.select().from(orders).where(eq(orders.id, orderId)).for('update', { skipLocked: true });
+    return row ? mapOrder(row) : null;
+  }
+
+  async lockPaymentSkipLocked(paymentId: string) {
+    const [row] = await this.db.select().from(payments).where(eq(payments.id, paymentId)).for('update', { skipLocked: true });
+    return row ? mapPayment(row) : null;
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }) {
@@ -188,7 +219,7 @@ export class DrizzleOrderStore implements OrderStore {
     return row?.n ?? 0;
   }
 
-  async insertRefund(refund: { orderId: string; paymentId: string; gatewayKey: string; amount: number; reason: string }) {
+  async insertRefund(refund: { orderId: string; paymentId: string; gatewayKey: string; amount: number; reason: string; needsReview: boolean }) {
     await this.db.insert(refunds).values(refund).onConflictDoNothing({ target: refunds.gatewayKey });
   }
 
