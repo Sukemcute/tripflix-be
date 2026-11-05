@@ -66,9 +66,16 @@ export class SocialCommentDto {
   @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() isEdited!: boolean;
+  @ApiProperty({ example: 0, description: 'Số lượt thích bình luận' }) likeCount!: number;
+  @ApiProperty({ example: false, description: 'Người xem hiện tại đã thích bình luận hay chưa' }) isLiked!: boolean;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ type: String, nullable: true }) deletedAt!: string | null;
+}
+export class UpdatedCommentReactionDto {
+  @ApiProperty() commentId!: string;
+  @ApiProperty() isLiked!: boolean;
+  @ApiProperty() likeCount!: number;
 }
 export class SocialCommentPageDto {
   @ApiProperty({ type: [SocialCommentDto] }) items!: SocialCommentDto[];

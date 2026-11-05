@@ -4,4 +4,5 @@ export * from './reaction.repository.js';
 export * from './bookmark.repository.js';
 export * from './moderation-action.repository.js';
 export * from './post-summary.repository.js';
+export * from './comment-reaction.repository.js';
 export * from './content-outbox-relay.js';

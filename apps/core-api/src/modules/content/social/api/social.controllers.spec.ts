@@ -152,15 +152,17 @@ describe('Social API Controllers', () => {
 
   describe('CommentsController', () => {
     const mockAddComment = { execute: vi.fn().mockResolvedValue({ id: 'c1', body: 'Tuyet voi' }) };
-    const mockEditComment = { execute: vi.fn().mockResolvedValue({ id: 'c1', body: 'Updated' }) };
+    const mockEditComment = { execute: vi.fn().mockResolvedValue({ id: 'c1', body: 'Updated', likeCount: 2 }) };
     const mockDeleteComment = { execute: vi.fn().mockResolvedValue({ success: true }) };
     const mockListComments = { execute: vi.fn().mockResolvedValue({ items: [], next_cursor: null }) };
+    const mockSetCommentReaction = { execute: vi.fn().mockResolvedValue({ commentId: 'c1', isLiked: true, likeCount: 1 }) };
 
     const controller = new CommentsController(
       mockAddComment as any,
       mockEditComment as any,
       mockDeleteComment as any,
       mockListComments as any,
+      mockSetCommentReaction as any,
     );
 
     it('createComment nên gọi addCommentUseCase', async () => {
@@ -171,7 +173,7 @@ describe('Social API Controllers', () => {
         body: 'Tuyet voi',
         parentCommentId: undefined,
       });
-      expect(res).toEqual({ id: 'c1', body: 'Tuyet voi' });
+      expect(res).toEqual({ id: 'c1', body: 'Tuyet voi', likeCount: 0, isLiked: false });
     });
 
     it('editComment nên gọi editCommentUseCase', async () => {
@@ -181,7 +183,7 @@ describe('Social API Controllers', () => {
         userId: mockUser.userId,
         body: 'Updated',
       });
-      expect(res).toEqual({ id: 'c1', body: 'Updated' });
+      expect(res).toEqual({ id: 'c1', body: 'Updated', likeCount: 2, isLiked: false });
     });
 
     it('deleteComment nên gọi deleteCommentUseCase', async () => {
@@ -202,7 +204,18 @@ describe('Social API Controllers', () => {
         cursor: undefined,
         parentCommentId: undefined,
         flat: false,
+        viewerId: undefined,
       });
+    });
+
+    it('setCommentReaction nên gọi setCommentReactionUseCase', async () => {
+      const res = await controller.setCommentReaction('c1', mockUser, { type: 'like' });
+      expect(mockSetCommentReaction.execute).toHaveBeenCalledWith({
+        commentId: 'c1',
+        userId: mockUser.userId,
+        type: 'like',
+      });
+      expect(res).toEqual({ commentId: 'c1', isLiked: true, likeCount: 1 });
     });
   });
 

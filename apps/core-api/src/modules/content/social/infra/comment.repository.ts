@@ -66,6 +66,21 @@ export class CommentRepository {
   }
 
   /**
+   * Cập nhật số lượt thích của bình luận (Atomic counter với SQL GREATEST).
+   */
+  async incrementLikeCount(id: string, delta: number): Promise<number> {
+    const [updated] = await this.db
+      .update(comments)
+      .set({
+        likeCount: sql<number>`GREATEST(${comments.likeCount} + ${delta}, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(comments.id, id))
+      .returning({ likeCount: comments.likeCount });
+    return updated?.likeCount ?? 0;
+  }
+
+  /**
    * Lấy danh sách bình luận theo bài đăng với Keyset Cursor Pagination.
    * Nếu options.flat = true: trả về mọi cấp bình luận (cả gốc và phản hồi),
    * mỗi phần tử có sẵn parentCommentId phục vụ AI tóm tắt hoặc xây dựng cây bình luận.

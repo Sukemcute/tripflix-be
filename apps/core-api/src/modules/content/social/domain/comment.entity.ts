@@ -9,6 +9,7 @@ export interface CommentProps {
   authorId: string;
   parentCommentId?: string | null;
   body: string;
+  likeCount?: number;
   isEdited: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +31,7 @@ export class Comment {
   get authorId(): string { return this.props.authorId; }
   get parentCommentId(): string | null | undefined { return this.props.parentCommentId; }
   get body(): string { return this.props.body; }
+  get likeCount(): number { return this.props.likeCount ?? 0; }
   get isEdited(): boolean { return this.props.isEdited; }
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }

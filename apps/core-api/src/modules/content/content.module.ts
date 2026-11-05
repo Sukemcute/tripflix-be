@@ -41,6 +41,7 @@ import {
   ListUserPostsUseCase,
   PublishPostUseCase,
   SavePostSummaryUseCase,
+  SetCommentReactionUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
   UpdatePostUseCase,
@@ -50,6 +51,7 @@ import {
 } from './social/application/index.js';
 import {
   BookmarkRepository,
+  CommentReactionRepository,
   CommentRepository,
   ContentOutboxRelay,
   ModerationActionRepository,
@@ -93,6 +95,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       provide: CommentRepository,
       inject: [buildTransactionHostToken('content')],
       useFactory: (txHost: ModuleTransactionHost) => new CommentRepository(() => txHost.tx),
+    },
+    {
+      provide: CommentReactionRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new CommentReactionRepository(() => txHost.tx),
     },
     {
       provide: ReactionRepository,
@@ -231,9 +238,21 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListCommentsUseCase,
-      inject: [PostRepository, CommentRepository],
-      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository) =>
-        new ListCommentsUseCase(postRepo, commentRepo),
+      inject: [PostRepository, CommentRepository, CommentReactionRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        commentRepo: CommentRepository,
+        commentReactionRepo: CommentReactionRepository,
+      ) => new ListCommentsUseCase(postRepo, commentRepo, commentReactionRepo),
+    },
+    {
+      provide: SetCommentReactionUseCase,
+      inject: [CommentRepository, CommentReactionRepository, CONTENT_OUTBOX],
+      useFactory: (
+        commentRepo: CommentRepository,
+        commentReactionRepo: CommentReactionRepository,
+        outbox: ContentOutbox,
+      ) => new SetCommentReactionUseCase(commentRepo, commentReactionRepo, outbox),
     },
     {
       provide: BookmarkPostUseCase,

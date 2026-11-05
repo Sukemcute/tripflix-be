@@ -1317,6 +1317,52 @@
         ]
       }
     },
+    "/api/v1/comments/{commentId}/reaction": {
+      "put": {
+        "operationId": "CommentsController_setCommentReaction",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommentReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cập nhật trạng thái thả tim thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedCommentReactionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thả tim hoặc hủy thả tim cho bình luận (FR11 - Idempotent)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
     "/api/v1/comments/{commentId}": {
       "patch": {
         "operationId": "CommentsController_editComment",
@@ -3902,6 +3948,16 @@
           "isEdited": {
             "type": "boolean"
           },
+          "likeCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số lượt thích bình luận"
+          },
+          "isLiked": {
+            "type": "boolean",
+            "example": false,
+            "description": "Người xem hiện tại đã thích bình luận hay chưa"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -3922,6 +3978,8 @@
           "parentCommentId",
           "body",
           "isEdited",
+          "likeCount",
+          "isLiked",
           "createdAt",
           "updatedAt",
           "deletedAt"
@@ -3948,6 +4006,40 @@
           "items",
           "nextCursor",
           "total"
+        ]
+      },
+      "SetCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "like",
+              null
+            ],
+            "nullable": true,
+            "example": "like",
+            "description": "Loại cảm xúc (\"like\" để thích, null để hủy thích, để trống để toggle)"
+          }
+        }
+      },
+      "UpdatedCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string"
+          },
+          "isLiked": {
+            "type": "boolean"
+          },
+          "likeCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "commentId",
+          "isLiked",
+          "likeCount"
         ]
       },
       "UpdateCommentDto": {
