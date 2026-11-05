@@ -13,17 +13,23 @@ curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"   # đăng xuất rồi vào lại SSH
 ```
 
-Repo private nên máy cần hai quyền đọc:
+Chép code từ laptop lên máy. Cách này không để credential GitHub trên server, và `git archive` chỉ lấy file đã commit nên không chép `.env`:
 
-- Clone repo: deploy key chỉ đọc của `tripflix-be`.
-- Tải image: `docker login ghcr.io`, mật khẩu là classic token chỉ có quyền `read:packages`.
+```bash
+git archive <nhánh> | gcloud compute ssh tripflix-staging --zone=asia-southeast1-b -- 'mkdir -p ~/tripflix-be && tar -x -C ~/tripflix-be'
+```
+
+`gcloud compute ssh` đăng nhập bằng tên người dùng trên laptop, còn nút SSH trên web dùng tên tài khoản Google. Đó là hai tài khoản khác nhau trên máy, nên chỉ thao tác bằng một tài khoản.
+
+Tải image cần `docker login ghcr.io`, mật khẩu là classic token chỉ có quyền `read:packages`. Dán token trực tiếp vào terminal.
 
 ## Giai đoạn 1: Postgres và Redis
 
 ```bash
-git clone git@github.com:Sukemcute/tripflix-be.git && cd tripflix-be
+cd ~/tripflix-be
 sh deploy/init-server-env.sh
-alias dc='docker compose -f deploy/compose.server.yaml --env-file deploy/.env.server'
+echo "alias dc='docker compose -f ~/tripflix-be/deploy/compose.server.yaml --env-file ~/tripflix-be/deploy/.env.server'" >> ~/.bashrc
+source ~/.bashrc
 dc up -d --wait
 dc ps
 ```
@@ -42,7 +48,7 @@ curl -s 'localhost:3000/api/v1/feed?limit=3'
 ```
 
 - Giai đoạn này chưa cần AWS key: link video trong seed là link CloudFront đã có sẵn.
-- Seed build từ mã nguồn vì image production không có file seed. Chạy lại không tạo trùng.
+- Seed build từ mã nguồn vì image production không có file seed, trên máy 2 vCPU mất vài phút. Chạy lại không tạo trùng.
 - Tài khoản mẫu, gồm cả superadmin, dùng `SEED_PASSWORD` trong `.env.server`.
 
 Xong khi `/health` trả 200 và đi hết các trang feed được 10 bài.
