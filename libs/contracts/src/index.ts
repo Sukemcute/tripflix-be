@@ -54,7 +54,11 @@ export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
-/** commerce.order.paid v1: đơn đã thanh toán, chỗ đã bán. Không mang thông tin liên hệ của khách. */
+/**
+ * commerce.order.paid v1: đơn đã thanh toán, chỗ đã bán. Mang thông tin liên hệ khách nhập khi đặt để notification gửi
+ * email xác nhận; contactEmail có thể null (form không bắt buộc), khi đó notification tra email tài khoản theo userId.
+ * Ba trường liên hệ thêm sau (TF37) nên optional: sự kiện cũ trong stream không có.
+ */
 export const CommerceOrderPaidV1Schema = z.object({
   orderId: z.uuid(),
   userId: z.uuid(),
@@ -69,6 +73,9 @@ export const CommerceOrderPaidV1Schema = z.object({
       qty: z.number().int().positive(),
     }),
   ),
+  confirmationCode: z.string().nullable().optional(),
+  contactName: z.string().nullable().optional(),
+  contactEmail: z.string().nullable().optional(),
 });
 export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
 

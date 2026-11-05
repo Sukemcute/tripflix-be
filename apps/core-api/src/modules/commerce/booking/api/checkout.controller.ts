@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Put, Query, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Put, Query, UseFilters } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
@@ -53,12 +53,15 @@ export class CheckoutController {
 
   /** Chuyến đi của tôi (TF37): mọi đơn của người đang đăng nhập, mới đặt trước, đọc thẳng database nên web vừa đặt là app thấy. */
   @Get()
+  // Dữ liệu riêng từng người, phải luôn mới: không để CDN hay trình duyệt giữ lại.
+  @Header('Cache-Control', 'no-store')
   @ApiOkResponse({ type: TripPageDto })
   list(@CurrentUser() user: AuthUser, @Query(new ZodQuery(ListTripsQuerySchema)) query: ListTripsQueryDto & z.infer<typeof ListTripsQuerySchema>) {
     return this.checkout.listTrips(user.userId, { statuses: query.status, cursor: query.cursor, limit: query.limit });
   }
 
   @Get(':id')
+  @Header('Cache-Control', 'no-store')
   @ApiOkResponse({ type: CheckoutDto })
   get(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.checkout.getCheckout(user.userId, id);
