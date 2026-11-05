@@ -33,10 +33,12 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | Dựng lại chỉ mục | `search/jobs/rebuild-suggest-index.job.ts` | Mỗi lần khởi động khi `APP_ROLE` là `worker` hoặc `all` |
 | `GET /api/stays` | `search/api/stays.controller.ts` | Trang kết quả web OTA: khách sạn còn phòng ở một nơi cho ngày đã chọn, giá thật từ commerce; lọc sao, giá; sắp giá hoặc sao |
 | `GET /api/recommendations/home` | `recommend/api/home-recommendations.controller.ts` | Khối "Gợi ý dành cho bạn" trang chủ web, mỗi thẻ kèm lý do (TF12) |
+| `POST /api/search` | `search/api/explore.controller.ts` | Tìm khám phá của app: một ô tìm, kết quả chia vùng (Ở đâu, Lộ trình, Bài viết, Video). Xem mục 6 (TF11) |
+| Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút |
 
 ## Giao tiếp
 
-- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`; danh mục cho gợi ý trang chủ) và `CommerceFacade.checkAvailability` (`/stays`). `DiscoveryModule` import `CommerceModule`.
+- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`; danh mục cho gợi ý trang chủ) và `CommerceFacade.checkAvailability` (`/stays`); `ContentFacade.listPosts` (dựng chỉ mục tìm khám phá) và `ContentFacade.getVisiblePosts` (`/search`, bỏ bài đã ẩn). `DiscoveryModule` import `CommerceModule`, `ContentModule`.
 - Nghe sự kiện: **không, ở v1** (05/11). Search không bao giờ chờ sự kiện: request chỉ đọc bảng của discovery hoặc gọi hàm module khác trong tiến trình. Bản chép được làm mới bằng job nền (xem bảng 1, 3, 4). **Không nghe `commerce.ari.updated`**: discovery không giữ giá hay còn phòng thật (`/stays` gọi thẳng commerce), nên không có gì để cập nhật. Danh mục khách sạn v1 là seed, nạp lại lúc worker khởi động hoặc qua lệnh reindex. Cần cập nhật ngay thì thêm `commerce.catalog.updated { productIds }` (chỉ mang id, discovery tự gọi `listCatalog`).
 - Cho module khác: không export hàm nào (content, commerce bị discovery gọi nên không được gọi ngược).
 
@@ -96,5 +98,16 @@ Chọn địa điểm thì web gọi `/stays?placeId=<refId>`. Chọn khách s�
 | Ra | `{ items: [{ hotelId, name, thumbnail, stars, brand, province, priceFrom, reason: { code, text } }] }`. `code`: `recent_place` ("Vì bạn vừa tìm Đà Lạt") hoặc `good_deal` ("Rẻ hơn 37% so với giá trung bình khách sạn 5 sao"). Có thể rỗng |
 | Luồng | 1. Danh mục khách sạn: `commerce.listCatalog({ type: 'hotel', days: 30 })` đọc hết theo con trỏ, giữ trong bộ nhớ 10 phút; bỏ khách sạn không có giá.<br>2. Tối đa 3 nơi vừa tìm, mỗi nơi 2 khách sạn (tỉnh gồm điểm đến con), nhiều sao rồi rẻ trước.<br>3. Phần còn lại: khách sạn rẻ hơn trung vị cùng hạng sao ≥ 10% (hạng có ≥ 3 khách sạn), rẻ nhiều nhất trước; mỗi tỉnh một, mỗi chuỗi (`brand`) một, `brand` null là độc lập nên không giới hạn |
 | Không làm | Chưa có "xu hướng", "người giống bạn": chưa có lượt xem, lượt đặt (chờ analytics, TF28). Lý do chỉ ghi điều đúng sự thật tính được từ danh mục |
+
+### 6. `POST /api/search` — app, **đã có** (TF11)
+
+| | |
+|---|---|
+| Vào | `{ q, loc?: { lat, lng } }`. `loc` chỉ dùng khi câu không nói nơi |
+| Ra | `{ understood, nearUser, sections: [{ kind, label, total, items }], suggest, dropped }`. `kind`: stay, plan, post, video (food, cafe, see rỗng tới khi có nguồn POI). Item: `id`, `kind`, `refId`, `title`, `subtitle`, `thumbnail`, `reason`, `priceFrom`, `days`, `location` |
+| Luồng | 1. Hiểu câu (`search/domain/explore/query.ts`): nơi, ý muốn, ngân sách, số ngày, tên riêng, cụm dính, sửa lỗi gõ — đọc bộ đếm cần cho câu từ `search_counts`.<br>2. Mỗi nhánh (song song) lấy ứng viên bằng SQL (`terms && …`, tên đường, tầm, số ngày, khung toạ độ quanh nơi) rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần bằng TS (`rank.ts`).<br>3. `content.getVisiblePosts` bỏ bài vừa ẩn |
+| Nạp dữ liệu | Job mỗi 10 phút (worker): đọc hết `listCatalog` + `listPosts`, dựng chỉ mục bằng TS, một transaction xoá rồi ghi lại (advisory lock). Dựng lại toàn bộ vì `listPosts` không báo bài bị ẩn; ~230 mục mất ~2 s |
+| Đối chiếu | Port từ prototype Python `experiments/natural-search` (ngoài repo). `explore.parity.spec.ts` chạy 134 câu của prototype, kết quả trùng hoàn toàn (đặt `EXPLORE_PARITY_DIR`) |
+| Từ điển | `search/domain/explore/lexicon-rows.ts`. Thêm cách viết mới = thêm dòng; chỉ mục dựng lại ở chu kỳ job kế tiếp |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate discovery`. Không sửa migration đã merge.

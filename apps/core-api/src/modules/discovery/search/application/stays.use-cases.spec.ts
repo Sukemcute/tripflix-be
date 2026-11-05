@@ -16,6 +16,8 @@ const hotel = (id: string, provinceSlug: string, stars: number): CatalogHotel =>
   priceFrom: null,
   isAvailable: true,
   options: [],
+  address: null,
+  location: null,
 });
 
 const available = (productId: string, unitPrice: number): AvailabilityResult => ({

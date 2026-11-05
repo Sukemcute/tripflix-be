@@ -16,6 +16,8 @@ const hotel = (id: string, slug: string, stars: number, priceFrom: number | null
   priceFrom,
   isAvailable: priceFrom !== null,
   options: [],
+  address: null,
+  location: null,
 });
 
 describe('HomeRecommendationUseCases', () => {
