@@ -8,29 +8,21 @@ import {
   type AuthUser,
   type SidBlocklist,
 } from '@tripflix/auth';
-import { baseEnvSchema, loadEnv } from '@tripflix/config';
+import { loadEnv } from '@tripflix/config';
 import { createPool, ping } from '@tripflix/db';
 import { loggerModule } from '@tripflix/observability';
 import { Redis } from 'ioredis';
 import { createRemoteJWKSet } from 'jose';
 import type pg from 'pg';
-import { z } from 'zod';
 
-export const envSchema = baseEnvSchema.extend({
-  PORT: z.coerce.number().int().positive().default(3001),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
-  DATABASE_URL_NOTIFICATION: z.string(),
-  // Khoá công khai của module access; service tự kiểm chữ ký access token.
-  JWKS_URL: z.url().default('http://localhost:3000/.well-known/jwks.json'),
-  AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
-  AUTH_JWT_AUDIENCE: z.string().default('tripflix'),
-});
-export type Env = z.infer<typeof envSchema>;
+import { NotificationConsumer } from './consumers/notification-consumer.js';
+import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
+import { envSchema, type Env } from './env.js';
+import { SmtpMailer, type Mailer } from './outapp/mailer.js';
+import { DB, ENV, MAILER, PROCESSED_EVENTS, REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
 
-export const ENV = Symbol('ENV');
-const DB = Symbol('DB');
-const REDIS = Symbol('REDIS');
-export const SID_BLOCKLIST_PROVIDER = Symbol('NOTIFICATION_SID_BLOCKLIST');
+export { envSchema, type Env } from './env.js';
+export { ENV, MAILER, PROCESSED_EVENTS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
 
 @Controller('health')
 class HealthController {
@@ -60,8 +52,8 @@ export class MeController {
 }
 
 /**
- * Khung notification-service. Phần sẽ làm (Dũng): consumers/ (group "notification"), inbox/ (WebSocket),
- * delivery/ (push, email qua BullMQ), preferences/, grouping/ — xem docs/architecture/10 §3.5.
+ * notification-service. Đã có: consumers/ (group "notification", email đặt lại mật khẩu). Sẽ làm (Dũng): inbox/ (WebSocket),
+ * push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
  */
 @Module({
   providers: [
@@ -78,8 +70,10 @@ export class MeController {
       useFactory: (env: Env) => new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 }),
     },
     { provide: SID_BLOCKLIST_PROVIDER, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
+    { provide: MAILER, inject: [ENV], useFactory: (env: Env): Mailer => new SmtpMailer(env.SMTP_URL, env.MAIL_FROM) },
+    { provide: PROCESSED_EVENTS, inject: [REDIS], useFactory: (redis: Redis): ProcessedEvents => new RedisProcessedEvents(redis) },
   ],
-  exports: [ENV, DB, REDIS, SID_BLOCKLIST_PROVIDER],
+  exports: [ENV, DB, REDIS, SID_BLOCKLIST_PROVIDER, MAILER, PROCESSED_EVENTS],
 })
 export class InfraModule {}
 
@@ -105,6 +99,7 @@ export class InfraModule {}
     }),
   ],
   controllers: [HealthController, MeController],
+  providers: [NotificationConsumer],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(

@@ -27,10 +27,14 @@
   "devDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/testing": "catalog:",
     "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
     "oxlint": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
+    "supertest": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

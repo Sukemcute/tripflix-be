@@ -1,6 +1,7 @@
 export * from './common/cursor.js';
 export * from './events/social-events.js';
 export * from './ports/commerce-service.port.js';
+export * from './ports/content-outbox.port.js';
 export * from './ports/event-publisher.port.js';
 export * from './use-cases/create-draft.use-case.js';
 export * from './use-cases/update-post.use-case.js';
@@ -19,3 +20,6 @@ export * from './use-cases/bookmark-post.use-case.js';
 export * from './use-cases/list-bookmarks.use-case.js';
 export * from './use-cases/track-share.use-case.js';
 export * from './use-cases/admin-moderate-post.use-case.js';
+export * from './use-cases/get-my-reaction.use-case.js';
+export * from './use-cases/list-admin-posts.use-case.js';
+export * from './use-cases/get-admin-post-detail.use-case.js';

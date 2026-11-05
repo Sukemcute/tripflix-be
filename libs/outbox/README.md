@@ -66,6 +66,19 @@ new OutboxRelay({
 }).start();
 ```
 
+Bảng outbox có sự kiện đi nhiều stream thì truyền hàm chọn cho `stream`:
+
+```ts
+stream: (envelope) => {
+  if (envelope.type === 'content.media.transcode_requested') return STREAMS.media;
+  if (envelope.type.startsWith('content.')) return STREAMS.content;
+  throw new Error(`Chưa khai báo stream cho ${envelope.type}`);
+},
+```
+
+- Mỗi sự kiện đi đúng một stream. Có sự kiện cần đi nhiều stream thì báo Dũng trước.
+- Không có stream mặc định. Hàm ném lỗi thì xử lý như gửi lỗi: gọi `onError`, ghi lỗi, dừng lô, sự kiện sau chưa gửi.
+
 ## Relay làm gì
 
 | Bước | Cách làm |

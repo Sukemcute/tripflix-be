@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   posts,
@@ -36,9 +36,14 @@ export interface FindAdminPostsOptions {
 
 /**
  * Repository thao tác với bảng content.posts qua Drizzle ORM.
+ * Hỗ trợ executor động để tự động tham gia @Transactional('content').
  */
 export class PostRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
+
+  private get db(): Db {
+    return typeof this.dbOrGetDb === 'function' ? this.dbOrGetDb() : this.dbOrGetDb;
+  }
 
   async create(data: NewPostRecord): Promise<PostRecord> {
     const [inserted] = await this.db.insert(posts).values(data).returning();

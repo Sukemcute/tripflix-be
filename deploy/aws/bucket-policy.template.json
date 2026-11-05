@@ -2,11 +2,14 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "CloudFrontReadsVideosOnly",
+      "Sid": "CloudFrontReadsVideosAndImages",
       "Effect": "Allow",
       "Principal": { "Service": "cloudfront.amazonaws.com" },
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::@BUCKET@/dev/*/videos/*",
+      "Resource": [
+        "arn:aws:s3:::@BUCKET@/dev/*/videos/*",
+        "arn:aws:s3:::@BUCKET@/dev/*/images/*"
+      ],
       "Condition": { "StringEquals": { "AWS:SourceArn": "@DISTRIBUTION_ARN@" } }
     }
   ]

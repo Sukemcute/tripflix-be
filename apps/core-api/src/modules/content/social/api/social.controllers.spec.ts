@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { AuthUser } from '@tripflix/auth';
+import { PostNotFoundException } from '../domain/errors.js';
 import {
   AdminPostsController,
   BookmarksController,
@@ -9,8 +11,18 @@ import {
 } from './index.js';
 
 describe('Social API Controllers', () => {
-  const mockUser = { id: '018d9f00-user-7000-8000-000000000001', role: 'member' };
-  const mockAdmin = { id: '018d9f00-mod-7000-8000-000000000099', role: 'moderator' };
+  const mockUser: AuthUser = {
+    userId: '018d9f00-user-7000-8000-000000000001',
+    role: 'member',
+    sid: 'sid-user-1',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
+  const mockAdmin: AuthUser = {
+    userId: '018d9f00-mod-7000-8000-000000000099',
+    role: 'moderator',
+    sid: 'sid-admin-1',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
 
   describe('PostsController', () => {
     const mockCreateDraft = { execute: vi.fn().mockResolvedValue({ id: 'p1', status: 'draft' }) };
@@ -40,7 +52,7 @@ describe('Social API Controllers', () => {
         media_ids: ['m1'],
       });
       expect(mockCreateDraft.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ authorId: mockUser.id, title: 'Draft 1' }),
+        expect.objectContaining({ authorId: mockUser.userId, title: 'Draft 1' }),
       );
       expect(res).toEqual({ id: 'p1', status: 'draft' });
     });
@@ -48,14 +60,14 @@ describe('Social API Controllers', () => {
     it('updatePost nên gọi updatePostUseCase', async () => {
       const res = await controller.updatePost('p1', mockUser, { title: 'New title' });
       expect(mockUpdatePost.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ postId: 'p1', userId: mockUser.id, title: 'New title' }),
+        expect.objectContaining({ postId: 'p1', userId: mockUser.userId, title: 'New title' }),
       );
       expect(res).toEqual({ id: 'p1', title: 'updated' });
     });
 
     it('publishPost nên gọi publishPostUseCase', async () => {
       const res = await controller.publishPost('p1', mockUser);
-      expect(mockPublishPost.execute).toHaveBeenCalledWith({ postId: 'p1', userId: mockUser.id });
+      expect(mockPublishPost.execute).toHaveBeenCalledWith({ postId: 'p1', userId: mockUser.userId });
       expect(res).toEqual({ id: 'p1', status: 'published' });
     });
 
@@ -63,7 +75,7 @@ describe('Social API Controllers', () => {
       const res = await controller.deletePost('p1', mockUser);
       expect(mockDeletePost.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
         isSuperAdmin: false,
       });
       expect(res).toEqual({ success: true });
@@ -73,7 +85,7 @@ describe('Social API Controllers', () => {
       const res = await controller.getPostDetail('p1', mockUser);
       expect(mockGetPostDetail.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        viewerId: mockUser.id,
+        viewerId: mockUser.userId,
         isStaff: false,
       });
       expect(res).toEqual({ id: 'p1', title: 'Post 1' });
@@ -95,7 +107,7 @@ describe('Social API Controllers', () => {
       const res = await controller.trackShare('p1', mockUser);
       expect(mockTrackShare.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
       });
       expect(res).toEqual({ share_url: 'https://...', share_count: 1 });
     });
@@ -104,19 +116,19 @@ describe('Social API Controllers', () => {
   describe('ReactionsController', () => {
     const mockSetReaction = { execute: vi.fn().mockResolvedValue({ post_id: 'p1', reaction_type: 'like' }) };
     const mockGetStats = { execute: vi.fn().mockResolvedValue({ reaction_total: 10 }) };
-    const mockReactionRepo = { findByPostAndUser: vi.fn().mockResolvedValue({ type: 'like' }) };
+    const mockGetMyReaction = { execute: vi.fn().mockResolvedValue({ postId: 'p1', type: 'like' }) };
 
     const controller = new ReactionsController(
       mockSetReaction as any,
       mockGetStats as any,
-      mockReactionRepo as any,
+      mockGetMyReaction as any,
     );
 
     it('setReaction nên gọi setReactionUseCase', async () => {
       const res = await controller.setReaction('p1', mockUser, { type: 'like' });
       expect(mockSetReaction.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
         type: 'like',
       });
       expect(res).toEqual({ post_id: 'p1', reaction_type: 'like' });
@@ -128,9 +140,12 @@ describe('Social API Controllers', () => {
       expect(res).toEqual({ reaction_total: 10 });
     });
 
-    it('getMyReaction nên lấy cảm xúc từ repository', async () => {
+    it('getMyReaction nên gọi getMyReactionUseCase', async () => {
       const res = await controller.getMyReaction('p1', mockUser);
-      expect(mockReactionRepo.findByPostAndUser).toHaveBeenCalledWith('p1', mockUser.id);
+      expect(mockGetMyReaction.execute).toHaveBeenCalledWith({
+        postId: 'p1',
+        userId: mockUser.userId,
+      });
       expect(res).toEqual({ post_id: 'p1', type: 'like' });
     });
   });
@@ -152,7 +167,7 @@ describe('Social API Controllers', () => {
       const res = await controller.createComment('p1', mockUser, { body: 'Tuyet voi' });
       expect(mockAddComment.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        authorId: mockUser.id,
+        authorId: mockUser.userId,
         body: 'Tuyet voi',
         parentCommentId: undefined,
       });
@@ -163,7 +178,7 @@ describe('Social API Controllers', () => {
       const res = await controller.editComment('c1', mockUser, { body: 'Updated' });
       expect(mockEditComment.execute).toHaveBeenCalledWith({
         commentId: 'c1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
         body: 'Updated',
       });
       expect(res).toEqual({ id: 'c1', body: 'Updated' });
@@ -173,7 +188,7 @@ describe('Social API Controllers', () => {
       const res = await controller.deleteComment('c1', mockUser);
       expect(mockDeleteComment.execute).toHaveBeenCalledWith({
         commentId: 'c1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
         isSuperAdmin: false,
       });
       expect(res).toEqual({ success: true });
@@ -200,7 +215,7 @@ describe('Social API Controllers', () => {
       const res = await controller.setBookmark('p1', mockUser, { is_bookmarked: true });
       expect(mockBookmark.execute).toHaveBeenCalledWith({
         postId: 'p1',
-        userId: mockUser.id,
+        userId: mockUser.userId,
         isBookmarked: true,
       });
       expect(res).toEqual({ post_id: 'p1', is_bookmarked: true });
@@ -209,7 +224,7 @@ describe('Social API Controllers', () => {
     it('listMyBookmarks nên gọi listBookmarksUseCase', async () => {
       await controller.listMyBookmarks(mockUser, { limit: 20 });
       expect(mockListBookmarks.execute).toHaveBeenCalledWith({
-        userId: mockUser.id,
+        userId: mockUser.userId,
         limit: 20,
         cursor: undefined,
       });
@@ -217,71 +232,76 @@ describe('Social API Controllers', () => {
   });
 
   describe('AdminPostsController', () => {
-    const mockPostRepo = {
-      findAdminPosts: vi.fn().mockResolvedValue([
-        {
-          id: 'p1',
-          authorId: 'u1',
-          title: 'Post 1',
-          postType: 'reels',
-          status: 'published',
-          visibility: 'public',
-          reactionTotal: 5,
-          commentCount: 2,
-          createdAt: new Date('2026-11-04T08:00:00.000Z'),
-        },
-      ]),
-      countAdminPosts: vi.fn().mockResolvedValue(1),
-      findById: vi.fn().mockResolvedValue({
-        id: 'p1',
-        authorId: 'u1',
-        title: 'Post 1',
-        body: 'Body 1',
-        postType: 'reels',
-        status: 'published',
-        visibility: 'public',
-        isVerified: true,
-        mediaIds: ['m1'],
-        coverMediaId: null,
-        hashtags: ['vlog'],
-        tripAttachment: null,
-        reactionCounts: {},
-        reactionTotal: 5,
-        commentCount: 2,
-        shareCount: 1,
-        bookmarkCount: 0,
-        createdAt: new Date('2026-11-04T08:00:00.000Z'),
-        updatedAt: new Date('2026-11-04T08:00:00.000Z'),
+    const mockListAdminPosts = {
+      execute: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'p1',
+            author: { id: 'u1', display_name: 'User u1' },
+            title: 'Post 1',
+            post_type: 'reels',
+            status: 'published',
+            visibility: 'public',
+            report_count: 0,
+            reaction_total: 5,
+            comment_count: 2,
+            created_at: '2026-11-04T08:00:00.000Z',
+          },
+        ],
+        next_cursor: null,
+        total: 1,
       }),
     };
-    const mockModerationRepo = {
-      findByPostId: vi.fn().mockResolvedValue([
-        {
-          id: 'act1',
-          postId: 'p1',
-          action: 'hide',
-          reasonCode: 'SPAM',
-          reasonDetail: 'Spam link',
-          reportIds: [],
-          moderatorId: 'mod1',
-          createdAt: new Date('2026-11-04T08:30:00.000Z'),
-        },
-      ]),
+
+    const mockGetAdminPostDetail = {
+      execute: vi.fn().mockResolvedValue({
+        id: 'p1',
+        title: 'Post 1',
+        body: 'Body 1',
+        post_type: 'reels',
+        status: 'published',
+        visibility: 'public',
+        is_verified: true,
+        author: { id: 'u1', display_name: 'User u1' },
+        media_ids: ['m1'],
+        cover_media_id: null,
+        hashtags: ['vlog'],
+        trip_attachment: null,
+        reaction_counts: {},
+        reaction_total: 5,
+        comment_count: 2,
+        share_count: 1,
+        bookmark_count: 0,
+        created_at: '2026-11-04T08:00:00.000Z',
+        updated_at: '2026-11-04T08:00:00.000Z',
+        moderation_history: [
+          {
+            action_id: 'act1',
+            action: 'hide',
+            reason_code: 'SPAM',
+            reason_detail: 'Spam link',
+            report_ids: [],
+            moderator_id: 'mod1',
+            created_at: '2026-11-04T08:30:00.000Z',
+          },
+        ],
+      }),
     };
+
     const mockAdminModeratePost = {
       execute: vi.fn().mockResolvedValue({
         actionId: 'act1',
         postId: 'p1',
         previousStatus: 'published',
         postStatus: 'hidden',
-        moderatorId: mockAdmin.id,
+        moderatorId: mockAdmin.userId,
         createdAt: new Date(),
       }),
     };
 
     const controller = new AdminPostsController(
-      mockPostRepo as any,
-      mockModerationRepo as any,
+      mockListAdminPosts as any,
+      mockGetAdminPostDetail as any,
       mockAdminModeratePost as any,
     );
 
@@ -295,21 +315,24 @@ describe('Social API Controllers', () => {
 
     it('listAdminPosts thành công với moderator', async () => {
       const res = await controller.listAdminPosts(mockAdmin, { limit: 10 });
-      expect(mockPostRepo.findAdminPosts).toHaveBeenCalled();
+      expect(mockListAdminPosts.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 10 }),
+      );
       expect(res.items.length).toBe(1);
       expect(res.total).toBe(1);
     });
 
     it('getAdminPostDetail thành công và trả về lịch sử kiểm duyệt', async () => {
       const res = await controller.getAdminPostDetail(mockAdmin, 'p1');
-      expect(mockPostRepo.findById).toHaveBeenCalledWith('p1');
-      expect(mockModerationRepo.findByPostId).toHaveBeenCalledWith('p1');
+      expect(mockGetAdminPostDetail.execute).toHaveBeenCalledWith({ postId: 'p1' });
       expect(res.id).toBe('p1');
       expect(res.moderation_history.length).toBe(1);
     });
 
     it('getAdminPostDetail ném NotFoundException nếu bài viết không tồn tại', async () => {
-      mockPostRepo.findById.mockResolvedValueOnce(null);
+      mockGetAdminPostDetail.execute.mockRejectedValueOnce(
+        new PostNotFoundException('non-existent'),
+      );
       await expect(controller.getAdminPostDetail(mockAdmin, 'non-existent')).rejects.toThrow(
         NotFoundException,
       );
@@ -323,7 +346,7 @@ describe('Social API Controllers', () => {
       expect(mockAdminModeratePost.execute).toHaveBeenCalledWith(
         expect.objectContaining({
           postId: 'p1',
-          moderatorId: mockAdmin.id,
+          moderatorId: mockAdmin.userId,
           action: 'hide',
           reasonCode: 'COMMUNITY_VIOLATION',
         }),

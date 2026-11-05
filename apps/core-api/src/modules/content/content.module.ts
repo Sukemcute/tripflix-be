@@ -1,15 +1,18 @@
 import { Module } from '@nestjs/common';
 import type { EventEnvelope } from '@tripflix/contracts';
-import { createDb, type Db } from '@tripflix/db';
+import { buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
 import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
+import { OutboxWriter } from '@tripflix/outbox';
 import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { ContentFacade } from './content.facade.js';
+import { contentOutboxEvents } from './db/schema/index.js';
 import { MediaModule } from './media/media.module.js';
 import {
   AdminPostsController,
   BookmarksController,
   CommentsController,
+  OptionalAuthGuard,
   PostsController,
   ReactionsController,
 } from './social/api/index.js';
@@ -18,13 +21,17 @@ import {
   AdminModeratePostUseCase,
   BookmarkPostUseCase,
   COMMERCE_SERVICE_PORT,
+  CONTENT_OUTBOX,
   CreateDraftUseCase,
   DeleteCommentUseCase,
   DeletePostUseCase,
   EditCommentUseCase,
   EVENT_PUBLISHER_PORT,
+  GetAdminPostDetailUseCase,
+  GetMyReactionUseCase,
   GetPostDetailUseCase,
   GetPostStatsUseCase,
+  ListAdminPostsUseCase,
   ListBookmarksUseCase,
   ListCommentsUseCase,
   ListPostsUseCase,
@@ -34,17 +41,20 @@ import {
   TrackShareUseCase,
   UpdatePostUseCase,
   type CommerceServicePort,
+  type ContentOutbox,
   type EventPublisherPort,
 } from './social/application/index.js';
 import {
   BookmarkRepository,
   CommentRepository,
+  ContentOutboxRelay,
   ModerationActionRepository,
   PostRepository,
   ReactionRepository,
 } from './social/infra/index.js';
 
 export const CONTENT_DB = Symbol('CONTENT_DB');
+export const CONTENT_EVENT_PRODUCER = 'core-api/content';
 
 /**
  * Module content. Quản lý Media, Posts, Comments, Reactions, Bookmarks, Shares và Admin Moderation.
@@ -60,41 +70,49 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     AdminPostsController,
   ],
   providers: [
-    // 1. Drizzle DB Client cho schema 'content'
+    // 1. Drizzle DB Client cho schema 'content' (kết nối trực tiếp khi không ở trong transaction)
     {
       provide: CONTENT_DB,
       inject: [DB_POOLS],
       useFactory: (pools: DbPools): Db => createDb(pools.content),
     },
 
-    // 2. Infra Repositories
+    // 2. Infra Repositories (sử dụng txHost.tx để tự động tham gia @Transactional('content'))
     {
       provide: PostRepository,
-      inject: [CONTENT_DB],
-      useFactory: (db: Db) => new PostRepository(db),
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new PostRepository(() => txHost.tx),
     },
     {
       provide: CommentRepository,
-      inject: [CONTENT_DB],
-      useFactory: (db: Db) => new CommentRepository(db),
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new CommentRepository(() => txHost.tx),
     },
     {
       provide: ReactionRepository,
-      inject: [CONTENT_DB],
-      useFactory: (db: Db) => new ReactionRepository(db),
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new ReactionRepository(() => txHost.tx),
     },
     {
       provide: BookmarkRepository,
-      inject: [CONTENT_DB],
-      useFactory: (db: Db) => new BookmarkRepository(db),
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new BookmarkRepository(() => txHost.tx),
     },
     {
       provide: ModerationActionRepository,
-      inject: [CONTENT_DB],
-      useFactory: (db: Db) => new ModerationActionRepository(db),
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new ModerationActionRepository(() => txHost.tx),
     },
 
-    // 3. Ports Adapters (Event Bus & Commerce Service)
+    // 3. Transactional Outbox Writer (ghi vào content.outbox_events trong transaction đang mở)
+    {
+      provide: CONTENT_OUTBOX,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost): ContentOutbox =>
+        new OutboxWriter(() => txHost.tx, contentOutboxEvents, CONTENT_EVENT_PRODUCER),
+    },
+
+    // 4. Ports Adapters (Event Bus & Commerce Service)
     {
       provide: EVENT_PUBLISHER_PORT,
       inject: [REDIS],
@@ -110,13 +128,14 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     {
       provide: COMMERCE_SERVICE_PORT,
       useFactory: (): CommerceServicePort => ({
-        async verifyCompletedBooking(bookingId: string, userId: string): Promise<boolean> {
-          return Boolean(bookingId.trim() && userId.trim());
+        async verifyCompletedBooking(): Promise<boolean> {
+          // Mặc định trả về false khi chưa tích hợp với module Commerce thật (chưa xác thực)
+          return false;
         },
       }),
     },
 
-    // 4. Application Use Cases
+    // 5. Application Use Cases
     {
       provide: CreateDraftUseCase,
       inject: [PostRepository],
@@ -129,18 +148,18 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     },
     {
       provide: PublishPostUseCase,
-      inject: [PostRepository, EVENT_PUBLISHER_PORT, COMMERCE_SERVICE_PORT],
+      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT],
       useFactory: (
         postRepo: PostRepository,
-        eventPublisher: EventPublisherPort,
+        outbox: ContentOutbox,
         commerceService: CommerceServicePort,
-      ) => new PublishPostUseCase(postRepo, eventPublisher, commerceService),
+      ) => new PublishPostUseCase(postRepo, outbox, commerceService),
     },
     {
       provide: DeletePostUseCase,
-      inject: [PostRepository, EVENT_PUBLISHER_PORT],
-      useFactory: (postRepo: PostRepository, eventPublisher: EventPublisherPort) =>
-        new DeletePostUseCase(postRepo, eventPublisher),
+      inject: [PostRepository, CONTENT_OUTBOX],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
+        new DeletePostUseCase(postRepo, outbox),
     },
     {
       provide: GetPostDetailUseCase,
@@ -163,12 +182,12 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     },
     {
       provide: SetReactionUseCase,
-      inject: [PostRepository, ReactionRepository, EVENT_PUBLISHER_PORT],
+      inject: [PostRepository, ReactionRepository, CONTENT_OUTBOX],
       useFactory: (
         postRepo: PostRepository,
         reactionRepo: ReactionRepository,
-        eventPublisher: EventPublisherPort,
-      ) => new SetReactionUseCase(postRepo, reactionRepo, eventPublisher),
+        outbox: ContentOutbox,
+      ) => new SetReactionUseCase(postRepo, reactionRepo, outbox),
     },
     {
       provide: GetPostStatsUseCase,
@@ -177,12 +196,12 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     },
     {
       provide: AddCommentUseCase,
-      inject: [PostRepository, CommentRepository, EVENT_PUBLISHER_PORT],
+      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX],
       useFactory: (
         postRepo: PostRepository,
         commentRepo: CommentRepository,
-        eventPublisher: EventPublisherPort,
-      ) => new AddCommentUseCase(postRepo, commentRepo, eventPublisher),
+        outbox: ContentOutbox,
+      ) => new AddCommentUseCase(postRepo, commentRepo, outbox),
     },
     {
       provide: EditCommentUseCase,
@@ -219,21 +238,45 @@ export const CONTENT_DB = Symbol('CONTENT_DB');
     },
     {
       provide: TrackShareUseCase,
-      inject: [PostRepository, EVENT_PUBLISHER_PORT],
-      useFactory: (postRepo: PostRepository, eventPublisher: EventPublisherPort) =>
-        new TrackShareUseCase(postRepo, eventPublisher),
+      inject: [PostRepository, CONTENT_OUTBOX],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
+        new TrackShareUseCase(postRepo, outbox),
     },
     {
       provide: AdminModeratePostUseCase,
-      inject: [PostRepository, ModerationActionRepository, EVENT_PUBLISHER_PORT],
+      inject: [PostRepository, ModerationActionRepository, CONTENT_OUTBOX],
       useFactory: (
         postRepo: PostRepository,
         modRepo: ModerationActionRepository,
-        eventPublisher: EventPublisherPort,
-      ) => new AdminModeratePostUseCase(postRepo, modRepo, eventPublisher),
+        outbox: ContentOutbox,
+      ) => new AdminModeratePostUseCase(postRepo, modRepo, outbox),
+    },
+    {
+      provide: GetMyReactionUseCase,
+      inject: [ReactionRepository],
+      useFactory: (reactionRepo: ReactionRepository) => new GetMyReactionUseCase(reactionRepo),
+    },
+    {
+      provide: ListAdminPostsUseCase,
+      inject: [PostRepository],
+      useFactory: (postRepo: PostRepository) => new ListAdminPostsUseCase(postRepo),
+    },
+    {
+      provide: GetAdminPostDetailUseCase,
+      inject: [PostRepository, ModerationActionRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        modRepo: ModerationActionRepository,
+      ) => new GetAdminPostDetailUseCase(postRepo, modRepo),
     },
 
-    // 5. Facade cho các module khác
+    // 6. Guard cho optional authentication
+    OptionalAuthGuard,
+
+    // 7. Background Outbox Relay worker
+    ContentOutboxRelay,
+
+    // 8. Facade cho các module khác
     ContentFacade,
   ],
   exports: [ContentFacade],

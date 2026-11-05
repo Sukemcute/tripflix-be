@@ -44,20 +44,27 @@ describe('ContentFacade', () => {
   const facade = new ContentFacade(mockPostRepo as any);
 
   describe('getPostById', () => {
-    it('trả về bản ghi bài viết khi tồn tại', async () => {
-      const mock = createMockPost();
+    it('trả về bài viết an toàn đã mask PII khi tồn tại và published', async () => {
+      const mock = createMockPost({ status: 'published', deletedAt: null });
       mockPostRepo.findById.mockResolvedValueOnce(mock);
 
       const res = await facade.getPostById(mock.id);
-      expect(res).toEqual(mock);
+      expect(res).not.toBeNull();
+      expect(res?.id).toBe(mock.id);
+      expect(res?.tripAttachment?.priceDisclaimer).toBe('Giá chỉ mang tính chất tham khảo');
+      expect((res?.tripAttachment as any)?.bookingId).toBeUndefined();
       expect(mockPostRepo.findById).toHaveBeenCalledWith(mock.id);
     });
 
-    it('trả về null khi bài viết không tồn tại', async () => {
+    it('trả về null khi bài viết không tồn tại, ở trạng thái draft/hidden hoặc đã xóa', async () => {
       mockPostRepo.findById.mockResolvedValueOnce(null);
+      expect(await facade.getPostById('non-existent')).toBeNull();
 
-      const res = await facade.getPostById('non-existent');
-      expect(res).toBeNull();
+      mockPostRepo.findById.mockResolvedValueOnce(createMockPost({ status: 'draft' }));
+      expect(await facade.getPostById('p1')).toBeNull();
+
+      mockPostRepo.findById.mockResolvedValueOnce(createMockPost({ status: 'published', deletedAt: new Date() }));
+      expect(await facade.getPostById('p1')).toBeNull();
     });
   });
 

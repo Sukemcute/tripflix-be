@@ -112,12 +112,29 @@ describe('Post Entity Domain Rules', () => {
     expect(post.deletedAt).toBeInstanceOf(Date);
   });
 
-  it('thao tác kiểm duyệt moderate ẩn và khôi phục bài viết', () => {
-    const post = createTestPost({ status: 'published' });
-    post.moderate('hide');
-    expect(post.status).toBe('hidden');
-    post.moderate('restore');
-    expect(post.status).toBe('published');
+  it('thao tác kiểm duyệt moderate ẩn và khôi phục bài viết đúng trạng thái', () => {
+    // Bài đã xuất bản
+    const publishedPost = createTestPost({ status: 'published', publishedAt: new Date() });
+    publishedPost.moderate('hide');
+    expect(publishedPost.status).toBe('hidden');
+    publishedPost.moderate('restore');
+    expect(publishedPost.status).toBe('published');
+
+    // Bài nháp chưa từng xuất bản
+    const draftPost = createTestPost({ status: 'draft', publishedAt: null });
+    draftPost.moderate('hide');
+    expect(draftPost.status).toBe('hidden');
+    draftPost.moderate('restore');
+    expect(draftPost.status).toBe('draft');
+  });
+
+  it('tự động hạ cờ isVerified về false khi tác giả sửa lộ trình', () => {
+    const verifiedPost = createTestPost({ status: 'published', isVerified: true });
+    expect(verifiedPost.isVerified).toBe(true);
+    verifiedPost.update(authorId, {
+      tripAttachment: { destinationName: 'Địa điểm mới', hotelName: 'Khách sạn mới' },
+    });
+    expect(verifiedPost.isVerified).toBe(false);
   });
 
   it('lộ trình du lịch trả về luôn bị ẩn PII và có disclaimer giá', () => {
@@ -173,6 +190,16 @@ describe('Comment Entity Domain Rules', () => {
     });
 
     expect(() => comment.updateBody(otherUserId, 'Nội dung khác')).toThrow(UnauthorizedCommentActionException);
+  });
+
+  it('chặn reply của reply (chỉ cho phép 1 cấp reply)', () => {
+    // Bình luận gốc (parentCommentId: null) -> cho phép reply
+    expect(() => Comment.validateParentForReply({ parentCommentId: null })).not.toThrow();
+
+    // Bình luận đã là reply (parentCommentId có giá trị) -> chặn không cho reply tiếp
+    expect(() => Comment.validateParentForReply({ parentCommentId: 'parent-001' })).toThrow(
+      /Chỉ hỗ trợ phản hồi bình luận 1 cấp/,
+    );
   });
 });
 

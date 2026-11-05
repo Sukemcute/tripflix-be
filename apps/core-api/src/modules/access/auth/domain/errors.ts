@@ -9,7 +9,8 @@ export class AccessError extends Error {
       | 'session_revoked'
       | 'not_found'
       | 'staff_rule'
-      | 'wrong_password',
+      | 'wrong_password'
+      | 'invalid_reset_token',
     message: string,
     readonly retryAfterSeconds?: number,
   ) {
