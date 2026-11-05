@@ -1,0 +1,66 @@
+# Gateway trên server: chỉ đi HTTPS, chỉ nhận đúng API_HOST. Máy dev dùng dynamic.yml.
+# Thêm service nào thì thêm router của service đó khi nó đã chạy (notification, ai).
+http:
+  middlewares:
+    # Cùng mức với dynamic.yml, xem README.md.
+    rate-limit-api:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 100
+    rate-limit-auth:
+      rateLimit:
+        average: 30
+        period: 1m
+        burst: 10
+
+    redirect-to-apex:
+      redirectRegex:
+        regex: ^https://www\.(.+)
+        replacement: https://${1}
+        permanent: true
+
+  routers:
+    core-api-auth:
+      rule: >-
+        Host(`{{ env "API_HOST" }}`) && Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) ||
+        Path(`/api/auth/google`) || Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`) ||
+        Path(`/api/auth/service-token`))
+      priority: 100
+      service: core-api
+      entryPoints: [websecure]
+      middlewares: [rate-limit-auth]
+      tls:
+        certResolver: letsencrypt
+    core-api:
+      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`)
+      service: core-api
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+
+    web:
+      rule: Host(`{{ env "WEB_HOST" }}`)
+      service: web
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+    web-www:
+      rule: Host(`www.{{ env "WEB_HOST" }}`)
+      service: web
+      entryPoints: [websecure]
+      middlewares: [redirect-to-apex]
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    core-api:
+      loadBalancer:
+        servers:
+          - url: http://core-api:3000
+    web:
+      loadBalancer:
+        servers:
+          - url: http://web:3100
