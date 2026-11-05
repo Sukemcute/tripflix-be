@@ -8,7 +8,7 @@
 
 | Phần | Trạng thái |
 |---|---|
-| `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05) |
+| `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05); cookie refresh token cho web, admin (TF056) |
 | `account/`: tài khoản của tôi | Có (TF055): đổi tên, đổi mật khẩu, xem và thoát từng thiết bị, thoát mọi thiết bị |
 | `staff/`: API `/admin/*` cho nhân viên | Có (TF054): tìm người dùng, cấp và thu hồi quyền kiểm duyệt viên, khoá và mở khoá tài khoản |
 | Đăng nhập Google, quên mật khẩu, token service-to-service | Chưa làm |
@@ -19,14 +19,14 @@
 |---|---|---|
 | `POST /api/auth/register` `{ email, password, displayName }` | Ai cũng được | `201` người dùng. Luôn là `member`, trường `role` gửi lên bị bỏ qua. Email trùng: `409` |
 | `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
-| `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được |
-| `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay |
+| `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
+| `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
 | `GET /api/auth/me` | Bearer access token | Người dùng đang đăng nhập |
 | `PATCH /api/auth/me` `{ displayName }` | Bearer access token | Người dùng sau khi đổi tên |
 | `POST /api/auth/password/change` `{ currentPassword, newPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
 | `GET /api/auth/sessions` | Bearer access token | Thiết bị đang đăng nhập: `{ id, deviceName, userAgent, createdAt, lastUsedAt, isCurrent }`, dùng gần nhất trước |
 | `DELETE /api/auth/sessions/{id}` | Bearer access token | `204`. Thoát thiết bị đó, token của nó nhận `401` ngay. Phiên không phải của mình: `404` |
-| `POST /api/auth/logout-all` | Bearer access token | `204`. Thoát mọi thiết bị, kể cả thiết bị đang gọi |
+| `POST /api/auth/logout-all` | Bearer access token | `204`. Thoát mọi thiết bị, kể cả thiết bị đang gọi. Có cookie thì xoá cookie |
 | `GET /.well-known/jwks.json` | Gateway, service khác | Khoá công khai ES256. Nằm ngoài `/api` |
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
@@ -50,6 +50,22 @@ Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền b�
 | Mật khẩu | argon2id, 8–128 ký tự |
 
 Giới hạn: chỉ phát hiện dùng lại token **liền trước**. Token cũ hơn bị từ chối `401` nhưng không thu hồi phiên.
+
+## Web, admin: refresh token trong cookie (TF056)
+
+App mobile giữ refresh token trong `expo-secure-store`, gửi trong body như trên. Web, admin không để JavaScript cầm refresh token (docs/10 §3.10):
+
+| | Cách làm |
+|---|---|
+| Bật chế độ web | Gửi header `X-Tripflix-Client: web` khi `login`, `refresh`, `logout`, `logout-all` |
+| Cookie | `tripflix_refresh`: `HttpOnly`, `SameSite=Lax`, `Path=/api/auth`, `Max-Age` 30 ngày, `Secure` khi `NODE_ENV=production`. Body của `login`, `refresh` **không** có `refreshToken` |
+| Làm mới | `POST /api/auth/refresh` body trống (hoặc không có body), trình duyệt tự gửi cookie. Lỗi (`401`) thì cookie bị xoá, web chuyển về trang đăng nhập |
+| Đăng xuất | `logout`, `logout-all` xoá cookie |
+| Chống CSRF | Mọi request ở chế độ web hoặc có dùng cookie phải có header `Origin` nằm trong `AUTH_WEB_ORIGINS`. Thiếu hoặc lạ: `403 "Nguồn gửi request không được phép"` |
+| CORS | `platform/http.ts` chỉ cho các origin trong `AUTH_WEB_ORIGINS`, có `credentials`. App mobile không bị CORS chặn |
+| Access token | Chỉ giữ trong bộ nhớ của trang, gửi `Authorization: Bearer`. Tải lại trang thì gọi `refresh` để lấy access token mới |
+
+Web gọi bằng `fetch(url, { method: 'POST', credentials: 'include', headers: { 'X-Tripflix-Client': 'web' } })`. Ở dev, web (`localhost:3100`) và gateway (`localhost:8080`) cùng site (chỉ khác cổng), nên cookie `SameSite=Lax` vẫn được gửi. Production cần web và API cùng tên miền gốc (ví dụ `tripflix.vn` và `api.tripflix.vn`).
 
 ## Bảng
 
@@ -90,6 +106,7 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_JWT_KID` | thumbprint của khoá | |
 | `AUTH_JWT_ISSUER` | `tripflix-core` | Service kiểm token phải đặt giống |
 | `AUTH_JWT_AUDIENCE` | `tripflix` | Service kiểm token phải đặt giống |
+| `AUTH_WEB_ORIGINS` | `http://localhost:3100,http://localhost:3200` | Origin của web, admin: CORS và chống CSRF cho cookie. Mỗi phần tử là origin đầy đủ, không có `/` cuối |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |
 
 ## Chạy trên máy

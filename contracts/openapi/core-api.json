@@ -49,7 +49,20 @@
     "/api/auth/login": {
       "post": {
         "operationId": "AuthController_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -70,6 +83,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
           }
         },
         "tags": [
@@ -80,9 +96,22 @@
     "/api/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -101,6 +130,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
           }
         },
         "tags": [
@@ -1518,7 +1550,8 @@
             "type": "string"
           },
           "refreshToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Không có khi gửi header X-Tripflix-Client: web; khi đó refresh token nằm trong cookie HttpOnly tripflix_refresh"
           },
           "tokenType": {
             "type": "string",
@@ -1534,7 +1567,6 @@
         },
         "required": [
           "accessToken",
-          "refreshToken",
           "tokenType",
           "expiresIn"
         ]
@@ -1543,12 +1575,10 @@
         "type": "object",
         "properties": {
           "refreshToken": {
-            "type": "string"
+            "type": "string",
+            "description": "App mobile gửi trong body. Web, admin bỏ trống, token nằm trong cookie tripflix_refresh"
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "UpdateProfileDto": {
         "type": "object",

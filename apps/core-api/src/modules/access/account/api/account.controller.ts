@@ -12,14 +12,16 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseFilters,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { UserDto } from '../../auth/api/dto.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
+import { WebSession, isWebClient } from '../../auth/api/web-session.js';
 import { AccountUseCases } from '../application/account.use-cases.js';
 import {
   ChangePasswordDto,
@@ -38,7 +40,10 @@ const SESSION_ID_PIPE = new ParseUUIDPipe({ exceptionFactory: () => new BadReque
 @UseFilters(AccessErrorFilter)
 @Authenticated()
 export class AccountController {
-  constructor(@Inject(AccountUseCases) private readonly account: AccountUseCases) {}
+  constructor(
+    @Inject(AccountUseCases) private readonly account: AccountUseCases,
+    @Inject(WebSession) private readonly web: WebSession,
+  ) {}
 
   @Patch('me')
   @ApiBody({ type: UpdateProfileDto })
@@ -85,7 +90,12 @@ export class AccountController {
   @Post('logout-all')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse()
-  async logoutAll(@CurrentUser() user: AuthUser, @Req() req: Request): Promise<void> {
+  async logoutAll(
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
     await this.account.logoutAll(user, readRequestMeta(req));
+    if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res);
   }
 }
