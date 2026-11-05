@@ -63,7 +63,7 @@ export const ContentMediaTranscodeRequestedV1Schema = z.object({
 export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
 
 export const MEDIA_QUALITY_LEVELS = [360, 540, 720] as const;
-export const mediaQualityLevelSchema = z.union([z.literal(360), z.literal(540), z.literal(720)]);
+export const mediaQualityLevelSchema = z.literal(MEDIA_QUALITY_LEVELS);
 export type MediaQualityLevel = z.infer<typeof mediaQualityLevelSchema>;
 
 export const MEDIA_ASPECTS = ['9:16', '16:9', '1:1'] as const;
