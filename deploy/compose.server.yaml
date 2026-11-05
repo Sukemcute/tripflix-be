@@ -109,6 +109,37 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
+  # ---------- Giai đoạn 3: HTTPS ----------
+  traefik:
+    profiles: [gateway]
+    image: traefik:v3.7
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/server.yml
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --ping=true
+    environment:
+      API_HOST: ${API_HOST:?}
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./traefik/server.yml:/etc/traefik/server.yml:ro
+      - letsencrypt:/letsencrypt
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
 volumes:
   pg-data:
   redis-data:
+  letsencrypt:
