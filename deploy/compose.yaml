@@ -10,7 +10,7 @@ x-be-env: &be-env
   DATABASE_URL_CONTENT: postgres://tf_content:tf_content_dev@postgres:5432/core
   DATABASE_URL_DISCOVERY: postgres://tf_discovery:tf_discovery_dev@postgres:5432/core
   DATABASE_URL_ANALYTICS: postgres://tf_analytics:tf_analytics_dev@postgres:5432/core
-  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/commerce
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/core
   DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
   # Access token: core-api ký (bỏ trống khoá ở dev thì tự sinh khoá tạm), service khác kiểm qua JWKS.
   AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
