@@ -31,7 +31,9 @@
 
 ## Kết quả kiểm tra
 
-`pnpm turbo run lint typecheck test --filter=@tripflix/core-api` (đã merge `origin/develop` có TF06): 12/12 task thành công, **181/181 test pass** (22 file), lint 0 lỗi, không cảnh báo nào trong `discovery`.
+`pnpm turbo run lint typecheck test --filter=@tripflix/core-api` (đã merge `origin/develop` tới `3b724c7`, có TF06): lint 0 lỗi, không cảnh báo nào trong `discovery`; typecheck pass; **186/186 test pass** (22 file).
+
+Ghi chú: khi chạy test cùng lúc với server local, `access/auth.e2e.spec.ts` ("sai quá 5 lần thì 429") có lần vượt timeout 5 s, vì băm argon2 chậm khi máy tải nặng. Tắt server rồi chạy lại thì pass. Lỗi này không liên quan tới discovery.
 
 Test mới của discovery:
 - `stays.spec.ts` (7): cây nơi, lọc, sắp, phân trang.
