@@ -13,7 +13,11 @@ export interface FindUserBookmarksOptions {
 }
 
 export class BookmarkRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
+
+  private get db(): Db {
+    return typeof this.dbOrGetDb === 'function' ? this.dbOrGetDb() : this.dbOrGetDb;
+  }
 
   /**
    * Lưu hoặc huỷ lưu bài viết (Idempotent).

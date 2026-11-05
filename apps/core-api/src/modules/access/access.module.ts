@@ -1,5 +1,11 @@
 import { Logger, Module } from '@nestjs/common';
-import { AuthModule, RedisSidBlocklist, createAccessTokenVerifier, type SidBlocklist } from '@tripflix/auth';
+import {
+  AuthModule,
+  RedisSidBlocklist,
+  createAccessTokenVerifier,
+  createServiceTokenVerifier,
+  type SidBlocklist,
+} from '@tripflix/auth';
 import { buildTransactionHostToken, type ModuleTransactionHost } from '@tripflix/db';
 import type { Redis } from 'ioredis';
 import { createLocalJWKSet } from 'jose';
@@ -9,6 +15,7 @@ import { AccountController } from './account/api/account.controller.js';
 import { AccountUseCases } from './account/application/account.use-cases.js';
 import { AuthController } from './auth/api/auth.controller.js';
 import { JwksController } from './auth/api/jwks.controller.js';
+import { WebSession } from './auth/api/web-session.js';
 import { AuthUseCases } from './auth/application/auth.use-cases.js';
 import {
   ACCESS_SID_BLOCKLIST,
@@ -26,6 +33,9 @@ import { DrizzleAccessStore } from './auth/infra/drizzle-access.store.js';
 import { JoseTokenIssuer } from './auth/infra/jose-token-issuer.js';
 import { RedisLoginRateLimiter } from './auth/infra/redis-login-rate-limiter.js';
 import { AccessCleanupJob } from './auth/jobs/access-cleanup.job.js';
+import { ServiceTokenController } from './service/api/service-token.controller.js';
+import { ServiceTokenUseCases } from './service/application/service-token.use-cases.js';
+import { CORE_API_SERVICE_AUDIENCE } from './service/domain/service-client-rules.js';
 import { AdminController } from './staff/api/admin.controller.js';
 import { StaffUseCases } from './staff/application/staff.use-cases.js';
 
@@ -79,17 +89,18 @@ export class AccessInfraModule {}
     AuthModule.forRootAsync({
       imports: [AccessInfraModule],
       inject: [TOKEN_ISSUER, ACCESS_SID_BLOCKLIST, CORE_ENV],
-      useFactory: (tokens: TokenIssuer, blocklist: SidBlocklist, env: CoreEnv) => ({
-        verifier: createAccessTokenVerifier({
-          keys: createLocalJWKSet(tokens.getJwks()),
-          issuer: env.AUTH_JWT_ISSUER,
-          audience: env.AUTH_JWT_AUDIENCE,
-        }),
-        blocklist,
-      }),
+      useFactory: (tokens: TokenIssuer, blocklist: SidBlocklist, env: CoreEnv) => {
+        const keys = createLocalJWKSet(tokens.getJwks());
+        return {
+          verifier: createAccessTokenVerifier({ keys, issuer: env.AUTH_JWT_ISSUER, audience: env.AUTH_JWT_AUDIENCE }),
+          blocklist,
+          // API nội bộ của core-api (@ServiceOnly) nhận token service có aud=core-api.
+          serviceVerifier: createServiceTokenVerifier({ keys, issuer: env.AUTH_JWT_ISSUER, audience: CORE_API_SERVICE_AUDIENCE }),
+        };
+      },
     }),
   ],
-  controllers: [AuthController, AccountController, JwksController, AdminController],
-  providers: [AuthUseCases, AccountUseCases, StaffUseCases, AccessOutboxRelay, AccessCleanupJob],
+  controllers: [AuthController, AccountController, ServiceTokenController, JwksController, AdminController],
+  providers: [AuthUseCases, AccountUseCases, StaffUseCases, ServiceTokenUseCases, WebSession, AccessOutboxRelay, AccessCleanupJob],
 })
 export class AccessModule {}

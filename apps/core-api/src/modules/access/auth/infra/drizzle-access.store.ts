@@ -1,8 +1,17 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, count, desc, eq, gt, ilike, lt, ne, or } from 'drizzle-orm';
-import { accessOutboxEvents, auditLogs, sessions, users, type SessionRow, type UserRow } from '../../db/schema/index.js';
+import { and, asc, count, desc, eq, gt, ilike, lt, ne, or, sql } from 'drizzle-orm';
+import {
+  accessOutboxEvents,
+  auditLogs,
+  serviceClients,
+  sessions,
+  users,
+  type ServiceClientRow,
+  type SessionRow,
+  type UserRow,
+} from '../../db/schema/index.js';
 import type {
   AccessOutbox,
   AccessStore,
@@ -11,6 +20,8 @@ import type {
   NewSession,
   SessionRecord,
   SessionRepository,
+  ServiceClientRecord,
+  ServiceClientRepository,
   SessionRotation,
   UserRecord,
   UserRepository,
@@ -169,6 +180,36 @@ class DrizzleSessionRepository implements SessionRepository {
   }
 }
 
+const mapServiceClientRow = (row: ServiceClientRow): ServiceClientRecord => ({ ...row });
+
+class DrizzleServiceClientRepository implements ServiceClientRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async findById(clientId: string) {
+    const [row] = await this.db.select().from(serviceClients).where(eq(serviceClients.clientId, clientId)).limit(1);
+    return row ? mapServiceClientRow(row) : null;
+  }
+
+  async insert(client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>) {
+    const [row] = await this.db.insert(serviceClients).values(client).onConflictDoNothing().returning();
+    return row ? mapServiceClientRow(row) : null;
+  }
+
+  async disable(clientId: string, at: Date) {
+    const rows = await this.db
+      .update(serviceClients)
+      .set({ disabledAt: sql`coalesce(${serviceClients.disabledAt}, ${at})` })
+      .where(eq(serviceClients.clientId, clientId))
+      .returning({ clientId: serviceClients.clientId });
+    return rows.length > 0;
+  }
+}
+
 class DrizzleAuditLog implements AuditLog {
   constructor(private readonly getDb: () => Db) {}
 
@@ -201,11 +242,13 @@ export class DrizzleAccessStore implements AccessStore {
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
   readonly outbox: AccessOutbox;
+  readonly serviceClients: ServiceClientRepository;
 
   constructor(getDb: () => Db) {
     this.users = new DrizzleUserRepository(getDb);
     this.sessions = new DrizzleSessionRepository(getDb);
     this.audit = new DrizzleAuditLog(getDb);
     this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
+    this.serviceClients = new DrizzleServiceClientRepository(getDb);
   }
 }
