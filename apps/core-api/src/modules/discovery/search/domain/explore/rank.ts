@@ -50,7 +50,7 @@ interface Vertical {
 
 const base: Omit<Vertical, 'name'> = {
   mods: null,
-  price: () => null,
+  price: (o) => o.cost, // mục nào có chi phí (vd video kèm lộ trình) cũng chịu giới hạn ngân sách
   boost: () => [0, []],
   sections: (o) => [o.kind],
   quality: bayesQuality,
@@ -85,7 +85,6 @@ export const VERTICALS: readonly Vertical[] = [
   {
     ...base,
     name: 'plans',
-    price: (o) => o.cost,
     boost: (u, o) => (u.days && o.days === u.days ? [2, [`${u.days} ngay`]] : [0, []]),
     quality: (o) => (o.kind === 'post' ? Math.min(1, Math.log10((o.likes || 1) + 1) / 4) : bayesQuality(o)),
     reason: (u, o) => {

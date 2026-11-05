@@ -98,6 +98,11 @@ describe('tìm', () => {
     const r = await searchExplore(src(food), 'bún chả hà nội');
     expect(r.sections.find((s) => s.kind === 'food')!.items.map((i) => i.obj.id)).toEqual(['1']);
     expect(await ids(plans, 'lịch trình đà lạt 3n2đ dưới 3tr')).toEqual(['p1']);
+    // Video kèm lộ trình có chi phí cũng không được vượt ngân sách (trước đây nhánh video bỏ qua giá).
+    const vids = [o({ id: 'v1', kind: 'video', title: 'Săn mây Đà Lạt', place: 'Đà Lạt', cost: 3_100_000, topics: ['plan'] })];
+    const cheap = await searchExplore(src(vids), 'đà lạt dưới 500k');
+    expect(cheap.sections.flatMap((s) => s.items.map((i) => i.obj.id))).toEqual([]);
+    expect((await searchExplore(src(vids), 'săn mây đà lạt')).sections.flatMap((s) => s.items.map((i) => i.obj.id))).toContain('v1');
   });
 
   it('luật dấu và mọi cách viết cafe', async () => {
