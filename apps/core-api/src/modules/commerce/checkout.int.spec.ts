@@ -161,6 +161,10 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
 
   afterAll(async () => {
     await app?.close();
+    // Dừng container có thể cắt kết nối đang đóng dở (57P01); không bắt thì Vitest báo lỗi dù test đã pass.
+    pool?.on('error', (error: Error & { code?: string }) => {
+      if (error.code !== '57P01') throw error;
+    });
     await pool?.end();
     await postgres?.stop();
   });
@@ -373,5 +377,117 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     const paid = await http().get('/api/payments/vnpay/ipn').query(signVnpay({ vnp_TxnRef: second.vnp_TxnRef!, vnp_Amount: second.vnp_Amount!, vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '14000002' }));
     expect(paid.body.RspCode).toBe('00');
     expect(await orderStatus(order.orderId)).toBe('paid');
+  });
+
+  describe('TF37 chuyến đi của tôi: GET /api/checkout', () => {
+    /** Thêm phiên đăng nhập thứ hai của cùng tài khoản, như mở app sau khi đặt trên web. */
+    const otherDevice = (user: { userId: string }) => {
+      const t = `token-${randomUUID()}`;
+      users.set(t, { userId: user.userId, role: 'member', sid: randomUUID(), exp: 9_999_999_999 });
+      return { Authorization: `Bearer ${t}` };
+    };
+    // Ngày 30 trở đi chỉ test TF37 dùng: các test TF29 phía trên tranh phòng cuối ở ngày gần.
+    beforeAll(async () => {
+      await pool.query('update commerce.room_inventory set total = 100 where room_type_id = $1 and date >= $2', [roomTypeId, addDays(TODAY_DATE, 30)]);
+    });
+    const listTrips = (auth: Record<string, string>, query: Record<string, string | number> = {}) => http().get('/api/checkout').set(auth).query(query);
+
+    it('đặt trên web xong, app (phiên khác) thấy ngay chuyến đó; trả tiền xong thấy paid', async () => {
+      const web = newUser();
+      const app2 = otherDevice(web);
+      const checkIn = addDays(TODAY_DATE, 30);
+      const order = await ready(web, checkIn);
+
+      const seen = await listTrips(app2);
+      expect(seen.status, JSON.stringify(seen.body)).toBe(200);
+      expect(seen.body.nextCursor).toBeNull();
+      expect(seen.body.trips).toHaveLength(1);
+      expect(seen.body.trips[0]).toMatchObject({
+        orderId: order.orderId,
+        status: 'pending',
+        total: order.total,
+        adults: 2,
+        paidAt: null,
+        startDate: checkIn,
+        endDate: addDays(checkIn, 2),
+        items: [{ productType: 'room', productId: roomTypeId, date: checkIn, dateTo: addDays(checkIn, 2), nights: 2 }],
+      });
+
+      expect((await pay(web, order)).status).toBe(200);
+      const after = await listTrips(app2);
+      expect(after.body.trips[0]).toMatchObject({ orderId: order.orderId, status: 'paid', confirmationCode: expect.stringMatching(/^TF-/), paidAt: expect.any(String) });
+    });
+
+    it('không thấy đơn của người khác; chưa có đơn thì danh sách rỗng', async () => {
+      const owner = newUser();
+      await holdRoom(owner, addDays(TODAY_DATE, 30));
+      const stranger = newUser();
+      const res = await listTrips(stranger.auth);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ trips: [], nextCursor: null });
+    });
+
+    it('lọc theo ?status=, gồm cả đơn hết hạn và đã huỷ; mới đặt trước', async () => {
+      const user = newUser();
+      const expired = (await holdRoom(user, addDays(TODAY_DATE, 31))).body.orderId as string;
+      await pool.query(`update commerce.orders set status = 'expired' where id = $1`, [expired]);
+      const cancelled = (await holdRoom(user, addDays(TODAY_DATE, 32))).body.orderId as string;
+      expect((await http().post(`/api/checkout/${cancelled}/cancel`).set({ ...user.auth, ...key() })).status).toBeLessThan(300);
+      const pending = (await holdRoom(user, addDays(TODAY_DATE, 33))).body.orderId as string;
+
+      const all = await listTrips(user.auth);
+      expect(all.body.trips.map((t: { orderId: string }) => t.orderId)).toEqual([pending, cancelled, expired]);
+      // Mỗi chuyến mang đúng mục của đơn đó (lấy mục cả trang trong một câu truy vấn rồi chia lại).
+      expect(all.body.trips.map((t: { items: { date: string }[] }) => t.items.map((i) => i.date))).toEqual([[addDays(TODAY_DATE, 33)], [addDays(TODAY_DATE, 32)], [addDays(TODAY_DATE, 31)]]);
+      const some = await listTrips(user.auth, { status: 'expired,cancelled' });
+      expect(some.body.trips.map((t: { orderId: string; status: string }) => [t.orderId, t.status])).toEqual([
+        [cancelled, 'cancelled'],
+        [expired, 'expired'],
+      ]);
+      expect((await listTrips(user.auth, { status: 'paid' })).body.trips).toEqual([]);
+    });
+
+    it('phân trang bằng cursor không trùng, không sót, kể cả đơn cùng mili giây khác micro giây', async () => {
+      const user = newUser();
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const held = await holdRoom(user, addDays(TODAY_DATE, 34 + i), 1);
+        expect(held.status, JSON.stringify(held.body)).toBe(201);
+        ids.push(held.body.orderId as string);
+      }
+      // Ba đơn cùng mili giây (khác micro giây), nằm vắt qua ranh giới trang.
+      const base = '2026-11-01T03:00:00.123';
+      await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[0], '2026-11-01T02:00:00Z']);
+      await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[1], `${base}100Z`]);
+      await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[2], `${base}900Z`]);
+      await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[3], `${base}500Z`]);
+      await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[4], '2026-11-01T04:00:00Z']);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const res = await listTrips(user.auth, cursor ? { limit: 2, cursor } : { limit: 2 });
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+        expect(res.body.trips.length).toBeLessThanOrEqual(2);
+        seen.push(...res.body.trips.map((t: { orderId: string }) => t.orderId));
+        cursor = res.body.nextCursor;
+        pages++;
+      } while (cursor && pages < 10);
+      expect(pages).toBe(3);
+      expect(seen).toHaveLength(5);
+      expect(new Set(seen).size).toBe(5);
+      expect(seen[0]).toBe(ids[4]);
+      expect(seen[4]).toBe(ids[0]);
+    });
+
+    it('tham số sai trả 400', async () => {
+      const user = newUser();
+      expect((await listTrips(user.auth, { status: 'shipped' })).status).toBe(400);
+      expect((await listTrips(user.auth, { cursor: 'khong-phai-cursor' })).status).toBe(400);
+      expect((await listTrips(user.auth, { limit: 0 })).status).toBe(400);
+      expect((await listTrips(user.auth, { limit: 51 })).status).toBe(400);
+      expect((await http().get('/api/checkout')).status).toBe(401);
+    });
   });
 });
