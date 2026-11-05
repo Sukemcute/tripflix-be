@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { MediaQualityLevel } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { sql } from 'drizzle-orm';
 import {
@@ -7,6 +8,7 @@ import {
   mediaAssets,
   posts,
   reactions,
+  renditions,
   type ReactionType,
   type TripAttachmentData,
 } from '../schema/index.js';
@@ -22,6 +24,7 @@ interface ContentSeed {
     hlsPrefix: string;
     durationSec: number;
     aspect: '9:16' | '16:9' | '1:1';
+    levels: MediaQualityLevel[];
   }[];
   posts: {
     id: string;
@@ -108,6 +111,13 @@ export async function seedContent(
             updatedAt: sql`now()`,
           },
         });
+      // MediaFacade chỉ trả video có ít nhất một mức, nên thiếu bảng này thì bài seed không lên feed.
+      for (const level of media.levels) {
+        await tx
+          .insert(renditions)
+          .values({ assetId: media.id, level })
+          .onConflictDoNothing({ target: [renditions.assetId, renditions.level] });
+      }
     }
 
     // 2. Seed Posts
