@@ -138,6 +138,18 @@ export class MemoryAccessStore implements AccessStore {
     return removed;
   }
 
+  readonly identityRows: { provider: 'google'; subject: string; userId: string; email: string }[] = [];
+
+  readonly identities = {
+    findUserId: async (provider: 'google', subject: string) =>
+      this.identityRows.find((i) => i.provider === provider && i.subject === subject)?.userId ?? null,
+    insert: async (identity: { provider: 'google'; subject: string; userId: string; email: string }) => {
+      if (this.identityRows.some((i) => i.provider === identity.provider && i.subject === identity.subject)) return false;
+      this.identityRows.push(identity);
+      return true;
+    },
+  };
+
   readonly outboxRows: EventEnvelope[] = [];
 
   readonly outbox = {

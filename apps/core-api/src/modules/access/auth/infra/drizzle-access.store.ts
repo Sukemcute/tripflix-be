@@ -8,6 +8,7 @@ import {
   passwordResets,
   serviceClients,
   sessions,
+  userIdentities,
   users,
   type ServiceClientRow,
   type SessionRow,
@@ -25,6 +26,8 @@ import type {
   ServiceClientRecord,
   ServiceClientRepository,
   SessionRotation,
+  IdentityProvider,
+  UserIdentityRepository,
   UserRecord,
   UserRepository,
 } from '../application/ports.js';
@@ -212,6 +215,29 @@ class DrizzleServiceClientRepository implements ServiceClientRepository {
   }
 }
 
+class DrizzleUserIdentityRepository implements UserIdentityRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
+  private get db(): Db {
+    return this.getDb();
+  }
+
+  async findUserId(provider: IdentityProvider, subject: string) {
+    const [row] = await this.db
+      .select({ userId: userIdentities.userId })
+      .from(userIdentities)
+      .where(and(eq(userIdentities.provider, provider), eq(userIdentities.subject, subject)))
+      .limit(1);
+    return row?.userId ?? null;
+  }
+
+  async insert(identity: { provider: IdentityProvider; subject: string; userId: string; email: string }) {
+    const rows = await this.db.insert(userIdentities).values(identity).onConflictDoNothing().returning({ userId: userIdentities.userId });
+    return rows.length > 0;
+  }
+}
+
 class DrizzlePasswordResetRepository implements PasswordResetRepository {
   constructor(private readonly getDb: () => Db) {}
 
@@ -294,6 +320,7 @@ export class DrizzleAccessStore implements AccessStore {
   readonly outbox: AccessOutbox;
   readonly serviceClients: ServiceClientRepository;
   readonly passwordResets: PasswordResetRepository;
+  readonly identities: UserIdentityRepository;
 
   constructor(getDb: () => Db) {
     this.users = new DrizzleUserRepository(getDb);
@@ -302,5 +329,6 @@ export class DrizzleAccessStore implements AccessStore {
     this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
     this.serviceClients = new DrizzleServiceClientRepository(getDb);
     this.passwordResets = new DrizzlePasswordResetRepository(getDb);
+    this.identities = new DrizzleUserIdentityRepository(getDb);
   }
 }

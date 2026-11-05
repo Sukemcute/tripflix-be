@@ -8,11 +8,10 @@
 
 | Phần | Trạng thái |
 |---|---|
-| `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05); cookie refresh token cho web, admin (TF056) |
+| `auth/`: đăng ký, đăng nhập, làm mới xoay vòng, đăng xuất, JWKS | Có (TF05); cookie refresh token cho web, admin (TF056); đăng nhập Google, gộp gu khách `X-Anon-Id` (TF059) |
 | `account/`: tài khoản của tôi | Có (TF055): đổi tên, đổi mật khẩu, xem và thoát từng thiết bị, thoát mọi thiết bị. Quên và đặt lại mật khẩu (TF057) |
 | `staff/`: API `/admin/*` cho nhân viên | Có (TF054): tìm người dùng, cấp và thu hồi quyền kiểm duyệt viên, khoá và mở khoá tài khoản |
 | `service/`: token service-to-service | Có (TF058): bảng `service_clients`, CLI tạo và vô hiệu hoá client, `POST /auth/service-token` |
-| Đăng nhập Google, gộp gu khách `X-Anon-Id` | Chưa làm (TF059) |
 
 ## API
 
@@ -20,6 +19,7 @@
 |---|---|---|
 | `POST /api/auth/register` `{ email, password, displayName }` | Ai cũng được | `201` người dùng. Luôn là `member`, trường `role` gửi lên bị bỏ qua. Email trùng: `409` |
 | `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
+| `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
 | `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
 | `GET /api/auth/me` | Bearer access token | Người dùng đang đăng nhập |
@@ -52,6 +52,13 @@ Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền b�
 | Thu hồi ngay | Đăng xuất, thoát thiết bị, đổi mật khẩu hoặc dùng lại token cũ: ghi `auth:revoked-sid:<sid>` vào Redis tới khi access token hết hạn. Mọi service dùng `@tripflix/auth` đều kiểm khoá này |
 | Đăng nhập sai | Sai 5 lần theo email hoặc 20 lần theo IP trong 15 phút: `429` kèm `Retry-After`. Email không tồn tại vẫn chạy argon2 để không lộ email nào có tài khoản. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào giới hạn này |
 | Mật khẩu | argon2id, 8–128 ký tự |
+
+## Đăng nhập Google và khách vãng lai (TF059)
+
+- App, web dùng Google Sign-In lấy **ID token** rồi gửi `POST /api/auth/google`. core-api tự kiểm chữ ký RS256 qua JWKS của Google, `iss` (`accounts.google.com`), `aud` thuộc `GOOGLE_CLIENT_IDS`, `exp`, `email_verified = true`. Không gọi API Google nào khác.
+- Thứ tự tìm tài khoản: đã liên kết `(google, sub)` → vào tài khoản đó; trùng email (Google đã xác minh) → liên kết; chưa có → tạo `member` không có mật khẩu, tên lấy từ `name` của Google. Tài khoản bị khoá: `401`, không liên kết thêm.
+- Tài khoản chỉ có Google: đăng nhập bằng mật khẩu nhận lỗi chung; muốn có mật khẩu thì dùng "quên mật khẩu".
+- `X-Anon-Id`: app sinh một UUID cho khách chưa đăng nhập và gửi kèm mọi request. Đăng ký, đăng nhập (cả Google) thành công thì ghi `access.user.guest_merged` trong cùng transaction. Header sai dạng thì bỏ qua.
 
 ## Quên mật khẩu (TF057)
 
@@ -128,12 +135,13 @@ Service nhận viết bằng NestJS kiểm token như ở `libs/auth/README.md` 
 
 | Bảng | Ghi chú |
 |---|---|
-| `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked` |
+| `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked`. `password_hash` trống với tài khoản chỉ có Google |
+| `user_identities` | Liên kết đăng nhập ngoài: khoá chính `(provider, subject)` (`subject` là `sub` của Google), `user_id`, `email` lúc liên kết |
 | `sessions` | `id` là `sid`. `refresh_token_hash`, `previous_token_hash`, `rotated_at`, `expires_at`, thiết bị, IP |
 | `outbox_events` | Sự kiện chờ gửi (`libs/outbox`) |
 | `password_resets` | `token_hash` (SHA-256 của token trên link, duy nhất), `expires_at` (30 phút), `used_at`. Yêu cầu mới xoá token chưa dùng của người đó |
 | `service_clients` | `client_id` (khoá chính), `secret_hash` (argon2), `allowed_audiences text[]`, `disabled_at` |
-| `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout`, `auth.logout_all`, `auth.session_revoked`, `auth.profile_updated`, `auth.password_changed`, `auth.password_change_failed`, `auth.password_reset_requested`, `auth.password_reset`, `service.token_failed` (lý do trong `meta.reason`), `service.client_created`, `service.client_disabled`, cùng các hành động quản lý nhân viên ở dưới |
+| `audit_logs` | Chỉ thêm: `auth.register`, `auth.login`, `auth.login_failed`, `auth.refresh`, `auth.refresh_reused`, `auth.logout`, `auth.logout_all`, `auth.session_revoked`, `auth.profile_updated`, `auth.password_changed`, `auth.password_change_failed`, `auth.password_reset_requested`, `auth.password_reset`, `auth.google_linked` (`auth.register`, `auth.login` có `meta.provider`), `service.token_failed` (lý do trong `meta.reason`), `service.client_created`, `service.client_disabled`, cùng các hành động quản lý nhân viên ở dưới |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate access`. Không sửa migration đã merge.
 
@@ -147,6 +155,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.role_changed` v1 | Cấp hoặc thu hồi quyền | `{ userId, oldRole, newRole, changedBy }` |
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 | `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
+| `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 
 ## Job dọn dẹp
@@ -169,6 +178,8 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_JWT_AUDIENCE` | `tripflix` | Service kiểm token phải đặt giống |
 | `AUTH_WEB_ORIGINS` | `http://localhost:3100,http://localhost:3200` | Origin của web, admin: CORS và chống CSRF cho cookie. Mỗi phần tử là origin đầy đủ, không có `/` cuối |
 | `AUTH_PASSWORD_RESET_URL` | `http://localhost:3100/dat-lai-mat-khau` | Trang đặt lại mật khẩu của web. Link trong email là địa chỉ này kèm `?token=...` |
+| `GOOGLE_CLIENT_IDS` | trống | OAuth Client ID (Web, Android, iOS) trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google (`503`) |
+| `GOOGLE_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` | Khoá công khai của Google. Test đổi sang server JWKS giả |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |
 
 ## Chạy trên máy

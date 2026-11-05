@@ -93,6 +93,59 @@
         ]
       }
     },
+    "/api/auth/google": {
+      "post": {
+        "operationId": "AuthController_loginWithGoogle",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Đăng nhập bằng Google không thành công"
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          },
+          "503": {
+            "description": "Đăng nhập bằng Google chưa được bật"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -2083,6 +2136,22 @@
           "accessToken",
           "tokenType",
           "expiresIn"
+        ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "ID token lấy từ Google Sign-In trên app hoặc web (credential)"
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "Pixel 8"
+          }
+        },
+        "required": [
+          "idToken"
         ]
       },
       "RefreshDto": {
