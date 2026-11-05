@@ -35,10 +35,10 @@ Code đang dùng `pgSchema('commerce')` (TF06) **không phải sửa**.
 | 3 | `apps/core-api/.env.example`, `deploy/compose.yaml` | `DATABASE_URL_COMMERCE=…/commerce` | `DATABASE_URL_COMMERCE=postgres://tf_commerce:tf_commerce_dev@<host>:5432/core` | Dũng (Duy backup) |
 | 4 | `libs/db/src/index.ts` (chú thích dòng 4) | "module `commerce` trên database riêng" | "5 module trên database `core`". Có thể gộp `commerce` vào `CORE_MODULES` | Dũng (Duy backup) |
 | 4b | `libs/testing/src/postgres.ts` (dòng 16, 23) | `commerce` → database `commerce` | `commerce` → `core`; `buildAdminUrl` bỏ `'commerce'` | Dũng (Duy backup) |
-| 4c | `libs/testing/src/fixtures.int.spec.ts` (dòng 30, 46) | Kiểm có đủ 3 database; kiểm `tf_access` bị chặn khi kết nối DB `commerce` | Kiểm có 2 database; đổi thành kiểm `tf_access` bị chặn khi đọc schema `commerce` (và `tf_commerce` bị chặn ở schema `access`). **Test này sẽ fail nếu chỉ sửa mục 1–3** | Dũng (Duy backup) |
+| 4c | `libs/testing/src/fixtures.int.spec.ts` (dòng 30, 45–46) | Kiểm có đủ 3 database; kiểm `tf_access` bị chặn khi kết nối DB `commerce` | Kiểm có 2 database; đổi thành kiểm `tf_access` bị chặn khi đọc schema `commerce` (và `tf_commerce` bị chặn ở schema `access`). **Test này sẽ fail nếu chỉ sửa mục 1–3** | Dũng (Duy backup) |
 | 4d | `libs/db/README.md` (dòng 15) | Bảng kết nối: `commerce` → DB `commerce` | `commerce` → DB `core` | Dũng (Duy backup) |
-| 5 | `tripflix-be/README.md` (dòng 64, 72), `modules/access/README.md` (dòng 75) | Liệt kê DB `commerce`, lệnh `GRANT … DATABASE commerce` | `core` có 5 schema; bỏ lệnh grant cho DB `commerce` | Dũng / Tech Lead |
-| 6 | `modules/commerce/README.md` (dòng 4, 13) | "Database riêng `commerce`" | "Database `core`, schema `commerce`" | Thắng |
+| 5 | `tripflix-be/README.md` (dòng 64, 72), `modules/access/README.md` (dòng 196) | Liệt kê DB `commerce`, lệnh `GRANT … DATABASE commerce` | `core` có 5 schema; bỏ lệnh grant cho DB `commerce` | Dũng / Tech Lead |
+| 6 | `modules/commerce/README.md` (dòng 4, 13), chú thích `commerce.module.ts` (dòng 28) | "Database riêng `commerce`" | "Database `core`, schema `commerce`" | Thắng |
 | 7 | `docs/architecture/11-…md` trong 3 repo | Ghi phần database của v1.1 là "đề xuất, chờ duyệt" | **Đã sửa** ở nhánh `duy/TF57-commerce-schema-trong-core` (3 repo) | Duy (QC kiến trúc) |
 | 8 | `docs/architecture/10-…md` (tóm tắt, §3.11, §4, sơ đồ mermaid) | "2 database: `core` và `commerce`", "database riêng" | **Đã sửa** ở cùng nhánh, có dòng "Cập nhật 04/11" ở đầu | Duy (QC kiến trúc) |
 | 9 | Sơ đồ `06-kien-truc-tong-quan.drawio`, `ARCHITECTURE.md` trong 3 repo | v4.5 (2 Postgres) | `.drawio` **đã thay** bằng v4.6 ở cùng nhánh. **Còn:** xuất lại `06-kien-truc-tong-quan.png` từ `.drawio` | Duy / Tech Lead |
@@ -47,30 +47,23 @@ Code đang dùng `pgSchema('commerce')` (TF06) **không phải sửa**.
 
 Mục 1 đến 5 nên đi chung **một PR** (gọi là "PR gộp DB"), để không ai kéo về nửa chừng rồi hỏng stack hoặc hỏng test.
 
-## Các nhánh trên remote (kiểm ngày 04/11)
+## Các nhánh trên remote (kiểm lại ngày 05/11)
 
-DB `commerce` riêng **không do nhánh nào thêm vào**: nó nằm sẵn trong `develop` và `main` từ khung repo (TF57). Vì thế mọi nhánh tạo từ `develop` đều kế thừa. Chưa nhánh nào *phụ thuộc* thật vào việc tách DB: không có code nào JOIN hay kết nối chéo giữa hai database. Chỉ có cấu hình, test hạ tầng và chú thích.
+Từ 05/11, code commerce đã vào `develop`: TF06 (kho sản phẩm, `CommerceFacade`, migration, seed; PR #35) và TF10 (trang chi tiết khách sạn; PR #37). Code commerce đã dùng `pgSchema('commerce')` nên **không phải sửa code**, chỉ đổi nơi kết nối. Không còn nhánh nào phải rebase vì chuyện này.
 
 | Nhánh | Chủ | Trạng thái | Liên quan DB `commerce` | Cần làm |
 |---|---|---|---|---|
-| `develop`, `main` | Tech Lead | — | Nguồn gốc: init SQL, `.env.example`, compose, `libs/db`, `libs/testing` | Nhận PR gộp DB |
-| `thang/TF06-kho-san-pham-commerce` | Thắng | Mở, +3 commit | **Dùng nhiều nhất**: migration `init_catalog`, seed, `CommerceFacade`, đọc `DATABASE_URL_COMMERCE`. Chú thích `commerce.module.ts:17` ghi "Database riêng commerce" | Code giữ nguyên (đã dùng `pgSchema('commerce')`). Sửa chú thích dòng 17 và `modules/commerce/README.md`. Rebase lên `develop` sau PR gộp DB; chạy lại migrate + seed trên `core` để lấy evidence |
-| `thang/TF10-trang-chi-tiet-khach-san` | Thắng | Mở, xếp chồng trên TF06 | Như TF06 (chú thích ở `commerce.module.ts:19`); e2e `hotels.e2e.spec.ts` | Rebase theo TF06; chạy lại e2e trên `core` |
-| `thanh/TF02-social-content` | Thành | Mở, chậm 56 commit so với `develop` | Chỉ có port `commerce-service.port.ts` (gọi qua facade), không đụng DB | Không cần sửa; rebase lên `develop` như bình thường |
-| `phong/TF09-media-upload-api` | Phong | Mở | Không (chỉ sửa `.env.example` cho S3) | Có thể conflict nhẹ ở `.env.example` khi rebase, giữ cả hai thay đổi |
-| `dung/TF051-hotfix-revert-main` | Dũng | Đã vào `main` | Không | Không |
-| Các nhánh `dung/TF05*`, `phong/TF09-*`, `trang/TF57-*` khác | — | Đã merge | Không | Có thể xoá trên remote |
-| `duy/TFxx-ota-suggest` (local, chưa push) | Duy | Chưa commit | Không (chỉ schema `discovery`) | Không |
+| `develop` | Tech Lead | Có toàn bộ code commerce | Nguồn gốc: init SQL, `.env.example`, compose, `libs/db`, `libs/testing`, README | Nhận PR gộp DB (mục 1–6) |
+| `phong/TF09-media-complete` | Phong | Mở (PR #31) | Không đụng file DB | Không cần làm gì; merge `develop` như bình thường |
+| `main`, `dung/TF051-hotfix-revert-main` | Tech Lead, Dũng | Bản cũ hơn `develop` | Có, nhưng sẽ theo `develop` ở lần release | Không |
+| Các nhánh task khác | — | Đã merge vào `develop` | — | Có thể xoá trên remote |
 
-### Thứ tự align đề xuất
+### Thứ tự align
 
-1. **PR gộp DB** (Dũng, Duy backup) vào `develop`: các mục 1–5 ở bảng trên. Kiểm bằng `pnpm stack:reset`, rồi `pnpm turbo run lint typecheck test`, kể cả test `libs/testing` dùng Postgres thật.
+1. **PR gộp DB** vào `develop` (Duy làm, Dũng duyệt vì là chủ `libs/`, `deploy/`): mục 1–6 ở bảng trên. Kiểm bằng `pnpm stack:reset` (máy local), migrate + seed, rồi `pnpm turbo run lint typecheck test`, kể cả test `libs/testing` dùng Postgres thật và e2e của commerce.
 2. **Báo cả team** ngay khi merge: mỗi người làm lại máy local theo mục dưới, nếu không `.env` cũ vẫn trỏ `/commerce`.
-3. **Thắng rebase TF06**, sửa chú thích, chạy lại migrate + seed, cập nhật evidence ("schema `commerce` trên DB `core`"). Sau đó mới merge TF06, rồi tới TF10.
-4. Nhánh khác rebase khi tới lượt merge, không cần làm gì thêm.
-5. Tài liệu kiến trúc trong 3 repo (mục 7–9) đã sửa ở nhánh `duy/TF57-commerce-schema-trong-core`, chỉ còn xuất lại PNG. Trang sửa Jira (mục 10). Không chặn code.
-
-Merge TF06 **trước** PR gộp DB cũng được, vì TF06 không đổi init SQL. Khi đó Thắng chỉ cần chạy lại migrate trên `core` sau khi PR gộp DB vào. Nhưng làm theo thứ tự trên thì evidence của TF06 đúng ngay từ đầu.
+3. Nhánh đang mở merge `develop` khi tới lượt, không cần làm gì thêm.
+4. Tài liệu kiến trúc trong 3 repo (mục 7–9) sửa ở nhánh `duy/TF57-commerce-schema-trong-core`, chỉ còn xuất lại PNG. Trang sửa Jira (mục 10). Không chặn code.
 
 ## Máy local đang có database `commerce` cũ
 
