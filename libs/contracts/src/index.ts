@@ -54,6 +54,24 @@ export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
+/** commerce.order.paid v1: đơn đã thanh toán, chỗ đã bán. Không mang thông tin liên hệ của khách. */
+export const CommerceOrderPaidV1Schema = z.object({
+  orderId: z.uuid(),
+  userId: z.uuid(),
+  total: z.number().int().positive(),
+  sourcePostId: z.string().nullable(),
+  items: z.array(
+    z.object({
+      productType: z.enum(['room', 'flight']),
+      productId: z.string().min(1),
+      date: z.string(),
+      nights: z.number().int().positive(),
+      qty: z.number().int().positive(),
+    }),
+  ),
+});
+export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -63,4 +81,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.locked.v1': AccessUserLockedV1Schema,
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
+  'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
 };

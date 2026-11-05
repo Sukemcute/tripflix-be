@@ -1624,6 +1624,395 @@
           "admin-commerce"
         ]
       }
+    },
+    "/api/checkout": {
+      "post": {
+        "operationId": "CheckoutController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}": {
+      "get": {
+        "operationId": "CheckoutController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/guests": {
+      "put": {
+        "operationId": "CheckoutController_setGuests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGuestsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/pay": {
+      "post": {
+        "operationId": "CheckoutController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/3ds": {
+      "post": {
+        "operationId": "CheckoutController_confirm3ds",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmThreeDsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/cancel": {
+      "post": {
+        "operationId": "CheckoutController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/pay-vnpay": {
+      "post": {
+        "operationId": "VnpayCheckoutController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartVnpayRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartVnpayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/payments/vnpay/ipn": {
+      "get": {
+        "operationId": "VnpayCallbackController_ipn",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/payments/vnpay/return": {
+      "get": {
+        "operationId": "VnpayCallbackController_return",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VnpayReturnResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/mock-gateway/tokens": {
+      "post": {
+        "operationId": "MockGatewayController_createToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mock-gateway"
+        ]
+      }
+    },
+    "/api/mock-gateway/test-cards": {
+      "get": {
+        "operationId": "MockGatewayController_listTestCards",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mock-gateway"
+        ]
+      }
     }
   },
   "info": {
@@ -2530,6 +2919,434 @@
         "required": [
           "from",
           "to"
+        ]
+      },
+      "CheckoutItemRequestDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-dn-01--DLX",
+            "description": "Mã loại phòng hoặc mã hạng ghế"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date",
+            "description": "Ngày nhận phòng / ngày bay"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date",
+            "description": "Ngày trả phòng (bắt buộc với phòng)"
+          },
+          "qty": {
+            "type": "number",
+            "description": "Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số khách"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Mặc định gói đầu tiên"
+          }
+        },
+        "required": [
+          "productId",
+          "checkIn"
+        ]
+      },
+      "CheckoutRequestDto": {
+        "type": "object",
+        "properties": {
+          "adults": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 9
+          },
+          "sourcePostId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bài đăng dẫn tới đơn này (Đặt y chang)"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemRequestDto"
+            }
+          }
+        },
+        "required": [
+          "adults",
+          "items"
+        ]
+      },
+      "CheckoutItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "room",
+              "flight"
+            ]
+          },
+          "productId": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "nights": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "Một đêm một phòng / một vé (VND)"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "ratePlanCode": {
+            "type": "string"
+          },
+          "ratePlanName": {
+            "type": "string"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelUntil": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "productType",
+          "productId",
+          "productName",
+          "date",
+          "dateTo",
+          "nights",
+          "qty",
+          "unitPrice",
+          "lineTotal",
+          "ratePlanCode",
+          "ratePlanName",
+          "isRefundable",
+          "freeCancelUntil",
+          "confirmationCode"
+        ]
+      },
+      "CheckoutDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paying",
+              "paid",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "number"
+          },
+          "adults": {
+            "type": "number"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemDto"
+            }
+          },
+          "isGuestInfoComplete": {
+            "type": "boolean"
+          },
+          "passengersRequired": {
+            "type": "number",
+            "description": "Số hành khách cần nhập (0 khi không có vé bay)"
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "holdExpiresAt",
+          "total",
+          "adults",
+          "confirmationCode",
+          "cancelReason",
+          "items",
+          "isGuestInfoComplete",
+          "passengersRequired",
+          "policyVersion"
+        ]
+      },
+      "ContactDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0901234567"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "fullName",
+          "phone"
+        ]
+      },
+      "GuestDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Họ tên theo giấy tờ"
+          },
+          "birthdate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Bắt buộc khi có vé bay"
+          }
+        },
+        "required": [
+          "fullName"
+        ]
+      },
+      "SetGuestsRequestDto": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/ContactDto"
+          },
+          "guests": {
+            "description": "Có vé bay thì cần đủ số khách",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestDto"
+            }
+          }
+        },
+        "required": [
+          "contact",
+          "guests"
+        ]
+      },
+      "PayRequestDto": {
+        "type": "object",
+        "properties": {
+          "paymentToken": {
+            "type": "string",
+            "description": "Token thẻ do cổng cấp (mock: POST /api/mock-gateway/tokens)"
+          },
+          "expectedTotal": {
+            "type": "number",
+            "description": "Tổng tiền khách đang thấy; khác giá hiện tại thì 409 PRICE_CHANGED, chưa trừ tiền"
+          },
+          "acceptedPolicyVersion": {
+            "type": "string",
+            "example": "2026-11-03"
+          }
+        },
+        "required": [
+          "paymentToken",
+          "expectedTotal",
+          "acceptedPolicyVersion"
+        ]
+      },
+      "PayResultDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "requires_action",
+              "pending"
+            ]
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "description": "Khi outcome = requires_action: gửi kèm OTP tới /3ds"
+          },
+          "message": {
+            "type": "string",
+            "description": "Khi outcome = pending: chưa rõ kết quả, gọi lại GET /checkout/:id sau ít giây"
+          },
+          "checkout": {
+            "$ref": "#/components/schemas/CheckoutDto"
+          }
+        },
+        "required": [
+          "outcome",
+          "orderId"
+        ]
+      },
+      "ConfirmThreeDsRequestDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "challengeId",
+          "otp"
+        ]
+      },
+      "StartVnpayRequestDto": {
+        "type": "object",
+        "properties": {
+          "expectedTotal": {
+            "type": "number",
+            "description": "Tổng tiền khách đang thấy; khác giá hiện tại thì 409 PRICE_CHANGED"
+          },
+          "acceptedPolicyVersion": {
+            "type": "string",
+            "example": "2026-11-03"
+          },
+          "bankCode": {
+            "type": "string",
+            "enum": [
+              "VNPAYQR",
+              "VNBANK",
+              "INTCARD"
+            ],
+            "description": "Bỏ trống: khách tự chọn trên trang VNPay. VNPAYQR: vào thẳng màn mã QR"
+          }
+        },
+        "required": [
+          "expectedTotal",
+          "acceptedPolicyVersion"
+        ]
+      },
+      "StartVnpayResultDto": {
+        "type": "object",
+        "properties": {
+          "paymentUrl": {
+            "type": "string",
+            "description": "Chuyển trình duyệt / WebView tới URL này"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "paymentUrl",
+          "expiresAt"
+        ]
+      },
+      "VnpayReturnResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isValidSignature": {
+            "type": "boolean"
+          },
+          "isSuccess": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "orderId",
+          "isValidSignature",
+          "isSuccess"
+        ]
+      },
+      "CreateTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "cardNumber": {
+            "type": "string",
+            "example": "4242424242424242",
+            "description": "Chỉ thẻ test"
+          }
+        },
+        "required": [
+          "cardNumber"
+        ]
+      },
+      "TokenDto": {
+        "type": "object",
+        "properties": {
+          "paymentToken": {
+            "type": "string"
+          },
+          "last4": {
+            "type": "string"
+          },
+          "isTestCard": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paymentToken",
+          "last4",
+          "isTestCard"
         ]
       }
     }

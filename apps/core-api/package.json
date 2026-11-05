@@ -31,6 +31,7 @@
     "@tripflix/db": "workspace:*",
     "@tripflix/event-bus": "workspace:*",
     "@tripflix/observability": "workspace:*",
+    "@tripflix/idempotency": "workspace:*",
     "@tripflix/outbox": "workspace:*",
     "@tripflix/storage": "workspace:*",
     "argon2": "catalog:",
