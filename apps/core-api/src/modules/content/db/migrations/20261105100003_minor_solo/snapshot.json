@@ -1,0 +1,331 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0ec6439d-e6c9-41c4-9ade-05da73aac14a",
+  "prevIds": [
+    "402f83e6-fdb6-48f9-8d32-d75144099869"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "comment_reactions"
+      ],
+      "writes": [
+        "s|tbl|content.comment_reactions",
+        "n|tbl|content.comment_reactions",
+        "e|tbl|content.comment_reactions",
+        "n|rel|content.comment_reactions",
+        "n|type|content.comment_reactions",
+        "n|rel|content.comment_reactions_pkey"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "comments",
+        "like_count"
+      ],
+      "writes": [
+        "s|col|content.comments.like_count",
+        "n|col|content.comments.like_count",
+        "e|col|content.comments.like_count"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "comment_reactions",
+        "idx_comment_reactions_comment_user"
+      ],
+      "writes": [
+        "s|idx|content.idx_comment_reactions_comment_user",
+        "n|idx|content.idx_comment_reactions_comment_user",
+        "e|idx|content.idx_comment_reactions_comment_user",
+        "n|rel|content.idx_comment_reactions_comment_user"
+      ],
+      "reads": [
+        "n|tbl|content.comment_reactions",
+        "n|sch|content",
+        "n|col|content.comment_reactions.comment_id",
+        "n|col|content.comment_reactions.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "comment_reactions",
+        "idx_comment_reactions_user_created"
+      ],
+      "writes": [
+        "s|idx|content.idx_comment_reactions_user_created",
+        "n|idx|content.idx_comment_reactions_user_created",
+        "e|idx|content.idx_comment_reactions_user_created",
+        "n|rel|content.idx_comment_reactions_user_created"
+      ],
+      "reads": [
+        "n|tbl|content.comment_reactions",
+        "n|sch|content",
+        "n|col|content.comment_reactions.user_id",
+        "n|col|content.comment_reactions.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "content",
+        "comment_reactions"
+      ],
+      "writes": [
+        "s|fk|content.comment_reactions.fk_comment_reactions_comment_id",
+        "n|fk|content.comment_reactions.fk_comment_reactions_comment_id",
+        "e|fk|content.comment_reactions.fk_comment_reactions_comment_id",
+        "n|con|content.comment_reactions.fk_comment_reactions_comment_id"
+      ],
+      "reads": [
+        "n|tbl|content.comment_reactions",
+        "n|sch|content",
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comment_reactions.comment_id",
+        "n|col|content.comments.id",
+        "e|uniqueness|content.comments.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "name": "comment_reactions",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "like_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "gen_random_uuid()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "comment_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "type",
+        "type": "varchar(20)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'like'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "idx_comment_reactions_comment_user",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "comment_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "idx_comment_reactions_user_created",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "fk_comment_reactions_comment_id",
+        "nameExplicit": true,
+        "columns": [
+          "comment_id"
+        ],
+        "schemaTo": "content",
+        "tableTo": "comments",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comment_reactions",
+        "name": "comment_reactions_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

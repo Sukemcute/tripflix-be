@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   postSummaries,
@@ -22,7 +22,11 @@ export class PostSummaryRepository {
     return record ?? null;
   }
 
-  async upsert(data: NewPostSummaryRecord): Promise<PostSummaryRecord> {
+  /**
+   * Ghi đè chỉ khi bản mới không cũ hơn bản trên đĩa (Atomic Compare-and-Swap ở tầng DB)
+   * và một lần failed không xóa bản ready cũ.
+   */
+  async saveIfNewer(data: NewPostSummaryRecord): Promise<PostSummaryRecord> {
     const [saved] = await this.db
       .insert(postSummaries)
       .values(data)
@@ -41,12 +45,25 @@ export class PostSummaryRepository {
           generatedAt: data.generatedAt,
           updatedAt: new Date(),
         },
+        where: sql`(
+          ${postSummaries.generatedAt} IS NULL
+          OR excluded.generated_at >= ${postSummaries.generatedAt}
+        ) AND NOT (
+          ${postSummaries.status} = 'ready' AND excluded.status = 'failed'
+        )`,
       })
       .returning();
 
-    if (!saved) {
+    if (saved) return saved;
+
+    const current = await this.findByPostId(data.postId);
+    if (!current) {
       throw new Error(`Không thể lưu tóm tắt cho bài đăng ${data.postId}`);
     }
-    return saved;
+    return current;
+  }
+
+  async upsert(data: NewPostSummaryRecord): Promise<PostSummaryRecord> {
+    return this.saveIfNewer(data);
   }
 }

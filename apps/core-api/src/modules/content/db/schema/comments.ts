@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   text,
   timestamp,
   uuid,
@@ -22,6 +23,7 @@ export const comments = contentSchema.table(
     authorId: uuid('author_id').notNull(),
     parentCommentId: uuid('parent_comment_id'),
     body: text('body').notNull(),
+    likeCount: integer('like_count').notNull().default(0),
     isEdited: boolean('is_edited').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

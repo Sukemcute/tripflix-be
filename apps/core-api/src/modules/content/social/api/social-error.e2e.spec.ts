@@ -8,6 +8,7 @@ import {
   PostPublishValidationException,
   UnauthorizedPostActionException,
   InvalidPostStatusTransitionException,
+  InvalidCommentBodyException,
 } from '../domain/errors.js';
 import { SocialErrorFilter } from './social-error.filter.js';
 
@@ -25,6 +26,9 @@ class ErrorController {
   }
   @Get('conflict') conflict() {
     throw new InvalidPostStatusTransitionException('published', 'published');
+  }
+  @Get('invalid-comment-body') invalidCommentBody() {
+    throw new InvalidCommentBodyException('Nội dung bình luận không được vượt quá 2,000 ký tự');
   }
 }
 let app: INestApplication;
@@ -47,4 +51,11 @@ it('keeps authorization failures actionable for frontend clients', async () => {
 it('distinguishes invalid publication from a repeated status transition', async () => {
   await request(app.getHttpServer()).get('/social-errors/invalid').expect(422);
   await request(app.getHttpServer()).get('/social-errors/conflict').expect(409);
+});
+it('returns 400 for invalid comment body instead of 500', async () => {
+  const res = await request(app.getHttpServer()).get('/social-errors/invalid-comment-body').expect(400);
+  expect(res.body).toMatchObject({
+    statusCode: 400,
+    message: expect.stringContaining('2,000 ký tự'),
+  });
 });

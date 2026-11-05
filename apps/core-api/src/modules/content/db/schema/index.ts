@@ -7,3 +7,4 @@ export * from './bookmarks.js';
 export * from './moderation-actions.js';
 export * from './outbox.js';
 export * from './post-summaries.js';
+export * from './comment-reactions.js';

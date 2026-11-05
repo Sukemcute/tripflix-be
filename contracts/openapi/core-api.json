@@ -1317,6 +1317,52 @@
         ]
       }
     },
+    "/api/v1/comments/{commentId}/reaction": {
+      "put": {
+        "operationId": "CommentsController_setCommentReaction",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommentReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cập nhật trạng thái thả tim thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedCommentReactionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thả tim hoặc hủy thả tim cho bình luận (FR11 - Idempotent)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
     "/api/v1/comments/{commentId}": {
       "patch": {
         "operationId": "CommentsController_editComment",
@@ -1710,13 +1756,20 @@
         ],
         "responses": {
           "200": {
-            "description": "Thông tin tóm tắt bài viết"
+            "description": "Thông tin tóm tắt bài viết",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSummaryResponseDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "postId sai định dạng UUID"
           },
           "404": {
-            "description": "Bài viết chưa có bản tóm tắt"
+            "description": "Bài viết chưa có bản tóm tắt hoặc không có quyền xem"
           }
         },
         "summary": "Lấy kết quả tóm tắt cộng đồng của bài viết",
@@ -3867,8 +3920,8 @@
           "body": {
             "type": "string",
             "example": "Bài viết chia sẻ rất chi tiết!",
-            "description": "Nội dung bình luận (tối đa 10.000 ký tự)",
-            "maxLength": 10000
+            "description": "Nội dung bình luận (tối đa 2.000 ký tự)",
+            "maxLength": 2000
           },
           "parent_comment_id": {
             "type": "string",
@@ -3902,6 +3955,16 @@
           "isEdited": {
             "type": "boolean"
           },
+          "likeCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số lượt thích bình luận"
+          },
+          "isLiked": {
+            "type": "boolean",
+            "example": false,
+            "description": "Người xem hiện tại đã thích bình luận hay chưa"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -3922,6 +3985,8 @@
           "parentCommentId",
           "body",
           "isEdited",
+          "likeCount",
+          "isLiked",
           "createdAt",
           "updatedAt",
           "deletedAt"
@@ -3950,14 +4015,48 @@
           "total"
         ]
       },
+      "SetCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "like",
+              null
+            ],
+            "nullable": true,
+            "example": "like",
+            "description": "Loại cảm xúc (\"like\" để thích, null để hủy thích, để trống để toggle)"
+          }
+        }
+      },
+      "UpdatedCommentReactionDto": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string"
+          },
+          "isLiked": {
+            "type": "boolean"
+          },
+          "likeCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "commentId",
+          "isLiked",
+          "likeCount"
+        ]
+      },
       "UpdateCommentDto": {
         "type": "object",
         "properties": {
           "body": {
             "type": "string",
             "example": "Nội dung bình luận đã chỉnh sửa...",
-            "description": "Nội dung mới (tối đa 10.000 ký tự)",
-            "maxLength": 10000
+            "description": "Nội dung mới (tối đa 2.000 ký tự)",
+            "maxLength": 2000
           }
         },
         "required": [
@@ -4372,6 +4471,112 @@
             "description": "Thời điểm sinh kết quả"
           }
         }
+      },
+      "PostSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "018d9f20-0000-7000-8000-000000000001",
+            "description": "Mã bài đăng"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "no_comments",
+              "insufficient_data",
+              "ready",
+              "failed"
+            ],
+            "example": "ready",
+            "description": "Trạng thái tóm tắt"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bài viết chia sẻ trải nghiệm du lịch Ninh Bình...",
+            "description": "Nội dung tóm tắt tiếng Việt sinh từ AI"
+          },
+          "keyTakeaways": {
+            "example": [
+              "Nên đi thuyền Tràng An lúc 7h sáng"
+            ],
+            "description": "Các điểm nổi bật từ thảo luận cộng đồng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Chi tiết phân tích cấu trúc: khen/chê, video vs thực tế"
+          },
+          "safety": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Cờ và đánh giá an toàn"
+          },
+          "inputHash": {
+            "type": "string",
+            "nullable": true,
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Bản băm của tập bình luận dùng để tóm tắt"
+          },
+          "commentCountAtSummary": {
+            "type": "number",
+            "example": 25,
+            "description": "Số lượng bình luận tại thời điểm tóm tắt"
+          },
+          "promptVersion": {
+            "type": "string",
+            "nullable": true,
+            "example": "v1.0",
+            "description": "Phiên bản prompt"
+          },
+          "modelName": {
+            "type": "string",
+            "nullable": true,
+            "example": "gemini-1.5-flash",
+            "description": "Tên mô hình LLM"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm sinh kết quả"
+          },
+          "isStale": {
+            "type": "boolean",
+            "example": false,
+            "description": "Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm tạo bản tóm tắt"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-05T14:00:00.000Z",
+            "description": "Thời điểm cập nhật bản tóm tắt"
+          }
+        },
+        "required": [
+          "postId",
+          "status",
+          "keyTakeaways",
+          "commentCountAtSummary",
+          "isStale",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "CreateUploadDto": {
         "type": "object",

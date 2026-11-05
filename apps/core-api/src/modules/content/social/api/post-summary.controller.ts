@@ -9,10 +9,12 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ServiceOnly } from '@tripflix/auth';
+import { ServiceOnly, type AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import { SocialErrorFilter } from './social-error.filter.js';
 import { ZodBody } from './http.js';
 import {
+  PostSummaryResponseDto,
   SavePostSummaryDto,
   SavePostSummaryRequestSchema,
   type SavePostSummaryRequest,
@@ -64,15 +66,24 @@ export class PostSummaryController {
   }
 
   @Get()
+  @OptionalAuthenticated()
   @ApiOperation({
     summary: 'Lấy kết quả tóm tắt cộng đồng của bài viết',
     description: 'Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).',
   })
-  @ApiResponse({ status: 200, description: 'Thông tin tóm tắt bài viết' })
+  @ApiResponse({ status: 200, description: 'Thông tin tóm tắt bài viết', type: PostSummaryResponseDto })
   @ApiResponse({ status: 400, description: 'postId sai định dạng UUID' })
-  @ApiResponse({ status: 404, description: 'Bài viết chưa có bản tóm tắt' })
-  async getSummary(@Param('postId', new ParseUUIDPipe()) postId: string) {
-    const summary = await this.getPostSummaryUseCase.execute(postId);
+  @ApiResponse({ status: 404, description: 'Bài viết chưa có bản tóm tắt hoặc không có quyền xem' })
+  async getSummary(
+    @Param('postId', new ParseUUIDPipe()) postId: string,
+    @OptionalCurrentUser() user?: AuthUser,
+  ) {
+    const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
+    const summary = await this.getPostSummaryUseCase.execute({
+      postId,
+      viewerId: user?.userId,
+      isStaff,
+    });
     if (!summary) {
       throw new NotFoundException(`Bài viết ${postId} chưa có bản tóm tắt nào`);
     }

@@ -3,8 +3,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateCommentDto {
   @ApiProperty({
     example: 'Bài viết chia sẻ rất chi tiết!',
-    description: 'Nội dung bình luận (tối đa 10.000 ký tự)',
-    maxLength: 10000,
+    description: 'Nội dung bình luận (tối đa 2.000 ký tự)',
+    maxLength: 2000,
   })
   body!: string;
 
@@ -15,8 +15,8 @@ export class CreateCommentDto {
 export class UpdateCommentDto {
   @ApiProperty({
     example: 'Nội dung bình luận đã chỉnh sửa...',
-    description: 'Nội dung mới (tối đa 10.000 ký tự)',
-    maxLength: 10000,
+    description: 'Nội dung mới (tối đa 2.000 ký tự)',
+    maxLength: 2000,
   })
   body!: string;
 }

@@ -79,27 +79,29 @@ class FakePlatformModule {}
       provide: PostSummaryRepository,
       useFactory: () => {
         const summaries = new Map<string, PostSummaryRecord>();
+        const save = async (data: any) => {
+          const record: PostSummaryRecord = {
+            postId: data.postId,
+            status: data.status ?? 'ready',
+            summary: data.summary ?? null,
+            keyTakeaways: data.keyTakeaways ?? [],
+            content: data.content ?? null,
+            safety: data.safety ?? null,
+            inputHash: data.inputHash ?? null,
+            commentCountAtSummary: data.commentCountAtSummary ?? 0,
+            promptVersion: data.promptVersion ?? null,
+            modelName: data.modelName ?? null,
+            generatedAt: data.generatedAt ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          summaries.set(data.postId, record);
+          return record;
+        };
         return {
           findByPostId: async (postId: string) => summaries.get(postId) ?? null,
-          upsert: async (data: any) => {
-            const record: PostSummaryRecord = {
-              postId: data.postId,
-              status: data.status ?? 'ready',
-              summary: data.summary ?? null,
-              keyTakeaways: data.keyTakeaways ?? [],
-              content: data.content ?? null,
-              safety: data.safety ?? null,
-              inputHash: data.inputHash ?? null,
-              commentCountAtSummary: data.commentCountAtSummary ?? 0,
-              promptVersion: data.promptVersion ?? null,
-              modelName: data.modelName ?? null,
-              generatedAt: data.generatedAt ?? null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            };
-            summaries.set(data.postId, record);
-            return record;
-          },
+          upsert: save,
+          saveIfNewer: save,
         };
       },
     },

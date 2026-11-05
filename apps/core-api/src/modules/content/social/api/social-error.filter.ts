@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import {
   CommentNotFoundException,
   DomainException,
+  InvalidCommentBodyException,
   InvalidPostStatusTransitionException,
   PostNotFoundException,
   UnauthorizedCommentActionException,
@@ -21,7 +22,9 @@ export class SocialErrorFilter implements ExceptionFilter<DomainException> {
           ? 403
           : error instanceof InvalidPostStatusTransitionException
             ? 409
-            : 422;
+            : error instanceof InvalidCommentBodyException
+              ? 400
+              : 422;
     host
       .switchToHttp()
       .getResponse<Response>()

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Comment,
+  InvalidCommentBodyException,
   InvalidCommentNestingException,
   UnauthorizedCommentActionException,
 } from './index.js';
@@ -18,21 +19,21 @@ describe('Comment Domain Entity', () => {
 
   describe('validateBody', () => {
     it('ném lỗi nếu nội dung rỗng hoặc chỉ có khoảng trắng', () => {
-      expect(() => Comment.validateBody('')).toThrow('Nội dung bình luận không được để trống');
-      expect(() => Comment.validateBody('   ')).toThrow('Nội dung bình luận không được để trống');
-      expect(() => Comment.validateBody(null as unknown as string)).toThrow('Nội dung bình luận không được để trống');
+      expect(() => Comment.validateBody('')).toThrow(InvalidCommentBodyException);
+      expect(() => Comment.validateBody('   ')).toThrow(InvalidCommentBodyException);
+      expect(() => Comment.validateBody(null as unknown as string)).toThrow(InvalidCommentBodyException);
     });
 
-    it('ném lỗi nếu nội dung vượt quá 10.000 ký tự', () => {
-      const longBody = 'A'.repeat(10_001);
-      expect(() => Comment.validateBody(longBody)).toThrow('Nội dung bình luận không được vượt quá 10,000 ký tự');
+    it('ném lỗi nếu nội dung vượt quá 2.000 ký tự', () => {
+      const longBody = 'A'.repeat(2_001);
+      expect(() => Comment.validateBody(longBody)).toThrow(InvalidCommentBodyException);
     });
 
-    it('hợp lệ và tự động trim khi nội dung đúng quy chuẩn (1 - 10.000 ký tự)', () => {
+    it('hợp lệ và tự động trim khi nội dung đúng quy chuẩn (1 - 2.000 ký tự)', () => {
       const validBody = '  Trải nghiệm rất tuyệt vời!  ';
       expect(Comment.validateBody(validBody)).toBe('Trải nghiệm rất tuyệt vời!');
 
-      const maxBody = 'B'.repeat(10_000);
+      const maxBody = 'B'.repeat(2_000);
       expect(Comment.validateBody(maxBody)).toBe(maxBody);
     });
   });
@@ -66,11 +67,11 @@ describe('Comment Domain Entity', () => {
       );
     });
 
-    it('ném lỗi khi cập nhật nội dung vượt quá 10.000 ký tự', () => {
+    it('ném lỗi khi cập nhật nội dung vượt quá 2.000 ký tự', () => {
       const comment = new Comment({ ...baseProps });
-      const tooLong = 'C'.repeat(10_001);
+      const tooLong = 'C'.repeat(2_001);
       expect(() => comment.updateBody('018d9f00-0000-7000-8000-000000000001', tooLong)).toThrow(
-        'Nội dung bình luận không được vượt quá 10,000 ký tự',
+        'Nội dung bình luận không được vượt quá 2,000 ký tự',
       );
     });
   });
