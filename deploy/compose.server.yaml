@@ -144,7 +144,8 @@ services:
   # Build trên server vì Next gắn địa chỉ API vào bundle lúc build, image trên GHCR không có địa chỉ này.
   web:
     profiles: [gateway]
-    image: tripflix-server-web
+    # Mặc định dùng image build trên máy; deploy-web.sh đặt 2 biến này trong .env.web để dùng image từ GHCR.
+    image: ${WEB_IMAGE:-tripflix-server-web}:${WEB_TAG:-latest}
     build:
       context: ${FE_REPO:-../../tripflix-fe}
       dockerfile: apps/web/Dockerfile

@@ -2,7 +2,7 @@
 
 `compose.server.yaml` chạy image production trên một máy. Postgres và Redis không mở cổng, API chỉ nghe trên `127.0.0.1`. `compose.yaml` vẫn chỉ dùng cho máy dev.
 
-Đã làm: giai đoạn 1, 2 và 3 (gồm website). Chưa làm: `video-worker`, `notification-service`, backup, deploy từ CI.
+Đã làm: giai đoạn 1, 2 và 3 (gồm website). Chưa làm: `video-worker`, `notification-service`, backup, deploy `core-api` từ CI.
 
 ## Chuẩn bị máy
 
@@ -28,7 +28,8 @@ Tải image cần `docker login ghcr.io`, mật khẩu là classic token chỉ c
 ```bash
 cd ~/tripflix-be
 sh deploy/init-server-env.sh
-echo "alias dc='docker compose -f ~/tripflix-be/deploy/compose.server.yaml --env-file ~/tripflix-be/deploy/.env.server'" >> ~/.bashrc
+echo "alias dc='docker compose -f ~/tripflix-be/deploy/compose.server.yaml --env-file ~/tripflix-be/deploy/.env.server --env-file ~/tripflix-be/deploy/.env.web'" >> ~/.bashrc
+touch ~/tripflix-be/deploy/.env.web
 source ~/.bashrc
 dc up -d --wait
 dc ps
@@ -100,3 +101,25 @@ dc --profile api --profile gateway pull && dc --profile api --profile gateway up
 `IMAGE_TAG` trong `.env.server` chọn bản chạy. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy.
 
 `docker compose down -v` xoá luôn database. Chưa có backup thì không chạy lệnh này trên server.
+
+## Deploy web tự động
+
+Merge vào `develop` của `tripflix-fe`: CI đạt, GitHub build image web, rồi SSH vào server chạy `deploy-web.sh` với tag `sha-xxxxxxx`. Script pull image, khởi động lại riêng `web`, kiểm tra website; không đạt thì quay về bản trước và báo workflow lỗi.
+
+Key của CI chỉ chạy được script này. User `deploy` không có quyền Docker, sudo chỉ cho phép chạy đúng script này dưới user đang chạy compose. Tag đang chạy nằm trong `deploy/.env.web`, file này không commit.
+
+Cài trên server, sau khi chép `deploy/` mới lên máy (`<user>` là user đang chạy compose):
+
+```bash
+sudo install -m 755 -o root -g root ~/tripflix-be/deploy/deploy-web.sh /opt/tripflix/deploy.sh
+echo 'deploy ALL=(<user>) NOPASSWD: /opt/tripflix/deploy.sh' | sudo tee /etc/sudoers.d/tripflix-deploy >/dev/null
+sudo chmod 440 /etc/sudoers.d/tripflix-deploy
+sudo visudo -cf /etc/sudoers.d/tripflix-deploy
+```
+
+Image trên GHCR là private, nên `<user>` phải `docker login ghcr.io` bằng token chỉ có quyền `read:packages`.
+
+Quay về bản cũ: chạy workflow `deploy-web` trên GitHub với commit muốn dùng, hoặc trên server chạy `/opt/tripflix/deploy.sh sha-xxxxxxx`.
+
+- Kiểm tra tự động chỉ phát hiện web không trả 200, không phát hiện lỗi giao diện hay nghiệp vụ.
+- Phần này chỉ áp dụng cho web. `core-api` có migration, quay về image cũ không hoàn tác được database, nên cần backup trước khi tự động hoá.
