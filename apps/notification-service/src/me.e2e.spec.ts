@@ -50,6 +50,11 @@ describe('notification-service kiểm access token qua JWKS', () => {
       JWKS_URL: `http://127.0.0.1:${port}/.well-known/jwks.json`,
       AUTH_JWT_ISSUER: 'tripflix-core',
       AUTH_JWT_AUDIENCE: 'tripflix',
+      SMTP_URL: 'smtp://127.0.0.1:1025',
+      MAIL_FROM: 'Tripflix <no-reply@tripflix.local>',
+      // Test này chỉ kiểm JWKS, không có Redis nên tắt consumer.
+      NOTIFICATION_CONSUMER_ENABLED: false,
+      NOTIFICATION_CONSUMER_NAME: undefined,
     };
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ENV)

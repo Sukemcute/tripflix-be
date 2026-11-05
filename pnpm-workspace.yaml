@@ -17,6 +17,7 @@ catalog:
   '@nestjs/testing': ^12.3.2
   '@testcontainers/postgresql': ^12.2.1
   '@testcontainers/redis': ^12.2.1
+  '@types/nodemailer': ^8.0.2
   '@types/express': ^5.0.6
   '@types/node': ^24.0.0
   '@types/pg': ^8.23.1
@@ -28,6 +29,7 @@ catalog:
   jose: ^6.2.15
   nestjs-cls: ^7.0.2
   nestjs-pino: ^5.3.1
+  nodemailer: ^10.3.1
   oxlint: ^1.91.0
   oxlint-tsgolint: ^7.0.2005
   pg: ^8.23.1

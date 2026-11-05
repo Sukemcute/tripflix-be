@@ -324,6 +324,67 @@
         ]
       }
     },
+    "/api/auth/password/forgot": {
+      "post": {
+        "operationId": "PasswordResetController_forgot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordAcceptedDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bạn đã yêu cầu đặt lại mật khẩu quá nhiều lần, vui lòng thử lại sau"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/reset": {
+      "post": {
+        "operationId": "PasswordResetController_reset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/service-token": {
       "post": {
         "operationId": "ServiceTokenController_issue",
@@ -2054,6 +2115,48 @@
           "createdAt",
           "lastUsedAt",
           "isCurrent"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgotPasswordAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Nếu email này có tài khoản, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Giá trị ?token= trên link trong email"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "token",
+          "newPassword"
         ]
       },
       "ServiceTokenRequestDto": {

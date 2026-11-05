@@ -61,6 +61,18 @@ export interface ServiceClientRepository {
   disable(clientId: string, at: Date): Promise<boolean>;
 }
 
+export interface PasswordResetRepository {
+  insert(reset: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
+  /** Xoá token chưa dùng của người dùng (khi có yêu cầu mới), trả số dòng đã xoá. */
+  deleteUnusedByUser(userId: string): Promise<number>;
+  /** Token còn dùng được (chưa dùng, chưa hết hạn); chỉ đọc, không khoá. */
+  findUsable(tokenHash: string, now: Date): Promise<{ userId: string } | null>;
+  /** Đánh dấu đã dùng nếu còn dùng được, trong một lệnh UPDATE: hai request cùng token thì chỉ một cái thắng. */
+  consume(tokenHash: string, now: Date): Promise<{ userId: string } | null>;
+  /** Xoá token hết hạn trước mốc `before` (đã dùng hay chưa), trả số dòng đã xoá. */
+  deleteExpired(before: Date): Promise<number>;
+}
+
 export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
@@ -104,6 +116,8 @@ export type AuditAction =
   | 'auth.profile_updated'
   | 'auth.password_changed'
   | 'auth.password_change_failed'
+  | 'auth.password_reset_requested'
+  | 'auth.password_reset'
   | 'service.token_failed'
   | 'service.client_created'
   | 'service.client_disabled'
@@ -136,6 +150,7 @@ export interface AccessStore {
   audit: AuditLog;
   outbox: AccessOutbox;
   serviceClients: ServiceClientRepository;
+  passwordResets: PasswordResetRepository;
 }
 
 export interface PasswordHasher {
@@ -167,6 +182,12 @@ export interface LoginRateLimiter {
   reset(email: string): Promise<void>;
 }
 
+/** Đếm số lần làm một việc trong cửa sổ thời gian (tính cả lần thành công), ví dụ yêu cầu quên mật khẩu. */
+export interface ActionRateLimiter {
+  /** Tính thêm một lần cho key; isBlocked khi đã vượt limit trong cửa sổ windowSeconds. */
+  consume(key: string, limit: number, windowSeconds: number): Promise<RateLimitStatus>;
+}
+
 export type Clock = () => Date;
 
 /** Thông tin request ghi vào phiên và nhật ký. */
@@ -180,4 +201,5 @@ export const PASSWORD_HASHER = Symbol('PASSWORD_HASHER');
 export const TOKEN_ISSUER = Symbol('TOKEN_ISSUER');
 export const LOGIN_RATE_LIMITER = Symbol('LOGIN_RATE_LIMITER');
 export const ACCESS_SID_BLOCKLIST = Symbol('ACCESS_SID_BLOCKLIST');
+export const ACTION_RATE_LIMITER = Symbol('ACTION_RATE_LIMITER');
 export const CLOCK = Symbol('CLOCK');
