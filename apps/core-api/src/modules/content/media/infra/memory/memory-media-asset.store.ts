@@ -92,7 +92,7 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
   findPlaybackAssets(assetIds: string[]): Promise<PlaybackAsset[]> {
     const readyAssets = assetIds.flatMap((id) => {
       const asset = this.assets.get(id);
-      return asset?.status === 'ready' ? [asset] : [];
+      return asset?.status === 'ready' && asset.levels.size > 0 ? [asset] : [];
     });
     return Promise.resolve(
       readyAssets.map((asset) => ({
