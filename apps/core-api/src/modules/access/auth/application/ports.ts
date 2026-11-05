@@ -6,7 +6,8 @@ import type { RefreshState } from '../domain/refresh-rotation.js';
 export interface UserRecord {
   id: string;
   email: string;
-  passwordHash: string;
+  /** null: tài khoản chỉ đăng nhập bằng Google, chưa đặt mật khẩu. */
+  passwordHash: string | null;
   displayName: string;
   role: Role;
   status: 'active' | 'locked';
@@ -59,6 +60,26 @@ export interface ServiceClientRepository {
   insert(client: Pick<ServiceClientRecord, 'clientId' | 'secretHash' | 'allowedAudiences'>): Promise<ServiceClientRecord | null>;
   /** Đặt disabled_at nếu đang bật; trả false khi không có client này. */
   disable(clientId: string, at: Date): Promise<boolean>;
+}
+
+export type IdentityProvider = 'google';
+
+export interface UserIdentityRepository {
+  findUserId(provider: IdentityProvider, subject: string): Promise<string | null>;
+  /** Trả false khi (provider, subject) đã được liên kết (request khác vừa liên kết trước). */
+  insert(identity: { provider: IdentityProvider; subject: string; userId: string; email: string }): Promise<boolean>;
+}
+
+/** Thông tin đã kiểm từ Google ID token. */
+export interface GoogleIdentity {
+  subject: string;
+  email: string;
+  name: string | null;
+}
+
+export interface GoogleIdTokenVerifier {
+  /** Ném AccessError google_invalid khi token sai chữ ký, sai aud, hết hạn, email chưa xác minh. */
+  verify(idToken: string): Promise<GoogleIdentity>;
 }
 
 export interface PasswordResetRepository {
@@ -117,6 +138,7 @@ export type AuditAction =
   | 'auth.password_changed'
   | 'auth.password_change_failed'
   | 'auth.password_reset_requested'
+  | 'auth.google_linked'
   | 'auth.password_reset'
   | 'service.token_failed'
   | 'service.client_created'
@@ -151,6 +173,7 @@ export interface AccessStore {
   outbox: AccessOutbox;
   serviceClients: ServiceClientRepository;
   passwordResets: PasswordResetRepository;
+  identities: UserIdentityRepository;
 }
 
 export interface PasswordHasher {
@@ -194,6 +217,8 @@ export type Clock = () => Date;
 export interface RequestMeta {
   ip: string;
   userAgent: string | null;
+  /** Header X-Anon-Id (UUID của khách vãng lai), null nếu không gửi hoặc sai dạng. */
+  anonId?: string | null;
 }
 
 export const ACCESS_STORE = Symbol('ACCESS_STORE');
@@ -202,4 +227,5 @@ export const TOKEN_ISSUER = Symbol('TOKEN_ISSUER');
 export const LOGIN_RATE_LIMITER = Symbol('LOGIN_RATE_LIMITER');
 export const ACCESS_SID_BLOCKLIST = Symbol('ACCESS_SID_BLOCKLIST');
 export const ACTION_RATE_LIMITER = Symbol('ACTION_RATE_LIMITER');
+export const GOOGLE_VERIFIER = Symbol('GOOGLE_VERIFIER');
 export const CLOCK = Symbol('CLOCK');

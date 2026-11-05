@@ -3,7 +3,7 @@ import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import { eq, inArray } from 'drizzle-orm';
 import type pg from 'pg';
-import { accessOutboxEvents, passwordResets, sessions } from '../../db/schema/index.js';
+import { accessOutboxEvents, passwordResets, sessions, users } from '../../db/schema/index.js';
 import { hashRefreshToken } from '../application/refresh-token.js';
 import { PUBLISHED_EVENT_RETENTION_MS, runAccessCleanup } from '../jobs/access-cleanup.job.js';
 import { DrizzleAccessStore } from './drizzle-access.store.js';
@@ -232,6 +232,19 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(result.expiredPasswordResets).toBeGreaterThanOrEqual(1);
     const left = await db.select({ tokenHash: passwordResets.tokenHash }).from(passwordResets).where(eq(passwordResets.userId, user!.id));
     expect(left.map((r) => r.tokenHash)).toEqual(['hash-used']);
+  });
+
+  it('TF059: tài khoản không có mật khẩu; liên kết Google trùng (provider, subject) trả false; xoá người dùng thì xoá liên kết', async () => {
+    const user = await store.users.insert({ email: 'google-only@gmail.com', passwordHash: null, displayName: 'G', role: 'member' });
+    expect(user?.passwordHash).toBeNull();
+    const identity = { provider: 'google' as const, subject: 'g-sub-1', userId: user!.id, email: 'google-only@gmail.com' };
+    expect(await store.identities.insert(identity)).toBe(true);
+    expect(await store.identities.insert(identity)).toBe(false);
+    expect(await store.identities.findUserId('google', 'g-sub-1')).toBe(user!.id);
+    expect(await store.identities.findUserId('google', 'khong-co')).toBeNull();
+
+    await db.delete(users).where(eq(users.id, user!.id));
+    expect(await store.identities.findUserId('google', 'g-sub-1')).toBeNull();
   });
 
   it('email trùng thì insert trả null, không ném lỗi', async () => {

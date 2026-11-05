@@ -6,15 +6,19 @@ import {
   ApiForbiddenResponse,
   ApiHeader,
   ApiOkResponse,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
-import { INVALID_REFRESH_MESSAGE } from '../domain/credentials.js';
+import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REFRESH_MESSAGE } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
 import {
+  GoogleLoginDto,
+  GoogleLoginRequestSchema,
   LoginDto,
   RefreshDto,
   RegisterDto,
@@ -66,6 +70,29 @@ export class AuthController {
     const isWeb = isWebClient(req);
     if (isWeb) this.web.assertTrustedOrigin(req);
     const pair = await this.auth.login(body, readRequestMeta(req));
+    return isWeb ? this.toWebResponse(res, pair) : pair;
+  }
+
+  /**
+   * Đăng nhập bằng Google: app, web gửi ID token lấy từ Google Sign-In. Lần đầu tạo member (hoặc liên kết vào
+   * tài khoản trùng email), lần sau vào đúng tài khoản đó. Chế độ web (cookie) giống /auth/login.
+   */
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiHeader(WEB_CLIENT_API_HEADER)
+  @ApiBody({ type: GoogleLoginDto })
+  @ApiOkResponse({ type: TokenPairDto })
+  @ApiUnauthorizedResponse({ description: GOOGLE_LOGIN_FAILED_MESSAGE })
+  @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
+  @ApiServiceUnavailableResponse({ description: GOOGLE_NOT_CONFIGURED_MESSAGE })
+  async loginWithGoogle(
+    @Body(new ZodBody(GoogleLoginRequestSchema)) body: z.infer<typeof GoogleLoginRequestSchema>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const isWeb = isWebClient(req);
+    if (isWeb) this.web.assertTrustedOrigin(req);
+    const pair = await this.auth.loginWithGoogle(body, readRequestMeta(req));
     return isWeb ? this.toWebResponse(res, pair) : pair;
   }
 
