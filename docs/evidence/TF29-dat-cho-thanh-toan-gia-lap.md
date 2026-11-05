@@ -69,3 +69,10 @@
 - `apps/core-api/.env.example`: thêm biến `VNPAY_*` (để trống, không có khoá thật).
 - Thành (content): có `CommerceFacade.verifyCompletedBooking` thật để thay bản giả trong `content.module.ts`.
 - Dũng (gateway): cần cho `/api/payments/vnpay/*` đi qua không kiểm token khi chạy IPN thật.
+
+## Bổ sung: khai báo OpenAPI (05/11)
+- `GET /api/hotels/:id` (phần của TF10): khai báo query `checkIn`, `checkOut`, `adults`, `calendarDays`.
+- `POST /api/checkout`: thêm mô tả 201 (mã API thật trả về), giữ mô tả 200 cũ để tương thích.
+- `POST /api/checkout/:id/pay`: thêm mô tả 202. `PUT /guests`, `POST /cancel`: thêm kiểu kết quả.
+- Không đổi hành vi API, không có migration. `pnpm contracts:build`: không mất endpoint nào, 5 đường dẫn thay đổi, đều của commerce.
+- Sau merge `develop`: lint 0 lỗi, typecheck pass, core-api 289/289, contracts 2/2, `test:int` 43/43, `check-boundaries` không vi phạm.

@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Param, Query, UseFilters } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { HotelDetailUseCases } from '../application/hotel-detail.use-cases.js';
 import { HotelDetailDto, HotelDetailQueryDto, HotelDetailQuerySchema } from './dto.js';
@@ -13,6 +13,8 @@ export class HotelsController {
   constructor(@Inject(HotelDetailUseCases) private readonly hotels: HotelDetailUseCases) {}
 
   @Get(':id')
+  // Kiểu tham số là giao của DTO và schema zod nên Swagger không tự đọc được: khai báo tường minh.
+  @ApiQuery({ type: HotelDetailQueryDto })
   @ApiOkResponse({ type: HotelDetailDto })
   @ApiNotFoundResponse({ description: 'Không có khách sạn này' })
   getHotel(@Param('id') id: string, @Query(new ZodQuery(HotelDetailQuerySchema)) query: HotelDetailQueryDto & z.infer<typeof HotelDetailQuerySchema>) {

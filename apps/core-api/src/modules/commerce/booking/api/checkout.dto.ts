@@ -121,6 +121,16 @@ export class CheckoutDto {
   @ApiProperty() policyVersion!: string;
 }
 
+export class SetGuestsResultDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ enum: [true] }) isGuestInfoComplete!: true;
+}
+
+export class CancelHoldResultDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ enum: ['cancelled'] }) status!: 'cancelled';
+}
+
 export class PayResultDto {
   @ApiProperty({ enum: ['paid', 'requires_action', 'pending'] }) outcome!: string;
   @ApiProperty({ format: 'uuid' }) orderId!: string;
