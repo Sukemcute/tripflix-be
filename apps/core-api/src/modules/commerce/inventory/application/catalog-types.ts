@@ -49,6 +49,9 @@ export interface CatalogHotel {
   priceFrom: number | null;
   isAvailable: boolean;
   options: CatalogOption[];
+  /** Thêm 06/11 (TF11, discovery cần cho tìm theo tên đường và gần tôi). Null khi chưa có dữ liệu. */
+  address: string | null;
+  location: { lat: number; lng: number } | null;
 }
 
 export interface CatalogFlight {

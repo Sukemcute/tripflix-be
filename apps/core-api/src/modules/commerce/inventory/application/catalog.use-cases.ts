@@ -104,6 +104,8 @@ export class CatalogUseCases {
         priceFrom,
         isAvailable: priceFrom !== null,
         options,
+        address: p.address ?? null,
+        location: p.lat != null && p.lng != null ? { lat: p.lat, lng: p.lng } : null,
       };
     });
     return { from: q.from, to: q.to, items, nextCursor: rows.length > q.limit ? page[page.length - 1]!.id : null };
