@@ -2040,6 +2040,49 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Mặc định hôm nay",
+            "required": false,
+            "name": "checkIn",
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mặc định ngày nhận phòng + 1",
+            "required": false,
+            "name": "checkOut",
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "adults",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 2,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Số ngày của lịch giá, tính từ hôm nay",
+            "required": false,
+            "name": "calendarDays",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 60,
+              "default": 14,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -2306,6 +2349,16 @@
                 }
               }
             }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2378,7 +2431,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetGuestsResultDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2426,6 +2486,16 @@
         "responses": {
           "200": {
             "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayResultDto"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "outcome = pending: chưa rõ kết quả từ cổng, đừng trả lại; gọi GET /checkout/:id sau ít giây",
             "content": {
               "application/json": {
                 "schema": {
@@ -2514,7 +2584,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelHoldResultDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5155,6 +5232,25 @@
           "guests"
         ]
       },
+      "SetGuestsResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isGuestInfoComplete": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "isGuestInfoComplete"
+        ]
+      },
       "PayRequestDto": {
         "type": "object",
         "properties": {
@@ -5227,6 +5323,25 @@
         "required": [
           "challengeId",
           "otp"
+        ]
+      },
+      "CancelHoldResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
         ]
       },
       "StartVnpayRequestDto": {
