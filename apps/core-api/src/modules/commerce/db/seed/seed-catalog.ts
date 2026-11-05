@@ -102,7 +102,18 @@ export async function seedCatalog(db: Db, file = CATALOG_SEED_FILE): Promise<{ h
         .values(rows)
         .onConflictDoUpdate({
           target: flights.id,
-          set: { name: sql`excluded.name`, airline: sql`excluded.airline`, departTime: sql`excluded.depart_time`, arriveTime: sql`excluded.arrive_time`, defaultSeats: sql`excluded.default_seats`, defaultPrice: sql`excluded.default_price`, farePlans: sql`excluded.fare_plans` },
+          set: {
+            name: sql`excluded.name`,
+            airline: sql`excluded.airline`,
+            departTime: sql`excluded.depart_time`,
+            arriveTime: sql`excluded.arrive_time`,
+            // Nơi đến theo cây địa điểm của discovery (sau sáp nhập tỉnh 2025); seed lại thì sửa cả dữ liệu cũ.
+            destinationSlug: sql`excluded.destination_slug`,
+            destinationName: sql`excluded.destination_name`,
+            defaultSeats: sql`excluded.default_seats`,
+            defaultPrice: sql`excluded.default_price`,
+            farePlans: sql`excluded.fare_plans`,
+          },
         });
     }
   });
