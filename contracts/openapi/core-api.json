@@ -2304,6 +2304,39 @@
         ]
       }
     },
+    "/api/hotels/{id}/reviews": {
+      "get": {
+        "operationId": "HotelsController_listReviews",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelReviewPageDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có khách sạn này"
+          }
+        },
+        "tags": [
+          "hotels"
+        ]
+      }
+    },
     "/api/admin/commerce/room-types/{id}/calendar": {
       "get": {
         "operationId": "AdminCalendarController_getRoomCalendar",
@@ -5802,6 +5835,218 @@
           "isAvailable",
           "rooms",
           "calendar"
+        ]
+      },
+      "RatingCountDto": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "number",
+            "example": 5
+          },
+          "count": {
+            "type": "number",
+            "example": 58
+          }
+        },
+        "required": [
+          "rating",
+          "count"
+        ]
+      },
+      "TagCountDto": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "example": "Phù hợp gia đình"
+          },
+          "count": {
+            "type": "number",
+            "example": 58
+          }
+        },
+        "required": [
+          "tag",
+          "count"
+        ]
+      },
+      "ReviewSummaryDto": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "example": 4.6,
+            "description": "Điểm trung bình đánh giá trên Tripflix"
+          },
+          "count": {
+            "type": "number",
+            "example": 24
+          },
+          "distribution": {
+            "description": "Từ 5 sao xuống 1 sao",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RatingCountDto"
+            }
+          },
+          "tags": {
+            "description": "Tag nhiều nhất trước, tối đa 10",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagCountDto"
+            }
+          },
+          "aiSummary": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tóm tắt ý kiến khách"
+          }
+        },
+        "required": [
+          "average",
+          "count",
+          "distribution",
+          "tags",
+          "aiSummary"
+        ]
+      },
+      "ReviewRoomDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-nt-01--DLX"
+          },
+          "name": {
+            "type": "string",
+            "example": "Deluxe hướng biển"
+          }
+        },
+        "required": [
+          "productId",
+          "name"
+        ]
+      },
+      "HotelReviewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "RV-P-h-nt-01-01"
+          },
+          "authorName": {
+            "type": "string",
+            "example": "Minh Anh"
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "description": "URL ảnh khách chụp",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "travelerType": {
+            "type": "string",
+            "nullable": true,
+            "description": "family | couple | solo | business | friends"
+          },
+          "stayMonth": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Tháng lưu trú (ngày 01)"
+          },
+          "room": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewRoomDto"
+              }
+            ]
+          },
+          "helpfulCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "authorName",
+          "rating",
+          "title",
+          "body",
+          "tags",
+          "images",
+          "travelerType",
+          "stayMonth",
+          "room",
+          "helpfulCount",
+          "createdAt"
+        ]
+      },
+      "HotelReviewPageDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-h-nt-01"
+          },
+          "summary": {
+            "description": "Thống kê trên mọi đánh giá, không theo bộ lọc",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewSummaryDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelReviewDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number",
+            "description": "Số đánh giá khớp bộ lọc"
+          }
+        },
+        "required": [
+          "hotelId",
+          "summary",
+          "items",
+          "page",
+          "limit",
+          "total"
         ]
       },
       "AdminRoomDayDto": {

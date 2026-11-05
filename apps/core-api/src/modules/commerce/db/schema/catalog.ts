@@ -28,6 +28,8 @@ export interface HotelAmenity {
 /** Thông tin hiển thị ở trang chi tiết, không dùng để lọc hay tính giá nên gom vào một cột JSONB. */
 export interface HotelDetails {
   description?: string;
+  /** Tóm tắt ý kiến khách (sau này do AI sinh từ đánh giá; dữ liệu demo do seed nạp). */
+  reviewSummary?: string;
   highlights?: { icon: string; text: string }[];
   nearby?: { name: string; distanceKm: number }[];
   amenities?: HotelAmenity[];
