@@ -1,9 +1,11 @@
 import { Body, Controller, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Post, UseFilters } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiGoneResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
@@ -13,6 +15,9 @@ import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { z } from 'zod';
 import { MediaUploadUseCases } from '../application/media-upload.use-cases.js';
 import {
+  CompleteUploadDto,
+  CompleteUploadRequestSchema,
+  CompletedUploadDto,
   CreateUploadDto,
   CreateUploadRequestSchema,
   CreatedUploadDto,
@@ -54,5 +59,20 @@ export class MediaUploadController {
     @Body(new ZodBody(ResignPartsRequestSchema)) body: z.infer<typeof ResignPartsRequestSchema>,
   ) {
     return this.uploads.resignParts(user.userId, assetId, body.partNumbers);
+  }
+
+  @Post(':assetId/complete')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBody({ type: CompleteUploadDto })
+  @ApiAcceptedResponse({ type: CompletedUploadDto })
+  @ApiNotFoundResponse({ type: MediaErrorDto, description: 'MEDIA_NOT_FOUND' })
+  @ApiConflictResponse({ type: MediaErrorDto, description: 'MEDIA_UPLOAD_INCOMPLETE, MEDIA_UPLOAD_NOT_ACTIVE' })
+  @ApiGoneResponse({ type: MediaErrorDto, description: 'MEDIA_UPLOAD_EXPIRED' })
+  completeUpload(
+    @CurrentUser() user: AuthUser,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
+    @Body(new ZodBody(CompleteUploadRequestSchema)) body: z.infer<typeof CompleteUploadRequestSchema>,
+  ) {
+    return this.uploads.completeUpload(user.userId, assetId, body.parts);
   }
 }

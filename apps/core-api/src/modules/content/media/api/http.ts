@@ -15,6 +15,8 @@ const HTTP_STATUS_BY_CODE: Record<MediaErrorCode, HttpStatus> = {
   MEDIA_NOT_FOUND: HttpStatus.NOT_FOUND,
   MEDIA_UPLOAD_NOT_ACTIVE: HttpStatus.CONFLICT,
   MEDIA_INVALID_PART_NUMBER: HttpStatus.BAD_REQUEST,
+  MEDIA_UPLOAD_INCOMPLETE: HttpStatus.CONFLICT,
+  MEDIA_UPLOAD_EXPIRED: HttpStatus.GONE,
 };
 
 /** Kiểm body bằng schema zod; lỗi trả 400 kèm danh sách trường sai. */

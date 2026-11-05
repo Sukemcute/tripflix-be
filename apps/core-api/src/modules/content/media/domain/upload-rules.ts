@@ -41,6 +41,22 @@ export function resolveRequestedPartNumbers(fileSizeBytes: number, partNumbers: 
   return uniquePartNumbers;
 }
 
+/**
+ * Kiểm trước khi gọi S3: S3 không biết file có bao nhiêu phần, sẽ ghép thiếu rồi xoá phiên upload,
+ * khiến app không tải tiếp được phần còn thiếu.
+ */
+export function assertAllPartsListed(fileSizeBytes: number, partNumbers: number[]): void {
+  const partCount = calculatePartCount(fileSizeBytes);
+  const uniquePartNumbers = new Set(partNumbers);
+  const isExactlyAllParts =
+    partNumbers.length === partCount &&
+    uniquePartNumbers.size === partCount &&
+    partNumbers.every((partNumber) => partNumber >= 1 && partNumber <= partCount);
+  if (!isExactlyAllParts) {
+    throw new MediaError('MEDIA_UPLOAD_INCOMPLETE', `Cần gửi đủ ${partCount} phần, mỗi phần một lần`);
+  }
+}
+
 /** Cột là số nguyên; làm tròn lên để video 300,5 giây vẫn bị tính là quá giới hạn. */
 export function roundUpDurationSeconds(durationSec: number): number {
   return Math.ceil(durationSec);

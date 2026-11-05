@@ -54,6 +54,14 @@ export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
+/** content.media.transcode_requested v1: file gốc đã ghép xong, video-worker chuyển mã và ghi vào videos/{assetId}/r{revision}/. */
+export const ContentMediaTranscodeRequestedV1Schema = z.object({
+  assetId: z.uuid(),
+  sourceKey: z.string().min(1),
+  revision: z.number().int().positive(),
+});
+export type ContentMediaTranscodeRequestedV1 = z.infer<typeof ContentMediaTranscodeRequestedV1Schema>;
+
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
 export const exportedSchemas: Record<string, z.ZodType> = {
   'event-envelope.v1': eventEnvelopeSchema,
@@ -63,4 +71,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.locked.v1': AccessUserLockedV1Schema,
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
+  'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
 };
