@@ -1,5 +1,6 @@
 import {
   AccessEmailVerificationRequestedV1Schema,
+  AccessRegistrationAttemptedExistingV1Schema,
   AccessRegistrationCodeRequestedV1Schema,
   AccessPasswordResetRequestedV1Schema,
   AccessUserWelcomeEmailRequestedV1Schema,
@@ -8,6 +9,7 @@ import {
 import type { Redis } from 'ioredis';
 import type { Mailer } from '../outapp/mailer.js';
 import { buildEmailVerificationEmail } from '../outapp/email-verification.email.js';
+import { buildExistingAccountEmail } from '../outapp/existing-account.email.js';
 import { buildRegistrationCodeEmail } from '../outapp/registration-code.email.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
 import { buildWelcomeEmail } from '../outapp/welcome.email.js';
@@ -71,6 +73,10 @@ export class EventRouter {
     } else if (event.type === 'access.registration_code_requested') {
       const payload = AccessRegistrationCodeRequestedV1Schema.parse(event.payload);
       await this.mailer.send(buildRegistrationCodeEmail(payload));
+      result = 'handled';
+    } else if (event.type === 'access.registration_attempted_existing') {
+      const payload = AccessRegistrationAttemptedExistingV1Schema.parse(event.payload);
+      await this.mailer.send(buildExistingAccountEmail(payload, this.links.webAppUrl));
       result = 'handled';
     } else if (event.type === 'access.email_verification_requested') {
       const payload = AccessEmailVerificationRequestedV1Schema.parse(event.payload);
