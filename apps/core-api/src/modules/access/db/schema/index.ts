@@ -1,6 +1,6 @@
 import { createOutboxTable } from '@tripflix/outbox';
 import { sql } from 'drizzle-orm';
-import { bigint, check, foreignKey, index, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, check, date, foreignKey, index, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** Mọi bảng của module access khai báo trong schema này. */
 export const accessSchema = pgSchema('access');
@@ -18,6 +18,11 @@ export const users = accessSchema.table(
     // Trống với tài khoản chỉ đăng nhập bằng Google (TF059); đăng nhập bằng mật khẩu vào tài khoản này luôn lỗi chung.
     passwordHash: text('password_hash'),
     displayName: text('display_name').notNull(),
+    // Thông tin cá nhân (TF06M): chỉ chủ tài khoản xem/sửa qua /auth/me, không đưa lên event bus. Đều có thể trống.
+    phone: text('phone'),
+    dateOfBirth: date('date_of_birth', { mode: 'string' }),
+    gender: text('gender'),
+    nationality: text('nationality'),
     role: text('role').notNull().default('member'),
     status: text('status').notNull().default('active'),
     createdAt: createdAtColumn(),
@@ -27,6 +32,9 @@ export const users = accessSchema.table(
     check('ck_users_role', sql`${t.role} in ('member', 'moderator', 'superadmin')`),
     check('ck_users_status', sql`${t.status} in ('active', 'locked')`),
     check('ck_users_email_lowercase', sql`${t.email} = lower(${t.email})`),
+    check('ck_users_gender', sql`${t.gender} is null or ${t.gender} in ('male', 'female', 'other')`),
+    check('ck_users_nationality', sql`${t.nationality} is null or ${t.nationality} ~ '^[A-Z]{2}$'`),
+    check('ck_users_phone', sql`${t.phone} is null or ${t.phone} ~ '^[+]?[0-9]{8,15}$'`),
     // Liệt kê nhân viên nhanh mà không quét cả bảng người dùng.
     index('idx_users_role').on(t.role).where(sql`${t.role} <> 'member'`),
   ],
