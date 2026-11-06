@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 import { currentPasswordField, displayNameField, newPasswordField, whenValid } from '../../auth/api/validation.js';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
+import { NEW_PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
+import { DISPLAY_NAME_MAX } from '../../auth/domain/text-rules.js';
 import { isKnownCountry } from '../domain/countries.js';
 import {
   GENDERS,
@@ -58,7 +59,7 @@ export const ChangePasswordRequestSchema = z
   });
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ maxLength: 50, example: 'Khang Nguyễn' }) displayName?: string;
+  @ApiPropertyOptional({ maxLength: DISPLAY_NAME_MAX, example: 'Khang Nguyễn' }) displayName?: string;
   @ApiPropertyOptional({
     type: String,
     nullable: true,
@@ -75,7 +76,7 @@ export class UpdateProfileDto {
 
 export class ChangePasswordDto {
   @ApiProperty() currentPassword!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }) newPassword!: string;
+  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) newPassword!: string;
 }
 
 export class SessionDto {

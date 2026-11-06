@@ -54,7 +54,7 @@ Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền b�
 | Dùng lại token cũ | Trong 10 giây sau lần xoay: vẫn cấp cặp mới (phòng mạng làm mất phản hồi). Quá 10 giây: xoá phiên, chặn `sid`, ghi `auth.refresh_reused`, trả `401` |
 | Thu hồi ngay | Đăng xuất, thoát thiết bị, đổi mật khẩu hoặc dùng lại token cũ: ghi `auth:revoked-sid:<sid>` vào Redis tới khi access token hết hạn. Mọi service dùng `@tripflix/auth` đều kiểm khoá này |
 | Đăng nhập sai | Sai 5 lần theo email hoặc 20 lần theo IP trong 15 phút: `429` kèm `Retry-After`. Email không tồn tại vẫn chạy argon2 để không lộ email nào có tài khoản. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào giới hạn này |
-| Mật khẩu | argon2id, 8–128 ký tự |
+| Mật khẩu | argon2id. Mật khẩu mới 8–64 ký tự (đăng ký 12–64), mật khẩu đang dùng nhận tới 128 ký tự |
 
 ## Đăng nhập Google và khách vãng lai (TF059)
 
@@ -246,10 +246,10 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 | --- | --- |
 | Email đăng ký | Cắt khoảng trắng hai đầu rồi kiểm định dạng, tối đa 254 ký tự; lưu chữ thường |
 | Email đăng nhập, quên mật khẩu | Chỉ cần có (cắt khoảng trắng), không kiểm định dạng: sai thì nhận câu trả lời chung, không lộ email nào đã đăng ký |
-| Mật khẩu mới khi đăng ký | 12–128 ký tự, chặn một số mật khẩu phổ biến, chuỗi số dễ đoán và mẫu lặp đơn giản |
-| Mật khẩu khi đổi hoặc đặt lại | 8–128 ký tự và có ít nhất một ký tự nhìn thấy |
-| Mật khẩu hiện tại (đăng nhập, đổi mật khẩu) | 1–128 ký tự, để tài khoản tạo trước TF05C vẫn đăng nhập được |
-| Tên hiển thị | Chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–50 ký tự, một dòng (không có xuống dòng, tab, ký tự điều khiển), có ít nhất một ký tự nhìn thấy. Không lọc HTML: web, app tự escape khi hiển thị. Tên lấy từ Google được làm sạch theo cùng quy tắc (`buildDisplayName`) |
+| Mật khẩu mới khi đăng ký | 12–64 ký tự, chặn một số mật khẩu phổ biến, chuỗi số dễ đoán và mẫu lặp đơn giản |
+| Mật khẩu khi đổi hoặc đặt lại | 8–64 ký tự và có ít nhất một ký tự nhìn thấy |
+| Mật khẩu hiện tại (đăng nhập, đổi mật khẩu) | 1–128 ký tự, để tài khoản tạo trước TF05C hoặc đặt mật khẩu dài hơn 64 trước khi giảm giới hạn vẫn đăng nhập được |
+| Tên hiển thị | Chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–30 ký tự, một dòng (không có xuống dòng, tab, ký tự điều khiển), có ít nhất một ký tự nhìn thấy. Không lọc HTML: web, app tự escape khi hiển thị. Tên lấy từ Google được làm sạch theo cùng quy tắc và cắt còn 30 ký tự (`buildDisplayName`). Tên đã lưu dài hơn 30 trước khi giảm giới hạn vẫn giữ, lần sửa sau phải rút gọn |
 | Tên thiết bị | Ký tự điều khiển đổi thành dấu cách, tối đa 100 ký tự; trống thì lưu `null` |
 
 - Độ dài đếm theo ký tự Unicode: một emoji tính 1 ký tự.

@@ -3345,7 +3345,7 @@
           "password": {
             "type": "string",
             "minLength": 12,
-            "maxLength": 128
+            "maxLength": 64
           }
         },
         "required": [
@@ -3381,11 +3381,11 @@
           "password": {
             "type": "string",
             "minLength": 12,
-            "maxLength": 128
+            "maxLength": 64
           },
           "displayName": {
             "type": "string",
-            "maxLength": 50,
+            "maxLength": 30,
             "example": "Khang"
           },
           "registrationId": {
@@ -3585,7 +3585,7 @@
         "properties": {
           "displayName": {
             "type": "string",
-            "maxLength": 50,
+            "maxLength": 30,
             "example": "Khang Nguyễn"
           },
           "phone": {
@@ -3627,7 +3627,7 @@
           "newPassword": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 128
+            "maxLength": 64
           }
         },
         "required": [
@@ -3707,7 +3707,7 @@
           "newPassword": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 128
+            "maxLength": 64
           }
         },
         "required": [

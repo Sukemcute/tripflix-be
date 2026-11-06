@@ -2,7 +2,7 @@
  * Quy tắc cho chữ người dùng gõ (tên hiển thị, tên thiết bị, mật khẩu) (TF05C).
  * Dùng chung cho kiểm tra đầu vào (api/validation.ts) và tên lấy từ Google (credentials.ts).
  */
-export const DISPLAY_NAME_MAX = 50;
+export const DISPLAY_NAME_MAX = 30;
 export const DEVICE_NAME_MAX = 100;
 
 /** Ký tự điều khiển (xuống dòng, tab, NUL…) và ký tự ngắt dòng, ngắt đoạn của Unicode. */

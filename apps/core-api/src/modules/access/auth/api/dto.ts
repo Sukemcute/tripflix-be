@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ROLES, type Role } from '@tripflix/contracts';
 import { z } from 'zod';
-import { PASSWORD_MAX } from '../domain/credentials.js';
+import { NEW_PASSWORD_MAX } from '../domain/credentials.js';
+import { DISPLAY_NAME_MAX } from '../domain/text-rules.js';
 import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_PATTERN, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
 import {
   currentPasswordField,
@@ -51,7 +52,7 @@ export class GoogleLoginDto {
 
 export class RegistrationCodeDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
-  @ApiProperty({ minLength: REGISTRATION_PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;
+  @ApiProperty({ minLength: REGISTRATION_PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) password!: string;
 }
 
 export class RegistrationCodeResultDto {
@@ -61,7 +62,7 @@ export class RegistrationCodeResultDto {
 }
 
 export class RegisterDto extends RegistrationCodeDto {
-  @ApiProperty({ maxLength: 50, example: 'Khang' }) displayName!: string;
+  @ApiProperty({ maxLength: DISPLAY_NAME_MAX, example: 'Khang' }) displayName!: string;
   @ApiProperty({ format: 'uuid' }) registrationId!: string;
   @ApiProperty({ pattern: REGISTRATION_CODE_PATTERN.source }) code!: string;
 }

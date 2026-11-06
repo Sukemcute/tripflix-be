@@ -12,7 +12,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { lookupEmailField, newPasswordField } from '../../auth/api/validation.js';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
+import { NEW_PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
 import { PasswordResetUseCases } from '../application/password-reset.use-cases.js';
 import {
   FORGOT_ACCEPTED_MESSAGE,
@@ -39,7 +39,7 @@ export class ForgotPasswordAcceptedDto {
 
 export class ResetPasswordDto {
   @ApiProperty({ description: 'Giá trị ?token= trên link trong email' }) token!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }) newPassword!: string;
+  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) newPassword!: string;
 }
 
 /** Quên mật khẩu: không cần đăng nhập. */

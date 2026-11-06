@@ -1,7 +1,10 @@
 import { DISPLAY_NAME_MAX, hasVisibleChar, stripControlChars } from './text-rules.js';
 
 export const PASSWORD_MIN = 8;
+/** Mật khẩu đang dùng (đăng nhập, mật khẩu hiện tại): giữ 128 để tài khoản đặt mật khẩu dài từ trước vẫn vào được. */
 export const PASSWORD_MAX = 128;
+/** Mật khẩu mới (đăng ký, đổi, đặt lại): tối đa 64 ký tự, đủ cho cụm mật khẩu dài. */
+export const NEW_PASSWORD_MAX = 64;
 
 /** Mọi lỗi đăng nhập trả cùng một thông báo, để không lộ email nào đã có tài khoản. */
 export const INVALID_CREDENTIALS_MESSAGE = 'Email hoặc mật khẩu không đúng';
