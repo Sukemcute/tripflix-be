@@ -2067,7 +2067,7 @@
     },
     "/api/stays": {
       "get": {
-        "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars`, `priceMin`/`priceMax` theo giá một đêm một phòng. `sort=price` (mặc định, rẻ trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
+        "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars` (từ X sao trở lên), `stars` (đúng X sao; gửi cả hai thì áp cả hai), `priceMin`/`priceMax` theo giá một đêm một phòng.\n- `sort=price` (mặc định, rẻ trước), `price_desc` (đắt trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
         "operationId": "StaysController_listStays",
         "parameters": [
           {
@@ -2093,6 +2093,7 @@
             "schema": {
               "enum": [
                 "price",
+                "price_desc",
                 "stars"
               ],
               "type": "string"
@@ -2115,9 +2116,19 @@
             "schema": {}
           },
           {
+            "name": "stars",
+            "required": false,
+            "in": "query",
+            "description": "Đúng X sao (1–5)",
+            "schema": {
+              "example": 3
+            }
+          },
+          {
             "name": "minStars",
             "required": false,
             "in": "query",
+            "description": "Từ X sao trở lên",
             "schema": {
               "example": 4
             }
@@ -2215,6 +2226,42 @@
           }
         },
         "summary": "Tìm khám phá bằng câu tự nhiên, kết quả chia theo vùng (Ở đâu, Lộ trình, Bài viết, Video...)",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/search/posts": {
+      "post": {
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.",
+        "operationId": "ExploreController_searchPosts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPostsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPostsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` rỗng hoặc dài hơn 200 ký tự, `postType`, `cursor`, `limit` sai"
+          }
+        },
+        "summary": "Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang",
         "tags": [
           "discovery"
         ]
@@ -2371,6 +2418,149 @@
         },
         "tags": [
           "hotels"
+        ]
+      }
+    },
+    "/api/flights": {
+      "get": {
+        "operationId": "FlightsController_search",
+        "parameters": [
+          {
+            "description": "Mã sân bay đi (IATA)",
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "SGN",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mã sân bay đến (IATA)",
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "CXR",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày bay",
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "passengers",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightSearchResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/api/flights/routes": {
+      "get": {
+        "operationId": "FlightsController_listRoutes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FlightRouteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/api/flights/{id}": {
+      "get": {
+        "operationId": "FlightsController_getFlight",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày bay",
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "passengers",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightOfferDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có chuyến bay này"
+          }
+        },
+        "tags": [
+          "flights"
         ]
       }
     },
@@ -5645,6 +5835,76 @@
           "dropped"
         ]
       },
+      "SearchPostsRequestDto": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "example": "lịch trình đà lạt 3n2đ dưới 3tr",
+            "description": "Câu người dùng gõ (1–200 ký tự)"
+          },
+          "postType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "plan",
+              "video",
+              "post"
+            ],
+            "default": "all",
+            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường"
+          },
+          "cursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "`nextCursor` của trang trước"
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "description": "1–50"
+          }
+        },
+        "required": [
+          "q"
+        ]
+      },
+      "SearchPostsResponseDto": {
+        "type": "object",
+        "properties": {
+          "understood": {
+            "description": "Máy hiểu câu thế nào (hiện dạng chip)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreUnderstoodDto"
+              }
+            ]
+          },
+          "items": {
+            "description": "Bài đã xếp theo mức khớp, đã bỏ bài bị ẩn. `reason` luôn có số ngày (nếu có lộ trình) và lượt thích",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreItemDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số bài khớp trên mọi trang"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Con trỏ trang sau; null = hết"
+          }
+        },
+        "required": [
+          "understood",
+          "items",
+          "total",
+          "nextCursor"
+        ]
+      },
       "HomeProvinceDto": {
         "type": "object",
         "properties": {
@@ -6505,6 +6765,234 @@
           "total"
         ]
       },
+      "FlightSearchEchoDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "to": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "passengers": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "date",
+          "passengers"
+        ]
+      },
+      "FlightDestinationDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "nha-trang"
+          },
+          "name": {
+            "type": "string",
+            "example": "Nha Trang"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "FlightFareQuoteDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ECO",
+            "description": "Gửi vào ratePlanCode khi POST /checkout"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tiết kiệm · không hoàn vé"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelDays": {
+            "type": "number",
+            "description": "Hoàn vé miễn phí trước ngày bay bao nhiêu ngày"
+          },
+          "pricePerPerson": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé (VND); null khi không bán được"
+          },
+          "totalPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Cả nhóm hành khách (VND); null khi không bán được"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isRefundable",
+          "freeCancelDays",
+          "pricePerPerson",
+          "totalPrice"
+        ]
+      },
+      "FlightOfferDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-f-hl-02--Y",
+            "description": "Gửi vào productId khi POST /checkout (checkIn = ngày bay)"
+          },
+          "flightKey": {
+            "type": "string",
+            "example": "P-f-hl-02",
+            "description": "Mã chuyến; các hạng ghế của cùng chuyến chung mã này"
+          },
+          "name": {
+            "type": "string",
+            "example": "Bay Sài Gòn – Nha Trang sớm"
+          },
+          "airline": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "departTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "06:20"
+          },
+          "arriveTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "07:30"
+          },
+          "cabinName": {
+            "type": "string",
+            "example": "Phổ thông"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/FlightDestinationDto"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "NOT_ON_SALE",
+              "STOP_SELL",
+              "SOLD_OUT"
+            ]
+          },
+          "remaining": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ghế thật còn lại ngày đó"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé rẻ nhất (VND)"
+          },
+          "fares": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightFareQuoteDto"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "flightKey",
+          "name",
+          "airline",
+          "fromAirport",
+          "toAirport",
+          "departTime",
+          "arriveTime",
+          "cabinName",
+          "destination",
+          "isAvailable",
+          "reason",
+          "remaining",
+          "priceFrom",
+          "fares"
+        ]
+      },
+      "FlightSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "$ref": "#/components/schemas/FlightSearchEchoDto"
+          },
+          "flights": {
+            "description": "Còn ghế lên trước, rồi theo giờ bay, rồi giá",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightOfferDto"
+            }
+          }
+        },
+        "required": [
+          "query",
+          "flights"
+        ]
+      },
+      "FlightRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "destinationSlug": {
+            "type": "string",
+            "example": "nha-trang"
+          },
+          "destinationName": {
+            "type": "string",
+            "example": "Nha Trang"
+          },
+          "flightCount": {
+            "type": "number",
+            "example": 3,
+            "description": "Số chuyến bay trên tuyến (mỗi chuyến có thể nhiều hạng ghế)"
+          }
+        },
+        "required": [
+          "fromAirport",
+          "toAirport",
+          "destinationSlug",
+          "destinationName",
+          "flightCount"
+        ]
+      },
       "AdminRoomDayDto": {
         "type": "object",
         "properties": {
@@ -6765,6 +7253,11 @@
           "productName": {
             "type": "string"
           },
+          "propertyName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên khách sạn của mục phòng; vé bay là null"
+          },
           "date": {
             "type": "string",
             "format": "date"
@@ -6810,6 +7303,7 @@
           "productType",
           "productId",
           "productName",
+          "propertyName",
           "date",
           "dateTo",
           "nights",

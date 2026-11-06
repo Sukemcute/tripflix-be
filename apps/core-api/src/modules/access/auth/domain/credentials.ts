@@ -1,3 +1,5 @@
+import { DISPLAY_NAME_MAX, hasVisibleChar, stripControlChars } from './text-rules.js';
+
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 
@@ -17,8 +19,11 @@ export const LOGIN_MAX_FAILS_PER_IP = 20;
 
 /** Tên hiển thị cho tài khoản tạo từ Google: tên trên Google, không có thì phần trước @ của email. */
 export function buildDisplayName(name: string | null, email: string): string {
-  const candidate = (name ?? email.split('@')[0] ?? '').trim().slice(0, 50);
-  return candidate || 'Thành viên Tripflix';
+  const fromGoogle = stripControlChars((name ?? '').normalize('NFC'));
+  const source = hasVisibleChar(fromGoogle) ? fromGoogle : (email.split('@')[0] ?? '');
+  // Cắt theo ký tự Unicode (không cắt đôi emoji), rồi cắt khoảng trắng còn thừa ở cuối.
+  const candidate = Array.from(source).slice(0, DISPLAY_NAME_MAX).join('').trim();
+  return hasVisibleChar(candidate) ? candidate : 'Thành viên Tripflix';
 }
 
 export function normalizeEmail(email: string): string {

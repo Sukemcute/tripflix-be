@@ -91,6 +91,10 @@ dc --profile gateway logs traefik | tail
 
 Xong khi website mở được với chứng chỉ hợp lệ, đăng nhập được trên trình duyệt, và app điện thoại xem được feed khi API trên laptop đã tắt.
 
+## VNPay sandbox
+
+Thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` vào `.env.server`, không commit và không gửi qua chat. Thiếu một trong hai thì các API VNPay trả 404. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web, đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
+
 ## Vận hành
 
 ```bash

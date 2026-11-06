@@ -15,18 +15,16 @@ import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AccessError } from '../domain/errors.js';
 import type { RequestMeta } from '../application/ports.js';
+import { parseAccessInput } from './validation.js';
 
-/** Kiểm body bằng schema zod; lỗi trả 400 kèm danh sách trường sai. */
+/** Kiểm body, query bằng schema zod; lỗi trả 400 kèm danh sách trường sai, câu lỗi tiếng Việt (validation.ts). */
 export class ZodBody<T extends z.ZodType> implements PipeTransform<unknown, z.infer<T>> {
   constructor(private readonly schema: T) {}
 
   transform(value: unknown): z.infer<T> {
-    const parsed = this.schema.safeParse(value);
+    const parsed = parseAccessInput(this.schema, value);
     if (parsed.success) return parsed.data;
-    throw new BadRequestException({
-      message: 'Dữ liệu gửi lên không hợp lệ',
-      errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
-    });
+    throw new BadRequestException({ message: 'Dữ liệu gửi lên không hợp lệ', errors: parsed.errors });
   }
 }
 

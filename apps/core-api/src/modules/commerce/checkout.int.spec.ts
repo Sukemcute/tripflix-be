@@ -62,6 +62,7 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
   let payment: PaymentUseCases;
   let facade: CommerceFacade;
   let roomTypeId: string;
+  let roomPropertyName: string;
   let flightId: string;
   const users = new Map<string, AuthUser>();
 
@@ -114,6 +115,9 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     await pool.query('update commerce.room_inventory set stop_sell = false, cta = false, ctd = false, min_los = 1, total = 10');
     await pool.query('update commerce.flight_inventory set stop_sell = false, total = 10');
     roomTypeId = (await pool.query<{ id: string }>('select id from commerce.room_types where max_guests >= 2 order by id limit 1')).rows[0]!.id;
+    roomPropertyName = (
+      await pool.query<{ name: string }>('select p.name from commerce.room_types r join commerce.properties p on p.id = r.property_id where r.id = $1', [roomTypeId])
+    ).rows[0]!.name;
     flightId = (await pool.query<{ id: string }>('select id from commerce.flights order by id limit 1')).rows[0]!.id;
 
     gateway = new FlakyGateway(db);
@@ -412,8 +416,9 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
         paidAt: null,
         startDate: checkIn,
         endDate: addDays(checkIn, 2),
-        items: [{ productType: 'room', productId: roomTypeId, date: checkIn, dateTo: addDays(checkIn, 2), nights: 2 }],
+        items: [{ productType: 'room', productId: roomTypeId, propertyName: roomPropertyName, date: checkIn, dateTo: addDays(checkIn, 2), nights: 2 }],
       });
+      expect((await http().get(`/api/checkout/${order.orderId}`).set(web.auth)).body.items[0].propertyName).toBe(roomPropertyName);
 
       expect((await pay(web, order)).status).toBe(200);
       const after = await listTrips(app2);
