@@ -11,6 +11,7 @@ import {
 import type { Request } from 'express';
 import { z } from 'zod';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
+import { lookupEmailField, newPasswordField } from '../../auth/api/validation.js';
 import { PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
 import { PasswordResetUseCases } from '../application/password-reset.use-cases.js';
 import {
@@ -20,12 +21,12 @@ import {
 } from '../domain/password-reset.js';
 
 export const ForgotPasswordRequestSchema = z.object({
-  email: z.string().min(1).max(254),
+  email: lookupEmailField(),
 });
 
 export const ResetPasswordRequestSchema = z.object({
-  token: z.string().min(1).max(200),
-  newPassword: z.string().min(PASSWORD_MIN, `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`).max(PASSWORD_MAX),
+  token: z.string().min(1, 'Thiếu mã đặt lại mật khẩu').max(200, 'Mã đặt lại mật khẩu không hợp lệ'),
+  newPassword: newPasswordField(),
 });
 
 export class ForgotPasswordDto {

@@ -2,32 +2,40 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ROLES, type Role } from '@tripflix/contracts';
 import { z } from 'zod';
 import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
+import {
+  currentPasswordField,
+  deviceNameField,
+  displayNameField,
+  lookupEmailField,
+  newPasswordField,
+  signupEmailField,
+} from './validation.js';
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
 // Trường lạ (như role) bị bỏ đi, nên không ai tự cấp quyền khi đăng ký.
 export const RegisterRequestSchema = z.object({
-  email: z.email('Email không hợp lệ').max(254),
-  password: z.string().min(PASSWORD_MIN, `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`).max(PASSWORD_MAX),
-  displayName: z.string().trim().min(1, 'Tên hiển thị không được để trống').max(50),
+  email: signupEmailField(),
+  password: newPasswordField(),
+  displayName: displayNameField(),
 });
 
 export const LoginRequestSchema = z.object({
-  email: z.string().min(1).max(254),
-  password: z.string().min(1).max(PASSWORD_MAX),
-  deviceName: z.string().trim().max(100).optional(),
+  email: lookupEmailField(),
+  password: currentPasswordField(),
+  deviceName: deviceNameField(),
 });
 
 // Web, admin không gửi refreshToken trong body (có khi không gửi body): core-api đọc từ cookie tripflix_refresh.
 export const RefreshRequestSchema = z.preprocess(
   (v) => v ?? {},
   z.object({
-    refreshToken: z.string().min(1).max(200).optional(),
+    refreshToken: z.string().min(1, 'Thiếu refresh token').max(200, 'Refresh token không hợp lệ').optional(),
   }),
 );
 
 export const GoogleLoginRequestSchema = z.object({
-  idToken: z.string().min(1).max(4096),
-  deviceName: z.string().trim().max(100).optional(),
+  idToken: z.string().min(1, 'Thiếu ID token của Google').max(4096, 'ID token của Google không hợp lệ'),
+  deviceName: deviceNameField(),
 });
 
 export class GoogleLoginDto {

@@ -1,12 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
+import { currentPasswordField, displayNameField, newPasswordField, whenValid } from '../../auth/api/validation.js';
 import { PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
+import { isKnownCountry } from '../domain/countries.js';
 import {
   GENDERS,
   isAllowedAge,
   MAX_AGE,
   MIN_AGE,
-  NATIONALITY_PATTERN,
   normalizePhone,
   PHONE_PATTERN,
 } from '../domain/personal-info.js';
@@ -20,7 +21,7 @@ const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim
  */
 export const UpdateProfileRequestSchema = z
   .object({
-    displayName: z.string().trim().min(1, 'Tên hiển thị không được để trống').max(50).optional(),
+    displayName: displayNameField().optional(),
     phone: z
       .preprocess(
         (v) => (typeof v === 'string' ? (blankToNull(v) === null ? null : normalizePhone(v)) : v),
@@ -32,15 +33,15 @@ export const UpdateProfileRequestSchema = z
         blankToNull,
         z.iso
           .date('Ngày sinh không hợp lệ (YYYY-MM-DD)')
-          .refine((d) => isAllowedAge(d, new Date()), `Tuổi phải từ ${MIN_AGE} đến ${MAX_AGE}`)
+          .refine((d) => isAllowedAge(d, new Date()), { message: `Tuổi phải từ ${MIN_AGE} đến ${MAX_AGE}`, ...whenValid })
           .nullable(),
       )
       .optional(),
-    gender: z.preprocess(blankToNull, z.enum(GENDERS, 'Giới tính không hợp lệ').nullable()).optional(),
+    gender: z.preprocess(blankToNull, z.enum(GENDERS, 'Giới tính là male, female hoặc other').nullable()).optional(),
     nationality: z
       .preprocess(
         (v) => (typeof v === 'string' ? (blankToNull(v) === null ? null : v.trim().toUpperCase()) : v),
-        z.string().regex(NATIONALITY_PATTERN, 'Quốc tịch là mã 2 chữ cái (ví dụ VN)').nullable(),
+        z.string().refine(isKnownCountry, 'Quốc tịch là mã quốc gia 2 chữ cái (ví dụ VN)').nullable(),
       )
       .optional(),
   })
@@ -48,8 +49,8 @@ export const UpdateProfileRequestSchema = z
 
 export const ChangePasswordRequestSchema = z
   .object({
-    currentPassword: z.string().min(1).max(PASSWORD_MAX),
-    newPassword: z.string().min(PASSWORD_MIN, `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`).max(PASSWORD_MAX),
+    currentPassword: currentPasswordField(),
+    newPassword: newPasswordField(),
   })
   .refine((v) => v.currentPassword !== v.newPassword, {
     path: ['newPassword'],
