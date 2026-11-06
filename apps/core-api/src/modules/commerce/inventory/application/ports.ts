@@ -40,6 +40,10 @@ export interface FlightRecord {
   flightKey: string;
   name: string;
   airline: string | null;
+  airlineCode?: string | null;
+  flightNumber?: string | null;
+  stops?: number;
+  cabinCode?: string;
   fromAirport: string;
   toAirport: string;
   departTime: string | null;

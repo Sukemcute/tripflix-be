@@ -45,6 +45,10 @@ interface CatalogSeed {
     flightKey: string;
     name: string;
     airline: string | null;
+    // Bổ sung TF29: mã hãng, số hiệu chuyến, số điểm dừng.
+    airlineCode?: string | null;
+    flightNumber?: string | null;
+    stops?: number;
     fromAirport: string;
     toAirport: string;
     departTime: string | null;
@@ -153,6 +157,9 @@ export async function seedCatalog(
           set: {
             name: sql`excluded.name`,
             airline: sql`excluded.airline`,
+            airlineCode: sql`excluded.airline_code`,
+            flightNumber: sql`excluded.flight_number`,
+            stops: sql`excluded.stops`,
             departTime: sql`excluded.depart_time`,
             arriveTime: sql`excluded.arrive_time`,
             // Nơi đến theo cây địa điểm của discovery (sau sáp nhập tỉnh 2025); seed lại thì sửa cả dữ liệu cũ.

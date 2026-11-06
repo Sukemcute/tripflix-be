@@ -1,16 +1,37 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
-import { MAX_ADULTS, isIsoDate, quoteFlight, type UnavailableReason } from '../domain/sales-rules.js';
+import { MAX_ADULTS, addDays, countNights, isIsoDate, quoteFlight, type UnavailableReason } from '../domain/sales-rules.js';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type FlightRouteRecord, type Today } from './ports.js';
 
 const DEFAULT_PASSENGERS = 1;
 const AIRPORT_CODE = /^[A-Z]{3}$/;
+const MAX_CALENDAR_DAYS = 31;
+
+export const FLIGHT_SORTS = ['recommended', 'price', 'departure', 'duration'] as const;
+export type FlightSort = (typeof FLIGHT_SORTS)[number];
 
 export interface FlightSearchQuery {
   from: string;
   to: string;
   date: string;
   passengers?: number;
+  /** recommended (mặc định): còn ghế trước, rồi giờ bay, rồi giá. */
+  sort?: FlightSort;
+}
+
+export interface FlightCalendarQuery {
+  from: string;
+  to: string;
+  /** Ngày đầu và ngày cuối (tính cả hai), tối đa 31 ngày. */
+  start: string;
+  end: string;
+  passengers?: number;
+}
+
+export interface FlightCalendarResult {
+  query: { from: string; to: string; start: string; end: string; passengers: number };
+  /** Giá một vé rẻ nhất của từng ngày trên tuyến; null khi ngày đó không còn chuyến nào đủ ghế. */
+  days: { date: string; priceFrom: number | null; isAvailable: boolean }[];
 }
 
 export interface FlightOfferQuery {
@@ -27,6 +48,9 @@ export interface FlightFareQuote {
   pricePerPerson: number | null;
   /** Cả nhóm hành khách; null khi không bán được. */
   totalPrice: number | null;
+  /** Hành lý xách tay và ký gửi, kg mỗi khách; null khi dữ liệu chưa có. */
+  carryOnKg: number | null;
+  checkedKg: number | null;
 }
 
 /** Một hạng ghế của một chuyến bay, đúng ngày và số khách đang tìm. productId dùng thẳng cho POST /checkout. */
@@ -35,10 +59,19 @@ export interface FlightOffer {
   flightKey: string;
   name: string;
   airline: string | null;
+  /** Mã IATA của hãng (VJ, VN...) để gắn logo. */
+  airlineCode: string | null;
+  /** Số hiệu chuyến, ví dụ VJ141. */
+  flightNumber: string | null;
   fromAirport: string;
   toAirport: string;
   departTime: string | null;
   arriveTime: string | null;
+  /** Thời gian bay (phút); null khi thiếu giờ đi hoặc giờ đến. */
+  durationMinutes: number | null;
+  /** Số điểm dừng; 0 là bay thẳng. */
+  stops: number;
+  cabinCode: string | null;
   cabinName: string;
   destination: { slug: string; name: string };
   isAvailable: boolean;
@@ -47,12 +80,33 @@ export interface FlightOffer {
   remaining: number | null;
   /** Giá một vé rẻ nhất trong các gói; null khi không bán được. */
   priceFrom: number | null;
+  /** Giá đã gồm thuế, phí. */
+  isPriceTaxIncluded: boolean;
   fares: FlightFareQuote[];
 }
 
 export interface FlightSearchResult {
   query: { from: string; to: string; date: string; passengers: number };
   flights: FlightOffer[];
+}
+
+/** Phút bay từ giờ đi tới giờ đến (HH:MM); qua nửa đêm thì cộng một ngày. */
+function countFlightMinutes(departTime: string | null, arriveTime: string | null): number | null {
+  if (!departTime || !arriveTime) return null;
+  const toMinutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  return (toMinutes(arriveTime) - toMinutes(departTime) + 24 * 60) % (24 * 60);
+}
+
+type CompareOffers = (a: FlightOffer, b: FlightOffer) => number;
+const byDeparture: CompareOffers = (a, b) => (a.departTime ?? '').localeCompare(b.departTime ?? '');
+const byPrice: CompareOffers = (a, b) => (a.priceFrom ?? Infinity) - (b.priceFrom ?? Infinity);
+const byDuration: CompareOffers = (a, b) => (a.durationMinutes ?? Infinity) - (b.durationMinutes ?? Infinity);
+const byAvailable: CompareOffers = (a, b) => Number(b.isAvailable) - Number(a.isAvailable);
+
+/** Chuyến hết ghế luôn xuống cuối; trong nhóm còn ghế thì xếp theo lựa chọn. */
+function compareOffers(sort: FlightSort): CompareOffers {
+  const order: Record<FlightSort, CompareOffers[]> = { recommended: [byDeparture, byPrice], price: [byPrice, byDeparture], departure: [byDeparture, byPrice], duration: [byDuration, byPrice] };
+  return (a, b) => byAvailable(a, b) || order[sort].reduce((result, compare) => result || compare(a, b), 0);
 }
 
 /** Tìm chuyến bay còn ghế cho người dùng (web, app). Công khai, chỉ đọc; đặt vé đi qua /checkout như khách sạn. */
@@ -75,10 +129,40 @@ export class FlightSearchUseCases {
     if (from === to) throw new CommerceError('invalid_query', 'Sân bay đi và đến phải khác nhau.', 'to');
     const passengers = this.validate(query);
     const flights = await this.store.catalog.findFlightsByRoute(from, to);
+    const sort = query.sort ?? 'recommended';
+    if (!FLIGHT_SORTS.includes(sort)) throw new CommerceError('invalid_query', `sort là một trong ${FLIGHT_SORTS.join(', ')}.`, 'sort');
     const offers = await this.quote(flights, query.date, passengers);
-    // Chuyến còn ghế lên trước, rồi theo giờ bay, rồi giá.
-    offers.sort((a, b) => Number(b.isAvailable) - Number(a.isAvailable) || (a.departTime ?? '').localeCompare(b.departTime ?? '') || (a.priceFrom ?? Infinity) - (b.priceFrom ?? Infinity));
+    offers.sort(compareOffers(sort));
     return { query: { from, to, date: query.date, passengers }, flights: offers };
+  }
+
+  /** Giá một vé rẻ nhất từng ngày trên tuyến, để vẽ dải ngày "From 1.804k". Một lần đọc lịch cho cả khoảng. */
+  async getPriceCalendar(query: FlightCalendarQuery): Promise<FlightCalendarResult> {
+    const from = query.from.toUpperCase();
+    const to = query.to.toUpperCase();
+    if (!AIRPORT_CODE.test(from)) throw new CommerceError('invalid_query', 'Mã sân bay đi gồm 3 chữ cái, ví dụ SGN.', 'from');
+    if (!AIRPORT_CODE.test(to)) throw new CommerceError('invalid_query', 'Mã sân bay đến gồm 3 chữ cái, ví dụ CXR.', 'to');
+    if (from === to) throw new CommerceError('invalid_query', 'Sân bay đi và đến phải khác nhau.', 'to');
+    const passengers = this.validate({ date: query.start, passengers: query.passengers }, 'start');
+    if (!isIsoDate(query.end) || query.end < query.start || countNights(query.start, query.end) + 1 > MAX_CALENDAR_DAYS) {
+      throw new CommerceError('invalid_query', `Ngày cuối phải từ ngày đầu trở đi, tối đa ${MAX_CALENDAR_DAYS} ngày.`, 'end');
+    }
+    const flights = await this.store.catalog.findFlightsByRoute(from, to);
+    const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), query.start, query.end);
+    const dates = Array.from({ length: countNights(query.start, query.end) + 1 }, (_, i) => addDays(query.start, i));
+    return {
+      query: { from, to, start: query.start, end: query.end, passengers },
+      days: dates.map((date) => {
+        const prices = flights.flatMap((flight) => {
+          const day = days.get(flight.id)?.find((d) => d.date === date);
+          return flight.farePlans.flatMap((plan) => {
+            const quote = quoteFlight({ day, passengers, plan });
+            return quote.isAvailable ? [quote.pricePerNight] : [];
+          });
+        });
+        return { date, priceFrom: prices.length ? Math.min(...prices) : null, isAvailable: prices.length > 0 };
+      }),
+    };
   }
 
   async getFlightOffer(productId: string, query: FlightOfferQuery): Promise<FlightOffer> {
@@ -88,9 +172,9 @@ export class FlightSearchUseCases {
     return (await this.quote([flight], query.date, passengers))[0]!;
   }
 
-  private validate(query: { date: string; passengers?: number }): number {
+  private validate(query: { date: string; passengers?: number }, dateField = 'date'): number {
     const passengers = query.passengers ?? DEFAULT_PASSENGERS;
-    if (!isIsoDate(query.date) || query.date < this.today()) throw new CommerceError('invalid_query', 'Ngày bay phải từ hôm nay trở đi.', 'date');
+    if (!isIsoDate(query.date) || query.date < this.today()) throw new CommerceError('invalid_query', 'Ngày bay phải từ hôm nay trở đi.', dateField);
     if (!Number.isInteger(passengers) || passengers < 1 || passengers > MAX_ADULTS) throw new CommerceError('invalid_query', `Số hành khách từ 1 đến ${MAX_ADULTS}.`, 'passengers');
     return passengers;
   }
@@ -107,16 +191,22 @@ export class FlightSearchUseCases {
         flightKey: flight.flightKey,
         name: flight.name,
         airline: flight.airline,
+        airlineCode: flight.airlineCode ?? null,
+        flightNumber: flight.flightNumber ?? null,
         fromAirport: flight.fromAirport,
         toAirport: flight.toAirport,
         departTime: flight.departTime,
         arriveTime: flight.arriveTime,
+        durationMinutes: countFlightMinutes(flight.departTime, flight.arriveTime),
+        stops: flight.stops ?? 0,
+        cabinCode: flight.cabinCode ?? null,
         cabinName: flight.cabinName,
         destination: { slug: flight.destinationSlug, name: flight.destinationName },
         isAvailable: first?.isAvailable ?? false,
         reason: first && !first.isAvailable ? first.reason : null,
         remaining: first ? (first.remaining ?? null) : null,
         priceFrom: prices.length ? Math.min(...prices) : null,
+        isPriceTaxIncluded: true,
         fares: quotes.map(({ plan, quote }) => ({
           code: plan.code,
           name: plan.name,
@@ -124,6 +214,8 @@ export class FlightSearchUseCases {
           freeCancelDays: plan.freeCancelDays,
           pricePerPerson: quote.isAvailable ? quote.pricePerNight : null,
           totalPrice: quote.isAvailable ? quote.totalPrice : null,
+          carryOnKg: plan.carryOnKg ?? null,
+          checkedKg: plan.checkedKg ?? null,
         })),
       };
     });

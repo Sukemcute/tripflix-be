@@ -93,3 +93,68 @@ describe('FlightSearchUseCases.listRoutes', () => {
     ]);
   });
 });
+
+describe('FlightSearchUseCases: thông tin hiển thị và sắp xếp', () => {
+  it('trả mã hãng, số hiệu, hạng ghế, thời gian bay (qua nửa đêm), điểm dừng, hành lý, cờ giá gồm thuế', async () => {
+    const { store, flights } = await setup();
+    Object.assign(store.flights.find((f) => f.id === 'F2--Y')!, {
+      airlineCode: 'VJ',
+      flightNumber: 'VJ141',
+      cabinCode: 'Y',
+      stops: 0,
+      departTime: '23:30',
+      arriveTime: '01:40',
+      farePlans: fares.map((f) => ({ ...f, carryOnKg: 7, checkedKg: f.code === 'FLEX' ? 20 : 0 })),
+    });
+    const offer = await flights.getFlightOffer('F2--Y', { date: DATE });
+    expect(offer).toMatchObject({ airlineCode: 'VJ', flightNumber: 'VJ141', cabinCode: 'Y', stops: 0, durationMinutes: 130, isPriceTaxIncluded: true });
+    expect(offer.fares.map((f) => [f.code, f.carryOnKg, f.checkedKg])).toEqual([['ECO', 7, 0], ['FLEX', 7, 20]]);
+    // Dữ liệu cũ chưa có các trường mới: trả null, không lỗi.
+    expect(await flights.getFlightOffer('F1--Y', { date: DATE })).toMatchObject({ airlineCode: null, flightNumber: null, durationMinutes: null, stops: 0, fares: [{ carryOnKg: null, checkedKg: null }, {}] });
+  });
+
+  it('sort=price, duration, departure; chuyến hết ghế luôn ở cuối; sort sai thì báo lỗi', async () => {
+    const { store, flights } = await setup();
+    store.flights.find((f) => f.id === 'F2--Y')!.arriveTime = '16:00';
+    store.flights.find((f) => f.id === 'F1--Y')!.arriveTime = '07:30';
+    store.flights.find((f) => f.id === 'F1--C')!.arriveTime = '07:30';
+    const ids = async (sort: 'price' | 'duration' | 'departure', passengers = 1) =>
+      (await flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, passengers, sort })).flights.map((f) => f.productId);
+    expect(await ids('price')).toEqual(['F1--Y', 'F2--Y', 'F1--C']);
+    expect(await ids('duration')).toEqual(['F2--Y', 'F1--Y', 'F1--C']);
+    expect(await ids('departure')).toEqual(['F1--Y', 'F1--C', 'F2--Y']);
+    expect(await ids('price', 3)).toEqual(['F2--Y', 'F1--Y', 'F1--C']);
+    await expect(flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, sort: 'random' as never })).rejects.toMatchObject({ field: 'sort' });
+  });
+});
+
+describe('FlightSearchUseCases.getPriceCalendar', () => {
+  it('giá rẻ nhất từng ngày trên tuyến, tính cả số khách; ngày hết ghế hoặc chưa mở bán thì null', async () => {
+    const { store, flights } = await setup();
+    store.flightDays.set('F1--Y|2026-12-02', { ...store.flightDays.get('F1--Y|2026-12-02')!, price: 800_000 });
+    store.flightDays.set('F2--Y|2026-12-03', { ...store.flightDays.get('F2--Y|2026-12-03')!, isStopSell: true });
+    const result = await flights.getPriceCalendar({ from: 'sgn', to: 'cxr', start: '2026-12-02', end: '2026-12-04' });
+    expect(result.query).toEqual({ from: 'SGN', to: 'CXR', start: '2026-12-02', end: '2026-12-04', passengers: 1 });
+    expect(result.days).toEqual([
+      { date: '2026-12-02', priceFrom: 800_000, isAvailable: true },
+      { date: '2026-12-03', priceFrom: 900_000, isAvailable: true },
+      { date: '2026-12-04', priceFrom: 900_000, isAvailable: true },
+    ]);
+    // 3 khách: F1 chỉ có 2 ghế mỗi hạng, nên chỉ còn F2; ngày F2 dừng bán thì không có chuyến nào.
+    const group = await flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-12-02', end: '2026-12-03', passengers: 3 });
+    expect(group.days).toEqual([
+      { date: '2026-12-02', priceFrom: 1_000_000, isAvailable: true },
+      { date: '2026-12-03', priceFrom: null, isAvailable: false },
+    ]);
+    const far = await flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2027-06-01', end: '2027-06-01' });
+    expect(far.days).toEqual([{ date: '2027-06-01', priceFrom: null, isAvailable: false }]);
+  });
+
+  it('khoảng ngày sai, quá 31 ngày, ngày quá khứ thì báo lỗi đúng trường', async () => {
+    const { flights } = await setup();
+    await expect(flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-11-30', end: '2026-12-02' })).rejects.toMatchObject({ field: 'start' });
+    await expect(flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-12-05', end: '2026-12-04' })).rejects.toMatchObject({ field: 'end' });
+    await expect(flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-12-01', end: '2027-01-01' })).rejects.toMatchObject({ field: 'end' });
+    await expect(flights.getPriceCalendar({ from: 'SGN', to: 'SGN', start: '2026-12-01', end: '2026-12-02' })).rejects.toMatchObject({ field: 'to' });
+  });
+});

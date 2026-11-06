@@ -2,7 +2,7 @@ import { Controller, Get, Inject, Param, Query, UseFilters } from '@nestjs/commo
 import { ApiNotFoundResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { FlightSearchUseCases } from '../application/flight-search.use-cases.js';
-import { FlightOfferDto, FlightOfferQueryDto, FlightOfferQuerySchema, FlightRouteDto, FlightSearchQueryDto, FlightSearchQuerySchema, FlightSearchResultDto } from './flights.dto.js';
+import { FlightCalendarQueryDto, FlightCalendarQuerySchema, FlightCalendarResultDto, FlightOfferDto, FlightOfferQueryDto, FlightOfferQuerySchema, FlightRouteDto, FlightSearchQueryDto, FlightSearchQuerySchema, FlightSearchResultDto } from './flights.dto.js';
 import { CommerceErrorFilter, ZodQuery } from './http.js';
 
 /** Tìm chuyến bay còn ghế cho web và app. Công khai, không cần đăng nhập; chỉ đọc. Đặt vé qua POST /checkout. */
@@ -18,6 +18,14 @@ export class FlightsController {
   @ApiOkResponse({ type: FlightSearchResultDto })
   search(@Query(new ZodQuery(FlightSearchQuerySchema)) query: FlightSearchQueryDto & z.infer<typeof FlightSearchQuerySchema>) {
     return this.flights.searchFlights(query);
+  }
+
+  /** Giá rẻ nhất từng ngày trên tuyến, cho dải ngày kèm giá. Khai báo trước :id để không bị hiểu là mã chuyến. */
+  @Get('calendar')
+  @ApiQuery({ type: FlightCalendarQueryDto })
+  @ApiOkResponse({ type: FlightCalendarResultDto })
+  getCalendar(@Query(new ZodQuery(FlightCalendarQuerySchema)) query: FlightCalendarQueryDto & z.infer<typeof FlightCalendarQuerySchema>) {
+    return this.flights.getPriceCalendar(query);
   }
 
   /** Các tuyến đang có chuyến, để web và app dựng ô chọn điểm đi, điểm đến. */
