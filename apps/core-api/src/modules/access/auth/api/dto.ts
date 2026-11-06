@@ -56,6 +56,8 @@ export class RegistrationCodeDto {
 
 export class RegistrationCodeResultDto {
   @ApiProperty({ format: 'uuid' }) registrationId!: string;
+  @ApiProperty({ example: 60, description: 'Số giây phải đợi trước khi xin mã lại cho email này' })
+  resendAfterSeconds!: number;
 }
 
 export class RegisterDto extends RegistrationCodeDto {

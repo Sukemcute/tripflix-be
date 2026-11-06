@@ -14,7 +14,12 @@ import { AccessModule } from './access.module.js';
 import { EmailVerificationUseCases } from './account/application/email-verification.use-cases.js';
 import { seedLegacyAccount } from '../../platform/registration.fixture.js';
 import {
+  REGISTRATION_CODE_COOLDOWN_MESSAGE,
+  REGISTRATION_CODE_COOLDOWN_SECONDS,
+} from './auth/domain/registration.js';
+import {
   INVALID_VERIFY_TOKEN_MESSAGE,
+  REGISTER_WINDOW_SECONDS,
   TOO_MANY_RESENDS_MESSAGE,
   TOO_MANY_SIGNUPS_MESSAGE,
 } from './account/domain/email-verification.js';
@@ -66,12 +71,17 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
   let app: INestApplication;
   let store: MemoryAccessStore;
   let limiter: MemoryActionRateLimiter;
+  // Đồng hồ riêng của limiter: tua qua thời gian chờ xin mã và cửa sổ theo giờ.
+  let limiterClockMs = Date.now();
+  const advanceLimiter = (seconds: number) => {
+    limiterClockMs += seconds * 1000;
+  };
   const http = () => request(app.getHttpServer());
   const as = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
     store = new MemoryAccessStore();
-    limiter = new MemoryActionRateLimiter();
+    limiter = new MemoryActionRateLimiter(() => limiterClockMs);
     const moduleRef = await Test.createTestingModule({
       imports: [
         FakePlatformModule,
@@ -93,6 +103,9 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     applyGlobalPrefix(app);
     await app.init();
   });
+
+  // Mỗi test bắt đầu với hạn mức mới (theo IP, theo email), không phụ thuộc test chạy trước.
+  beforeEach(() => advanceLimiter(REGISTER_WINDOW_SECONDS + 1));
 
   afterAll(async () => {
     await app.close();
@@ -152,6 +165,7 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
       expect(response.body.errors).toEqual([expect.objectContaining({ field: 'password' })]);
     }
     const first = await http().post('/api/auth/registration-code').send(credentials).expect(202);
+    advanceLimiter(REGISTRATION_CODE_COOLDOWN_SECONDS);
     const second = await http().post('/api/auth/registration-code').send(credentials).expect(202);
     const messages = store.outboxRows.filter((event) => event.type === 'access.registration_code_requested' && event.payload.email === email);
     expect(messages).toHaveLength(2);
@@ -170,6 +184,50 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     const login = await http().post('/api/auth/login').send(credentials).expect(200);
     expect(decodeJwt(login.body.accessToken).ev).toBe(true);
     await http().post('/api/auth/register').send(payload).expect(400);
+  });
+
+  it('xin mã bằng email đã có tài khoản: trả như email mới, không tạo mã, báo chủ email; tài khoản khoá thì không báo', async () => {
+    const emails = ['ton-tai@example.com', 'ton-tai-google@example.com', 'ton-tai-khoa@example.com'];
+    const existingEvents = (userId: string) =>
+      store.outboxRows.filter((event) => event.type === 'access.registration_attempted_existing' && event.userId === userId);
+    const withPassword = await signUp(emails[0]!);
+    const googleOnly = await signUp(emails[1]!);
+    store.userRows.get(googleOnly.id)!.passwordHash = null;
+    const locked = await signUp(emails[2]!);
+    store.userRows.get(locked.id)!.status = 'locked';
+
+    for (const email of ['Ton-Tai@example.com', emails[1]!, emails[2]!]) {
+      const response = await http().post('/api/auth/registration-code').send({ email, password: PASSWORD }).expect(202);
+      expect(response.body).toEqual({ registrationId: expect.any(String), resendAfterSeconds: REGISTRATION_CODE_COOLDOWN_SECONDS });
+      expect(store.registrationChallengeRows.has(email.toLowerCase())).toBe(false);
+    }
+    const codeEvents = store.outboxRows.filter(
+      (event) => event.type === 'access.registration_code_requested' && emails.includes(event.payload.email as string),
+    );
+    expect(codeEvents).toHaveLength(0);
+    expect(existingEvents(withPassword.id).map((event) => event.payload)).toEqual([
+      { userId: withPassword.id, email: emails[0], displayName: 'Lan', hasPassword: true },
+    ]);
+    expect(existingEvents(googleOnly.id).map((event) => event.payload.hasPassword)).toEqual([false]);
+    expect(existingEvents(locked.id)).toHaveLength(0);
+  });
+
+  it('xin mã lại trước 60 giây: 429 kèm retryAfterSeconds, như nhau dù email đã có tài khoản; hết thời gian chờ thì gửi được', async () => {
+    const existing = 'cho-gui-lai-cu@example.com';
+    await signUp(existing);
+    for (const email of ['cho-gui-lai-moi@example.com', existing]) {
+      await http().post('/api/auth/registration-code').send({ email, password: PASSWORD }).expect(202);
+      advanceLimiter(REGISTRATION_CODE_COOLDOWN_SECONDS - 20);
+      const tooSoon = await http().post('/api/auth/registration-code').send({ email, password: PASSWORD }).expect(429);
+      expect(tooSoon.body).toMatchObject({ message: REGISTRATION_CODE_COOLDOWN_MESSAGE, retryAfterSeconds: 20 });
+      expect(tooSoon.headers['retry-after']).toBe('20');
+      advanceLimiter(20);
+      await http().post('/api/auth/registration-code').send({ email, password: PASSWORD }).expect(202);
+    }
+    const codes = store.outboxRows.filter(
+      (event) => event.type === 'access.registration_code_requested' && event.payload.email === 'cho-gui-lai-moi@example.com',
+    );
+    expect(codes).toHaveLength(2);
   });
 
   it('mã đăng ký hết hạn không tạo được tài khoản', async () => {

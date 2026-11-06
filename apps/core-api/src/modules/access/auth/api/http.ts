@@ -57,8 +57,14 @@ export class AccessErrorFilter implements ExceptionFilter {
         break;
       case 'too_many_attempts':
         if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
+        // retryAfterSeconds trong body để app hiện đếm ngược mà không cần đọc header.
         http = new HttpException(
-          { statusCode: HttpStatus.TOO_MANY_REQUESTS, message: err.message, error: 'Too Many Requests' },
+          {
+            statusCode: HttpStatus.TOO_MANY_REQUESTS,
+            message: err.message,
+            error: 'Too Many Requests',
+            ...(err.retryAfterSeconds ? { retryAfterSeconds: err.retryAfterSeconds } : {}),
+          },
           HttpStatus.TOO_MANY_REQUESTS,
         );
         break;

@@ -3,6 +3,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserGuestMergedV1,
+  AccessRegistrationAttemptedExistingV1,
   AccessRegistrationCodeRequestedV1,
   AccessUserRegisteredV1,
   AccessUserWelcomeEmailRequestedV1,
@@ -26,7 +27,12 @@ import {
   normalizeEmail,
 } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
-import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_TTL_MS } from '../domain/registration.js';
+import {
+  INVALID_REGISTRATION_CODE,
+  REGISTRATION_CODE_COOLDOWN_MESSAGE,
+  REGISTRATION_CODE_COOLDOWN_SECONDS,
+  REGISTRATION_CODE_TTL_MS,
+} from '../domain/registration.js';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TTL_MS,
@@ -91,16 +97,39 @@ export class AuthUseCases {
 
   async requestRegistrationCode(address: string, meta: RequestMeta): Promise<string> {
     const email = normalizeEmail(address);
+    // Đợi giữa hai lần xin mã: kiểm trước để lần bấm quá sớm không ăn vào hạn mức theo giờ.
+    const cooldown = await this.actionLimiter.consume(`register:cooldown:${email}`, 1, REGISTRATION_CODE_COOLDOWN_SECONDS);
+    if (cooldown.isBlocked) {
+      throw new AccessError('too_many_attempts', REGISTRATION_CODE_COOLDOWN_MESSAGE, cooldown.retryAfterSeconds);
+    }
     await this.checkRegistrationLimit(
       [`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
       [`register:email:${email}`, 3, REGISTER_WINDOW_SECONDS],
     );
     const id = randomUUID();
-    if (await this.store.users.findByEmail(email)) return id;
-
+    // Băm cả khi email đã có tài khoản để thời gian trả lời như nhau, không dò được email nào đã đăng ký.
     const code = String(randomInt(100_000_000)).padStart(8, '0');
-    await this.saveRegistrationCode(email, id, code, await this.hasher.hash(code));
+    const codeHash = await this.hasher.hash(code);
+    const existing = await this.store.users.findByEmail(email);
+    if (existing) {
+      if (existing.status === 'active') await this.notifyExistingAccount(existing);
+      return id;
+    }
+
+    await this.saveRegistrationCode(email, id, code, codeHash);
     return id;
+  }
+
+  /** API vẫn trả như email mới; chủ email nhận thư báo đã có tài khoản và cách đăng nhập. */
+  @Transactional('access')
+  private async notifyExistingAccount(user: UserRecord): Promise<void> {
+    const payload: AccessRegistrationAttemptedExistingV1 = {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      hasPassword: user.passwordHash !== null,
+    };
+    await this.store.outbox.add({ type: 'access.registration_attempted_existing', userId: user.id, payload });
   }
 
   @Transactional('access')

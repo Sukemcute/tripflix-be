@@ -206,6 +206,19 @@ export const AccessRegistrationCodeRequestedV1Schema = z.object({
 });
 export type AccessRegistrationCodeRequestedV1 = z.infer<typeof AccessRegistrationCodeRequestedV1Schema>;
 
+/**
+ * access.registration_attempted_existing v1: ai đó xin mã đăng ký bằng email đã có tài khoản đang hoạt động.
+ * API vẫn trả như email mới (không lộ email nào đã đăng ký); notification-service báo cho chủ email biết họ đã có
+ * tài khoản, kèm cách đăng nhập. hasPassword false: tài khoản chỉ đăng nhập bằng Google. Chỉ notification-service dùng.
+ */
+export const AccessRegistrationAttemptedExistingV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  hasPassword: z.boolean(),
+});
+export type AccessRegistrationAttemptedExistingV1 = z.infer<typeof AccessRegistrationAttemptedExistingV1Schema>;
+
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
   assetId: z.uuid(),
@@ -245,4 +258,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.welcome_email_requested.v1': AccessUserWelcomeEmailRequestedV1Schema,
   'access.email_verification_requested.v1': AccessEmailVerificationRequestedV1Schema,
   'access.registration_code_requested.v1': AccessRegistrationCodeRequestedV1Schema,
+  'access.registration_attempted_existing.v1': AccessRegistrationAttemptedExistingV1Schema,
 };

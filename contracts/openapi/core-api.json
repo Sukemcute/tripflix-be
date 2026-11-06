@@ -3311,10 +3311,16 @@
           "registrationId": {
             "type": "string",
             "format": "uuid"
+          },
+          "resendAfterSeconds": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây phải đợi trước khi xin mã lại cho email này"
           }
         },
         "required": [
-          "registrationId"
+          "registrationId",
+          "resendAfterSeconds"
         ]
       },
       "RegisterDto": {

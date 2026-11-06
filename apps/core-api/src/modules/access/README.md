@@ -17,7 +17,7 @@
 
 | API | Ai gọi | Kết quả |
 |---|---|---|
-| `POST /api/auth/registration-code` `{ email, password }` | Ai cũng được | `202 { registrationId }`. Gửi mã khi email có thể đăng ký. Chưa tạo người dùng hay phiên đăng nhập. Quá giới hạn gửi mã trả `429` |
+| `POST /api/auth/registration-code` `{ email, password }` | Ai cũng được | `202 { registrationId, resendAfterSeconds }`. Gửi mã khi email có thể đăng ký; email đã có tài khoản đang hoạt động thì trả y hệt nhưng gửi thư báo đã có tài khoản thay cho mã. Chưa tạo người dùng hay phiên đăng nhập. Mỗi email xin mã cách nhau 60 giây (`resendAfterSeconds`), xin sớm hơn hoặc quá giới hạn theo giờ trả `429` kèm `Retry-After` và `retryAfterSeconds` trong body |
 | `POST /api/auth/register` `{ email, password, displayName, registrationId, code }` | Ai cũng được | `201` người dùng `member` có email đã xác thực. Thiếu mã, mã sai, hết hạn hoặc đã dùng trả `400`. Email được dùng bởi tài khoản khác trong lúc đăng ký trả `409` |
 | `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
@@ -162,6 +162,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
 | `access.user.welcome_email_requested` v1 | Đã tạo tài khoản bằng mã đăng ký hoặc lần đầu qua Google | `{ userId, email, displayName, provider }`. Chỉ `notification-service` dùng |
 | `access.registration_code_requested` v1 | Người dùng yêu cầu mã đăng ký | `{ email, code, expiresAt }`. Chỉ `notification-service` dùng |
+| `access.registration_attempted_existing` v1 | Xin mã đăng ký bằng email đã có tài khoản đang hoạt động. API vẫn trả 202 như email mới, không tạo mã | `{ userId, email, displayName, hasPassword }`. Chỉ `notification-service` dùng: gửi thư báo đã có tài khoản kèm link đăng nhập, quên mật khẩu |
 | `access.email_verification_requested` v1 (TF05D) | Tài khoản cũ chưa xác thực yêu cầu gửi link | `{ userId, email, displayName, verifyUrl, expiresAt, reason }`. Chỉ `notification-service` dùng |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 

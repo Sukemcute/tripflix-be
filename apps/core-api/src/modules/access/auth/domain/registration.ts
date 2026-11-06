@@ -1,6 +1,9 @@
 export const REGISTRATION_PASSWORD_MIN = 12;
 export const REGISTRATION_CODE_TTL_MS = 10 * 60 * 1000;
 export const REGISTRATION_CODE_PATTERN = /^[0-9]{8}$/;
+/** Mỗi email xin mã cách nhau ít nhất 60 giây, như nhau dù email đã có tài khoản hay chưa. */
+export const REGISTRATION_CODE_COOLDOWN_SECONDS = 60;
+export const REGISTRATION_CODE_COOLDOWN_MESSAGE = 'Bạn vừa yêu cầu mã, vui lòng đợi rồi gửi lại.';
 export const INVALID_REGISTRATION_CODE = 'Mã xác thực không đúng hoặc đã hết hạn. Hãy kiểm tra lại hoặc yêu cầu mã mới.';
 
 const COMMON_PASSWORD = /^(?:password|matkhau|mat-khau|tripflix|qwerty|admin|letmein|iloveyou|welcome)[\d!@#$%^&*._-]*$/i;

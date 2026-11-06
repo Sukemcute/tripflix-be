@@ -17,6 +17,7 @@ import type { z } from 'zod';
 import { AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
 import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REFRESH_MESSAGE } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
+import { REGISTRATION_CODE_COOLDOWN_SECONDS } from '../domain/registration.js';
 import {
   GoogleLoginDto,
   GoogleLoginRequestSchema,
@@ -63,7 +64,7 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<RegistrationCodeResultDto> {
     const registrationId = await this.auth.requestRegistrationCode(body.email, readRequestMeta(req));
-    return { registrationId };
+    return { registrationId, resendAfterSeconds: REGISTRATION_CODE_COOLDOWN_SECONDS };
   }
 
   @Post('register')
