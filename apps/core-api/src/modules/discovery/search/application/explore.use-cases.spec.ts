@@ -74,6 +74,30 @@ describe('ExploreUseCases', () => {
     expect(plans.sections.find((s) => s.kind === 'plan')!.items.map((i) => i.refId)).toEqual(['P1']);
   });
 
+  it('tìm bài: phân trang, lọc postType, video kèm lộ trình chỉ một lần, bỏ bài ẩn', async () => {
+    const trip = { destinationName: 'Đà Nẵng', daysCount: 3, estimatedCostPerPerson: 2_500_000 };
+    const posts = [
+      post('P1', 'Lịch trình Đà Nẵng 3N2Đ', { tripAttachment: trip, reactionTotal: 120 }),
+      post('V1', 'Vlog Đà Nẵng 3 ngày', { postType: 'video', tripAttachment: trip }),
+      post('P2', 'Review biển Đà Nẵng'),
+      post('P3', 'Ăn gì ở Đà Nẵng'),
+      post('P4', 'Đà Nẵng mùa mưa'),
+    ];
+    const { explore } = setup([hotel('H1', 'Vinpearl Đà Nẵng', 'Đà Nẵng')], posts, ['P4']);
+    const first = await explore.searchPosts({ q: 'đà nẵng', postType: 'all', limit: 2 });
+    expect(first.total).toBe(4); // V1 ở cả Lộ trình và Video, P4 bị ẩn, không có khách sạn
+    expect(first.items).toHaveLength(2);
+    const rest = await explore.searchPosts({ q: 'đà nẵng', postType: 'all', limit: 2, cursor: first.nextCursor! });
+    expect(rest.nextCursor).toBeNull();
+    const ids = [...first.items, ...rest.items].map((i) => i.refId);
+    expect(new Set(ids)).toEqual(new Set(['P1', 'V1', 'P2', 'P3']));
+    expect(first.items.find((i) => i.refId === 'P1')?.reason).toMatch(/^3 ngày · .*♥ 120$/);
+    const videos = await explore.searchPosts({ q: 'đà nẵng', postType: 'video', limit: 20 });
+    expect(videos.items.map((i) => i.refId)).toEqual(['V1']);
+    const plans = await explore.searchPosts({ q: 'lịch trình đà nẵng dưới 2tr', postType: 'plan', limit: 20 });
+    expect(plans).toMatchObject({ total: 0, items: [], nextCursor: null, understood: { budget: 2_000_000 } });
+  });
+
   it('dựng lại chỉ mục từ cả hai nguồn', async () => {
     const { explore, store } = setup([hotel('H1', 'A', 'Huế')], [post('P1', 'B')]);
     expect(await explore.rebuildIndex()).toBe(2);

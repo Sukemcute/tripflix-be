@@ -1,7 +1,21 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
-import { ExploreRequestDto, ExploreRequestSchema, ExploreResponseDto } from './dto.js';
+import {
+  ExploreRequestDto,
+  ExploreRequestSchema,
+  ExploreResponseDto,
+  SearchPostsRequestDto,
+  SearchPostsRequestSchema,
+  SearchPostsResponseDto,
+} from './dto.js';
+
+function invalidBody(issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>): BadRequestException {
+  return new BadRequestException({
+    message: 'Dữ liệu gửi lên không hợp lệ',
+    errors: issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+  });
+}
 
 /** Tìm khám phá của app (kiểu TikTok/Netflix): một ô tìm, kết quả chia theo vùng. Công khai. */
 @ApiTags('discovery')
@@ -27,12 +41,28 @@ export class ExploreController {
   @ApiBadRequestResponse({ description: '`q` rỗng hoặc dài hơn 200 ký tự, `loc` sai' })
   async search(@Body() body: unknown): Promise<ExploreResponseDto> {
     const parsed = ExploreRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException({
-        message: 'Dữ liệu gửi lên không hợp lệ',
-        errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
-      });
-    }
+    if (!parsed.success) throw invalidBody(parsed.error.issues);
     return this.explore.search(parsed.data);
+  }
+
+  @Post('posts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang',
+    description: [
+      'Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.',
+      '',
+      '- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.',
+      '- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.',
+      '- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.',
+    ].join('\n'),
+  })
+  @ApiBody({ type: SearchPostsRequestDto })
+  @ApiOkResponse({ type: SearchPostsResponseDto })
+  @ApiBadRequestResponse({ description: '`q` rỗng hoặc dài hơn 200 ký tự, `postType`, `cursor`, `limit` sai' })
+  async searchPosts(@Body() body: unknown): Promise<SearchPostsResponseDto> {
+    const parsed = SearchPostsRequestSchema.safeParse(body);
+    if (!parsed.success) throw invalidBody(parsed.error.issues);
+    return this.explore.searchPosts(parsed.data);
   }
 }
