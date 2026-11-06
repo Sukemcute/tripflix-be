@@ -141,11 +141,28 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.sessions.deleteOwned(current.id, current.userId)).toBe(true);
   });
 
-  it('TF055: updateDisplayName, updatePasswordHash đổi đúng dòng', async () => {
+  it('TF055: updateProfile (tên), updatePasswordHash đổi đúng dòng', async () => {
     const user = await store.users.insert({ email: 'profile@example.com', passwordHash: 'old', displayName: 'A', role: 'member' });
-    expect((await store.users.updateDisplayName(user!.id, 'Bình'))?.displayName).toBe('Bình');
+    expect((await store.users.updateProfile(user!.id, { displayName: 'Bình' }))?.displayName).toBe('Bình');
     expect((await store.users.updatePasswordHash(user!.id, 'new'))?.passwordHash).toBe('new');
     expect(await store.users.findById(user!.id)).toMatchObject({ displayName: 'Bình', passwordHash: 'new', email: 'profile@example.com' });
+  });
+
+  it('TF06M: thông tin cá nhân lưu, xoá được; DB chặn giá trị sai dù bỏ qua kiểm tra của API', async () => {
+    const user = await store.users.insert({ email: 'personal@example.com', passwordHash: 'x', displayName: 'C', role: 'member' });
+    expect(user!.personal).toEqual({ phone: null, dateOfBirth: null, gender: null, nationality: null });
+    const saved = await store.users.updateProfile(user!.id, {
+      phone: '+84912345678',
+      dateOfBirth: '2000-05-20',
+      gender: 'female',
+      nationality: 'VN',
+    });
+    expect(saved?.personal).toEqual({ phone: '+84912345678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN' });
+    expect((await store.users.findById(user!.id))?.personal.dateOfBirth).toBe('2000-05-20');
+    expect((await store.users.updateProfile(user!.id, { phone: null, gender: null }))?.personal).toMatchObject({ phone: null, gender: null, nationality: 'VN' });
+    for (const bad of [{ gender: 'unknown' }, { nationality: 'vn' }, { phone: '12ab' }] as never[]) {
+      await expect(store.users.updateProfile(user!.id, bad)).rejects.toThrow();
+    }
   });
 
   it('TF055: job dọn xoá phiên hết hạn và sự kiện đã gửi quá 7 ngày, giữ phần còn lại', async () => {

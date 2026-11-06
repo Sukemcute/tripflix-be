@@ -19,7 +19,7 @@ import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiTags } 
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
-import { UserDto } from '../../auth/api/dto.js';
+import { MyProfileDto } from '../../auth/api/dto.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { WebSession, isWebClient } from '../../auth/api/web-session.js';
 import { AccountUseCases } from '../application/account.use-cases.js';
@@ -47,7 +47,7 @@ export class AccountController {
 
   @Patch('me')
   @ApiBody({ type: UpdateProfileDto })
-  @ApiOkResponse({ type: UserDto })
+  @ApiOkResponse({ type: MyProfileDto })
   updateProfile(
     @CurrentUser() user: AuthUser,
     @Body(new ZodBody(UpdateProfileRequestSchema)) body: z.infer<typeof UpdateProfileRequestSchema>,

@@ -23,6 +23,7 @@ import {
   RefreshDto,
   RegisterDto,
   TokenPairDto,
+  MyProfileDto,
   UserDto,
   LoginRequestSchema,
   RefreshRequestSchema,
@@ -144,7 +145,7 @@ export class AuthController {
   @Get('me')
   @Authenticated()
   @ApiBearerAuth()
-  @ApiOkResponse({ type: UserDto })
+  @ApiOkResponse({ type: MyProfileDto })
   getMe(@CurrentUser() user: AuthUser) {
     return this.auth.getMe(user.userId);
   }

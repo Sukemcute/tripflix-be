@@ -21,6 +21,7 @@ import type {
   AuditLog,
   NewSession,
   PasswordResetRepository,
+  ProfilePatch,
   SessionRecord,
   SessionRepository,
   ServiceClientRecord,
@@ -40,6 +41,12 @@ const mapUserRow = (row: UserRow): UserRecord => ({
   role: row.role as Role,
   status: row.status as UserRecord['status'],
   createdAt: row.createdAt,
+  personal: {
+    phone: row.phone,
+    dateOfBirth: row.dateOfBirth,
+    gender: row.gender as UserRecord['personal']['gender'],
+    nationality: row.nationality,
+  },
 });
 
 const mapSessionRow = (row: SessionRow): SessionRecord => ({
@@ -99,15 +106,20 @@ class DrizzleUserRepository implements UserRepository {
     return this.patch(id, { status });
   }
 
-  async updateDisplayName(id: string, displayName: string) {
-    return this.patch(id, { displayName });
+  async updateProfile(id: string, patch: ProfilePatch) {
+    return this.patch(id, patch);
   }
 
   async updatePasswordHash(id: string, passwordHash: string) {
     return this.patch(id, { passwordHash });
   }
 
-  private async patch(id: string, values: Partial<Pick<UserRow, 'status' | 'displayName' | 'passwordHash'>>) {
+  private async patch(
+    id: string,
+    values: Partial<
+      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality'>
+    >,
+  ) {
     const [row] = await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return row ? mapUserRow(row) : null;
   }

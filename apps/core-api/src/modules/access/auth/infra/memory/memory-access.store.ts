@@ -5,6 +5,7 @@ import type {
   AccessStore,
   AuditEntry,
   NewSession,
+  ProfilePatch,
   SessionRecord,
   ServiceClientRecord,
   SessionRotation,
@@ -26,7 +27,13 @@ export class MemoryAccessStore implements AccessStore {
     findById: async (id: string) => this.userRows.get(id) ?? null,
     insert: async (user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>) => {
       if ([...this.userRows.values()].some((u) => u.email === user.email)) return null;
-      const row: UserRecord = { ...user, id: randomUUID(), status: 'active', createdAt: new Date() };
+      const row: UserRecord = {
+        ...user,
+        id: randomUUID(),
+        status: 'active',
+        createdAt: new Date(),
+        personal: { phone: null, dateOfBirth: null, gender: null, nationality: null },
+      };
       this.userRows.set(row.id, row);
       return row;
     },
@@ -40,7 +47,14 @@ export class MemoryAccessStore implements AccessStore {
     },
     updateRole: async (id: string, role: UserRecord['role']) => this.patchUser(id, { role }),
     updateStatus: async (id: string, status: UserRecord['status']) => this.patchUser(id, { status }),
-    updateDisplayName: async (id: string, displayName: string) => this.patchUser(id, { displayName }),
+    updateProfile: async (id: string, { displayName, ...personal }: ProfilePatch) => {
+      const row = this.userRows.get(id);
+      if (!row) return null;
+      return this.patchUser(id, {
+        ...(displayName === undefined ? {} : { displayName }),
+        personal: { ...row.personal, ...personal },
+      });
+    },
     updatePasswordHash: async (id: string, passwordHash: string) => this.patchUser(id, { passwordHash }),
   };
 

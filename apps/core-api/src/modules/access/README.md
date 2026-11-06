@@ -22,8 +22,8 @@
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
 | `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
-| `GET /api/auth/me` | Bearer access token | Người dùng đang đăng nhập |
-| `PATCH /api/auth/me` `{ displayName }` | Bearer access token | Người dùng sau khi đổi tên |
+| `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `phone`, `dateOfBirth`, `gender`, `nationality` (có thể `null`) |
+| `PATCH /api/auth/me` `{ displayName?, phone?, dateOfBirth?, gender?, nationality? }` | Bearer access token | Hồ sơ sau khi sửa. Chỉ gửi trường muốn đổi, gửi `null` hoặc `""` để xoá (trừ tên). Sai định dạng: `400 { errors: [{ field, message }] }` (xem "Thông tin cá nhân" bên dưới) |
 | `POST /api/auth/password/change` `{ currentPassword, newPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
 | `GET /api/auth/sessions` | Bearer access token | Thiết bị đang đăng nhập: `{ id, deviceName, userAgent, createdAt, lastUsedAt, isCurrent }`, dùng gần nhất trước |
 | `DELETE /api/auth/sessions/{id}` | Bearer access token | `204`. Thoát thiết bị đó, token của nó nhận `401` ngay. Phiên không phải của mình: `404` |
@@ -135,7 +135,7 @@ Service nhận viết bằng NestJS kiểm token như ở `libs/auth/README.md` 
 
 | Bảng | Ghi chú |
 |---|---|
-| `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked`. `password_hash` trống với tài khoản chỉ có Google |
+| `users` | `email` chữ thường, duy nhất. `role` thuộc `member`, `moderator`, `superadmin`. `status` thuộc `active`, `locked`. `password_hash` trống với tài khoản chỉ có Google. Thông tin cá nhân (TF06M, đều có thể trống): `phone` (`^[+]?[0-9]{8,15}$`), `date_of_birth` (`date`), `gender` (`male`, `female`, `other`), `nationality` (ISO 3166-1 alpha-2 chữ hoa), có check ở DB |
 | `user_identities` | Liên kết đăng nhập ngoài: khoá chính `(provider, subject)` (`subject` là `sub` của Google), `user_id`, `email` lúc liên kết |
 | `sessions` | `id` là `sid`. `refresh_token_hash`, `previous_token_hash`, `rotated_at`, `expires_at`, thiết bị, IP |
 | `outbox_events` | Sự kiện chờ gửi (`libs/outbox`) |
@@ -154,7 +154,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.registered` v1 | Đăng ký thành công | `AccessUserRegisteredV1Schema`: `{ userId, displayName }`, không có email |
 | `access.user.role_changed` v1 | Cấp hoặc thu hồi quyền | `{ userId, oldRole, newRole, changedBy }` |
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
-| `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
+| `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên, hoặc chỉ đổi thông tin cá nhân thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
 | `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
 | `access.user.welcome_email_requested` v1 | Tạo tài khoản mới: đăng ký hoặc lần đầu đăng nhập Google (đăng nhập lại, liên kết Google vào tài khoản có sẵn thì không) | `{ userId, email, displayName, provider }`, `provider` là `password` hoặc `google`. Có email vì `notification-service` cần người nhận; chỉ `notification-service` dùng |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
@@ -219,3 +219,10 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 - Đổi quyền hoặc khoá thì xoá mọi phiên của người đó trong cùng transaction rồi chặn từng `sid` trong Redis: token cũ nhận `401` ngay ở request kế tiếp, đăng nhập lại sẽ có `role` mới.
 - Các lệnh này không cần `Idempotency-Key`: gửi lại cho cùng kết quả (đặt giá trị, không cộng dồn); gửi lại sau khi đã làm thì nhận `409` "đã là kiểm duyệt viên" hoặc "đã bị khoá".
 - `audit_logs`: `staff.role_granted`, `staff.role_revoked`, `user.locked`, `user.unlocked` (người làm ở `actor_user_id`, người bị đổi ở `meta.targetUserId`).
+
+## Thông tin cá nhân (TF06M)
+
+- Số điện thoại, ngày sinh, giới tính, quốc tịch chỉ chủ tài khoản xem và sửa qua `GET/PATCH /auth/me`. Không có trong danh sách nhân viên, tìm người dùng của admin, phản hồi đăng ký/đăng nhập, và không lên event bus.
+- Audit `auth.profile_updated` chỉ ghi `meta.changedFields` (tên trường), không ghi giá trị; tên hiển thị vẫn ghi `oldDisplayName`, `newDisplayName`.
+- Kiểm tra (`account/domain/personal-info.ts`, `account/api/dto.ts`): số điện thoại bỏ dấu cách, chấm, gạch, ngoặc rồi phải có 8–15 chữ số (có thể `+` ở đầu); ngày sinh `YYYY-MM-DD`, tuổi 13–120 tại ngày gọi API; giới tính trong danh sách; quốc tịch 2 chữ cái, tự viết hoa.
+

@@ -92,6 +92,55 @@ describe('TF055: tài khoản của tôi', () => {
     await http().patch('/api/auth/me').send({ displayName: 'X' }).expect(401);
   });
 
+  it('TF06M: GET/PATCH /auth/me có thông tin cá nhân; chuẩn hoá, xoá được; không lên event bus, audit không chứa giá trị', async () => {
+    const { userId, phone } = await createAccountOnTwoDevices('personal@example.com');
+    const me = (await http().get('/api/auth/me').set(as(phone.accessToken)).expect(200)).body;
+    expect(me).toMatchObject({ id: userId, phone: null, dateOfBirth: null, gender: null, nationality: null });
+
+    const res = await http()
+      .patch('/api/auth/me')
+      .set(as(phone.accessToken))
+      .send({ phone: '0912 345.678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'vn' })
+      .expect(200);
+    expect(res.body).toMatchObject({ displayName: 'Khang', phone: '0912345678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN' });
+    expect((await http().get('/api/auth/me').set(as(phone.accessToken)).expect(200)).body).toMatchObject({ phone: '0912345678', nationality: 'VN' });
+
+    // Chỉ đổi thông tin cá nhân: không phát access.user.profile_updated; audit chỉ ghi tên trường.
+    expect(store.outboxRows.filter((e) => e.type === 'access.user.profile_updated' && e.userId === userId)).toHaveLength(0);
+    const audit = store.auditRows.filter((a) => a.action === 'auth.profile_updated' && a.actorUserId === userId);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.meta).toEqual({ changedFields: ['phone', 'dateOfBirth', 'gender', 'nationality'] });
+    expect(JSON.stringify(audit[0])).not.toContain('0912345678');
+
+    // Xoá bằng "" hoặc null; trường không gửi giữ nguyên.
+    const cleared = await http().patch('/api/auth/me').set(as(phone.accessToken)).send({ phone: '', gender: null }).expect(200);
+    expect(cleared.body).toMatchObject({ phone: null, gender: null, dateOfBirth: '2000-05-20', nationality: 'VN' });
+
+    // Đổi tên cùng lúc với thông tin cá nhân: phát sự kiện, chỉ có tên.
+    await http().patch('/api/auth/me').set(as(phone.accessToken)).send({ displayName: 'Lan', phone: '+84912345678' }).expect(200);
+    const events = store.outboxRows.filter((e) => e.type === 'access.user.profile_updated' && e.userId === userId);
+    expect(events.map((e) => e.payload)).toEqual([{ userId, displayName: 'Lan' }]);
+  });
+
+  it('TF06M: PATCH /auth/me sai định dạng trả 400 kèm trường sai; body rỗng 400', async () => {
+    const { phone } = await createAccountOnTwoDevices('personal-bad@example.com');
+    const nextYear = `${new Date().getUTCFullYear() + 1}-01-01`;
+    const tooYoung = `${new Date().getUTCFullYear() - 5}-01-01`;
+    for (const [body, field] of [
+      [{ phone: '12ab' }, 'phone'],
+      [{ phone: '1234567' }, 'phone'],
+      [{ dateOfBirth: '20-05-2000' }, 'dateOfBirth'],
+      [{ dateOfBirth: nextYear }, 'dateOfBirth'],
+      [{ dateOfBirth: tooYoung }, 'dateOfBirth'],
+      [{ gender: 'unknown' }, 'gender'],
+      [{ nationality: 'VNM' }, 'nationality'],
+    ] as const) {
+      const res = await http().patch('/api/auth/me').set(as(phone.accessToken)).send(body).expect(400);
+      expect(res.body.errors.map((e: { field: string }) => e.field)).toContain(field);
+    }
+    await http().patch('/api/auth/me').set(as(phone.accessToken)).send({}).expect(400);
+  });
+
   it('GET /auth/sessions liệt kê thiết bị, đánh dấu phiên hiện tại; không có bản băm token', async () => {
     const { phone } = await createAccountOnTwoDevices('sessions@example.com');
 

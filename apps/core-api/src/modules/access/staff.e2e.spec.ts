@@ -85,6 +85,21 @@ describe('TF054: quản lý nhân viên và khoá tài khoản', () => {
     await http().get('/api/admin/users').set(as(member.accessToken)).expect(403);
   });
 
+  it('TF06M: admin tìm người dùng, xem nhân viên không thấy thông tin cá nhân (số điện thoại, ngày sinh…)', async () => {
+    const admin = await createAccount('admin-pii@example.com', 'superadmin');
+    const member = await createAccount('pii@example.com');
+    await http()
+      .patch('/api/auth/me')
+      .set(as(member.accessToken))
+      .send({ phone: '0912345678', dateOfBirth: '2000-05-20', gender: 'male', nationality: 'VN' })
+      .expect(200);
+    const found = (await http().get('/api/admin/users?query=pii').set(as(admin.accessToken)).expect(200)).body.items[0];
+    const staff = (await http().get('/api/admin/staff').set(as(admin.accessToken)).expect(200)).body;
+    for (const row of [found, ...staff]) {
+      for (const key of ['phone', 'dateOfBirth', 'gender', 'nationality']) expect(row).not.toHaveProperty(key);
+    }
+  });
+
   it('moderator không cấp quyền được; superadmin cấp quyền thì token cũ bị chặn ngay, đăng nhập lại có role mới', async () => {
     const admin = await createAccount('admin2@example.com', 'superadmin');
     const mod = await createAccount('mod2@example.com', 'moderator');

@@ -12,10 +12,11 @@ import {
   type Clock,
   type LoginRateLimiter,
   type PasswordHasher,
+  type ProfilePatch,
   type RequestMeta,
   type UserRecord,
 } from '../../auth/application/ports.js';
-import { mapPublicUser, type PublicUser } from '../../auth/application/public-user.js';
+import { mapMyProfile, type MyProfile } from '../../auth/application/public-user.js';
 import { TOO_MANY_ATTEMPTS_MESSAGE } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
@@ -49,8 +50,9 @@ export class AccountUseCases {
     @Inject(CLOCK) private readonly now: Clock,
   ) {}
 
-  async updateProfile(actor: AuthUser, input: { displayName: string }, meta: RequestMeta): Promise<PublicUser> {
-    return mapPublicUser(await this.applyProfileUpdate(actor.userId, input.displayName.trim(), meta));
+  /** Chỉ ghi các trường thật sự đổi. Trả hồ sơ đầy đủ của chính mình (có thông tin cá nhân). */
+  async updateProfile(actor: AuthUser, input: ProfilePatch, meta: RequestMeta): Promise<MyProfile> {
+    return mapMyProfile(await this.applyProfileUpdate(actor.userId, input, meta));
   }
 
   /**
@@ -107,18 +109,34 @@ export class AccountUseCases {
   }
 
   @Transactional('access')
-  private async applyProfileUpdate(userId: string, displayName: string, meta: RequestMeta): Promise<UserRecord> {
+  private async applyProfileUpdate(userId: string, input: ProfilePatch, meta: RequestMeta): Promise<UserRecord> {
     const before = await this.loadUser(userId);
-    if (before.displayName === displayName) return before;
-    const user = (await this.store.users.updateDisplayName(userId, displayName))!;
+    const current: Required<ProfilePatch> = { displayName: before.displayName, ...before.personal };
+    const changes = Object.fromEntries(
+      Object.entries(input).filter(
+        ([key, value]) => value !== undefined && value !== current[key as keyof ProfilePatch],
+      ),
+    ) as ProfilePatch;
+    const changedFields = Object.keys(changes);
+    if (changedFields.length === 0) return before;
+    const user = (await this.store.users.updateProfile(userId, changes))!;
+    // Không ghi giá trị thông tin cá nhân vào audit log, chỉ ghi tên trường đã đổi; tên hiển thị thì ghi cũ/mới như trước.
     await this.store.audit.record({
       action: 'auth.profile_updated',
       actorUserId: userId,
       ...meta,
-      meta: { oldDisplayName: before.displayName, newDisplayName: displayName },
+      meta: {
+        changedFields,
+        ...(changes.displayName === undefined
+          ? {}
+          : { oldDisplayName: before.displayName, newDisplayName: changes.displayName }),
+      },
     });
-    const payload: AccessUserProfileUpdatedV1 = { userId, displayName };
-    await this.store.outbox.add({ type: 'access.user.profile_updated', userId, payload });
+    // Module khác chỉ cần tên hiển thị; thông tin cá nhân không lên event bus.
+    if (changes.displayName !== undefined) {
+      const payload: AccessUserProfileUpdatedV1 = { userId, displayName: changes.displayName };
+      await this.store.outbox.add({ type: 'access.user.profile_updated', userId, payload });
+    }
     return user;
   }
 
