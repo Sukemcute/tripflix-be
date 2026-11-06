@@ -35,3 +35,12 @@
 - API đăng ký kiểm lại mật khẩu 12–128 ký tự, từ chối các mẫu dễ đoán và bắt buộc mã hợp lệ cho đúng địa chỉ email. Tạo tài khoản và tiêu mã trong cùng transaction. Tài khoản có email đã xác thực ngay khi tạo.
 - Kiểm thử bằng Chromium và Mailpit đã xác nhận rằng mật khẩu yếu bị chặn, gọi thẳng API thiếu mã bị từ chối và đăng nhập chưa được phép trước khi nhập đúng mã.
 - Test tích hợp Access qua 28/28 bài với Postgres và Redis thật. Hai yêu cầu đồng thời dùng cùng mã chỉ tạo được một tài khoản.
+
+## Cập nhật: báo email đã có tài khoản, chờ 60 giây giữa hai lần xin mã
+
+- Xin mã bằng email đã có tài khoản đang hoạt động vẫn trả `202` như email mới, không tạo mã, để không lộ email nào đã đăng ký. Hệ thống phát `access.registration_attempted_existing` v1, và `notification-service` gửi thư "Email này đã có tài khoản Tripflix" có link đăng nhập và quên mật khẩu. Tài khoản Google thì hướng dẫn tạo mật khẩu. Tài khoản bị khoá thì không gửi thư. Mã được băm ở cả hai nhánh để thời gian trả lời như nhau.
+- Mỗi email xin mã cách nhau ít nhất 60 giây, áp dụng như nhau cho email mới và email đã có tài khoản. `202` trả thêm `resendAfterSeconds`. Xin sớm hơn trả `429`, có `Retry-After` và `retryAfterSeconds` trong body.
+- Chỉ thêm trường và sự kiện mới, không đổi trường cũ. Đã chạy `pnpm contracts:build` (`contracts/events/access.registration_attempted_existing.v1.schema.json`, `contracts/openapi/core-api.json`).
+- Test: `email-verification.e2e.spec.ts` có 2 bài mới (email đã có tài khoản, thời gian chờ). Mẫu thư được kiểm trong `existing-account.email.spec.ts` và `event-router.spec.ts`.
+- Kết quả sau khi merge `origin/develop`: `pnpm turbo run lint typecheck test --affected` có 49/49 task pass. core-api 631 pass và 1 skip, notification-service 24/24 pass.
+- Chạy thật trên máy local qua gateway `:8080`, gửi qua SMTP Gmail. Lần xin đầu trả `202 { resendAfterSeconds: 60 }`, xin lại ngay trả `429 { retryAfterSeconds: 60 }`. Thư báo đã có tài khoản đã được gửi tới hộp thư thật.
