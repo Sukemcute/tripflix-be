@@ -92,7 +92,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/core-api/src, target: /repo/apps/core-api/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   notification-service:
@@ -114,7 +114,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/notification-service/src, target: /repo/apps/notification-service/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   video-worker:
@@ -126,7 +126,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/video-worker/src, target: /repo/apps/video-worker/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   # ---------- AI (profile ai) — build từ repo tripflix-ai đặt cạnh ----------
