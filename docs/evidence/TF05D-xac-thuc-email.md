@@ -44,3 +44,12 @@
 - Test: `email-verification.e2e.spec.ts` có 2 bài mới (email đã có tài khoản, thời gian chờ). Mẫu thư được kiểm trong `existing-account.email.spec.ts` và `event-router.spec.ts`.
 - Kết quả sau khi merge `origin/develop`: `pnpm turbo run lint typecheck test --affected` có 49/49 task pass. core-api 631 pass và 1 skip, notification-service 24/24 pass.
 - Chạy thật trên máy local qua gateway `:8080`, gửi qua SMTP Gmail. Lần xin đầu trả `202 { resendAfterSeconds: 60 }`, xin lại ngay trả `429 { retryAfterSeconds: 60 }`. Thư báo đã có tài khoản đã được gửi tới hộp thư thật.
+
+## Cập nhật: mật khẩu mới tối đa 64 ký tự, tên hiển thị tối đa 30 ký tự
+
+- Nhánh `dung/TF05D-gioi-han-mat-khau-va-ten` · 2026-11-06
+- Thêm `NEW_PASSWORD_MAX = 64` cho mật khẩu mới khi đăng ký, xin mã đăng ký, đổi mật khẩu và đặt lại mật khẩu. Mật khẩu đang dùng (đăng nhập, mật khẩu hiện tại) vẫn nhận tới 128 ký tự (`PASSWORD_MAX`), để tài khoản đã đặt mật khẩu dài từ trước không bị khoá.
+- `DISPLAY_NAME_MAX` giảm từ 50 xuống 30, áp dụng khi đăng ký, sửa hồ sơ và với tên lấy từ Google (`buildDisplayName` cắt còn 30). Tên đã lưu dài hơn 30 vẫn giữ nguyên, lần sửa sau phải rút gọn. Database local có 4 tài khoản như vậy.
+- OpenAPI đổi `maxLength`. Đây là thay đổi hợp đồng có thu hẹp, Dũng đã đồng ý. Đã chạy `pnpm contracts:build`.
+- Test: `validation.spec.ts` kiểm 64 nhận, 65 từ chối cho mật khẩu mới, đăng nhập vẫn nhận 128, tên 30 nhận và 31 từ chối (có đếm emoji). `text-rules.spec.ts` kiểm Google cắt còn 30.
+- `pnpm turbo run lint typecheck test --affected`: 49/49 task pass, core-api 631 pass và 1 skip.
