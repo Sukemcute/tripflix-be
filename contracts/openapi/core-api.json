@@ -2066,7 +2066,7 @@
     },
     "/api/stays": {
       "get": {
-        "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars`, `priceMin`/`priceMax` theo giá một đêm một phòng. `sort=price` (mặc định, rẻ trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
+        "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars` (từ X sao trở lên), `stars` (đúng X sao; gửi cả hai thì áp cả hai), `priceMin`/`priceMax` theo giá một đêm một phòng.\n- `sort=price` (mặc định, rẻ trước), `price_desc` (đắt trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
         "operationId": "StaysController_listStays",
         "parameters": [
           {
@@ -2092,6 +2092,7 @@
             "schema": {
               "enum": [
                 "price",
+                "price_desc",
                 "stars"
               ],
               "type": "string"
@@ -2114,9 +2115,19 @@
             "schema": {}
           },
           {
+            "name": "stars",
+            "required": false,
+            "in": "query",
+            "description": "Đúng X sao (1–5)",
+            "schema": {
+              "example": 3
+            }
+          },
+          {
             "name": "minStars",
             "required": false,
             "in": "query",
+            "description": "Từ X sao trở lên",
             "schema": {
               "example": 4
             }

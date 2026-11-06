@@ -42,6 +42,16 @@ describe('filterAndSortStays', () => {
     expect(picked.map((s) => s.hotelId)).toEqual(['b']);
     expect(filterAndSortStays(stays, { priceMin: 800_000 }, 'price').map((s) => s.hotelId)).toEqual(['a', 'c']);
   });
+
+  it('lọc đúng một hạng sao, không lấy hạng cao hơn hay chưa xếp hạng', () => {
+    expect(filterAndSortStays(stays, { stars: 3 }, 'price').map((s) => s.hotelId)).toEqual(['a']);
+    expect(filterAndSortStays(stays, { stars: 4, minStars: 5 }, 'price')).toEqual([]);
+  });
+
+  it('price_desc: đắt trước, cùng giá thì theo tên', () => {
+    const same = [...stays, stay('e', 900_000, 2)];
+    expect(filterAndSortStays(same, {}, 'price_desc').map((s) => s.hotelId)).toEqual(['c', 'a', 'e', 'd', 'b']);
+  });
 });
 
 describe('paginate', () => {
