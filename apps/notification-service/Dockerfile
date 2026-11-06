@@ -23,7 +23,8 @@ FROM deps AS dev
 ARG APP
 ENV APP=${APP} NODE_ENV=development
 COPY --from=prune /repo/out/full/ .
-CMD pnpm turbo run dev --filter=${APP}...
+# Chỉ watch app; libs build một lần (dev dependsOn ^build). Sửa libs: compose watch sync+restart.
+CMD pnpm turbo run dev --filter=${APP}
 
 FROM dev AS build
 ARG APP
