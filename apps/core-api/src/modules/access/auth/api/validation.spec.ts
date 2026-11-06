@@ -156,14 +156,14 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
   });
 
   describe('password', () => {
-    it('12 ký tự nhận, 11 từ chối; 128 nhận, 129 từ chối', () => {
+    it('12 ký tự nhận, 11 từ chối; 64 nhận, 65 từ chối', () => {
       expect(ok(RegisterRequestSchema, register({ password: 'tuyet-cuoi-9' })).password).toBe('tuyet-cuoi-9');
       expect(onlyError(RegisterRequestSchema, register({ password: 'tuyet-cuoi-' }), 'password')).toBe(
         'Mật khẩu cần ít nhất 12 ký tự',
       );
-      expect(ok(RegisterRequestSchema, register({ password: 'x'.repeat(126) + '1Y' })).password).toHaveLength(128);
-      expect(onlyError(RegisterRequestSchema, register({ password: 'x'.repeat(129) }), 'password')).toBe(
-        'Mật khẩu tối đa 128 ký tự',
+      expect(ok(RegisterRequestSchema, register({ password: 'x'.repeat(62) + '1Y' })).password).toHaveLength(64);
+      expect(onlyError(RegisterRequestSchema, register({ password: 'x'.repeat(63) + '1Y' }), 'password')).toBe(
+        'Mật khẩu tối đa 64 ký tự',
       );
     });
 
@@ -190,12 +190,12 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
       expect(onlyError(RegisterRequestSchema, register({ password: EMOJI.repeat(11) }), 'password')).toBe(
         'Mật khẩu cần ít nhất 12 ký tự',
       );
-      expect(ok(RegisterRequestSchema, register({ displayName: EMOJI.repeat(50) })).displayName).toBe(
-        EMOJI.repeat(50),
+      expect(ok(RegisterRequestSchema, register({ displayName: EMOJI.repeat(30) })).displayName).toBe(
+        EMOJI.repeat(30),
       );
       expect(
-        onlyError(RegisterRequestSchema, register({ displayName: EMOJI.repeat(51) }), 'displayName'),
-      ).toBe('Tên hiển thị tối đa 50 ký tự');
+        onlyError(RegisterRequestSchema, register({ displayName: EMOJI.repeat(31) }), 'displayName'),
+      ).toBe('Tên hiển thị tối đa 30 ký tự');
     });
 
     it('mật khẩu ngắn chỉ báo một lỗi (không kèm lỗi khoảng trắng)', () => {
@@ -219,15 +219,15 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
       expect(ok(RegisterRequestSchema, register({ displayName: input })).displayName).toBe(expected);
     });
 
-    it('50 ký tự nhận, 51 từ chối (đếm sau khi cắt khoảng trắng)', () => {
-      expect(ok(RegisterRequestSchema, register({ displayName: 'a'.repeat(50) })).displayName).toHaveLength(
-        50,
+    it('30 ký tự nhận, 31 từ chối (đếm sau khi cắt khoảng trắng)', () => {
+      expect(ok(RegisterRequestSchema, register({ displayName: 'a'.repeat(30) })).displayName).toHaveLength(
+        30,
       );
       expect(
-        ok(RegisterRequestSchema, register({ displayName: `  ${'a'.repeat(50)}  ` })).displayName,
-      ).toHaveLength(50);
-      expect(onlyError(RegisterRequestSchema, register({ displayName: 'a'.repeat(51) }), 'displayName')).toBe(
-        'Tên hiển thị tối đa 50 ký tự',
+        ok(RegisterRequestSchema, register({ displayName: `  ${'a'.repeat(30)}  ` })).displayName,
+      ).toHaveLength(30);
+      expect(onlyError(RegisterRequestSchema, register({ displayName: 'a'.repeat(31) }), 'displayName')).toBe(
+        'Tên hiển thị tối đa 30 ký tự',
       );
     });
 
@@ -298,6 +298,8 @@ describe('TF05C: đăng nhập, refresh, Google', () => {
     expect(onlyError(LoginRequestSchema, { email: 'a@x.com', password: 'x'.repeat(129) }, 'password')).toBe(
       'Mật khẩu tối đa 128 ký tự',
     );
+    // Mật khẩu mới tối đa 64, nhưng tài khoản đặt mật khẩu dài từ trước vẫn đăng nhập được.
+    expect(ok(LoginRequestSchema, { email: 'a@x.com', password: 'x'.repeat(128) }).password).toHaveLength(128);
   });
 
   it.each([
@@ -576,8 +578,8 @@ describe('TF05C: mật khẩu (đổi, quên, đặt lại)', () => {
       onlyError(ResetPasswordRequestSchema, { token: 't', newPassword: ZWSP.repeat(9) }, 'newPassword'),
     ).toBe('Mật khẩu không được chỉ có khoảng trắng');
     expect(
-      onlyError(ResetPasswordRequestSchema, { token: 't', newPassword: 'x'.repeat(129) }, 'newPassword'),
-    ).toBe('Mật khẩu tối đa 128 ký tự');
+      onlyError(ResetPasswordRequestSchema, { token: 't', newPassword: 'x'.repeat(65) }, 'newPassword'),
+    ).toBe('Mật khẩu tối đa 64 ký tự');
   });
 });
 

@@ -67,10 +67,10 @@ describe('TF05C: credentials', () => {
     expect(buildDisplayName(null, '@example.com')).toBe('Thành viên Tripflix');
   });
 
-  it('buildDisplayName: cắt còn 50 ký tự, không cắt đôi emoji, không để dấu cách ở cuối', () => {
-    expect(buildDisplayName('a'.repeat(80), 'x@y.z')).toBe('a'.repeat(50));
+  it('buildDisplayName: cắt còn 30 ký tự, không cắt đôi emoji, không để dấu cách ở cuối', () => {
+    expect(buildDisplayName('a'.repeat(80), 'x@y.z')).toBe('a'.repeat(30));
     const emoji = ch(0x1f600);
-    expect(buildDisplayName(emoji.repeat(60), 'x@y.z')).toBe(emoji.repeat(50));
-    expect(buildDisplayName(`${'a'.repeat(49)} b`, 'x@y.z')).toBe('a'.repeat(49));
+    expect(buildDisplayName(emoji.repeat(60), 'x@y.z')).toBe(emoji.repeat(30));
+    expect(buildDisplayName(`${'a'.repeat(29)} b`, 'x@y.z')).toBe('a'.repeat(29));
   });
 });

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
+import { NEW_PASSWORD_MAX, PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
 import { isCommonRegistrationPassword, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
 import {
   DEVICE_NAME_MAX,
@@ -70,12 +70,12 @@ export const signupEmailField = () =>
 export const lookupEmailField = () =>
   z.string().trim().min(1, 'Nhập email').max(254, 'Email tối đa 254 ký tự');
 
-/** Mật khẩu mới (đăng ký, đổi, đặt lại): 8–128 ký tự, không được chỉ có khoảng trắng. Không cắt khoảng trắng. */
+/** Mật khẩu mới (đăng ký, đổi, đặt lại): 8–64 ký tự, không được chỉ có khoảng trắng. Không cắt khoảng trắng. */
 export const newPasswordField = (min = PASSWORD_MIN) =>
   z
     .string()
     .min(min, `Mật khẩu cần ít nhất ${min} ký tự`)
-    .max(PASSWORD_MAX, `Mật khẩu tối đa ${PASSWORD_MAX} ký tự`)
+    .max(NEW_PASSWORD_MAX, `Mật khẩu tối đa ${NEW_PASSWORD_MAX} ký tự`)
     .refine(hasVisibleChar, { message: 'Mật khẩu không được chỉ có khoảng trắng', ...whenValid });
 
 /** Mật khẩu đang dùng: chỉ cần có, để tài khoản tạo trước quy tắc mới vẫn đăng nhập được. */
@@ -93,7 +93,7 @@ export const registrationPasswordField = () =>
       ...whenValid,
     });
 
-/** Tên hiển thị: chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–50 ký tự, một dòng, có ít nhất một ký tự nhìn thấy. */
+/** Tên hiển thị: chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–30 ký tự, một dòng, có ít nhất một ký tự nhìn thấy. */
 export const displayNameField = () =>
   z
     .string()
