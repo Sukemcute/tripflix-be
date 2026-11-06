@@ -15,6 +15,9 @@ export interface RatePlan {
   discountPct?: number;
   /** Quyền lợi kèm gói, ví dụ "Bữa sáng buffet cho 2 người". */
   perks?: string[];
+  /** Chuyến bay: hành lý xách tay và ký gửi (kg mỗi khách). */
+  carryOnKg?: number;
+  checkedKg?: number;
 }
 
 /** Một tiện ích của khách sạn. group: dining | sports | wellness | kids | general. featured: hiện ở mục "Tiện ích nổi bật". */
@@ -168,6 +171,10 @@ export const flights = commerceSchema.table(
     flightKey: text('flight_key').notNull(),
     name: text('name').notNull(),
     airline: text('airline'),
+    // Mã IATA của hãng (VJ, VN...) để web và app gắn logo; số hiệu chuyến dạng VJ141.
+    airlineCode: text('airline_code'),
+    flightNumber: text('flight_number'),
+    stops: smallint('stops').notNull().default(0),
     fromAirport: text('from_airport').notNull(),
     toAirport: text('to_airport').notNull(),
     departTime: text('depart_time'),
@@ -185,6 +192,7 @@ export const flights = commerceSchema.table(
     index('idx_flights_flight_key').on(t.flightKey),
     check('ck_flights_default_seats', sql`${t.defaultSeats} >= 0`),
     check('ck_flights_default_price', sql`${t.defaultPrice} > 0`),
+    check('ck_flights_stops', sql`${t.stops} >= 0`),
   ],
 );
 
