@@ -37,7 +37,13 @@
 - `vitest run src/modules/discovery`: 55 pass, 1 skip (bài đối chiếu Python khi không có dữ liệu prototype).
 - Có dữ liệu prototype (`EXPLORE_PARITY_DIR`): `domain/explore` 17/17 pass, gồm đối chiếu 134 câu.
 - `pnpm turbo run lint typecheck --filter=@tripflix/core-api`: 12/12 task, 0 lỗi lint (warning đều ở module khác).
-- **Chưa thử trên stack local**: Docker không chạy lúc kiểm tra.
+- **Stack local** (code nhánh nạp vào container core-api, 10 bài seed), 18–75 ms mỗi câu:
+  - `"lich trinh da lat 3n2d"` → 1 bài (video Săn mây Đà Lạt, có ở cả Lộ trình và Video, chỉ trả một lần), `reason` "3 ngày · Ở Đà Lạt · ♥ 109";
+  - `"nha trang"`, `limit 1` → 3 trang (1 lộ trình, 2 video), `total` 3, trang cuối `nextCursor: null`;
+  - `"đà lạt"`, `postType video` → 1 video;
+  - `"lịch trình đà lạt dưới 2tr"`, `postType plan` → 0 (lộ trình 3,1 tr/người vượt ngân sách);
+  - `"khách sạn đà nẵng"` → vẫn ra lộ trình Đà Nẵng (bài không bị giới hạn 3 mục như ở `/api/search`);
+  - `postType: "reel"`, `cursor: "abc"`, `q: "  "` → 400 đúng trường.
 
 ## Cách kiểm lại
 
