@@ -3,6 +3,7 @@ import type { Db } from '@tripflix/db';
 import { sql } from 'drizzle-orm';
 import { flights, properties, roomTypes, type HotelDetails, type RatePlan, type RoomTypeDetails } from '../schema/index.js';
 import { toHotelImageKey } from './image-keys.js';
+import { seedReviews } from './seed-reviews.js';
 
 /** Dữ liệu giả lập: khách sạn, loại phòng, chuyến bay theo hạng ghế. Lịch trống không nằm ở đây mà do job sinh. */
 interface CatalogSeed {
@@ -77,7 +78,7 @@ export async function seedCatalog(
   file = CATALOG_SEED_FILE,
   // Ảnh lưu khoá đầy đủ trên kho media (thêm tiền tố môi trường, như S3ObjectStorage.resolveKey); mặc định giữ khoá tương đối.
   resolveImageKey: (relativeKey: string) => string = (relativeKey) => relativeKey,
-): Promise<{ hotels: number; roomTypes: number; flights: number }> {
+): Promise<{ hotels: number; roomTypes: number; flights: number; reviews: number }> {
   const seed = JSON.parse(readFileSync(file, 'utf8')) as CatalogSeed;
   const toImageKey = (sourcePath: string) => {
     const key = toHotelImageKey(sourcePath);
@@ -96,6 +97,7 @@ export async function seedCatalog(
       details: r.details ? { ...r.details, images: r.details.images?.map(toImageKey) } : {},
     })),
   );
+  let reviewCount = 0;
   await db.transaction(async (tx) => {
     const hotelRows = seed.hotels.map(({ roomTypes: _roomTypes, basePrice: _basePrice, ...hotel }) => ({
     ...hotel,
@@ -162,6 +164,8 @@ export async function seedCatalog(
           },
         });
     }
+    // Sau khi có khách sạn, loại phòng: đánh giá demo trỏ khoá ngoại tới chúng; tóm tắt ghi đè lên details vừa nạp.
+    reviewCount = await seedReviews(tx, seed.hotels, toImageKey);
   });
-  return { hotels: seed.hotels.length, roomTypes: roomTypeRows.length, flights: seed.flights.length };
+  return { hotels: seed.hotels.length, roomTypes: roomTypeRows.length, flights: seed.flights.length, reviews: reviewCount };
 }

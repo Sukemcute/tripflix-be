@@ -2183,6 +2183,42 @@
         ]
       }
     },
+    "/api/search": {
+      "post": {
+        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Không có gì khớp thì vùng có `total: 0`, không đoán bừa.\n- Vùng câu muốn tìm rỗng: `suggest` là các gợi ý khác (bỏ các từ trong `dropped`).\n- `loc` chỉ dùng khi câu không nói nơi.",
+        "operationId": "ExploreController_search",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` rỗng hoặc dài hơn 200 ký tự, `loc` sai"
+          }
+        },
+        "summary": "Tìm khám phá bằng câu tự nhiên, kết quả chia theo vùng (Ở đâu, Lộ trình, Bài viết, Video...)",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/recommendations/home": {
       "get": {
         "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi, mỗi nơi 2 khách sạn: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do \"Rẻ hơn X% so với …\".\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
@@ -2291,6 +2327,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HotelDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có khách sạn này"
+          }
+        },
+        "tags": [
+          "hotels"
+        ]
+      }
+    },
+    "/api/hotels/{id}/reviews": {
+      "get": {
+        "operationId": "HotelsController_listReviews",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelReviewPageDto"
                 }
               }
             }
@@ -5156,6 +5225,337 @@
           "nextCursor"
         ]
       },
+      "ExploreLocationDto": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "example": 10.7769
+          },
+          "lng": {
+            "type": "number",
+            "example": 106.7009
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "ExploreRequestDto": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "example": "cafe chill đà lạt",
+            "description": "Câu người dùng gõ, có dấu hay không đều được (1–200 ký tự)"
+          },
+          "loc": {
+            "nullable": true,
+            "description": "Vị trí người dùng. Chỉ dùng khi câu không nói nơi: chỗ gần người dùng được xếp lên",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "q"
+        ]
+      },
+      "ExploreUnderstoodDto": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt"
+          },
+          "intents": {
+            "example": [
+              "cafe"
+            ],
+            "description": "Vùng câu nhắm tới, theo thứ tự trong câu",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "type": "number",
+            "nullable": true,
+            "example": 2000000,
+            "description": "Ngân sách (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "example": 3
+          },
+          "names": {
+            "description": "Tên riêng (đường, chuỗi cửa hàng) phải khớp nguyên cụm",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "phrases": {
+            "description": "Cụm từ dính (mì quảng, cao lầu)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fixed": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "trug": "trung"
+            },
+            "description": "Từ đã sửa lỗi gõ"
+          }
+        },
+        "required": [
+          "place",
+          "intents",
+          "budget",
+          "days",
+          "names",
+          "phrases",
+          "fixed"
+        ]
+      },
+      "ExploreItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "hotel:P-h-dl-01",
+            "description": "`<loại>:<mã gốc>`, duy nhất"
+          },
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)"
+          },
+          "refId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt",
+            "description": "Nơi của mục"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm",
+            "description": "Lý do hiện mục này"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "stay: giá từ / đêm · plan: chi phí ước tính / người (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ngày của lộ trình"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "refId",
+          "title",
+          "subtitle",
+          "thumbnail",
+          "reason",
+          "priceFrom",
+          "days",
+          "location"
+        ]
+      },
+      "ExploreSectionDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "food · cafe · see · stay · plan · post · video"
+          },
+          "label": {
+            "type": "string",
+            "example": "Ở đâu"
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số mục khớp; 0 = vùng không có kết quả phù hợp"
+          },
+          "items": {
+            "description": "Tối đa 6 mục (3 nếu không phải vùng câu nhắm tới)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreItemDto"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "total",
+          "items"
+        ]
+      },
+      "ExploreSuggestItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "hotel:P-h-dl-01",
+            "description": "`<loại>:<mã gốc>`, duy nhất"
+          },
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)"
+          },
+          "refId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt",
+            "description": "Nơi của mục"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm",
+            "description": "Lý do hiện mục này"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "stay: giá từ / đêm · plan: chi phí ước tính / người (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ngày của lộ trình"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          },
+          "section": {
+            "type": "string",
+            "example": "Ở đâu",
+            "description": "Tên vùng của mục gợi ý"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "refId",
+          "title",
+          "subtitle",
+          "thumbnail",
+          "reason",
+          "priceFrom",
+          "days",
+          "location",
+          "section"
+        ]
+      },
+      "ExploreResponseDto": {
+        "type": "object",
+        "properties": {
+          "understood": {
+            "description": "Máy hiểu câu thế nào (hiện dạng chip)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreUnderstoodDto"
+              }
+            ]
+          },
+          "nearUser": {
+            "type": "boolean",
+            "description": "true = đã xếp theo vị trí người dùng (câu không nói nơi)"
+          },
+          "sections": {
+            "description": "Vùng câu nhắm tới đứng đầu, vùng rỗng xuống cuối",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreSectionDto"
+            }
+          },
+          "suggest": {
+            "description": "Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreSuggestItemDto"
+            }
+          },
+          "dropped": {
+            "example": [
+              "dịp",
+              "lễ"
+            ],
+            "description": "Từ đã bỏ qua để ra gợi ý khác",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "understood",
+          "nearUser",
+          "sections",
+          "suggest",
+          "dropped"
+        ]
+      },
       "HomeProvinceDto": {
         "type": "object",
         "properties": {
@@ -5802,6 +6202,218 @@
           "isAvailable",
           "rooms",
           "calendar"
+        ]
+      },
+      "RatingCountDto": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "number",
+            "example": 5
+          },
+          "count": {
+            "type": "number",
+            "example": 58
+          }
+        },
+        "required": [
+          "rating",
+          "count"
+        ]
+      },
+      "TagCountDto": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "example": "Phù hợp gia đình"
+          },
+          "count": {
+            "type": "number",
+            "example": 58
+          }
+        },
+        "required": [
+          "tag",
+          "count"
+        ]
+      },
+      "ReviewSummaryDto": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "example": 4.6,
+            "description": "Điểm trung bình đánh giá trên Tripflix"
+          },
+          "count": {
+            "type": "number",
+            "example": 24
+          },
+          "distribution": {
+            "description": "Từ 5 sao xuống 1 sao",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RatingCountDto"
+            }
+          },
+          "tags": {
+            "description": "Tag nhiều nhất trước, tối đa 10",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagCountDto"
+            }
+          },
+          "aiSummary": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tóm tắt ý kiến khách"
+          }
+        },
+        "required": [
+          "average",
+          "count",
+          "distribution",
+          "tags",
+          "aiSummary"
+        ]
+      },
+      "ReviewRoomDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-h-nt-01--DLX"
+          },
+          "name": {
+            "type": "string",
+            "example": "Deluxe hướng biển"
+          }
+        },
+        "required": [
+          "productId",
+          "name"
+        ]
+      },
+      "HotelReviewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "RV-P-h-nt-01-01"
+          },
+          "authorName": {
+            "type": "string",
+            "example": "Minh Anh"
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "description": "URL ảnh khách chụp",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "travelerType": {
+            "type": "string",
+            "nullable": true,
+            "description": "family | couple | solo | business | friends"
+          },
+          "stayMonth": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Tháng lưu trú (ngày 01)"
+          },
+          "room": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewRoomDto"
+              }
+            ]
+          },
+          "helpfulCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "authorName",
+          "rating",
+          "title",
+          "body",
+          "tags",
+          "images",
+          "travelerType",
+          "stayMonth",
+          "room",
+          "helpfulCount",
+          "createdAt"
+        ]
+      },
+      "HotelReviewPageDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-h-nt-01"
+          },
+          "summary": {
+            "description": "Thống kê trên mọi đánh giá, không theo bộ lọc",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewSummaryDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelReviewDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number",
+            "description": "Số đánh giá khớp bộ lọc"
+          }
+        },
+        "required": [
+          "hotelId",
+          "summary",
+          "items",
+          "page",
+          "limit",
+          "total"
         ]
       },
       "AdminRoomDayDto": {

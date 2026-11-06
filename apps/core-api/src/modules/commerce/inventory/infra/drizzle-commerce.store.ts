@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
-import { and, asc, eq, gt, gte, inArray, lte, max, sql } from 'drizzle-orm';
-import { auditLogs, flightInventory, flights, properties, roomInventory, roomRates, roomTypes, type FlightRow, type PropertyRow, type RoomTypeRow } from '../../db/schema/index.js';
+import { and, asc, desc, eq, gt, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { auditLogs, flightInventory, flights, properties, reviews, roomInventory, roomRates, roomTypes, type FlightRow, type PropertyRow, type ReviewRow, type RoomTypeRow } from '../../db/schema/index.js';
 import type {
   CalendarAdminRepository,
   CalendarRepository,
@@ -12,6 +12,10 @@ import type {
   NewFlightDay,
   NewRoomDay,
   PropertyRecord,
+  ReviewFilter,
+  ReviewRecord,
+  ReviewRepository,
+  ReviewStats,
   RoomCalendarPatch,
   RoomTypeRecord,
 } from '../application/ports.js';
@@ -336,10 +340,90 @@ class DrizzleCalendarAdminRepository implements CalendarAdminRepository {
   }
 }
 
+const mapReview = (row: ReviewRow): ReviewRecord => ({
+  id: row.id,
+  propertyId: row.propertyId,
+  roomTypeId: row.roomTypeId,
+  authorName: row.authorName,
+  rating: row.rating,
+  title: row.title,
+  body: row.body,
+  tags: row.tags,
+  images: row.images,
+  travelerType: row.travelerType,
+  stayMonth: row.stayMonth,
+  helpfulCount: row.helpfulCount,
+  createdAt: row.createdAt.toISOString(),
+});
+
+class DrizzleReviewRepository implements ReviewRepository {
+  constructor(private readonly host: DbHost) {}
+
+  private get db(): Db {
+    return this.host.tx;
+  }
+
+  async listReviews(filter: ReviewFilter) {
+    const where = and(
+      eq(reviews.propertyId, filter.propertyId),
+      eq(reviews.status, 'published'),
+      filter.rating !== undefined ? eq(reviews.rating, filter.rating) : undefined,
+      filter.travelerType ? eq(reviews.travelerType, filter.travelerType) : undefined,
+      filter.tag ? sql`${reviews.tags} @> ${JSON.stringify([filter.tag])}::jsonb` : undefined,
+    );
+    const order = {
+      newest: [desc(reviews.createdAt)],
+      highest: [desc(reviews.rating), desc(reviews.createdAt)],
+      lowest: [asc(reviews.rating), desc(reviews.createdAt)],
+      helpful: [desc(reviews.helpfulCount), desc(reviews.createdAt)],
+    }[filter.sort];
+    const rows = await this.db
+      .select()
+      .from(reviews)
+      .where(where)
+      .orderBy(...order, asc(reviews.id))
+      .offset(filter.offset)
+      .limit(filter.limit);
+    const [counted] = await this.db.select({ total: sql<number>`count(*)::int` }).from(reviews).where(where);
+    return { items: rows.map(mapReview), total: counted?.total ?? 0 };
+  }
+
+  async getReviewStats(propertyId: string, tagLimit: number): Promise<ReviewStats> {
+    const published = and(eq(reviews.propertyId, propertyId), eq(reviews.status, 'published'));
+    const [agg] = await this.db
+      .select({
+        count: sql<number>`count(*)::int`,
+        average: sql<number | null>`avg(${reviews.rating})::float8`,
+        r1: sql<number>`count(*) filter (where ${reviews.rating} = 1)::int`,
+        r2: sql<number>`count(*) filter (where ${reviews.rating} = 2)::int`,
+        r3: sql<number>`count(*) filter (where ${reviews.rating} = 3)::int`,
+        r4: sql<number>`count(*) filter (where ${reviews.rating} = 4)::int`,
+        r5: sql<number>`count(*) filter (where ${reviews.rating} = 5)::int`,
+      })
+      .from(reviews)
+      .where(published);
+    const tag = sql<string>`t.tag`;
+    const tagRows = await this.db
+      .select({ tag, count: sql<number>`count(*)::int` })
+      .from(sql`${reviews} cross join lateral jsonb_array_elements_text(${reviews.tags}) as t(tag)`)
+      .where(published)
+      .groupBy(tag)
+      .orderBy(sql`count(*) desc`, tag)
+      .limit(tagLimit);
+    return {
+      count: agg?.count ?? 0,
+      average: agg?.average ?? null,
+      distribution: agg ? [agg.r1, agg.r2, agg.r3, agg.r4, agg.r5] : [0, 0, 0, 0, 0],
+      tags: tagRows,
+    };
+  }
+}
+
 @Injectable()
 export class DrizzleCommerceStore implements CommerceStore {
   readonly catalog: CatalogRepository;
   readonly calendar: CalendarRepository;
+  readonly reviews: ReviewRepository;
 
   readonly admin: CalendarAdminRepository;
 
@@ -347,6 +431,7 @@ export class DrizzleCommerceStore implements CommerceStore {
   constructor(@InjectTransactionHost('commerce') host: DbHost) {
     this.catalog = new DrizzleCatalogRepository(host);
     this.calendar = new DrizzleCalendarRepository(host);
+    this.reviews = new DrizzleReviewRepository(host);
     this.admin = new DrizzleCalendarAdminRepository(host);
   }
 }

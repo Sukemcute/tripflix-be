@@ -141,3 +141,68 @@ export class HotelDetailQueryDto {
   @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 2 }) adults?: number;
   @ApiPropertyOptional({ minimum: 1, maximum: 60, default: 14, description: 'Số ngày của lịch giá, tính từ hôm nay' }) calendarDays?: number;
 }
+
+export const HotelReviewQuerySchema = z.object({
+  sort: z.enum(['newest', 'highest', 'lowest', 'helpful']).optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  tag: z.string().trim().min(1).max(50).optional(),
+  travelerType: z.enum(['family', 'couple', 'solo', 'business', 'friends']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+export class HotelReviewQueryDto {
+  @ApiPropertyOptional({ enum: ['newest', 'highest', 'lowest', 'helpful'], default: 'newest' }) sort?: string;
+  @ApiPropertyOptional({ minimum: 1, maximum: 5, description: 'Chỉ lấy đánh giá đúng số sao này' }) rating?: number;
+  @ApiPropertyOptional({ example: 'Gần biển', description: 'Chỉ lấy đánh giá có tag này' }) tag?: string;
+  @ApiPropertyOptional({ enum: ['family', 'couple', 'solo', 'business', 'friends'] }) travelerType?: string;
+  @ApiPropertyOptional({ minimum: 1, default: 1 }) page?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 10 }) limit?: number;
+}
+
+class RatingCountDto {
+  @ApiProperty({ example: 5 }) rating!: number;
+  @ApiProperty({ example: 58 }) count!: number;
+}
+
+class TagCountDto {
+  @ApiProperty({ example: 'Phù hợp gia đình' }) tag!: string;
+  @ApiProperty({ example: 58 }) count!: number;
+}
+
+class ReviewSummaryDto {
+  @ApiProperty({ type: Number, nullable: true, example: 4.6, description: 'Điểm trung bình đánh giá trên Tripflix' }) average!: number | null;
+  @ApiProperty({ example: 24 }) count!: number;
+  @ApiProperty({ type: [RatingCountDto], description: 'Từ 5 sao xuống 1 sao' }) distribution!: RatingCountDto[];
+  @ApiProperty({ type: [TagCountDto], description: 'Tag nhiều nhất trước, tối đa 10' }) tags!: TagCountDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Tóm tắt ý kiến khách' }) aiSummary!: string | null;
+}
+
+class ReviewRoomDto {
+  @ApiProperty({ example: 'P-h-nt-01--DLX' }) productId!: string;
+  @ApiProperty({ example: 'Deluxe hướng biển' }) name!: string;
+}
+
+class HotelReviewDto {
+  @ApiProperty({ example: 'RV-P-h-nt-01-01' }) id!: string;
+  @ApiProperty({ example: 'Minh Anh' }) authorName!: string;
+  @ApiProperty({ minimum: 1, maximum: 5 }) rating!: number;
+  @ApiProperty({ type: String, nullable: true }) title!: string | null;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: [String] }) tags!: string[];
+  @ApiProperty({ type: [String], description: 'URL ảnh khách chụp' }) images!: string[];
+  @ApiProperty({ type: String, nullable: true, description: 'family | couple | solo | business | friends' }) travelerType!: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date', description: 'Tháng lưu trú (ngày 01)' }) stayMonth!: string | null;
+  @ApiProperty({ type: ReviewRoomDto, nullable: true }) room!: ReviewRoomDto | null;
+  @ApiProperty() helpfulCount!: number;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+}
+
+export class HotelReviewPageDto {
+  @ApiProperty({ example: 'P-h-nt-01' }) hotelId!: string;
+  @ApiProperty({ type: ReviewSummaryDto, description: 'Thống kê trên mọi đánh giá, không theo bộ lọc' }) summary!: ReviewSummaryDto;
+  @ApiProperty({ type: [HotelReviewDto] }) items!: HotelReviewDto[];
+  @ApiProperty() page!: number;
+  @ApiProperty() limit!: number;
+  @ApiProperty({ description: 'Số đánh giá khớp bộ lọc' }) total!: number;
+}

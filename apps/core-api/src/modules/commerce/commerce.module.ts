@@ -19,6 +19,7 @@ import { CalendarAdminUseCases } from './inventory/application/calendar-admin.us
 import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
 import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
 import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
+import { ReviewUseCases } from './inventory/application/review.use-cases.js';
 import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type MediaUrl, type Today } from './inventory/application/ports.js';
 import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
 import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
@@ -89,6 +90,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     { provide: MEDIA_URL, inject: [CORE_ENV], useFactory: (env: CoreEnv) => buildMediaUrl(env.MEDIA_CDN_URL) },
     CatalogUseCases,
     HotelDetailUseCases,
+    ReviewUseCases,
     CalendarUseCases,
     CalendarAdminUseCases,
     CheckoutUseCases,

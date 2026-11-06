@@ -155,6 +155,80 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
     expect(res.body.rooms[0].ratePlans[0]).toMatchObject({ listPricePerNight: null, discountPct: null, perks: [] });
   });
 
+  describe('GET /api/hotels/:id/reviews', () => {
+    const review = (id: string, rating: number, createdAt: string, extra: Partial<(typeof store.reviewRows)[number]> = {}) => ({
+      id,
+      propertyId: 'H1',
+      roomTypeId: null,
+      authorName: `Khách ${id}`,
+      rating,
+      title: null,
+      body: `Nội dung ${id}`,
+      tags: [],
+      images: [],
+      travelerType: null,
+      stayMonth: '2026-10-01',
+      helpfulCount: 0,
+      createdAt,
+      ...extra,
+    });
+
+    beforeEach(() => {
+      store.properties[0]!.details = { reviewSummary: 'Khách khen gần biển.' };
+      store.reviewRows.push(
+        review('R1', 5, '2026-10-20T00:00:00.000Z', { tags: ['Gần biển', 'Sạch sẽ'], roomTypeId: 'H1--STD', images: ['dev/thang/images/hotels/a.jpg'], travelerType: 'family' }),
+        review('R2', 4, '2026-10-25T00:00:00.000Z', { tags: ['Gần biển'], helpfulCount: 9 }),
+        review('R3', 2, '2026-10-10T00:00:00.000Z', { tags: [] }),
+        review('R4', 1, '2026-10-30T00:00:00.000Z', { status: 'hidden' }),
+        { ...review('X1', 5, '2026-10-30T00:00:00.000Z'), propertyId: 'H2' },
+      );
+    });
+
+    it('trả thống kê, tóm tắt và trang đánh giá mới nhất trước; bỏ đánh giá đã ẩn và của khách sạn khác', async () => {
+      const res = await request(app.getHttpServer()).get('/api/hotels/H1/reviews').expect(200);
+      expect(res.body.summary).toEqual({
+        average: 3.7,
+        count: 3,
+        distribution: [
+          { rating: 5, count: 1 },
+          { rating: 4, count: 1 },
+          { rating: 3, count: 0 },
+          { rating: 2, count: 1 },
+          { rating: 1, count: 0 },
+        ],
+        tags: [
+          { tag: 'Gần biển', count: 2 },
+          { tag: 'Sạch sẽ', count: 1 },
+        ],
+        aiSummary: 'Khách khen gần biển.',
+      });
+      expect(res.body.items.map((r: { id: string }) => r.id)).toEqual(['R2', 'R1', 'R3']);
+      expect(res.body).toMatchObject({ page: 1, limit: 10, total: 3 });
+      expect(res.body.items[1]).toMatchObject({ room: { productId: 'H1--STD', name: 'Tiêu chuẩn' }, images: ['https://cdn.test/dev/thang/images/hotels/a.jpg'], travelerType: 'family' });
+    });
+
+    it('lọc theo tag, số sao; sắp theo hữu ích; phân trang', async () => {
+      const byTag = await request(app.getHttpServer()).get(`/api/hotels/H1/reviews?tag=${encodeURIComponent('Gần biển')}&sort=helpful`).expect(200);
+      expect(byTag.body.items.map((r: { id: string }) => r.id)).toEqual(['R2', 'R1']);
+      expect(byTag.body.summary.count).toBe(3);
+      const byRating = await request(app.getHttpServer()).get('/api/hotels/H1/reviews?rating=2').expect(200);
+      expect(byRating.body).toMatchObject({ total: 1, items: [{ id: 'R3' }] });
+      const page2 = await request(app.getHttpServer()).get('/api/hotels/H1/reviews?sort=lowest&limit=2&page=2').expect(200);
+      expect(page2.body).toMatchObject({ page: 2, limit: 2, total: 3, items: [{ id: 'R1' }] });
+    });
+
+    it('khách sạn chưa có đánh giá thì thống kê rỗng; không có khách sạn 404; tham số sai 400', async () => {
+      store.reviewRows.length = 0;
+      store.properties[0]!.details = {};
+      const empty = await request(app.getHttpServer()).get('/api/hotels/H1/reviews').expect(200);
+      expect(empty.body).toMatchObject({ summary: { average: null, count: 0, tags: [], aiSummary: null }, items: [], total: 0 });
+      await request(app.getHttpServer()).get('/api/hotels/KHONG-CO/reviews').expect(404);
+      const bad = await request(app.getHttpServer()).get('/api/hotels/H1/reviews?rating=6').expect(400);
+      expect(bad.body.errors[0].field).toBe('rating');
+      await request(app.getHttpServer()).get('/api/hotels/H1/reviews?sort=random').expect(400);
+    });
+  });
+
   it('khách sạn không có thì 404; ngày sai hoặc quá khứ thì 400 kèm tên trường', async () => {
     await request(app.getHttpServer()).get('/api/hotels/KHONG-CO').expect(404);
     const past = await request(app.getHttpServer()).get('/api/hotels/H1?checkIn=2026-11-01').expect(400);
