@@ -15,6 +15,37 @@
         ]
       }
     },
+    "/api/auth/registration-code": {
+      "post": {
+        "operationId": "AuthController_requestRegistrationCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCodeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -3256,6 +3287,36 @@
       }
     },
     "schemas": {
+      "RegistrationCodeDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RegistrationCodeResultDto": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "registrationId"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -3265,19 +3326,29 @@
           },
           "password": {
             "type": "string",
-            "minLength": 8,
+            "minLength": 12,
             "maxLength": 128
           },
           "displayName": {
             "type": "string",
             "maxLength": 50,
             "example": "Khang"
+          },
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$"
           }
         },
         "required": [
           "email",
           "password",
-          "displayName"
+          "displayName",
+          "registrationId",
+          "code"
         ]
       },
       "UserDto": {

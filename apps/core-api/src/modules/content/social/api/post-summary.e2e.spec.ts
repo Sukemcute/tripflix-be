@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from '../../../access/index.js';
+import { registerTestAccount } from '../../../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -150,6 +152,8 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -284,10 +288,7 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
   });
 
   it('token người dùng bị từ chối ở API @ServiceOnly: 401 Unauthorized', async () => {
-    await http()
-      .post('/api/auth/register')
-      .send({ email: 'member@example.com', password: 'mat-khau-an-toan-123', displayName: 'Thành' })
-      .expect(201);
+    await registerTestAccount(app, { email: 'member@example.com', password: 'mat-khau-an-toan-123', displayName: 'Thành' });
 
     const userLogin = await http()
       .post('/api/auth/login')

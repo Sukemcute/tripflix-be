@@ -11,6 +11,8 @@ import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
+import { EmailVerificationUseCases } from './account/application/email-verification.use-cases.js';
+import { seedLegacyAccount } from '../../platform/registration.fixture.js';
 import {
   INVALID_VERIFY_TOKEN_MESSAGE,
   TOO_MANY_RESENDS_MESSAGE,
@@ -27,7 +29,7 @@ import { MemoryActionRateLimiter } from './auth/infra/memory/memory-action-rate-
 import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
 
 const VERIFY_PAGE = 'https://tripflix.example/xac-thuc-email';
-const REGISTER_LIMIT = 30;
+const REGISTER_LIMIT = 5;
 const env = {
   NODE_ENV: 'test',
   AUTH_JWT_ISSUER: 'tripflix-core',
@@ -104,21 +106,19 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
   const tokenOf = (verifyUrl: string) => new URL(verifyUrl).searchParams.get('token')!;
 
   async function signUp(email: string) {
-    const reg = await http()
-      .post('/api/auth/register')
-      .send({ email, password: PASSWORD, displayName: 'Lan' })
-      .expect(201);
+    const user = await seedLegacyAccount(app, { email, password: PASSWORD, displayName: 'Lan' });
+    await app.get(EmailVerificationUseCases).issueInCurrentTransaction(user, 'signup', { ip: '127.0.0.1', userAgent: null });
     const login = await http().post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
-    const events = verificationEvents(reg.body.id);
+    const events = verificationEvents(user.id);
     return {
-      id: reg.body.id as string,
+      id: user.id,
       accessToken: login.body.accessToken as string,
       refreshToken: login.body.refreshToken as string,
       token: tokenOf(events.at(-1)!.verifyUrl),
     };
   }
 
-  it('đăng ký bằng mật khẩu: chưa xác thực, có đúng 1 sự kiện signup với link 24 giờ, token chỉ lưu bản băm', async () => {
+  it('tài khoản cũ chưa xác thực: link 24 giờ và token chỉ lưu bản băm', async () => {
     const before = Date.now();
     const user = await signUp('moi@example.com');
     const events = verificationEvents(user.id);
@@ -141,6 +141,46 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     expect(decodeJwt(user.accessToken).ev).toBe(false);
     const me = await http().get('/api/auth/me').set(as(user.accessToken)).expect(200);
     expect(me.body.emailVerified).toBe(false);
+  });
+
+  it('yêu cầu mã chỉ gửi email, không tạo tài khoản hoặc cho đăng nhập', async () => {
+    const email = 'otp-new@example.com';
+    const credentials = { email, password: PASSWORD, displayName: 'Lan' };
+    await http().post('/api/auth/register').send(credentials).expect(400);
+    for (const password of ['huhuhuhu', 'Password123456', 'aaaaaaaaaaaa']) {
+      const response = await http().post('/api/auth/registration-code').send({ email, password }).expect(400);
+      expect(response.body.errors).toEqual([expect.objectContaining({ field: 'password' })]);
+    }
+    const first = await http().post('/api/auth/registration-code').send(credentials).expect(202);
+    const second = await http().post('/api/auth/registration-code').send(credentials).expect(202);
+    const messages = store.outboxRows.filter((event) => event.type === 'access.registration_code_requested' && event.payload.email === email);
+    expect(messages).toHaveLength(2);
+    const code = messages[1]!.payload.code as string;
+    const payload = { ...credentials, registrationId: second.body.registrationId, code };
+    const wrongCode = code === '00000000' ? '00000001' : '00000000';
+    expect(store.registrationChallengeRows.get(email)?.codeHash).not.toContain(code);
+    expect(await store.users.findByEmail(email)).toBeNull();
+    await http().post('/api/auth/login').send(credentials).expect(401);
+    await http().post('/api/auth/register').send({ ...payload, registrationId: first.body.registrationId }).expect(400);
+    await http().post('/api/auth/register').send({ ...payload, code: wrongCode }).expect(400);
+    await http().post('/api/auth/register').send({ ...payload, email: 'other@example.com' }).expect(400);
+    expect(await store.users.findByEmail(email)).toBeNull();
+    const reg = await http().post('/api/auth/register').send(payload).expect(201);
+    expect(store.userRows.get(reg.body.id)?.emailVerifiedAt).toBeInstanceOf(Date);
+    const login = await http().post('/api/auth/login').send(credentials).expect(200);
+    expect(decodeJwt(login.body.accessToken).ev).toBe(true);
+    await http().post('/api/auth/register').send(payload).expect(400);
+  });
+
+  it('mã đăng ký hết hạn không tạo được tài khoản', async () => {
+    const email = 'otp-expired@example.com';
+    const credentials = { email, password: PASSWORD, displayName: 'Lan' };
+    const requested = await http().post('/api/auth/registration-code').send(credentials).expect(202);
+    const challenge = store.registrationChallengeRows.get(email)!;
+    challenge.expiresAt = new Date(Date.now() - 1);
+    const code = store.outboxRows.find((event) => event.type === 'access.registration_code_requested' && event.payload.email === email)!.payload.code;
+    await http().post('/api/auth/register').send({ ...credentials, code, registrationId: requested.body.registrationId }).expect(400);
+    expect(await store.users.findByEmail(email)).toBeNull();
   });
 
   it('chưa xác thực: API có @RequireVerifiedEmail trả 403 code email_unverified; chưa đăng nhập 401', async () => {
@@ -259,19 +299,19 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     let blocked: request.Response | undefined;
     for (let i = 0; i < REGISTER_LIMIT + 1 && !blocked; i += 1) {
       const res = await http()
-        .post('/api/auth/register')
+        .post('/api/auth/registration-code')
         .send({ email: `hang-loat-${i}@example.com`, password: PASSWORD, displayName: 'Bot' });
       if (res.status === 429) blocked = res;
       else {
-        expect(res.status).toBe(201);
+        expect(res.status).toBe(202);
         created += 1;
       }
     }
     expect(blocked?.body.message).toBe(TOO_MANY_SIGNUPS_MESSAGE);
     expect(Number(blocked?.headers['retry-after'])).toBeGreaterThan(0);
-    expect(created).toBeLessThan(REGISTER_LIMIT);
+    expect(created).toBeLessThanOrEqual(REGISTER_LIMIT);
     const blockedEmail = `hang-loat-${created}@example.com`;
-    expect([...store.userRows.values()].some((u) => u.email === blockedEmail)).toBe(false);
+    expect(store.registrationChallengeRows.has(blockedEmail)).toBe(false);
     // Đăng nhập không bị giới hạn đăng ký chặn.
     await http().post('/api/auth/login').send({ email: 'moi@example.com', password: PASSWORD }).expect(200);
   });

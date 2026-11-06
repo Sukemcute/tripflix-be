@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -59,6 +61,8 @@ describe('access E2E', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter(() => nowMs))
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -76,7 +80,7 @@ describe('access E2E', () => {
   });
 
   async function registerAndLogin(email: string, role?: 'moderator' | 'superadmin') {
-    await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: email }).expect(201);
+    await registerTestAccount(app, { email, password: PASSWORD, displayName: email });
     if (role) {
       const user = [...store.userRows.values()].find((u) => u.email === email)!;
       store.userRows.set(user.id, { ...user, role });
@@ -86,18 +90,14 @@ describe('access E2E', () => {
   }
 
   it('đăng ký → đăng nhập → /auth/me → làm mới → đăng xuất → token cũ bị từ chối', async () => {
-    const reg = await http()
-      .post('/api/auth/register')
-      .send({ email: 'Khang@Example.com', password: PASSWORD, displayName: 'Khang', role: 'superadmin' })
-      .expect(201);
+    const reg = await registerTestAccount(app, { email: 'Khang@Example.com', password: PASSWORD, displayName: 'Khang', role: 'superadmin' });
     expect(reg.body).toMatchObject({ email: 'khang@example.com', role: 'member' });
     expect(reg.body).not.toHaveProperty('passwordHash');
     expect(store.userRows.get(reg.body.id)!.passwordHash).toMatch(/^\$argon2id\$/);
     // Đăng ký ghi đúng 2 sự kiện: access.user.registered (cho mọi module, không có email) và yêu cầu gửi email
-    // xác thực kèm lời chào (chỉ notification-service dùng, có email vì cần người nhận).
+    // chào mừng (chỉ notification-service dùng, có email vì cần người nhận).
     const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
-    // TF05D: đăng ký bằng mật khẩu gửi email xác thực (gộp lời chào), không gửi email chào mừng riêng.
-    expect(events.map((e) => e.type)).toEqual(['access.user.registered', 'access.email_verification_requested']);
+    expect(events.map((e) => e.type)).toEqual(['access.user.registered', 'access.user.welcome_email_requested']);
     expect(events[0]).toMatchObject({
       type: 'access.user.registered',
       version: 1,
@@ -105,15 +105,14 @@ describe('access E2E', () => {
       payload: { userId: reg.body.id, displayName: 'Khang' },
     });
     expect(JSON.stringify(events[0]!.payload)).not.toContain('@');
-    expect(events[1]!.payload).toMatchObject({ userId: reg.body.id, email: 'khang@example.com', displayName: 'Khang', reason: 'signup' });
-    expect((events[1]!.payload as { verifyUrl: string }).verifyUrl).toMatch(/\/xac-thuc-email\?token=[A-Za-z0-9_-]{40,}$/);
+    expect(events[1]!.payload).toMatchObject({ userId: reg.body.id, email: 'khang@example.com', displayName: 'Khang', provider: 'password' });
 
     const login = await http().post('/api/auth/login').send({ email: 'khang@example.com', password: PASSWORD }).expect(200);
     expect(login.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
     const { accessToken, refreshToken } = login.body as { accessToken: string; refreshToken: string };
 
     const me = await http().get('/api/auth/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
-    expect(me.body).toMatchObject({ id: reg.body.id, email: 'khang@example.com', role: 'member', emailVerified: false });
+    expect(me.body).toMatchObject({ id: reg.body.id, email: 'khang@example.com', role: 'member', emailVerified: true });
 
     const refreshed = await http().post('/api/auth/refresh').send({ refreshToken }).expect(200);
     expect(refreshed.body.refreshToken).not.toBe(refreshToken);
@@ -141,7 +140,7 @@ describe('access E2E', () => {
     });
     expect(decodeProtectedHeader(accessToken)).toMatchObject({ alg: 'ES256', kid: jwks.body.keys[0].kid });
     expect(Object.keys(payload).sort()).toEqual(['aud', 'ev', 'exp', 'iat', 'iss', 'role', 'sid', 'sub']);
-    expect(payload.ev).toBe(false);
+    expect(payload.ev).toBe(true);
     expect(payload.exp! - payload.iat!).toBe(900);
   });
 
@@ -199,7 +198,7 @@ describe('access E2E', () => {
   it('kiểm dữ liệu đăng ký và chặn email trùng', async () => {
     await http().post('/api/auth/register').send({ email: 'khong-phai-email', password: PASSWORD, displayName: 'A' }).expect(400);
     await http().post('/api/auth/register').send({ email: 'ngan@example.com', password: '123', displayName: 'A' }).expect(400);
-    await http().post('/api/auth/register').send({ email: 'dup@example.com', password: PASSWORD, displayName: 'A' }).expect(201);
-    await http().post('/api/auth/register').send({ email: 'DUP@example.com', password: PASSWORD, displayName: 'B' }).expect(409);
+    await registerTestAccount(app, { email: 'dup@example.com', password: PASSWORD, displayName: 'A' });
+    await registerTestAccount(app, { email: 'DUP@example.com', password: PASSWORD, displayName: 'B' }, 409);
   });
 });

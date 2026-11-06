@@ -199,6 +199,13 @@ export const AccessEmailVerificationRequestedV1Schema = z.object({
 });
 export type AccessEmailVerificationRequestedV1 = z.infer<typeof AccessEmailVerificationRequestedV1Schema>;
 
+export const AccessRegistrationCodeRequestedV1Schema = z.object({
+  email: z.email(),
+  code: z.string().regex(/^[0-9]{8}$/),
+  expiresAt: z.iso.datetime(),
+});
+export type AccessRegistrationCodeRequestedV1 = z.infer<typeof AccessRegistrationCodeRequestedV1Schema>;
+
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
   assetId: z.uuid(),
@@ -237,4 +244,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
   'access.user.welcome_email_requested.v1': AccessUserWelcomeEmailRequestedV1Schema,
   'access.email_verification_requested.v1': AccessEmailVerificationRequestedV1Schema,
+  'access.registration_code_requested.v1': AccessRegistrationCodeRequestedV1Schema,
 };

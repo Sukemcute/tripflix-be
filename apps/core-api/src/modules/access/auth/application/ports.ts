@@ -187,7 +187,22 @@ export interface AccessOutbox {
 }
 
 /** Truy cập dữ liệu của access. Transaction do @Transactional('access') ở use case mở, repository tự dùng. */
+export interface RegistrationChallenge {
+  email: string;
+  id: string;
+  codeHash: string;
+  expiresAt: Date;
+}
+
+export interface RegistrationChallengeRepository {
+  save(challenge: RegistrationChallenge): Promise<void>;
+  findUsable(email: string, id: string, now: Date): Promise<RegistrationChallenge | null>;
+  consume(email: string, id: string, now: Date): Promise<boolean>;
+  deleteExpired(before: Date): Promise<number>;
+}
+
 export interface AccessStore {
+  registrationChallenges: RegistrationChallengeRepository;
   users: UserRepository;
   sessions: SessionRepository;
   audit: AuditLog;

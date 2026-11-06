@@ -1,14 +1,15 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserGuestMergedV1,
+  AccessRegistrationCodeRequestedV1,
   AccessUserRegisteredV1,
   AccessUserWelcomeEmailRequestedV1,
 } from '@tripflix/contracts';
 import { Transactional } from '@tripflix/db';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
-import { EmailVerificationUseCases } from '../../account/application/email-verification.use-cases.js';
 import {
   DEFAULT_REGISTER_MAX_PER_IP,
   REGISTER_WINDOW_SECONDS,
@@ -25,6 +26,7 @@ import {
   normalizeEmail,
 } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
+import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_TTL_MS } from '../domain/registration.js';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TTL_MS,
@@ -69,7 +71,6 @@ export interface TokenPair {
  */
 @Injectable()
 export class AuthUseCases {
-  private readonly logger = new Logger('AuthUseCases');
   private dummyHash?: Promise<string>;
   private readonly registerMaxPerIp: number;
 
@@ -82,28 +83,56 @@ export class AuthUseCases {
     @Inject(CLOCK) private readonly now: Clock,
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleIdTokenVerifier,
     @Inject(ACTION_RATE_LIMITER) private readonly actionLimiter: ActionRateLimiter,
-    @Inject(EmailVerificationUseCases) private readonly emailVerification: EmailVerificationUseCases,
     @Inject(CORE_ENV) env: CoreEnv,
   ) {
     // E2E dựng env tay có thể thiếu biến này: dùng mặc định như khi parse env.
     this.registerMaxPerIp = (env.AUTH_REGISTER_MAX_PER_IP_HOUR as number | undefined) ?? DEFAULT_REGISTER_MAX_PER_IP;
   }
 
-  async register(input: { email: string; password: string; displayName: string }, meta: RequestMeta): Promise<PublicUser> {
+  async requestRegistrationCode(address: string, meta: RequestMeta): Promise<string> {
+    const email = normalizeEmail(address);
+    await this.checkRegistrationLimit(
+      [`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
+      [`register:email:${email}`, 3, REGISTER_WINDOW_SECONDS],
+    );
+    const id = randomUUID();
+    if (await this.store.users.findByEmail(email)) return id;
+
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    await this.saveRegistrationCode(email, id, code, await this.hasher.hash(code));
+    return id;
+  }
+
+  @Transactional('access')
+  private async saveRegistrationCode(email: string, id: string, code: string, codeHash: string): Promise<void> {
+    const expiresAt = new Date(this.now().getTime() + REGISTRATION_CODE_TTL_MS);
+    await this.store.registrationChallenges.save({ email, id, codeHash, expiresAt });
+    const payload: AccessRegistrationCodeRequestedV1 = { email, code, expiresAt: expiresAt.toISOString() };
+    await this.store.outbox.add({ type: 'access.registration_code_requested', userId: id, payload });
+  }
+
+  async register(input: { email: string; password: string; displayName: string; registrationId: string; code: string }, meta: RequestMeta): Promise<PublicUser> {
     const email = normalizeEmail(input.email);
-    // Chống tạo tài khoản hàng loạt (TF05D): đếm theo IP trước khi băm argon2, tính cả lần trùng email.
-    // Redis lỗi thì vẫn cho đăng ký (gateway vẫn giới hạn theo IP), chỉ ghi cảnh báo.
-    const limit = await this.actionLimiter
-      .consume(`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS)
-      .catch((err: unknown) => {
-        this.logger.warn({ err }, 'Không đếm được số lần đăng ký theo IP, bỏ qua giới hạn lần này');
-        return null;
-      });
-    if (limit?.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, limit.retryAfterSeconds);
+    await this.checkRegistrationLimit(
+      [`register-code:ip:${meta.ip}`, 30, 600],
+      [`register-code:id:${input.registrationId}`, 5, 600],
+    );
+    const challenge = await this.store.registrationChallenges.findUsable(email, input.registrationId, this.now());
+    if (!challenge || !(await this.hasher.verify(challenge.codeHash, input.code))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
     const passwordHash = await this.hasher.hash(input.password);
-    const user = await this.createMember({ email, passwordHash, displayName: input.displayName.trim() }, meta);
-    if (!user) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
+    const user = await this.createVerifiedMember(
+      { email, passwordHash, displayName: input.displayName.trim(), registrationId: input.registrationId },
+      meta,
+    );
     return mapPublicUser(user);
+  }
+
+  private async checkRegistrationLimit(...keys: [key: string, max: number, seconds: number][]): Promise<void> {
+    const results = await Promise.all(keys.map(([key, max, seconds]) => this.actionLimiter.consume(key, max, seconds)));
+    const blocked = results.find((result) => result.isBlocked);
+    if (blocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, blocked.retryAfterSeconds);
   }
 
   async login(
@@ -192,21 +221,26 @@ export class AuthUseCases {
     return mapMyProfile(user);
   }
 
-  /** Đăng ký công khai luôn là member; nhân viên do superadmin cấp. Trả null khi email đã có. */
+  /** Tiêu mã và tạo tài khoản trong cùng transaction. */
   @Transactional('access')
-  private async createMember(
-    input: { email: string; passwordHash: string; displayName: string },
+  private async createVerifiedMember(
+    input: { email: string; passwordHash: string; displayName: string; registrationId: string },
     meta: RequestMeta,
-  ): Promise<UserRecord | null> {
-    const created = await this.insertMember(input, meta, 'password');
-    if (created) await this.addGuestMerged(created.id, meta);
+  ): Promise<UserRecord> {
+    const { registrationId, ...credentials } = input;
+    if (!(await this.store.registrationChallenges.consume(input.email, registrationId, this.now()))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
+    const created = await this.insertMember(credentials, meta, 'password');
+    if (!created) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
+    await this.addGuestMerged(created.id, meta);
     return created;
   }
 
   /**
    * Thêm member, phát access.user.registered và yêu cầu gửi email; gọi trong transaction đang mở,
    * nên tài khoản không tạo được (email trùng, rollback) thì không có email.
-   * Mật khẩu: email chào mừng gộp link xác thực (TF05D). Google: email do Google xác minh, chỉ gửi chào mừng.
+   * Chỉ gọi sau khi xác thực email bằng mã đăng ký hoặc danh tính Google.
    */
   private async insertMember(
     input: { email: string; passwordHash: string | null; displayName: string },
@@ -216,16 +250,12 @@ export class AuthUseCases {
     const created = await this.store.users.insert({
       ...input,
       role: 'member',
-      emailVerifiedAt: provider === 'google' ? this.now() : null,
+      emailVerifiedAt: this.now(),
     });
     if (!created) return null;
     await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
     const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
     await this.store.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
-    if (provider === 'password') {
-      await this.emailVerification.issueInCurrentTransaction(created, 'signup', meta);
-      return created;
-    }
     const welcome: AccessUserWelcomeEmailRequestedV1 = {
       userId: created.id,
       email: created.email,

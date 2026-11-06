@@ -7,6 +7,7 @@ import {
   auditLogs,
   emailVerifications,
   passwordResets,
+  registrationChallenges,
   serviceClients,
   sessions,
   userIdentities,
@@ -23,6 +24,8 @@ import type {
   NewSession,
   OneTimeTokenRepository,
   ProfilePatch,
+  RegistrationChallenge,
+  RegistrationChallengeRepository,
   SessionRecord,
   SessionRepository,
   ServiceClientRecord,
@@ -327,6 +330,38 @@ class DrizzleOneTimeTokenRepository implements OneTimeTokenRepository {
   }
 }
 
+class DrizzleRegistrationChallenges implements RegistrationChallengeRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  async save(challenge: RegistrationChallenge) {
+    await this.getDb().insert(registrationChallenges).values(challenge).onConflictDoUpdate({
+      target: registrationChallenges.email,
+      set: { id: challenge.id, codeHash: challenge.codeHash, expiresAt: challenge.expiresAt },
+    });
+  }
+
+  async findUsable(email: string, id: string, now: Date) {
+    const [row] = await this.getDb().select().from(registrationChallenges).where(this.usable(email, id, now));
+    return row ?? null;
+  }
+
+  async consume(email: string, id: string, now: Date) {
+    const [row] = await this.getDb().delete(registrationChallenges).where(this.usable(email, id, now))
+      .returning({ id: registrationChallenges.id });
+    return row !== undefined;
+  }
+
+  async deleteExpired(before: Date) {
+    const rows = await this.getDb().delete(registrationChallenges).where(lt(registrationChallenges.expiresAt, before))
+      .returning({ id: registrationChallenges.id });
+    return rows.length;
+  }
+
+  private usable(email: string, id: string, now: Date) {
+    return and(eq(registrationChallenges.email, email), eq(registrationChallenges.id, id), gt(registrationChallenges.expiresAt, now));
+  }
+}
+
 class DrizzleAuditLog implements AuditLog {
   constructor(private readonly getDb: () => Db) {}
 
@@ -355,6 +390,7 @@ export const ACCESS_EVENT_PRODUCER = 'core-api/access';
  * nếu đang mở); ở CLI, test là `() => db`.
  */
 export class DrizzleAccessStore implements AccessStore {
+  readonly registrationChallenges: RegistrationChallengeRepository;
   readonly users: UserRepository;
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
@@ -365,6 +401,7 @@ export class DrizzleAccessStore implements AccessStore {
   readonly identities: UserIdentityRepository;
 
   constructor(getDb: () => Db) {
+    this.registrationChallenges = new DrizzleRegistrationChallenges(getDb);
     this.users = new DrizzleUserRepository(getDb);
     this.sessions = new DrizzleSessionRepository(getDb);
     this.audit = new DrizzleAuditLog(getDb);

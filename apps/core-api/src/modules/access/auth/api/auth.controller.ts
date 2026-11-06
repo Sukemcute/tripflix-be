@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res, UseFilters } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiAcceptedResponse,
   ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -22,6 +23,9 @@ import {
   LoginDto,
   RefreshDto,
   RegisterDto,
+  RegistrationCodeDto,
+  RegistrationCodeResultDto,
+  RegistrationCodeRequestSchema,
   TokenPairDto,
   MyProfileDto,
   UserDto,
@@ -49,6 +53,18 @@ export class AuthController {
     @Inject(AuthUseCases) private readonly auth: AuthUseCases,
     @Inject(WebSession) private readonly web: WebSession,
   ) {}
+
+  @Post('registration-code')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBody({ type: RegistrationCodeDto })
+  @ApiAcceptedResponse({ type: RegistrationCodeResultDto })
+  async requestRegistrationCode(
+    @Body(new ZodBody(RegistrationCodeRequestSchema)) body: z.infer<typeof RegistrationCodeRequestSchema>,
+    @Req() req: Request,
+  ): Promise<RegistrationCodeResultDto> {
+    const registrationId = await this.auth.requestRegistrationCode(body.email, readRequestMeta(req));
+    return { registrationId };
+  }
 
   @Post('register')
   @ApiBody({ type: RegisterDto })

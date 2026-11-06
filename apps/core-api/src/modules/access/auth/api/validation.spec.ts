@@ -53,6 +53,8 @@ const register = (patch: Record<string, unknown>) => ({
   email: 'lan@example.com',
   password: PASSWORD,
   displayName: 'Lan',
+  registrationId: '9784c96c-801f-4d05-b8ee-a6284bcf1935',
+  code: '48162357',
   ...patch,
 });
 
@@ -65,11 +67,13 @@ describe('TF05C: câu lỗi chung (accessErrorMap)', () => {
     }
   });
 
-  it('thiếu từng trường bắt buộc: "Thiếu trường này", báo đủ cả ba trường', () => {
+  it('thiếu từng trường bắt buộc: "Thiếu trường này", báo đủ các trường', () => {
     expect(errors(RegisterRequestSchema, {})).toEqual([
       { field: 'email', message: 'Thiếu trường này' },
       { field: 'password', message: 'Thiếu trường này' },
       { field: 'displayName', message: 'Thiếu trường này' },
+      { field: 'registrationId', message: 'Yêu cầu gửi mã xác thực email trước khi đăng ký' },
+      { field: 'code', message: 'Thiếu trường này' },
     ]);
   });
 
@@ -152,22 +156,22 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
   });
 
   describe('password', () => {
-    it('8 ký tự nhận, 7 từ chối; 128 nhận, 129 từ chối', () => {
-      expect(ok(RegisterRequestSchema, register({ password: '12345678' })).password).toBe('12345678');
-      expect(onlyError(RegisterRequestSchema, register({ password: '1234567' }), 'password')).toBe(
-        'Mật khẩu cần ít nhất 8 ký tự',
+    it('12 ký tự nhận, 11 từ chối; 128 nhận, 129 từ chối', () => {
+      expect(ok(RegisterRequestSchema, register({ password: 'tuyet-cuoi-9' })).password).toBe('tuyet-cuoi-9');
+      expect(onlyError(RegisterRequestSchema, register({ password: 'tuyet-cuoi-' }), 'password')).toBe(
+        'Mật khẩu cần ít nhất 12 ký tự',
       );
-      expect(ok(RegisterRequestSchema, register({ password: 'x'.repeat(128) })).password).toHaveLength(128);
+      expect(ok(RegisterRequestSchema, register({ password: 'x'.repeat(126) + '1Y' })).password).toHaveLength(128);
       expect(onlyError(RegisterRequestSchema, register({ password: 'x'.repeat(129) }), 'password')).toBe(
         'Mật khẩu tối đa 128 ký tự',
       );
     });
 
     it.each([
-      ['8 dấu cách', ' '.repeat(8)],
-      ['tab và xuống dòng', '\t\n\t\n\t\n\t\n'],
-      ['dấu cách không ngắt', NBSP.repeat(8)],
-      ['ký tự zero-width', ZWSP.repeat(8)],
+      ['12 dấu cách', ' '.repeat(12)],
+      ['tab và xuống dòng', '\t\n'.repeat(6)],
+      ['dấu cách không ngắt', NBSP.repeat(12)],
+      ['ký tự zero-width', ZWSP.repeat(12)],
     ])('từ chối mật khẩu chỉ có khoảng trắng (%s)', (_, password) => {
       expect(onlyError(RegisterRequestSchema, register({ password }), 'password')).toBe(
         'Mật khẩu không được chỉ có khoảng trắng',
@@ -175,16 +179,16 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
     });
 
     it('giữ nguyên mật khẩu: không cắt khoảng trắng hai đầu, nhận tiếng Việt và emoji', () => {
-      expect(ok(RegisterRequestSchema, register({ password: '  mat khau  ' })).password).toBe('  mat khau  ');
-      expect(ok(RegisterRequestSchema, register({ password: 'mậtkhẩuViệt' })).password).toBe('mậtkhẩuViệt');
-      expect(ok(RegisterRequestSchema, register({ password: EMOJI.repeat(8) })).password).toBe(
-        EMOJI.repeat(8),
+      expect(ok(RegisterRequestSchema, register({ password: '  song tren nui  ' })).password).toBe('  song tren nui  ');
+      expect(ok(RegisterRequestSchema, register({ password: 'mậtkhẩuViệtNam' })).password).toBe('mậtkhẩuViệtNam');
+      expect(ok(RegisterRequestSchema, register({ password: EMOJI + 'song-tren-nui' })).password).toBe(
+        EMOJI + 'song-tren-nui',
       );
     });
 
     it('độ dài đếm theo ký tự Unicode: mỗi emoji tính 1 ký tự (không phải 2 đơn vị UTF-16)', () => {
-      expect(onlyError(RegisterRequestSchema, register({ password: EMOJI.repeat(7) }), 'password')).toBe(
-        'Mật khẩu cần ít nhất 8 ký tự',
+      expect(onlyError(RegisterRequestSchema, register({ password: EMOJI.repeat(11) }), 'password')).toBe(
+        'Mật khẩu cần ít nhất 12 ký tự',
       );
       expect(ok(RegisterRequestSchema, register({ displayName: EMOJI.repeat(50) })).displayName).toBe(
         EMOJI.repeat(50),
@@ -196,7 +200,7 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
 
     it('mật khẩu ngắn chỉ báo một lỗi (không kèm lỗi khoảng trắng)', () => {
       expect(errors(RegisterRequestSchema, register({ password: '   ' }))).toEqual([
-        { field: 'password', message: 'Mật khẩu cần ít nhất 8 ký tự' },
+        { field: 'password', message: 'Mật khẩu cần ít nhất 12 ký tự' },
       ]);
     });
   });
@@ -260,12 +264,12 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
       RegisterRequestSchema,
       register({ role: 'superadmin', status: 'active', id: 'x', passwordHash: 'y' }),
     );
-    expect(Object.keys(data).sort()).toEqual(['displayName', 'email', 'password']);
+    expect(Object.keys(data).sort()).toEqual(['code', 'displayName', 'email', 'password', 'registrationId']);
   });
 
   it('nhiều trường sai cùng lúc: báo đủ từng trường', () => {
     expect(
-      errors(RegisterRequestSchema, { email: 'x', password: '1', displayName: '' }).map((e) => e.field),
+      errors(RegisterRequestSchema, register({ email: 'x', password: '1', displayName: '' })).map((e) => e.field),
     ).toEqual(['email', 'password', 'displayName']);
   });
 });

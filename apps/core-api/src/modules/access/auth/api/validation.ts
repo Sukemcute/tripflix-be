@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
+import { isCommonRegistrationPassword, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
 import {
   DEVICE_NAME_MAX,
   DISPLAY_NAME_MAX,
@@ -70,16 +71,27 @@ export const lookupEmailField = () =>
   z.string().trim().min(1, 'Nhập email').max(254, 'Email tối đa 254 ký tự');
 
 /** Mật khẩu mới (đăng ký, đổi, đặt lại): 8–128 ký tự, không được chỉ có khoảng trắng. Không cắt khoảng trắng. */
-export const newPasswordField = () =>
+export const newPasswordField = (min = PASSWORD_MIN) =>
   z
     .string()
-    .min(PASSWORD_MIN, `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`)
+    .min(min, `Mật khẩu cần ít nhất ${min} ký tự`)
     .max(PASSWORD_MAX, `Mật khẩu tối đa ${PASSWORD_MAX} ký tự`)
     .refine(hasVisibleChar, { message: 'Mật khẩu không được chỉ có khoảng trắng', ...whenValid });
 
 /** Mật khẩu đang dùng: chỉ cần có, để tài khoản tạo trước quy tắc mới vẫn đăng nhập được. */
 export const currentPasswordField = () =>
   z.string().min(1, 'Nhập mật khẩu').max(PASSWORD_MAX, `Mật khẩu tối đa ${PASSWORD_MAX} ký tự`);
+
+export const registrationPasswordField = () =>
+  newPasswordField(REGISTRATION_PASSWORD_MIN)
+    .refine((value) => Array.from(value).length >= REGISTRATION_PASSWORD_MIN, {
+      message: `Mật khẩu cần ít nhất ${REGISTRATION_PASSWORD_MIN} ký tự`,
+      ...whenValid,
+    })
+    .refine((value) => !isCommonRegistrationPassword(value), {
+      message: 'Mật khẩu quá phổ biến hoặc dễ đoán. Hãy chọn mật khẩu khác.',
+      ...whenValid,
+    });
 
 /** Tên hiển thị: chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–50 ký tự, một dòng, có ít nhất một ký tự nhìn thấy. */
 export const displayNameField = () =>

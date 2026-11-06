@@ -17,7 +17,8 @@
 
 | API | Ai gọi | Kết quả |
 |---|---|---|
-| `POST /api/auth/register` `{ email, password, displayName }` | Ai cũng được | `201` người dùng. Luôn là `member`, trường `role` gửi lên bị bỏ qua. Email trùng: `409`. Chưa xác thực email, nhận email chào mừng kèm link xác thực. Quá `AUTH_REGISTER_MAX_PER_IP_HOUR` (mặc định 5) lần mỗi giờ theo IP: `429` |
+| `POST /api/auth/registration-code` `{ email, password }` | Ai cũng được | `202 { registrationId }`. Gửi mã khi email có thể đăng ký. Chưa tạo người dùng hay phiên đăng nhập. Quá giới hạn gửi mã trả `429` |
+| `POST /api/auth/register` `{ email, password, displayName, registrationId, code }` | Ai cũng được | `201` người dùng `member` có email đã xác thực. Thiếu mã, mã sai, hết hạn hoặc đã dùng trả `400`. Email được dùng bởi tài khoản khác trong lúc đăng ký trả `409` |
 | `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
@@ -159,8 +160,9 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 | `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên, hoặc chỉ đổi thông tin cá nhân thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
 | `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
-| `access.user.welcome_email_requested` v1 | Lần đầu đăng nhập Google tạo tài khoản mới (đăng nhập lại, liên kết Google vào tài khoản có sẵn thì không). Từ TF05D, đăng ký bằng mật khẩu không phát sự kiện này | `{ userId, email, displayName, provider }`. Có email vì `notification-service` cần người nhận; chỉ `notification-service` dùng |
-| `access.email_verification_requested` v1 (TF05D) | Đăng ký bằng mật khẩu (`reason: "signup"`, email gộp lời chào) hoặc người dùng bấm gửi lại (`reason: "resend"`) | `{ userId, email, displayName, verifyUrl, expiresAt, reason }`. `verifyUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
+| `access.user.welcome_email_requested` v1 | Đã tạo tài khoản bằng mã đăng ký hoặc lần đầu qua Google | `{ userId, email, displayName, provider }`. Chỉ `notification-service` dùng |
+| `access.registration_code_requested` v1 | Người dùng yêu cầu mã đăng ký | `{ email, code, expiresAt }`. Chỉ `notification-service` dùng |
+| `access.email_verification_requested` v1 (TF05D) | Tài khoản cũ chưa xác thực yêu cầu gửi link | `{ userId, email, displayName, verifyUrl, expiresAt, reason }`. Chỉ `notification-service` dùng |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 
 ## Job dọn dẹp
@@ -184,7 +186,7 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_WEB_ORIGINS` | `http://localhost:3100,http://localhost:3200` | Origin của web, admin: CORS và chống CSRF cho cookie. Mỗi phần tử là origin đầy đủ, không có `/` cuối |
 | `AUTH_PASSWORD_RESET_URL` | `http://localhost:3100/dat-lai-mat-khau` | Trang đặt lại mật khẩu của web. Link trong email là địa chỉ này kèm `?token=...` |
 | `AUTH_EMAIL_VERIFY_URL` | `http://localhost:3100/xac-thuc-email` | Trang xác thực email của web. Link trong email là địa chỉ này kèm `?token=...` |
-| `AUTH_REGISTER_MAX_PER_IP_HOUR` | `5` | Số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ. Máy dev, CI chạy e2e đặt cao (`.env.example`, `compose.yaml`: 1000) |
+| `AUTH_REGISTER_MAX_PER_IP_HOUR` | `5` | Số yêu cầu gửi mã đăng ký mỗi IP mỗi giờ. Máy dev, CI chạy e2e có thể đặt cao hơn |
 | `GOOGLE_CLIENT_IDS` | trống | OAuth Client ID (Web, Android, iOS) trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google (`503`) |
 | `GOOGLE_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` | Khoá công khai của Google. Test đổi sang server JWKS giả |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |
@@ -243,7 +245,8 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 | --- | --- |
 | Email đăng ký | Cắt khoảng trắng hai đầu rồi kiểm định dạng, tối đa 254 ký tự; lưu chữ thường |
 | Email đăng nhập, quên mật khẩu | Chỉ cần có (cắt khoảng trắng), không kiểm định dạng: sai thì nhận câu trả lời chung, không lộ email nào đã đăng ký |
-| Mật khẩu mới (đăng ký, đổi, đặt lại) | 8–128 ký tự, có ít nhất một ký tự không phải khoảng trắng (khoảng trắng gồm cả dấu cách không ngắt, zero-width). Không cắt khoảng trắng |
+| Mật khẩu mới khi đăng ký | 12–128 ký tự, chặn một số mật khẩu phổ biến, chuỗi số dễ đoán và mẫu lặp đơn giản |
+| Mật khẩu khi đổi hoặc đặt lại | 8–128 ký tự và có ít nhất một ký tự nhìn thấy |
 | Mật khẩu hiện tại (đăng nhập, đổi mật khẩu) | 1–128 ký tự, để tài khoản tạo trước TF05C vẫn đăng nhập được |
 | Tên hiển thị | Chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–50 ký tự, một dòng (không có xuống dòng, tab, ký tự điều khiển), có ít nhất một ký tự nhìn thấy. Không lọc HTML: web, app tự escape khi hiển thị. Tên lấy từ Google được làm sạch theo cùng quy tắc (`buildDisplayName`) |
 | Tên thiết bị | Ký tự điều khiển đổi thành dấu cách, tối đa 100 ký tự; trống thì lưu `null` |
@@ -254,9 +257,10 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 
 ## Xác thực email (TF05D)
 
-- Tài khoản đăng ký bằng mật khẩu bắt đầu ở trạng thái chưa xác thực (`users.email_verified_at` trống). Đã xác thực khi: bấm link trong email, đặt lại mật khẩu qua email, hoặc đăng nhập Google. Migration `20261106032708_add_email_verifications` đánh dấu tài khoản đã liên kết Google là đã xác thực; tài khoản chỉ có mật khẩu tạo trước đó phải xác thực lại. `pnpm db:seed` đánh dấu 3 tài khoản mẫu `@tripflix.local` (không nhận được thư).
+- Đăng ký bằng mật khẩu yêu cầu mã 8 chữ số, hiệu lực 10 phút. Gửi lại thay mã cũ. Backend tạo người dùng và tiêu mã trong cùng transaction. Tài khoản mới có `email_verified_at` ngay khi được tạo.
+- Tài khoản cũ chưa xác thực vẫn dùng link, đặt lại mật khẩu qua email hoặc đăng nhập Google để xác thực. Ba tài khoản mẫu `@tripflix.local` được seed với email đã xác thực.
 - Link dùng một lần và có hiệu lực 24 giờ. Bảng `email_verifications` lưu bản băm SHA-256 của token 256 bit. Khi gửi lại, link cũ hết hiệu lực. Các thao tác gửi lại và xác thực cùng khóa theo người dùng để xử lý tuần tự.
 - Access token có claim `ev` (true/false), đọc lại từ database mỗi lần cấp (đăng nhập, refresh). Tạo bản nháp, đăng bài và tạo bình luận yêu cầu `@RequireVerifiedEmail()` của `@tripflix/auth`. Nếu email chưa xác thực, API trả `403` với mã `email_unverified`. Phiên đã đăng nhập cần làm mới access token sau khi xác thực.
-- Đăng ký bằng mật khẩu giới hạn theo IP (`AUTH_REGISTER_MAX_PER_IP_HOUR`, Redis). Redis lỗi thì vẫn cho đăng ký, ghi cảnh báo; gateway vẫn giới hạn `POST /api/auth/register` 30 lần mỗi phút theo IP.
+- Redis giới hạn yêu cầu gửi mã theo IP và địa chỉ email, đồng thời giới hạn thử mã theo IP và mã yêu cầu. Dịch vụ từ chối xử lý khi không đọc được bộ giới hạn.
 - Audit: `auth.email_verification_requested` (`meta.reason`), `auth.email_verified` (`meta.via`: `link`, `google`).
 - Gửi email thật trên server: `deploy/SERVER.md`, Giai đoạn 4 (Amazon SES).

@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -61,6 +63,8 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -77,7 +81,7 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
   });
 
   async function register(email: string) {
-    await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: 'Web' }).expect(201);
+    await registerTestAccount(app, { email, password: PASSWORD, displayName: 'Web' });
   }
 
   async function webLogin(email: string) {

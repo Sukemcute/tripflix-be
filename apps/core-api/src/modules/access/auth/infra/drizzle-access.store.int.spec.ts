@@ -179,7 +179,7 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     await db.update(accessOutboxEvents).set({ publishedAt: published(PUBLISHED_EVENT_RETENTION_MS + DAY) }).where(eq(accessOutboxEvents.id, oldId));
     await db.update(accessOutboxEvents).set({ publishedAt: published(DAY) }).where(eq(accessOutboxEvents.id, recentId));
 
-    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, registrationChallenges: store.registrationChallenges, db, now });
     // Phiên hết hạn của các test trước cũng bị dọn, nên chỉ kiểm tối thiểu.
     expect(result.expiredSessions).toBeGreaterThanOrEqual(1);
     expect(result.publishedEvents).toBe(1);
@@ -193,10 +193,11 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(leftEvents.map((r) => r.id).sort()).toEqual([recentId, pendingId].sort());
 
     // Chạy lại không còn gì để dọn.
-    expect(await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now })).toEqual({
+    expect(await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, registrationChallenges: store.registrationChallenges, db, now })).toEqual({
       expiredSessions: 0,
       expiredPasswordResets: 0,
       expiredEmailVerifications: 0,
+      expiredRegistrationChallenges: 0,
       publishedEvents: 0,
     });
   });
@@ -340,7 +341,7 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.passwordResets.deleteUnusedByUser(user!.id)).toBe(1);
 
     await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-expired', expiresAt: new Date(now.getTime() - 1000) });
-    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, registrationChallenges: store.registrationChallenges, db, now });
     expect(result.expiredPasswordResets).toBeGreaterThanOrEqual(1);
     const left = await db.select({ tokenHash: passwordResets.tokenHash }).from(passwordResets).where(eq(passwordResets.userId, user!.id));
     expect(left.map((r) => r.tokenHash)).toEqual(['hash-used']);

@@ -1,22 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ROLES, type Role } from '@tripflix/contracts';
 import { z } from 'zod';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
+import { PASSWORD_MAX } from '../domain/credentials.js';
+import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_PATTERN, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
 import {
   currentPasswordField,
   deviceNameField,
   displayNameField,
   lookupEmailField,
-  newPasswordField,
+  registrationPasswordField,
   signupEmailField,
 } from './validation.js';
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
 // Trường lạ (như role) bị bỏ đi, nên không ai tự cấp quyền khi đăng ký.
-export const RegisterRequestSchema = z.object({
+export const RegistrationCodeRequestSchema = z.object({
   email: signupEmailField(),
-  password: newPasswordField(),
+  password: registrationPasswordField(),
+});
+
+export const RegisterRequestSchema = RegistrationCodeRequestSchema.extend({
   displayName: displayNameField(),
+  registrationId: z.uuid('Yêu cầu gửi mã xác thực email trước khi đăng ký'),
+  code: z.string().regex(REGISTRATION_CODE_PATTERN, INVALID_REGISTRATION_CODE),
 });
 
 export const LoginRequestSchema = z.object({
@@ -43,10 +49,19 @@ export class GoogleLoginDto {
   @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
 }
 
-export class RegisterDto {
+export class RegistrationCodeDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;
+  @ApiProperty({ minLength: REGISTRATION_PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;
+}
+
+export class RegistrationCodeResultDto {
+  @ApiProperty({ format: 'uuid' }) registrationId!: string;
+}
+
+export class RegisterDto extends RegistrationCodeDto {
   @ApiProperty({ maxLength: 50, example: 'Khang' }) displayName!: string;
+  @ApiProperty({ format: 'uuid' }) registrationId!: string;
+  @ApiProperty({ pattern: REGISTRATION_CODE_PATTERN.source }) code!: string;
 }
 
 export class LoginDto {

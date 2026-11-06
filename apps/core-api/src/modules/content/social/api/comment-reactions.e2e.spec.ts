@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from '../../../access/index.js';
+import { registerTestAccount, seedLegacyAccount } from '../../../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -186,6 +188,8 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(new MemoryAccessStore())
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -217,22 +221,22 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     await app.init();
 
     // Đăng ký 2 user test
-    await http().post('/api/auth/register').send({
+    await seedLegacyAccount(app, {
       email: 'user-a@tripflix.vn',
       password: PASSWORD,
       displayName: 'User A',
-    }).expect(201);
+    });
     const loginA = await http().post('/api/auth/login').send({
       email: 'user-a@tripflix.vn',
       password: PASSWORD,
     }).expect(200);
     userAToken = loginA.body.accessToken;
 
-    await http().post('/api/auth/register').send({
+    await registerTestAccount(app, {
       email: 'user-b@tripflix.vn',
       password: PASSWORD,
       displayName: 'User B',
-    }).expect(201);
+    });
     const loginB = await http().post('/api/auth/login').send({
       email: 'user-b@tripflix.vn',
       password: PASSWORD,

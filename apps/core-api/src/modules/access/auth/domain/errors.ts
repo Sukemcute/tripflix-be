@@ -12,6 +12,7 @@ export class AccessError extends Error {
       | 'wrong_password'
       | 'invalid_reset_token'
       | 'invalid_verify_token'
+      | 'invalid_registration_code'
       | 'google_invalid'
       | 'google_not_configured',
     message: string,

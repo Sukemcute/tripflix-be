@@ -10,6 +10,7 @@ import {
   type AccessStore,
   type Clock,
   type OneTimeTokenRepository,
+  type RegistrationChallengeRepository,
   type SessionRepository,
 } from '../application/ports.js';
 
@@ -21,6 +22,7 @@ export interface AccessCleanupResult {
   expiredSessions: number;
   expiredPasswordResets: number;
   expiredEmailVerifications: number;
+  expiredRegistrationChallenges: number;
   publishedEvents: number;
 }
 
@@ -29,18 +31,20 @@ export async function runAccessCleanup(deps: {
   sessions: Pick<SessionRepository, 'deleteExpired'>;
   passwordResets: Pick<OneTimeTokenRepository, 'deleteExpired'>;
   emailVerifications: Pick<OneTimeTokenRepository, 'deleteExpired'>;
+  registrationChallenges: Pick<RegistrationChallengeRepository, 'deleteExpired'>;
   db: Db;
   now: Date;
 }): Promise<AccessCleanupResult> {
   const expiredSessions = await deps.sessions.deleteExpired(deps.now);
   const expiredPasswordResets = await deps.passwordResets.deleteExpired(deps.now);
   const expiredEmailVerifications = await deps.emailVerifications.deleteExpired(deps.now);
+  const expiredRegistrationChallenges = await deps.registrationChallenges.deleteExpired(deps.now);
   const publishedEvents = await deletePublishedBefore(
     deps.db,
     accessOutboxEvents,
     new Date(deps.now.getTime() - PUBLISHED_EVENT_RETENTION_MS),
   );
-  return { expiredSessions, expiredPasswordResets, expiredEmailVerifications, publishedEvents };
+  return { expiredSessions, expiredPasswordResets, expiredEmailVerifications, expiredRegistrationChallenges, publishedEvents };
 }
 
 /**
@@ -85,6 +89,7 @@ export class AccessCleanupJob implements OnApplicationBootstrap, OnApplicationSh
         sessions: this.store.sessions,
         passwordResets: this.store.passwordResets,
         emailVerifications: this.store.emailVerifications,
+        registrationChallenges: this.store.registrationChallenges,
         db,
         now: this.now(),
       });

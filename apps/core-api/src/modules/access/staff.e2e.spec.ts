@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -47,6 +49,8 @@ describe('TF054: quản lý nhân viên và khoá tài khoản', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -62,7 +66,7 @@ describe('TF054: quản lý nhân viên và khoá tài khoản', () => {
   });
 
   async function createAccount(email: string, role?: 'moderator' | 'superadmin') {
-    const reg = await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: email }).expect(201);
+    const reg = await registerTestAccount(app, { email, password: PASSWORD, displayName: email });
     if (role) store.userRows.set(reg.body.id, { ...store.userRows.get(reg.body.id)!, role });
     const login = await http().post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
     return { id: reg.body.id as string, accessToken: login.body.accessToken as string, refreshToken: login.body.refreshToken as string };

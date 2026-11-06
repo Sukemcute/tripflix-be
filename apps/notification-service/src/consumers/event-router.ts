@@ -1,5 +1,6 @@
 import {
   AccessEmailVerificationRequestedV1Schema,
+  AccessRegistrationCodeRequestedV1Schema,
   AccessPasswordResetRequestedV1Schema,
   AccessUserWelcomeEmailRequestedV1Schema,
   type EventEnvelope,
@@ -7,6 +8,7 @@ import {
 import type { Redis } from 'ioredis';
 import type { Mailer } from '../outapp/mailer.js';
 import { buildEmailVerificationEmail } from '../outapp/email-verification.email.js';
+import { buildRegistrationCodeEmail } from '../outapp/registration-code.email.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
 import { buildWelcomeEmail } from '../outapp/welcome.email.js';
 
@@ -65,6 +67,10 @@ export class EventRouter {
     if (event.type === 'access.password_reset_requested') {
       const payload = AccessPasswordResetRequestedV1Schema.parse(event.payload);
       await this.mailer.send(buildPasswordResetEmail(payload));
+      result = 'handled';
+    } else if (event.type === 'access.registration_code_requested') {
+      const payload = AccessRegistrationCodeRequestedV1Schema.parse(event.payload);
+      await this.mailer.send(buildRegistrationCodeEmail(payload));
       result = 'handled';
     } else if (event.type === 'access.email_verification_requested') {
       const payload = AccessEmailVerificationRequestedV1Schema.parse(event.payload);

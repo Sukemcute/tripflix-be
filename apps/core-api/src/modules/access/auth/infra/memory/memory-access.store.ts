@@ -6,6 +6,7 @@ import type {
   AuditEntry,
   NewSession,
   OneTimeTokenRepository,
+  RegistrationChallenge,
   ProfilePatch,
   SessionRecord,
   ServiceClientRecord,
@@ -138,6 +139,25 @@ export class MemoryAccessStore implements AccessStore {
 
   readonly passwordResets = new MemoryOneTimeTokens();
   readonly emailVerifications = new MemoryOneTimeTokens();
+  readonly registrationChallengeRows = new Map<string, RegistrationChallenge>();
+  readonly registrationChallenges = {
+    save: async (challenge: RegistrationChallenge) => {
+      this.registrationChallengeRows.set(challenge.email, challenge);
+    },
+    findUsable: async (email: string, id: string, now: Date) => {
+      const row = this.registrationChallengeRows.get(email);
+      return row?.id === id && row.expiresAt > now ? row : null;
+    },
+    consume: async (email: string, id: string, now: Date) => {
+      const row = this.registrationChallengeRows.get(email);
+      return row?.id === id && row.expiresAt > now && this.registrationChallengeRows.delete(email);
+    },
+    deleteExpired: async (before: Date) => {
+      const expired = [...this.registrationChallengeRows.values()].filter((row) => row.expiresAt < before);
+      for (const row of expired) this.registrationChallengeRows.delete(row.email);
+      return expired.length;
+    },
+  };
 
   /** Dòng của password_resets (test sửa trực tiếp, ví dụ cho hết hạn). */
   get passwordResetRows(): OneTimeTokenRow[] {

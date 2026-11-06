@@ -128,6 +128,17 @@ export const passwordResets = accessSchema.table(
  * Link xác thực email (TF05D), cùng cách với password_resets: chỉ giữ SHA-256 của token, dùng một lần,
  * sống 24 giờ. Mỗi lúc một người chỉ có một link chưa dùng (gửi lại thì xoá link cũ).
  */
+export const registrationChallenges = accessSchema.table(
+  'registration_challenges',
+  {
+    email: text('email').primaryKey(),
+    id: uuid('id').notNull().unique('uq_registration_challenges_id'),
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('idx_registration_challenges_expires_at').on(table.expiresAt)],
+);
+
 export const emailVerifications = accessSchema.table(
   'email_verifications',
   {

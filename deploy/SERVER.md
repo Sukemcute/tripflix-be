@@ -135,9 +135,9 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 - GCP chặn cổng 25 ra ngoài, nên dùng cổng 465 (TLS) như trên.
 - Thiếu `SMTP_URL` mà vẫn bật profile `mail` thì `notification-service` dừng ngay lúc khởi động, log ghi `SMTP_URL: bắt buộc ở production`.
-- `AUTH_REGISTER_MAX_PER_IP_HOUR` (mặc định 5) giới hạn số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ.
+- `AUTH_REGISTER_MAX_PER_IP_HOUR` (mặc định 5) giới hạn số lần yêu cầu gửi mã đăng ký mỗi IP mỗi giờ.
 
-Xong khi đăng ký tài khoản mới trên `https://tripflix.io.vn` thì nhận được email "Chào mừng bạn đến với Tripflix, hãy xác nhận email" ở Gmail (không vào Spam), và bấm "Quên mật khẩu" cũng nhận được email.
+Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
 ## VNPay sandbox
 
