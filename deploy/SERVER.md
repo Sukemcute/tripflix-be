@@ -139,6 +139,24 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
+## Đăng nhập Google
+
+Backend kiểm ID token của Google theo `GOOGLE_CLIENT_IDS`. Web gắn `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vào bundle lúc build. Thiếu một trong hai thì không đăng nhập bằng Google được: backend trả `503`, web không hiện nút.
+
+1. **Google Cloud Console → APIs & Services → Credentials**, mở OAuth client loại *Web application* mà dev đang dùng (hoặc tạo client mới). Trong *Authorized JavaScript origins*, thêm `https://<WEB_HOST>` và `https://www.<WEB_HOST>`. Web dùng popup lấy ID token nên không cần redirect URI.
+2. **OAuth consent screen:** chuyển *Publishing status* sang *In production*. Nếu vẫn để *Testing*, chỉ các email nằm trong *Test users* mới đăng nhập được.
+3. Thêm Client ID vào `.env.server`. Client ID là giá trị công khai, không phải secret:
+
+   ```bash
+   GOOGLE_CLIENT_IDS=<client id>.apps.googleusercontent.com
+   ```
+
+   App mobile có client Android hoặc iOS riêng thì thêm vào cùng dòng, cách nhau bằng dấu phẩy.
+4. Khởi động lại API: `dc --profile api --profile gateway --profile mail up -d --wait`.
+5. Trên GitHub repo `tripflix-fe`, vào Settings → Secrets and variables → Actions → *Variables*, tạo biến `GOOGLE_CLIENT_ID` có cùng Client ID. Workflow `publish` truyền biến này vào lúc build web. Merge một commit bất kỳ vào `develop` để build lại web.
+
+Kiểm tra: `curl -s -X POST https://<API_HOST>/api/auth/google -H 'content-type: application/json' -d '{"idToken":"x"}'` phải trả `401` (token sai), không phải `503`. Trang `/login` phải hiện nút Google, và đăng nhập thử bằng tài khoản Google phải vào được trang tài khoản.
+
 ## VNPay sandbox
 
 Thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` vào `.env.server`, không commit và không gửi qua chat. Thiếu một trong hai thì các API VNPay trả 404. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web, đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
