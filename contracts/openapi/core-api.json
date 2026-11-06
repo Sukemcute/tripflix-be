@@ -2562,6 +2562,22 @@
               "default": 1,
               "type": "number"
             }
+          },
+          {
+            "description": "recommended: còn ghế trước, rồi giờ bay, rồi giá. Chuyến hết ghế luôn ở cuối.",
+            "required": false,
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "default": "recommended",
+              "type": "string",
+              "enum": [
+                "recommended",
+                "price",
+                "departure",
+                "duration"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2571,6 +2587,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FlightSearchResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/api/flights/calendar": {
+      "get": {
+        "operationId": "FlightsController_getCalendar",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "HAN",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "SGN",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày đầu",
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày cuối (tính cả ngày này), tối đa 31 ngày",
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-07",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "passengers",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightCalendarResultDto"
                 }
               }
             }
@@ -7017,6 +7106,18 @@
             "type": "number",
             "nullable": true,
             "description": "Cả nhóm hành khách (VND); null khi không bán được"
+          },
+          "carryOnKg": {
+            "type": "number",
+            "nullable": true,
+            "example": 7,
+            "description": "Hành lý xách tay (kg/khách)"
+          },
+          "checkedKg": {
+            "type": "number",
+            "nullable": true,
+            "example": 20,
+            "description": "Hành lý ký gửi (kg/khách); 0 là không có"
           }
         },
         "required": [
@@ -7025,7 +7126,9 @@
           "isRefundable",
           "freeCancelDays",
           "pricePerPerson",
-          "totalPrice"
+          "totalPrice",
+          "carryOnKg",
+          "checkedKg"
         ]
       },
       "FlightOfferDto": {
@@ -7049,6 +7152,17 @@
             "type": "string",
             "nullable": true
           },
+          "airlineCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "VJ",
+            "description": "Mã IATA của hãng, dùng gắn logo"
+          },
+          "flightNumber": {
+            "type": "string",
+            "nullable": true,
+            "example": "VJ141"
+          },
           "fromAirport": {
             "type": "string",
             "example": "SGN"
@@ -7066,6 +7180,23 @@
             "type": "string",
             "nullable": true,
             "example": "07:30"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true,
+            "example": 130,
+            "description": "Thời gian bay (phút)"
+          },
+          "stops": {
+            "type": "number",
+            "example": 0,
+            "description": "Số điểm dừng; 0 là bay thẳng"
+          },
+          "cabinCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "Y",
+            "description": "Y phổ thông, W phổ thông đặc biệt, J thương gia"
           },
           "cabinName": {
             "type": "string",
@@ -7096,6 +7227,10 @@
             "nullable": true,
             "description": "Giá một vé rẻ nhất (VND)"
           },
+          "isPriceTaxIncluded": {
+            "type": "boolean",
+            "description": "Giá đã gồm thuế, phí"
+          },
           "fares": {
             "type": "array",
             "items": {
@@ -7108,16 +7243,22 @@
           "flightKey",
           "name",
           "airline",
+          "airlineCode",
+          "flightNumber",
           "fromAirport",
           "toAirport",
           "departTime",
           "arriveTime",
+          "durationMinutes",
+          "stops",
+          "cabinCode",
           "cabinName",
           "destination",
           "isAvailable",
           "reason",
           "remaining",
           "priceFrom",
+          "isPriceTaxIncluded",
           "fares"
         ]
       },
@@ -7128,7 +7269,7 @@
             "$ref": "#/components/schemas/FlightSearchEchoDto"
           },
           "flights": {
-            "description": "Còn ghế lên trước, rồi theo giờ bay, rồi giá",
+            "description": "Xếp theo tham số sort; chuyến hết ghế luôn ở cuối",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FlightOfferDto"
@@ -7138,6 +7279,78 @@
         "required": [
           "query",
           "flights"
+        ]
+      },
+      "FlightCalendarEchoDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "HAN"
+          },
+          "to": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "passengers": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "start",
+          "end",
+          "passengers"
+        ]
+      },
+      "FlightCalendarDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé rẻ nhất ngày đó trên tuyến (VND)"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "priceFrom",
+          "isAvailable"
+        ]
+      },
+      "FlightCalendarResultDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "$ref": "#/components/schemas/FlightCalendarEchoDto"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightCalendarDayDto"
+            }
+          }
+        },
+        "required": [
+          "query",
+          "days"
         ]
       },
       "FlightRouteDto": {

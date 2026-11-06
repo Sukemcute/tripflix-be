@@ -15,6 +15,8 @@ export interface PricePlan {
   /** Chỉ để hiện giá gạch; không đổi số tiền khách trả. */
   discountPct?: number;
   perks?: string[];
+  carryOnKg?: number;
+  checkedKg?: number;
 }
 
 /** Một ngày của lịch phòng: số phòng, giá gốc và luật bán của ngày nhận phòng. */
