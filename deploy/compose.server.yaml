@@ -21,6 +21,8 @@ x-core-env: &core-env
   AUTH_JWT_AUDIENCE: tripflix
   AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100}
   AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  AUTH_EMAIL_VERIFY_URL: ${AUTH_EMAIL_VERIFY_URL:-http://localhost:3100/xac-thuc-email}
+  AUTH_REGISTER_MAX_PER_IP_HOUR: ${AUTH_REGISTER_MAX_PER_IP_HOUR:-5}
   AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
@@ -100,6 +102,37 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+
+  # ---------- Giai đoạn 4: gửi email (TF05D) ----------
+  # Gửi email xác thực, đặt lại mật khẩu, chào mừng qua SMTP của Amazon SES (deploy/SERVER.md, Giai đoạn 4).
+  # Profile riêng, bật khi đã có SMTP_URL; thiếu thì service dừng lúc khởi động với lỗi rõ ràng, profile khác chạy như cũ.
+  notification-service:
+    profiles: [mail]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/notification-service:${IMAGE_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL_NOTIFICATION: postgres://tf_notification:${DB_PASS_NOTIFICATION:?}@postgres:5432/notification
+      JWKS_URL: http://core-api:3000/.well-known/jwks.json
+      AUTH_JWT_ISSUER: tripflix-core
+      AUTH_JWT_AUDIENCE: tripflix
+      # smtps://<SMTP user>:<SMTP password>@email-smtp.<region>.amazonaws.com:465 (mật khẩu đã URL-encode).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Tripflix <no-reply@tripflix.io.vn>}
+      WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
+    depends_on:
+      redis: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   # Dữ liệu mẫu, chạy tay một lần. Image production không có file seed và cli/seed chặn NODE_ENV=production,
   # nên service này build stage dev từ mã nguồn trên server.

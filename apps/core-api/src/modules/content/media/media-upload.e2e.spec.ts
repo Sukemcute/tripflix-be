@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from '../../access/index.js';
+import { registerTestAccount } from '../../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -55,7 +57,7 @@ describe('media upload E2E', () => {
   const http = () => request(app.getHttpServer());
 
   async function registerAndLogin(email: string): Promise<string> {
-    await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: email }).expect(201);
+    await registerTestAccount(app, { email, password: PASSWORD, displayName: email });
     const response = await http().post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
     return (response.body as { accessToken: string }).accessToken;
   }
@@ -83,6 +85,8 @@ describe('media upload E2E', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(new MemoryAccessStore())
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)

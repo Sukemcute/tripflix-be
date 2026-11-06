@@ -1,0 +1,177 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "071d6539-479b-4802-bfd7-078c07ccb668",
+  "prevIds": [
+    "e280b9a7-e15b-4466-b69d-2a1bb3b5bc33"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "registration_challenges"
+      ],
+      "writes": [
+        "s|tbl|access.registration_challenges",
+        "n|tbl|access.registration_challenges",
+        "e|tbl|access.registration_challenges",
+        "n|rel|access.registration_challenges",
+        "n|type|access.registration_challenges",
+        "n|rel|access.registration_challenges_pkey",
+        "n|rel|access.uq_registration_challenges_id"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "registration_challenges",
+        "idx_registration_challenges_expires_at"
+      ],
+      "writes": [
+        "s|idx|access.idx_registration_challenges_expires_at",
+        "n|idx|access.idx_registration_challenges_expires_at",
+        "e|idx|access.idx_registration_challenges_expires_at",
+        "n|rel|access.idx_registration_challenges_expires_at"
+      ],
+      "reads": [
+        "n|tbl|access.registration_challenges",
+        "n|sch|access",
+        "n|col|access.registration_challenges.expires_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "name": "registration_challenges",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "email",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "code_hash",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "idx_registration_challenges_expires_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "expires_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "registration_challenges_pkey",
+        "columns": [
+          "email"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "registration_challenges",
+        "name": "uq_registration_challenges_id",
+        "nameExplicit": true,
+        "columns": [
+          "id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    }
+  ]
+}

@@ -7,6 +7,9 @@ const OptionalStringSchema = z.preprocess((v) => (v === '' ? undefined : v), z.s
 /** Trang đặt lại mật khẩu của web (Thành); link trong email là địa chỉ này kèm ?token=... */
 export const DEFAULT_PASSWORD_RESET_URL = 'http://localhost:3100/dat-lai-mat-khau';
 
+/** Trang xác thực email của web (TF05D); link trong email là địa chỉ này kèm ?token=... */
+export const DEFAULT_EMAIL_VERIFY_URL = 'http://localhost:3100/xac-thuc-email';
+
 /** Khoá công khai của Google để kiểm ID token (POST /auth/google). */
 export const DEFAULT_GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
@@ -48,6 +51,9 @@ export const coreEnvSchema = baseEnvSchema
     // Web, admin được gọi API từ trình duyệt (CORS) và dùng cookie refresh token (chặn CSRF theo Origin).
     AUTH_WEB_ORIGINS: WebOriginsSchema,
     AUTH_PASSWORD_RESET_URL: z.url().default(DEFAULT_PASSWORD_RESET_URL),
+    AUTH_EMAIL_VERIFY_URL: z.url().default(DEFAULT_EMAIL_VERIFY_URL),
+    // Số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ (TF05D). Máy dev, CI chạy e2e đăng ký nhiều lần thì đặt cao hơn.
+    AUTH_REGISTER_MAX_PER_IP_HOUR: z.coerce.number().int().positive().default(5),
     // OAuth Client ID (Android, iOS, Web) tạo trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google.
     GOOGLE_CLIENT_IDS: z
       .string()

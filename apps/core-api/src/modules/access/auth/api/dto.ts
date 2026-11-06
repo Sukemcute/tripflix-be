@@ -1,22 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ROLES, type Role } from '@tripflix/contracts';
 import { z } from 'zod';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
+import { PASSWORD_MAX } from '../domain/credentials.js';
+import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_PATTERN, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
 import {
   currentPasswordField,
   deviceNameField,
   displayNameField,
   lookupEmailField,
-  newPasswordField,
+  registrationPasswordField,
   signupEmailField,
 } from './validation.js';
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
 // Trường lạ (như role) bị bỏ đi, nên không ai tự cấp quyền khi đăng ký.
-export const RegisterRequestSchema = z.object({
+export const RegistrationCodeRequestSchema = z.object({
   email: signupEmailField(),
-  password: newPasswordField(),
+  password: registrationPasswordField(),
+});
+
+export const RegisterRequestSchema = RegistrationCodeRequestSchema.extend({
   displayName: displayNameField(),
+  registrationId: z.uuid('Yêu cầu gửi mã xác thực email trước khi đăng ký'),
+  code: z.string().regex(REGISTRATION_CODE_PATTERN, INVALID_REGISTRATION_CODE),
 });
 
 export const LoginRequestSchema = z.object({
@@ -43,10 +49,21 @@ export class GoogleLoginDto {
   @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
 }
 
-export class RegisterDto {
+export class RegistrationCodeDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;
+  @ApiProperty({ minLength: REGISTRATION_PASSWORD_MIN, maxLength: PASSWORD_MAX }) password!: string;
+}
+
+export class RegistrationCodeResultDto {
+  @ApiProperty({ format: 'uuid' }) registrationId!: string;
+  @ApiProperty({ example: 60, description: 'Số giây phải đợi trước khi xin mã lại cho email này' })
+  resendAfterSeconds!: number;
+}
+
+export class RegisterDto extends RegistrationCodeDto {
   @ApiProperty({ maxLength: 50, example: 'Khang' }) displayName!: string;
+  @ApiProperty({ format: 'uuid' }) registrationId!: string;
+  @ApiProperty({ pattern: REGISTRATION_CODE_PATTERN.source }) code!: string;
 }
 
 export class LoginDto {
@@ -80,6 +97,8 @@ export class UserDto {
 
 /** GET/PATCH /auth/me: hồ sơ của chính mình, có thông tin cá nhân (không có ở danh sách nhân viên). */
 export class MyProfileDto extends UserDto {
+  @ApiProperty({ description: 'Đã xác thực email (TF05D). false: chưa đăng bài, bình luận được; gửi lại link bằng POST /auth/email/verification' })
+  emailVerified!: boolean;
   @ApiProperty({ type: String, nullable: true, example: '0912345678' }) phone!: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true, example: '2000-05-20' }) dateOfBirth!: string | null;
   @ApiProperty({ enum: ['male', 'female', 'other'], nullable: true }) gender!: 'male' | 'female' | 'other' | null;

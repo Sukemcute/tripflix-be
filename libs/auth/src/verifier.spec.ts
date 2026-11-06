@@ -85,6 +85,22 @@ describe('createAccessTokenVerifier', () => {
     );
   });
 
+  it('TF05D: claim ev = true thì emailVerified true; thiếu, false hay sai kiểu thì false', async () => {
+    await expect(verify(await sign(good.privateKey, { claims: { ev: true } }))).resolves.toMatchObject({
+      emailVerified: true,
+    });
+    await expect(verify(await sign(good.privateKey, { claims: { ev: false } }))).resolves.toMatchObject({
+      emailVerified: false,
+    });
+    await expect(verify(await sign(good.privateKey))).resolves.toMatchObject({ emailVerified: false });
+    await expect(verify(await sign(good.privateKey, { claims: { ev: 'true' } }))).resolves.toMatchObject({
+      emailVerified: false,
+    });
+    await expect(verify(await sign(good.privateKey, { claims: { ev: 1 } }))).resolves.toMatchObject({
+      emailVerified: false,
+    });
+  });
+
   it('từ chối token thiếu sid hoặc role lạ', async () => {
     await expect(verify(await sign(good.privateKey, { claims: { sid: undefined } }))).rejects.toBeInstanceOf(
       InvalidAccessTokenError,

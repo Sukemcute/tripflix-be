@@ -1,3 +1,4 @@
+import { prepareTestRegistration, registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -25,6 +26,8 @@ const env = {
   AUTH_JWT_ISSUER: 'tripflix-core',
   AUTH_JWT_AUDIENCE: 'tripflix',
   AUTH_PASSWORD_RESET_URL: 'https://tripflix.example/dat-lai-mat-khau',
+  // File này đăng ký nhiều tài khoản từ cùng một IP; giới hạn đăng ký kiểm ở email-verification.e2e.spec.ts.
+  AUTH_REGISTER_MAX_PER_IP_HOUR: 1000,
 } as CoreEnv;
 
 @Global()
@@ -77,10 +80,7 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
   });
 
   async function createAccount(email: string, role?: 'superadmin') {
-    const reg = await http()
-      .post('/api/auth/register')
-      .send({ email, password: PASSWORD, displayName: 'Lan' })
-      .expect(201);
+    const reg = await registerTestAccount(app, { email, password: PASSWORD, displayName: 'Lan' });
     if (role) store.userRows.set(reg.body.id, { ...store.userRows.get(reg.body.id)!, role });
     const login = await http().post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
     return { id: reg.body.id as string, accessToken: login.body.accessToken as string };
@@ -124,6 +124,8 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
       'email',
       'password',
       'displayName',
+      'registrationId',
+      'code',
     ]);
   });
 
@@ -136,10 +138,7 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
   });
 
   it('đăng ký: email có khoảng trắng, chữ hoa được nhận và lưu chữ thường; đăng nhập lại bằng cách gõ khác vẫn được', async () => {
-    const reg = await http()
-      .post('/api/auth/register')
-      .send({ email: '  Trim.Case@Example.COM  ', password: PASSWORD, displayName: '  Lan  ' })
-      .expect(201);
+    const reg = await registerTestAccount(app, { email: '  Trim.Case@Example.COM  ', password: PASSWORD, displayName: '  Lan  ' });
     expect(reg.body).toMatchObject({ email: 'trim.case@example.com', displayName: 'Lan', role: 'member' });
     await http()
       .post('/api/auth/login')
@@ -148,16 +147,13 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
   });
 
   it('đăng ký: gửi role, status thì bị bỏ, tài khoản vẫn là member', async () => {
-    const reg = await http()
-      .post('/api/auth/register')
-      .send({
+    const reg = await registerTestAccount(app, {
         email: 'role-inject@example.com',
         password: PASSWORD,
         displayName: 'Lan',
         role: 'superadmin',
         status: 'locked',
-      })
-      .expect(201);
+      });
     expect(reg.body.role).toBe('member');
     expect(store.userRows.get(reg.body.id)).toMatchObject({ role: 'member', status: 'active' });
   });
@@ -171,9 +167,10 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
     ['sai cả ba', { email: 1, password: '1', displayName: '' }, ['email', 'password', 'displayName']],
   ])('đăng ký: %s → 400 đúng trường, không tạo tài khoản', async (_, patch, fields) => {
     const before = store.userRows.size;
+    const proof = await prepareTestRegistration(app, "unused@example.com");
     const res = await http()
       .post('/api/auth/register')
-      .send({ email: `reject-${Date.now()}@example.com`, password: PASSWORD, displayName: 'Lan', ...patch })
+      .send({ email: `reject-${Date.now()}@example.com`, password: PASSWORD, displayName: 'Lan', ...proof, ...patch })
       .expect(400);
     expectFieldErrors(res.body, fields);
     expect(store.userRows.size).toBe(before);

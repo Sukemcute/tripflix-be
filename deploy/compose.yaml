@@ -19,6 +19,9 @@ x-be-env: &be-env
   # Web (3100), admin (3200) gọi API qua gateway :8080 từ trình duyệt: CORS và cookie refresh token.
   AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100,http://localhost:3200}
   AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  AUTH_EMAIL_VERIFY_URL: ${AUTH_EMAIL_VERIFY_URL:-http://localhost:3100/xac-thuc-email}
+  # Dev chạy e2e đăng ký nhiều tài khoản từ cùng IP; production để mặc định 5.
+  AUTH_REGISTER_MAX_PER_IP_HOUR: ${AUTH_REGISTER_MAX_PER_IP_HOUR:-1000}
   GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
   JWKS_URL: http://core-api:3000/.well-known/jwks.json
   # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.

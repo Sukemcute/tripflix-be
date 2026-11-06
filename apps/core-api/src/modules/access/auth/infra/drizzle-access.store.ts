@@ -5,7 +5,9 @@ import { and, asc, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'd
 import {
   accessOutboxEvents,
   auditLogs,
+  emailVerifications,
   passwordResets,
+  registrationChallenges,
   serviceClients,
   sessions,
   userIdentities,
@@ -20,8 +22,10 @@ import type {
   AuditEntry,
   AuditLog,
   NewSession,
-  PasswordResetRepository,
+  OneTimeTokenRepository,
   ProfilePatch,
+  RegistrationChallenge,
+  RegistrationChallengeRepository,
   SessionRecord,
   SessionRepository,
   ServiceClientRecord,
@@ -41,6 +45,7 @@ const mapUserRow = (row: UserRow): UserRecord => ({
   role: row.role as Role,
   status: row.status as UserRecord['status'],
   createdAt: row.createdAt,
+  emailVerifiedAt: row.emailVerifiedAt,
   personal: {
     phone: row.phone,
     dateOfBirth: row.dateOfBirth,
@@ -76,7 +81,12 @@ class DrizzleUserRepository implements UserRepository {
     return row ? mapUserRow(row) : null;
   }
 
-  async insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>) {
+  async lockById(id: string) {
+    const [row] = await this.db.select().from(users).where(eq(users.id, id)).for('no key update');
+    return row ? mapUserRow(row) : null;
+  }
+
+  async insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null }) {
     const [row] = await this.db.insert(users).values(user).onConflictDoNothing({ target: users.email }).returning();
     return row ? mapUserRow(row) : null;
   }
@@ -110,8 +120,18 @@ class DrizzleUserRepository implements UserRepository {
     return this.patch(id, patch);
   }
 
-  async updatePasswordHash(id: string, passwordHash: string) {
+  async updatePasswordHash(id: string, passwordHash: string | null) {
     return this.patch(id, { passwordHash });
+  }
+
+  async markEmailVerified(id: string, at: Date) {
+    // coalesce: đã xác thực rồi thì giữ mốc đầu tiên, không đổi updated_at vô ích.
+    const [row] = await this.db
+      .update(users)
+      .set({ emailVerifiedAt: sql`coalesce(${users.emailVerifiedAt}, ${at.toISOString()}::timestamptz)` })
+      .where(eq(users.id, id))
+      .returning();
+    return row ? mapUserRow(row) : null;
   }
 
   private async patch(
@@ -250,51 +270,95 @@ class DrizzleUserIdentityRepository implements UserIdentityRepository {
   }
 }
 
-class DrizzlePasswordResetRepository implements PasswordResetRepository {
-  constructor(private readonly getDb: () => Db) {}
+/** Bảng token dùng một lần qua email: password_resets, email_verifications có cùng các cột. */
+type OneTimeTokenTable = typeof passwordResets | typeof emailVerifications;
+
+class DrizzleOneTimeTokenRepository implements OneTimeTokenRepository {
+  constructor(
+    private readonly getDb: () => Db,
+    // Hai bảng cùng cột; Drizzle không suy được kiểu cho hợp (union) của hai bảng, nên dùng kiểu của password_resets.
+    private readonly table: typeof passwordResets,
+  ) {}
+
+  static for(getDb: () => Db, table: OneTimeTokenTable): DrizzleOneTimeTokenRepository {
+    return new DrizzleOneTimeTokenRepository(getDb, table as typeof passwordResets);
+  }
 
   // Mỗi lệnh lấy executor mới: trong @Transactional là transaction đang mở, ngoài ra là kết nối thường.
   private get db(): Db {
     return this.getDb();
   }
 
-  async insert(reset: { userId: string; tokenHash: string; expiresAt: Date }) {
-    await this.db.insert(passwordResets).values(reset);
+  async insert(token: { userId: string; tokenHash: string; expiresAt: Date }) {
+    await this.db.insert(this.table).values(token);
   }
 
   async deleteUnusedByUser(userId: string) {
+    const t = this.table;
     const rows = await this.db
-      .delete(passwordResets)
-      .where(and(eq(passwordResets.userId, userId), isNull(passwordResets.usedAt)))
-      .returning({ id: passwordResets.id });
+      .delete(t)
+      .where(and(eq(t.userId, userId), isNull(t.usedAt)))
+      .returning({ id: t.id });
     return rows.length;
   }
 
   async findUsable(tokenHash: string, now: Date) {
-    const [row] = await this.db
-      .select({ userId: passwordResets.userId })
-      .from(passwordResets)
-      .where(this.usable(tokenHash, now))
-      .limit(1);
+    const t = this.table;
+    const [row] = await this.db.select({ userId: t.userId }).from(t).where(this.usable(tokenHash, now)).limit(1);
     return row ?? null;
   }
 
   async consume(tokenHash: string, now: Date) {
+    const t = this.table;
     const [row] = await this.db
-      .update(passwordResets)
+      .update(t)
       .set({ usedAt: now })
       .where(this.usable(tokenHash, now))
-      .returning({ userId: passwordResets.userId });
+      .returning({ userId: t.userId });
     return row ?? null;
   }
 
   async deleteExpired(before: Date) {
-    const rows = await this.db.delete(passwordResets).where(lt(passwordResets.expiresAt, before)).returning({ id: passwordResets.id });
+    const t = this.table;
+    const rows = await this.db.delete(t).where(lt(t.expiresAt, before)).returning({ id: t.id });
     return rows.length;
   }
 
   private usable(tokenHash: string, now: Date) {
-    return and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now));
+    const t = this.table;
+    return and(eq(t.tokenHash, tokenHash), isNull(t.usedAt), gt(t.expiresAt, now));
+  }
+}
+
+class DrizzleRegistrationChallenges implements RegistrationChallengeRepository {
+  constructor(private readonly getDb: () => Db) {}
+
+  async save(challenge: RegistrationChallenge) {
+    await this.getDb().insert(registrationChallenges).values(challenge).onConflictDoUpdate({
+      target: registrationChallenges.email,
+      set: { id: challenge.id, codeHash: challenge.codeHash, expiresAt: challenge.expiresAt },
+    });
+  }
+
+  async findUsable(email: string, id: string, now: Date) {
+    const [row] = await this.getDb().select().from(registrationChallenges).where(this.usable(email, id, now));
+    return row ?? null;
+  }
+
+  async consume(email: string, id: string, now: Date) {
+    const [row] = await this.getDb().delete(registrationChallenges).where(this.usable(email, id, now))
+      .returning({ id: registrationChallenges.id });
+    return row !== undefined;
+  }
+
+  async deleteExpired(before: Date) {
+    const rows = await this.getDb().delete(registrationChallenges).where(lt(registrationChallenges.expiresAt, before))
+      .returning({ id: registrationChallenges.id });
+    return rows.length;
+  }
+
+  private usable(email: string, id: string, now: Date) {
+    return and(eq(registrationChallenges.email, email), eq(registrationChallenges.id, id), gt(registrationChallenges.expiresAt, now));
   }
 }
 
@@ -326,21 +390,25 @@ export const ACCESS_EVENT_PRODUCER = 'core-api/access';
  * nếu đang mở); ở CLI, test là `() => db`.
  */
 export class DrizzleAccessStore implements AccessStore {
+  readonly registrationChallenges: RegistrationChallengeRepository;
   readonly users: UserRepository;
   readonly sessions: SessionRepository;
   readonly audit: AuditLog;
   readonly outbox: AccessOutbox;
   readonly serviceClients: ServiceClientRepository;
-  readonly passwordResets: PasswordResetRepository;
+  readonly passwordResets: OneTimeTokenRepository;
+  readonly emailVerifications: OneTimeTokenRepository;
   readonly identities: UserIdentityRepository;
 
   constructor(getDb: () => Db) {
+    this.registrationChallenges = new DrizzleRegistrationChallenges(getDb);
     this.users = new DrizzleUserRepository(getDb);
     this.sessions = new DrizzleSessionRepository(getDb);
     this.audit = new DrizzleAuditLog(getDb);
     this.outbox = new OutboxWriter(getDb, accessOutboxEvents, ACCESS_EVENT_PRODUCER);
     this.serviceClients = new DrizzleServiceClientRepository(getDb);
-    this.passwordResets = new DrizzlePasswordResetRepository(getDb);
+    this.passwordResets = DrizzleOneTimeTokenRepository.for(getDb, passwordResets);
+    this.emailVerifications = DrizzleOneTimeTokenRepository.for(getDb, emailVerifications);
     this.identities = new DrizzleUserIdentityRepository(getDb);
   }
 }

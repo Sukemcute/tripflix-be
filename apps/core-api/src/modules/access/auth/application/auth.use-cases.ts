@@ -1,11 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserGuestMergedV1,
+  AccessRegistrationAttemptedExistingV1,
+  AccessRegistrationCodeRequestedV1,
   AccessUserRegisteredV1,
   AccessUserWelcomeEmailRequestedV1,
 } from '@tripflix/contracts';
 import { Transactional } from '@tripflix/db';
+import type { CoreEnv } from '../../../../platform/env.js';
+import { CORE_ENV } from '../../../../platform/tokens.js';
+import {
+  DEFAULT_REGISTER_MAX_PER_IP,
+  REGISTER_WINDOW_SECONDS,
+  TOO_MANY_SIGNUPS_MESSAGE,
+} from '../../account/domain/email-verification.js';
 import {
   EMAIL_TAKEN_MESSAGE,
   GOOGLE_LOGIN_FAILED_MESSAGE,
@@ -18,6 +28,12 @@ import {
 } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
 import {
+  INVALID_REGISTRATION_CODE,
+  REGISTRATION_CODE_COOLDOWN_MESSAGE,
+  REGISTRATION_CODE_COOLDOWN_SECONDS,
+  REGISTRATION_CODE_TTL_MS,
+} from '../domain/registration.js';
+import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TTL_MS,
   decideRefresh,
@@ -26,12 +42,14 @@ import {
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  ACTION_RATE_LIMITER,
   CLOCK,
   GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
   TOKEN_ISSUER,
   type AccessStore,
+  type ActionRateLimiter,
   type Clock,
   type GoogleIdentity,
   type GoogleIdTokenVerifier,
@@ -60,6 +78,7 @@ export interface TokenPair {
 @Injectable()
 export class AuthUseCases {
   private dummyHash?: Promise<string>;
+  private readonly registerMaxPerIp: number;
 
   constructor(
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
@@ -69,14 +88,80 @@ export class AuthUseCases {
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
     @Inject(CLOCK) private readonly now: Clock,
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleIdTokenVerifier,
-  ) {}
+    @Inject(ACTION_RATE_LIMITER) private readonly actionLimiter: ActionRateLimiter,
+    @Inject(CORE_ENV) env: CoreEnv,
+  ) {
+    // E2E dựng env tay có thể thiếu biến này: dùng mặc định như khi parse env.
+    this.registerMaxPerIp = (env.AUTH_REGISTER_MAX_PER_IP_HOUR as number | undefined) ?? DEFAULT_REGISTER_MAX_PER_IP;
+  }
 
-  async register(input: { email: string; password: string; displayName: string }, meta: RequestMeta): Promise<PublicUser> {
+  async requestRegistrationCode(address: string, meta: RequestMeta): Promise<string> {
+    const email = normalizeEmail(address);
+    // Đợi giữa hai lần xin mã: kiểm trước để lần bấm quá sớm không ăn vào hạn mức theo giờ.
+    const cooldown = await this.actionLimiter.consume(`register:cooldown:${email}`, 1, REGISTRATION_CODE_COOLDOWN_SECONDS);
+    if (cooldown.isBlocked) {
+      throw new AccessError('too_many_attempts', REGISTRATION_CODE_COOLDOWN_MESSAGE, cooldown.retryAfterSeconds);
+    }
+    await this.checkRegistrationLimit(
+      [`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
+      [`register:email:${email}`, 3, REGISTER_WINDOW_SECONDS],
+    );
+    const id = randomUUID();
+    // Băm cả khi email đã có tài khoản để thời gian trả lời như nhau, không dò được email nào đã đăng ký.
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    const codeHash = await this.hasher.hash(code);
+    const existing = await this.store.users.findByEmail(email);
+    if (existing) {
+      if (existing.status === 'active') await this.notifyExistingAccount(existing);
+      return id;
+    }
+
+    await this.saveRegistrationCode(email, id, code, codeHash);
+    return id;
+  }
+
+  /** API vẫn trả như email mới; chủ email nhận thư báo đã có tài khoản và cách đăng nhập. */
+  @Transactional('access')
+  private async notifyExistingAccount(user: UserRecord): Promise<void> {
+    const payload: AccessRegistrationAttemptedExistingV1 = {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      hasPassword: user.passwordHash !== null,
+    };
+    await this.store.outbox.add({ type: 'access.registration_attempted_existing', userId: user.id, payload });
+  }
+
+  @Transactional('access')
+  private async saveRegistrationCode(email: string, id: string, code: string, codeHash: string): Promise<void> {
+    const expiresAt = new Date(this.now().getTime() + REGISTRATION_CODE_TTL_MS);
+    await this.store.registrationChallenges.save({ email, id, codeHash, expiresAt });
+    const payload: AccessRegistrationCodeRequestedV1 = { email, code, expiresAt: expiresAt.toISOString() };
+    await this.store.outbox.add({ type: 'access.registration_code_requested', userId: id, payload });
+  }
+
+  async register(input: { email: string; password: string; displayName: string; registrationId: string; code: string }, meta: RequestMeta): Promise<PublicUser> {
     const email = normalizeEmail(input.email);
+    await this.checkRegistrationLimit(
+      [`register-code:ip:${meta.ip}`, 30, 600],
+      [`register-code:id:${input.registrationId}`, 5, 600],
+    );
+    const challenge = await this.store.registrationChallenges.findUsable(email, input.registrationId, this.now());
+    if (!challenge || !(await this.hasher.verify(challenge.codeHash, input.code))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
     const passwordHash = await this.hasher.hash(input.password);
-    const user = await this.createMember({ email, passwordHash, displayName: input.displayName.trim() }, meta);
-    if (!user) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
+    const user = await this.createVerifiedMember(
+      { email, passwordHash, displayName: input.displayName.trim(), registrationId: input.registrationId },
+      meta,
+    );
     return mapPublicUser(user);
+  }
+
+  private async checkRegistrationLimit(...keys: [key: string, max: number, seconds: number][]): Promise<void> {
+    const results = await Promise.all(keys.map(([key, max, seconds]) => this.actionLimiter.consume(key, max, seconds)));
+    const blocked = results.find((result) => result.isBlocked);
+    if (blocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, blocked.retryAfterSeconds);
   }
 
   async login(
@@ -117,7 +202,8 @@ export class AuthUseCases {
    */
   async loginWithGoogle(input: { idToken: string; deviceName?: string | undefined }, meta: RequestMeta): Promise<TokenPair> {
     const identity = await this.google.verify(input.idToken);
-    const user = await this.resolveGoogleUser(identity, meta);
+    const { user, revokedSids } = await this.resolveGoogleUser(identity, meta);
+    await Promise.all(revokedSids.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
     if (user.status !== 'active') {
       await this.store.audit.record({ action: 'auth.login_failed', actorUserId: user.id, ...meta, meta: { provider: 'google' } });
       throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
@@ -164,27 +250,37 @@ export class AuthUseCases {
     return mapMyProfile(user);
   }
 
-  /** Đăng ký công khai luôn là member; nhân viên do superadmin cấp. Trả null khi email đã có. */
+  /** Tiêu mã và tạo tài khoản trong cùng transaction. */
   @Transactional('access')
-  private async createMember(
-    input: { email: string; passwordHash: string; displayName: string },
+  private async createVerifiedMember(
+    input: { email: string; passwordHash: string; displayName: string; registrationId: string },
     meta: RequestMeta,
-  ): Promise<UserRecord | null> {
-    const created = await this.insertMember(input, meta, 'password');
-    if (created) await this.addGuestMerged(created.id, meta);
+  ): Promise<UserRecord> {
+    const { registrationId, ...credentials } = input;
+    if (!(await this.store.registrationChallenges.consume(input.email, registrationId, this.now()))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
+    const created = await this.insertMember(credentials, meta, 'password');
+    if (!created) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
+    await this.addGuestMerged(created.id, meta);
     return created;
   }
 
   /**
-   * Thêm member, phát access.user.registered và yêu cầu gửi email chào mừng; gọi trong transaction đang mở,
+   * Thêm member, phát access.user.registered và yêu cầu gửi email; gọi trong transaction đang mở,
    * nên tài khoản không tạo được (email trùng, rollback) thì không có email.
+   * Chỉ gọi sau khi xác thực email bằng mã đăng ký hoặc danh tính Google.
    */
   private async insertMember(
     input: { email: string; passwordHash: string | null; displayName: string },
     meta: RequestMeta,
     provider: 'password' | 'google',
   ): Promise<UserRecord | null> {
-    const created = await this.store.users.insert({ ...input, role: 'member' });
+    const created = await this.store.users.insert({
+      ...input,
+      role: 'member',
+      emailVerifiedAt: this.now(),
+    });
     if (!created) return null;
     await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
     const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
@@ -199,28 +295,55 @@ export class AuthUseCases {
     return created;
   }
 
-  /** Tìm hoặc tạo tài khoản cho danh tính Google; không liên kết vào tài khoản đang bị khoá. */
+  /**
+   * Tìm hoặc tạo tài khoản cho danh tính Google; không liên kết vào tài khoản đang bị khoá. Google đã xác minh
+   * email, nên tài khoản đi qua đây được đánh dấu đã xác thực (TF05D).
+   *
+   * Liên kết vào tài khoản mật khẩu CHƯA xác thực: mật khẩu đó có thể do người khác đặt trước bằng email của
+   * chủ thật (chiếm tài khoản trước, pre-account hijacking). Khi đó xoá mật khẩu và mọi phiên cũ; chủ thật
+   * muốn dùng mật khẩu thì đặt lại qua email.
+   */
   @Transactional('access')
-  private async resolveGoogleUser(identity: GoogleIdentity, meta: RequestMeta): Promise<UserRecord> {
+  private async resolveGoogleUser(
+    identity: GoogleIdentity,
+    meta: RequestMeta,
+  ): Promise<{ user: UserRecord; revokedSids: string[] }> {
     const linkedUserId = await this.store.identities.findUserId('google', identity.subject);
     if (linkedUserId) {
       const linked = await this.store.users.findById(linkedUserId);
-      if (linked) return linked;
+      if (linked) return { user: await this.ensureVerified(linked, meta), revokedSids: [] };
     }
     const email = normalizeEmail(identity.email);
     const link = { provider: 'google' as const, subject: identity.subject, email };
     const existing = await this.store.users.findByEmail(email);
     if (existing) {
-      if (existing.status !== 'active') return existing;
+      if (existing.status !== 'active') return { user: existing, revokedSids: [] };
       await this.linkIdentity({ ...link, userId: existing.id });
-      await this.store.audit.record({ action: 'auth.google_linked', actorUserId: existing.id, ...meta, meta: { email } });
-      return existing;
+      const isTakeoverRisk = existing.emailVerifiedAt === null && existing.passwordHash !== null;
+      const revokedSids = isTakeoverRisk ? await this.store.sessions.deleteByUser(existing.id) : [];
+      if (isTakeoverRisk) await this.store.users.updatePasswordHash(existing.id, null);
+      await this.store.audit.record({
+        action: 'auth.google_linked',
+        actorUserId: existing.id,
+        ...meta,
+        meta: { email, ...(isTakeoverRisk ? { clearedUnverifiedPassword: true, revokedSessions: revokedSids.length } : {}) },
+      });
+      const current = (await this.store.users.findById(existing.id)) ?? existing;
+      return { user: await this.ensureVerified(current, meta), revokedSids };
     }
     const created = await this.insertMember({ email, passwordHash: null, displayName: buildDisplayName(identity.name, email) }, meta, 'google');
     // Request khác vừa tạo cùng email: lỗi để client thử lại, lần sau sẽ vào nhánh liên kết ở trên.
     if (!created) throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
     await this.linkIdentity({ ...link, userId: created.id });
-    return created;
+    return { user: created, revokedSids: [] };
+  }
+
+  /** Gọi trong transaction đang mở: đăng nhập bằng Google chứng minh sở hữu email, đánh dấu đã xác thực nếu chưa. */
+  private async ensureVerified(user: UserRecord, meta: RequestMeta): Promise<UserRecord> {
+    if (user.emailVerifiedAt) return user;
+    const verified = (await this.store.users.markEmailVerified(user.id, this.now())) ?? user;
+    await this.store.audit.record({ action: 'auth.email_verified', actorUserId: user.id, ...meta, meta: { via: 'google' } });
+    return verified;
   }
 
   /** Hai request đăng nhập Google lần đầu cùng lúc: request thua thì ném lỗi để transaction của nó rollback. */
@@ -312,7 +435,7 @@ export class AuthUseCases {
   }
 
   private async issueTokenPair(user: UserRecord, sid: string, refreshToken: string): Promise<TokenPair> {
-    const access = await this.tokens.issue({ userId: user.id, role: user.role, sid });
+    const access = await this.tokens.issue({ userId: user.id, role: user.role, sid, emailVerified: user.emailVerifiedAt !== null });
     return { accessToken: access.token, refreshToken, tokenType: 'Bearer', expiresIn: access.expiresIn };
   }
 

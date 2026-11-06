@@ -15,6 +15,37 @@
         ]
       }
     },
+    "/api/auth/registration-code": {
+      "post": {
+        "operationId": "AuthController_requestRegistrationCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCodeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -438,6 +469,62 @@
         ]
       }
     },
+    "/api/auth/email/verify": {
+      "post": {
+        "operationId": "EmailVerificationController_verify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Liên kết xác thực email không hợp lệ hoặc đã hết hạn"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/email/verification": {
+      "post": {
+        "operationId": "EmailVerificationController_resend",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendVerificationResultDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bạn đã yêu cầu gửi lại email xác thực quá nhiều lần, vui lòng thử lại sau"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/service-token": {
       "post": {
         "operationId": "ServiceTokenController_issue",
@@ -752,6 +839,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Email chưa được xác thực (email_unverified)"
           }
         },
         "security": [
@@ -1049,6 +1139,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Email chưa được xác thực (email_unverified)"
           }
         },
         "security": [
@@ -1237,6 +1330,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Email chưa được xác thực (email_unverified)"
           }
         },
         "security": [
@@ -3239,6 +3335,42 @@
       }
     },
     "schemas": {
+      "RegistrationCodeDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RegistrationCodeResultDto": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resendAfterSeconds": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây phải đợi trước khi xin mã lại cho email này"
+          }
+        },
+        "required": [
+          "registrationId",
+          "resendAfterSeconds"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -3248,19 +3380,29 @@
           },
           "password": {
             "type": "string",
-            "minLength": 8,
+            "minLength": 12,
             "maxLength": 128
           },
           "displayName": {
             "type": "string",
             "maxLength": 50,
             "example": "Khang"
+          },
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$"
           }
         },
         "required": [
           "email",
           "password",
-          "displayName"
+          "displayName",
+          "registrationId",
+          "code"
         ]
       },
       "UserDto": {
@@ -3395,6 +3537,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Đã xác thực email (TF05D). false: chưa đăng bài, bình luận được; gửi lại link bằng POST /auth/email/verification"
+          },
           "phone": {
             "type": "string",
             "nullable": true,
@@ -3427,6 +3573,7 @@
           "displayName",
           "role",
           "createdAt",
+          "emailVerified",
           "phone",
           "dateOfBirth",
           "gender",
@@ -3566,6 +3713,39 @@
         "required": [
           "token",
           "newPassword"
+        ]
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Giá trị ?token= trên link trong email"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "ResendVerificationResultDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "already_verified"
+            ],
+            "description": "already_verified: email đã xác thực, không gửi gì"
+          },
+          "message": {
+            "type": "string",
+            "example": "Đã gửi email xác thực, vui lòng kiểm tra hộp thư"
+          }
+        },
+        "required": [
+          "status",
+          "message"
         ]
       },
       "ServiceTokenRequestDto": {

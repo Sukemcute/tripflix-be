@@ -42,9 +42,19 @@ export class JoseTokenIssuer implements TokenIssuer {
     return { issuer: new JoseTokenIssuer(privateKey, publicJwk, config, now), isEphemeral: !pem };
   }
 
-  async issue({ userId, role, sid }: { userId: string; role: Role; sid: string }): Promise<IssuedAccessToken> {
+  async issue({
+    userId,
+    role,
+    sid,
+    emailVerified,
+  }: {
+    userId: string;
+    role: Role;
+    sid: string;
+    emailVerified: boolean;
+  }): Promise<IssuedAccessToken> {
     const iat = Math.floor(this.now().getTime() / 1000);
-    const token = await new SignJWT({ role, sid })
+    const token = await new SignJWT({ role, sid, ev: emailVerified })
       .setProtectedHeader({ alg: ACCESS_TOKEN_ALG, kid: this.publicJwk.kid ?? '', typ: 'JWT' })
       .setSubject(userId)
       .setIssuer(this.config.issuer)

@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -47,6 +49,8 @@ describe('TF055: tài khoản của tôi', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -66,7 +70,7 @@ describe('TF055: tài khoản của tôi', () => {
 
   /** Đăng ký rồi đăng nhập trên 2 thiết bị. */
   async function createAccountOnTwoDevices(email: string) {
-    const reg = await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: 'Khang' }).expect(201);
+    const reg = await registerTestAccount(app, { email, password: PASSWORD, displayName: 'Khang' });
     const phone = (await login(email, 'Pixel 8').expect(200)).body;
     const laptop = (await login(email, 'MacBook').expect(200)).body;
     return { userId: reg.body.id as string, phone, laptop };

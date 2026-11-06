@@ -9,7 +9,8 @@ import {
   CLOCK,
   type AccessStore,
   type Clock,
-  type PasswordResetRepository,
+  type OneTimeTokenRepository,
+  type RegistrationChallengeRepository,
   type SessionRepository,
 } from '../application/ports.js';
 
@@ -20,24 +21,30 @@ export const PUBLISHED_EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export interface AccessCleanupResult {
   expiredSessions: number;
   expiredPasswordResets: number;
+  expiredEmailVerifications: number;
+  expiredRegistrationChallenges: number;
   publishedEvents: number;
 }
 
-/** Một lượt dọn: phiên, token đặt lại mật khẩu đã hết hạn và dòng outbox đã gửi quá 7 ngày. */
+/** Một lượt dọn: phiên, token đặt lại mật khẩu, link xác thực email đã hết hạn và dòng outbox đã gửi quá 7 ngày. */
 export async function runAccessCleanup(deps: {
   sessions: Pick<SessionRepository, 'deleteExpired'>;
-  passwordResets: Pick<PasswordResetRepository, 'deleteExpired'>;
+  passwordResets: Pick<OneTimeTokenRepository, 'deleteExpired'>;
+  emailVerifications: Pick<OneTimeTokenRepository, 'deleteExpired'>;
+  registrationChallenges: Pick<RegistrationChallengeRepository, 'deleteExpired'>;
   db: Db;
   now: Date;
 }): Promise<AccessCleanupResult> {
   const expiredSessions = await deps.sessions.deleteExpired(deps.now);
   const expiredPasswordResets = await deps.passwordResets.deleteExpired(deps.now);
+  const expiredEmailVerifications = await deps.emailVerifications.deleteExpired(deps.now);
+  const expiredRegistrationChallenges = await deps.registrationChallenges.deleteExpired(deps.now);
   const publishedEvents = await deletePublishedBefore(
     deps.db,
     accessOutboxEvents,
     new Date(deps.now.getTime() - PUBLISHED_EVENT_RETENTION_MS),
   );
-  return { expiredSessions, expiredPasswordResets, publishedEvents };
+  return { expiredSessions, expiredPasswordResets, expiredEmailVerifications, expiredRegistrationChallenges, publishedEvents };
 }
 
 /**
@@ -81,10 +88,12 @@ export class AccessCleanupJob implements OnApplicationBootstrap, OnApplicationSh
       const result = await runAccessCleanup({
         sessions: this.store.sessions,
         passwordResets: this.store.passwordResets,
+        emailVerifications: this.store.emailVerifications,
+        registrationChallenges: this.store.registrationChallenges,
         db,
         now: this.now(),
       });
-      this.logger.log(result, 'Đã dọn phiên, token đặt lại mật khẩu hết hạn và sự kiện access đã gửi quá 7 ngày');
+      this.logger.log(result, 'Đã dọn phiên, token đặt lại mật khẩu, link xác thực email hết hạn và sự kiện access đã gửi quá 7 ngày');
     } catch (err) {
       this.logger.error({ err }, 'Dọn dữ liệu access lỗi, sẽ thử lại ở lượt sau');
     }

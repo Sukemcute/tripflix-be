@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from '../../access/index.js';
+import { registerTestAccount } from '../../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -119,6 +121,8 @@ describe('GET /api/v1/feed E2E', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(new MemoryAccessStore())
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -134,7 +138,7 @@ describe('GET /api/v1/feed E2E', () => {
     applyGlobalPrefix(app);
     await app.init();
     const credentials = { email: 'xem@example.com', password: 'mat-khau-an-toan', displayName: 'Người xem' };
-    const registered = await http().post('/api/auth/register').send(credentials).expect(201);
+    const registered = await registerTestAccount(app, credentials);
     userId = (registered.body as { id: string }).id;
     const login = await http().post('/api/auth/login').send(credentials).expect(200);
     token = (login.body as { accessToken: string }).accessToken;

@@ -170,7 +170,8 @@ export const AccessUserGuestMergedV1Schema = z.object({ anonId: z.uuid(), userId
 export type AccessUserGuestMergedV1 = z.infer<typeof AccessUserGuestMergedV1Schema>;
 
 /**
- * access.user.welcome_email_requested v1: tài khoản vừa được tạo (đăng ký hoặc lần đầu đăng nhập Google),
+ * access.user.welcome_email_requested v1: tài khoản vừa được tạo bằng Google lần đầu (TF05D: đăng ký bằng mật khẩu
+ * dùng access.email_verification_requested reason "signup"; provider "password" giữ lại cho sự kiện cũ),
  * notification-service gửi email chào mừng. Có email vì bên gửi cần người nhận (docs/10 §3.5); chỉ
  * notification-service dùng sự kiện này, module khác nghe access.user.registered (không có email).
  */
@@ -181,6 +182,42 @@ export const AccessUserWelcomeEmailRequestedV1Schema = z.object({
   provider: z.enum(['password', 'google']),
 });
 export type AccessUserWelcomeEmailRequestedV1 = z.infer<typeof AccessUserWelcomeEmailRequestedV1Schema>;
+
+/**
+ * access.email_verification_requested v1 (TF05D): notification-service gửi email xác nhận địa chỉ email.
+ * reason "signup": vừa đăng ký bằng mật khẩu, email gộp lời chào mừng (thay access.user.welcome_email_requested);
+ * "resend": người dùng bấm gửi lại. verifyUrl đã gồm token dùng một lần, sống 24 giờ. Có email vì bên gửi cần
+ * người nhận (docs/10 §3.5); chỉ notification-service dùng sự kiện này.
+ */
+export const AccessEmailVerificationRequestedV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  verifyUrl: z.url(),
+  expiresAt: z.iso.datetime(),
+  reason: z.enum(['signup', 'resend']),
+});
+export type AccessEmailVerificationRequestedV1 = z.infer<typeof AccessEmailVerificationRequestedV1Schema>;
+
+export const AccessRegistrationCodeRequestedV1Schema = z.object({
+  email: z.email(),
+  code: z.string().regex(/^[0-9]{8}$/),
+  expiresAt: z.iso.datetime(),
+});
+export type AccessRegistrationCodeRequestedV1 = z.infer<typeof AccessRegistrationCodeRequestedV1Schema>;
+
+/**
+ * access.registration_attempted_existing v1: ai đó xin mã đăng ký bằng email đã có tài khoản đang hoạt động.
+ * API vẫn trả như email mới (không lộ email nào đã đăng ký); notification-service báo cho chủ email biết họ đã có
+ * tài khoản, kèm cách đăng nhập. hasPassword false: tài khoản chỉ đăng nhập bằng Google. Chỉ notification-service dùng.
+ */
+export const AccessRegistrationAttemptedExistingV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  hasPassword: z.boolean(),
+});
+export type AccessRegistrationAttemptedExistingV1 = z.infer<typeof AccessRegistrationAttemptedExistingV1Schema>;
 
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
@@ -219,4 +256,7 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,
   'access.user.guest_merged.v1': AccessUserGuestMergedV1Schema,
   'access.user.welcome_email_requested.v1': AccessUserWelcomeEmailRequestedV1Schema,
+  'access.email_verification_requested.v1': AccessEmailVerificationRequestedV1Schema,
+  'access.registration_code_requested.v1': AccessRegistrationCodeRequestedV1Schema,
+  'access.registration_attempted_existing.v1': AccessRegistrationAttemptedExistingV1Schema,
 };

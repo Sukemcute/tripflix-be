@@ -12,6 +12,12 @@ export interface AuthUser {
   sid: string;
   /** Thời điểm hết hạn của token, tính bằng giây (claim exp). */
   exp: number;
+  /**
+   * Chủ tài khoản đã xác thực email (claim ev, TF05D). Token không có claim này (cấp trước TF05D) coi là chưa:
+   * access token chỉ sống 15 phút, làm mới là có claim. Verifier luôn điền; tuỳ chọn để AuthUser dựng tay
+   * trong test của module khác không phải sửa. Thiếu thì RequireVerifiedEmail coi là chưa xác thực.
+   */
+  emailVerified?: boolean;
 }
 
 export interface AccessTokenVerifierOptions {
@@ -48,6 +54,6 @@ export function createAccessTokenVerifier({ keys, issuer, audience }: AccessToke
     if (!role.success || typeof payload.sid !== 'string' || !payload.sub || typeof payload.exp !== 'number') {
       throw new InvalidAccessTokenError();
     }
-    return { userId: payload.sub, role: role.data, sid: payload.sid, exp: payload.exp };
+    return { userId: payload.sub, role: role.data, sid: payload.sid, exp: payload.exp, emailVerified: payload.ev === true };
   };
 }

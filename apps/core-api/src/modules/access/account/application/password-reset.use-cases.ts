@@ -122,12 +122,15 @@ export class PasswordResetUseCases {
     // Bị khoá sau khi xin link: không cho đổi mật khẩu. Ném lỗi thì transaction rollback, token chưa bị tiêu.
     if (!user || user.status !== 'active') throw new AccessError('invalid_reset_token', INVALID_RESET_TOKEN_MESSAGE);
     await this.store.users.updatePasswordHash(user.id, passwordHash);
+    // Mở được link trong hộp thư là đã chứng minh sở hữu email (TF05D).
+    const wasVerified = user.emailVerifiedAt !== null;
+    if (!wasVerified) await this.store.users.markEmailVerified(user.id, this.now());
     const revokedSids = await this.store.sessions.deleteByUser(user.id);
     await this.store.audit.record({
       action: 'auth.password_reset',
       actorUserId: user.id,
       ...meta,
-      meta: { revokedSessions: revokedSids.length },
+      meta: { revokedSessions: revokedSids.length, ...(wasVerified ? {} : { emailVerified: true }) },
     });
     return { user, revokedSids };
   }

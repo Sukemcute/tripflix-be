@@ -68,6 +68,21 @@ describe('EventRouter', () => {
     expect(mailer.sent[0]?.text).toContain('https://tripflix.vn');
   });
 
+  it('access.registration_attempted_existing thì gửi email báo đã có tài khoản, giao lại không gửi lần hai', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log, { webAppUrl: 'https://tripflix.vn' });
+    const event = createEvent('access.registration_attempted_existing', {
+      userId: randomUUID(),
+      email: 'binh@example.com',
+      displayName: 'Bình',
+      hasPassword: true,
+    });
+    expect(await router.route(event)).toBe('handled');
+    expect(await router.route(event)).toBe('duplicate');
+    expect(mailer.sent.map((m) => m.subject)).toEqual(['Email này đã có tài khoản Tripflix']);
+    expect(mailer.sent[0]?.to).toBe('binh@example.com');
+  });
+
   it('access.password_reset_requested thì gửi email, sự kiện giao lại không gửi lần hai', async () => {
     const mailer = new MemoryMailer();
     const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);

@@ -15,6 +15,8 @@ import { CORE_ENV, REDIS } from '../../platform/tokens.js';
 import { AccountController } from './account/api/account.controller.js';
 import { PasswordResetController } from './account/api/password-reset.controller.js';
 import { AccountUseCases } from './account/application/account.use-cases.js';
+import { EmailVerificationController } from './account/api/email-verification.controller.js';
+import { EmailVerificationUseCases } from './account/application/email-verification.use-cases.js';
 import { PasswordResetUseCases } from './account/application/password-reset.use-cases.js';
 import { AuthController } from './auth/api/auth.controller.js';
 import { JwksController } from './auth/api/jwks.controller.js';
@@ -129,11 +131,20 @@ export class AccessInfraModule {}
       },
     }),
   ],
-  controllers: [AuthController, AccountController, PasswordResetController, ServiceTokenController, JwksController, AdminController],
+  controllers: [
+    AuthController,
+    AccountController,
+    PasswordResetController,
+    EmailVerificationController,
+    ServiceTokenController,
+    JwksController,
+    AdminController,
+  ],
   providers: [
     AuthUseCases,
     AccountUseCases,
     PasswordResetUseCases,
+    EmailVerificationUseCases,
     StaffUseCases,
     ServiceTokenUseCases,
     WebSession,

@@ -1,3 +1,4 @@
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -71,7 +72,7 @@ describe('TF057: quên và đặt lại mật khẩu', () => {
   });
 
   async function register(email: string) {
-    const res = await http().post('/api/auth/register').send({ email, password: PASSWORD, displayName: 'Khang' }).expect(201);
+    const res = await registerTestAccount(app, { email, password: PASSWORD, displayName: 'Khang' });
     return res.body.id as string;
   }
 

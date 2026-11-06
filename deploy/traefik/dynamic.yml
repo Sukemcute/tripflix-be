@@ -20,7 +20,7 @@ http:
     # Ưu tiên hơn router core-api bên dưới, nên các đường dẫn này chỉ chịu giới hạn chặt.
     core-api-auth:
       rule: >-
-        Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/google`) ||
+        Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/registration-code`) || Path(`/api/auth/google`) ||
         Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`) || Path(`/api/auth/service-token`))
       priority: 100
       service: core-api

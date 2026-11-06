@@ -21,6 +21,9 @@ const ROLES_KEY = 'tripflix:roles';
 
 export const UNAUTHORIZED_MESSAGE = 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn';
 export const FORBIDDEN_MESSAGE = 'Bạn không có quyền dùng chức năng này';
+export const EMAIL_UNVERIFIED_MESSAGE = 'Bạn cần xác thực email trước khi dùng chức năng này';
+/** Mã trong body 403 để client phân biệt với thiếu quyền (hiện nút gửi lại email xác thực). */
+export const EMAIL_UNVERIFIED_CODE = 'email_unverified';
 
 interface AuthRequest {
   headers: Record<string, string | string[] | undefined>;
@@ -77,12 +80,35 @@ export class RolesGuard implements CanActivate {
   }
 }
 
+/** Chặn tài khoản chưa xác thực email (claim ev); chạy sau AccessTokenGuard. 403 kèm code email_unverified. */
+@Injectable()
+export class VerifiedEmailGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const user = context.switchToHttp().getRequest<AuthRequest>().user;
+    if (!user) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
+    if (user.emailVerified !== true) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: EMAIL_UNVERIFIED_MESSAGE,
+        code: EMAIL_UNVERIFIED_CODE,
+      });
+    }
+    return true;
+  }
+}
+
 /** Bắt buộc đăng nhập. */
 export const Authenticated = () => UseGuards(AccessTokenGuard);
 
 /** Bắt buộc đăng nhập và có một trong các vai trò. Dùng cho controller hoặc từng handler. */
 export const Roles = (...roles: Role[]) =>
   applyDecorators(SetMetadata(ROLES_KEY, roles), UseGuards(AccessTokenGuard, RolesGuard));
+
+/**
+ * Bắt buộc đăng nhập và đã xác thực email (TF05D). Dùng cho thao tác tạo nội dung (đăng bài, bình luận) để chặn
+ * spam bằng email không có thật. Dùng được cùng @Authenticated hoặc @Roles ở controller.
+ */
+export const RequireVerifiedEmail = () => UseGuards(AccessTokenGuard, VerifiedEmailGuard);
 
 /** Lấy người dùng đã kiểm từ request (chỉ dùng sau @Authenticated hoặc @Roles). */
 export const CurrentUser = createParamDecorator((_data: unknown, context: ExecutionContext): AuthUser => {

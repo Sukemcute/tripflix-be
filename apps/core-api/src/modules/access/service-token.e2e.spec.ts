@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { Controller, Get, Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -77,6 +79,8 @@ describe('TF058: token giữa các service', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -127,7 +131,7 @@ describe('TF058: token giữa các service', () => {
   });
 
   it('token người dùng bị từ chối ở API service; token service bị từ chối ở API người dùng', async () => {
-    await http().post('/api/auth/register').send({ email: 'user@example.com', password: 'mat-khau-an-toan', displayName: 'U' }).expect(201);
+    await registerTestAccount(app, { email: 'user@example.com', password: 'mat-khau-an-toan', displayName: 'U' });
     const user = (await http().post('/api/auth/login').send({ email: 'user@example.com', password: 'mat-khau-an-toan' }).expect(200)).body;
     await http().get('/api/internal/any-service').set(bearer(user.accessToken)).expect(401);
 

@@ -46,6 +46,8 @@ export class AccessErrorFilter implements ExceptionFilter {
         http = new ConflictException(err.message);
         break;
       case 'invalid_reset_token':
+      case 'invalid_verify_token':
+      case 'invalid_registration_code':
       case 'wrong_password':
         // 400, không phải 401: client hiểu 401 là token hết hạn rồi tự làm mới hoặc đăng xuất.
         http = new BadRequestException(err.message);
@@ -55,8 +57,14 @@ export class AccessErrorFilter implements ExceptionFilter {
         break;
       case 'too_many_attempts':
         if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
+        // retryAfterSeconds trong body để app hiện đếm ngược mà không cần đọc header.
         http = new HttpException(
-          { statusCode: HttpStatus.TOO_MANY_REQUESTS, message: err.message, error: 'Too Many Requests' },
+          {
+            statusCode: HttpStatus.TOO_MANY_REQUESTS,
+            message: err.message,
+            error: 'Too Many Requests',
+            ...(err.retryAfterSeconds ? { retryAfterSeconds: err.retryAfterSeconds } : {}),
+          },
           HttpStatus.TOO_MANY_REQUESTS,
         );
         break;

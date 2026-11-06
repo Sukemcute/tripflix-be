@@ -1,3 +1,5 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount, seedLegacyAccount } from '../../platform/registration.fixture.js';
 import 'reflect-metadata';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -87,6 +89,8 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
@@ -120,13 +124,31 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
     await http().get('/api/auth/me').set('Authorization', `Bearer ${again.body.accessToken}`).expect(200);
   });
 
-  it('trùng email với tài khoản mật khẩu: liên kết vào tài khoản đó, mật khẩu vẫn dùng được', async () => {
-    const reg = await http().post('/api/auth/register').send({ email: 'co-mat-khau@example.com', password: PASSWORD, displayName: 'An' }).expect(201);
+  it('trùng email với tài khoản mật khẩu ĐÃ xác thực: liên kết vào tài khoản đó, mật khẩu vẫn dùng được', async () => {
+    const reg = await registerTestAccount(app, { email: 'co-mat-khau@example.com', password: PASSWORD, displayName: 'An' });
+    await store.users.markEmailVerified(reg.body.id, new Date());
     const res = await google(await googleToken({ sub: 'sub-linked', email: 'co-mat-khau@example.com' })).expect(200);
-    expect(decodeJwt(res.body.accessToken).sub).toBe(reg.body.id);
+    expect(decodeJwt(res.body.accessToken)).toMatchObject({ sub: reg.body.id, ev: true });
     expect(store.identityRows.some((i) => i.subject === 'sub-linked' && i.userId === reg.body.id)).toBe(true);
     expect(store.userRows.get(reg.body.id)?.displayName).toBe('An');
     await http().post('/api/auth/login').send({ email: 'co-mat-khau@example.com', password: PASSWORD }).expect(200);
+  });
+
+  it('TF05D: trùng email với tài khoản mật khẩu CHƯA xác thực: liên kết, xoá mật khẩu và phiên cũ (chống chiếm tài khoản trước)', async () => {
+    // Kẻ xấu đăng ký trước bằng email của chủ thật rồi đăng nhập giữ phiên.
+    const reg = await seedLegacyAccount(app, { email: 'bi-chiem@example.com', password: PASSWORD, displayName: 'Kẻ xấu' });
+    const attacker = await http().post('/api/auth/login').send({ email: 'bi-chiem@example.com', password: PASSWORD }).expect(200);
+    // Chủ thật đăng nhập Google: Google chứng minh họ sở hữu email.
+    const res = await google(await googleToken({ sub: 'sub-chu-that', email: 'bi-chiem@example.com' })).expect(200);
+    expect(decodeJwt(res.body.accessToken)).toMatchObject({ sub: reg.id, ev: true });
+    expect(store.userRows.get(reg.id)).toMatchObject({ passwordHash: null });
+    expect(store.userRows.get(reg.id)?.emailVerifiedAt).toBeInstanceOf(Date);
+    // Mật khẩu kẻ xấu đặt hết dùng được, phiên của kẻ xấu bị thu hồi ngay.
+    await http().post('/api/auth/login').send({ email: 'bi-chiem@example.com', password: PASSWORD }).expect(401);
+    await http().get('/api/auth/me').set('Authorization', `Bearer ${attacker.body.accessToken}`).expect(401);
+    await http().post('/api/auth/refresh').send({ refreshToken: attacker.body.refreshToken }).expect(401);
+    const audit = store.auditRows.find((a) => a.action === 'auth.google_linked' && a.actorUserId === reg.id);
+    expect(audit?.meta).toMatchObject({ clearedUnverifiedPassword: true, revokedSessions: 1 });
   });
 
   it('token sai aud, sai iss, hết hạn, sai chữ ký, email chưa xác minh: 401 cùng một câu', async () => {
@@ -148,7 +170,7 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
   });
 
   it('tài khoản bị khoá: 401, không liên kết thêm', async () => {
-    const reg = await http().post('/api/auth/register').send({ email: 'bi-khoa@example.com', password: PASSWORD, displayName: 'K' }).expect(201);
+    const reg = await registerTestAccount(app, { email: 'bi-khoa@example.com', password: PASSWORD, displayName: 'K' });
     store.userRows.set(reg.body.id, { ...store.userRows.get(reg.body.id)!, status: 'locked' });
     await google(await googleToken({ sub: 'sub-locked', email: 'bi-khoa@example.com' })).expect(401);
     expect(store.identityRows.some((i) => i.subject === 'sub-locked')).toBe(false);
@@ -167,11 +189,7 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
 
   it('X-Anon-Id: đúng một access.user.guest_merged mỗi lần đăng ký, đăng nhập, đăng nhập Google', async () => {
     const anonRegister = '6f1c1c55-8a1e-4c0b-9e43-2b1a7a8f0a01';
-    const reg = await http()
-      .post('/api/auth/register')
-      .set('X-Anon-Id', anonRegister)
-      .send({ email: 'khach@example.com', password: PASSWORD, displayName: 'Khách' })
-      .expect(201);
+    const reg = await registerTestAccount(app, { email: 'khach@example.com', password: PASSWORD, displayName: 'Khách' }, 201, { 'X-Anon-Id': anonRegister });
     expect(guestMerged(anonRegister).map((e) => e.payload)).toEqual([{ anonId: anonRegister, userId: reg.body.id }]);
 
     const anonLogin = '6f1c1c55-8a1e-4c0b-9e43-2b1a7a8f0a02';
@@ -202,11 +220,10 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
     const welcome = (userId: string) =>
       store.outboxRows.filter((e) => e.type === 'access.user.welcome_email_requested' && e.userId === userId);
 
-    const reg = await http().post('/api/auth/register').send({ email: 'chao@example.com', password: PASSWORD, displayName: 'Chào' }).expect(201);
-    expect(welcome(reg.body.id).map((e) => e.payload)).toEqual([
-      { userId: reg.body.id, email: 'chao@example.com', displayName: 'Chào', provider: 'password' },
-    ]);
-    await http().post('/api/auth/register').send({ email: 'chao@example.com', password: PASSWORD, displayName: 'Trùng' }).expect(409);
+    const reg = await registerTestAccount(app, { email: 'chao@example.com', password: PASSWORD, displayName: 'Chào' });
+    expect(welcome(reg.body.id)).toHaveLength(1);
+    await store.users.markEmailVerified(reg.body.id, new Date());
+    await registerTestAccount(app, { email: 'chao@example.com', password: PASSWORD, displayName: 'Trùng' }, 409);
     await http().post('/api/auth/login').send({ email: 'chao@example.com', password: PASSWORD }).expect(200);
     // Liên kết Google vào tài khoản có sẵn: không phải tài khoản mới, không chào lại.
     await google(await googleToken({ sub: 'sub-chao-link', email: 'chao@example.com' })).expect(200);

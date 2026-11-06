@@ -35,6 +35,10 @@ export class StaffController {
 @Get('me')
 @Authenticated()                // chỉ cần đăng nhập
 me(@CurrentUser() user: AuthUser) {}
+
+@Post()
+@RequireVerifiedEmail()         // đăng nhập và đã xác thực email (TF05D): chưa thì 403 { code: 'email_unverified' }
+create(@CurrentUser() user: AuthUser) {}
 ```
 
 ## Kiểm những gì
@@ -46,6 +50,7 @@ me(@CurrentUser() user: AuthUser) {}
 | `iss`, `aud`, `exp`; đủ claim `sub`, `role`, `sid`, `iat` | 401 |
 | `sid` không nằm trong danh sách chặn (Redis `auth:revoked-sid:<sid>`, ghi khi đăng xuất hoặc phát hiện dùng lại refresh token) | 401 |
 | `role` nằm trong `@Roles(...)` | 403 |
+| Claim `ev` là `true` khi có `@RequireVerifiedEmail()` (`AuthUser.emailVerified`; token không có `ev` coi là chưa xác thực) | 403, body `{ statusCode, message, code: "email_unverified" }` |
 
 `MemorySidBlocklist` dùng cho test.
 

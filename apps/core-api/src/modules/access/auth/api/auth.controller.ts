@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res, UseFilters } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiAcceptedResponse,
   ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -16,12 +17,16 @@ import type { z } from 'zod';
 import { AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
 import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REFRESH_MESSAGE } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
+import { REGISTRATION_CODE_COOLDOWN_SECONDS } from '../domain/registration.js';
 import {
   GoogleLoginDto,
   GoogleLoginRequestSchema,
   LoginDto,
   RefreshDto,
   RegisterDto,
+  RegistrationCodeDto,
+  RegistrationCodeResultDto,
+  RegistrationCodeRequestSchema,
   TokenPairDto,
   MyProfileDto,
   UserDto,
@@ -49,6 +54,18 @@ export class AuthController {
     @Inject(AuthUseCases) private readonly auth: AuthUseCases,
     @Inject(WebSession) private readonly web: WebSession,
   ) {}
+
+  @Post('registration-code')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBody({ type: RegistrationCodeDto })
+  @ApiAcceptedResponse({ type: RegistrationCodeResultDto })
+  async requestRegistrationCode(
+    @Body(new ZodBody(RegistrationCodeRequestSchema)) body: z.infer<typeof RegistrationCodeRequestSchema>,
+    @Req() req: Request,
+  ): Promise<RegistrationCodeResultDto> {
+    const registrationId = await this.auth.requestRegistrationCode(body.email, readRequestMeta(req));
+    return { registrationId, resendAfterSeconds: REGISTRATION_CODE_COOLDOWN_SECONDS };
+  }
 
   @Post('register')
   @ApiBody({ type: RegisterDto })

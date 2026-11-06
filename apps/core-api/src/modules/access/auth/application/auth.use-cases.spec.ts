@@ -7,6 +7,8 @@ import { AccessError } from '../domain/errors.js';
 import { REFRESH_GRACE_MS } from '../domain/refresh-rotation.js';
 import { MemoryAccessStore } from '../infra/memory/memory-access.store.js';
 import { MemoryLoginRateLimiter } from '../infra/memory/memory-login-rate-limiter.js';
+import { MemoryActionRateLimiter } from '../infra/memory/memory-action-rate-limiter.js';
+import type { CoreEnv } from '../../../../platform/env.js';
 import { AuthUseCases } from './auth.use-cases.js';
 import type { PasswordHasher, TokenIssuer } from './ports.js';
 import { hashRefreshToken } from './refresh-token.js';
@@ -36,8 +38,20 @@ async function setup() {
   const store = new MemoryAccessStore();
   const blocklist = new MemorySidBlocklist(() => nowMs);
   const google = { verify: async () => Promise.reject(new Error('không dùng trong test này')) };
-  const auth = new AuthUseCases(store, hasher, issuer, new MemoryLoginRateLimiter(() => nowMs), blocklist, clock, google);
-  await auth.register({ email: 'An@Example.com', password: 'mat-khau-1', displayName: 'An' }, meta);
+  const actionLimiter = new MemoryActionRateLimiter();
+  const env = {} as CoreEnv;
+  const auth = new AuthUseCases(
+    store,
+    hasher,
+    issuer,
+    new MemoryLoginRateLimiter(() => nowMs),
+    blocklist,
+    clock,
+    google,
+    actionLimiter,
+    env,
+  );
+  await store.users.insert({ email: 'an@example.com', passwordHash: await hasher.hash('mat-khau-1'), displayName: 'An', role: 'member' });
   const first = await auth.login({ email: 'an@example.com', password: 'mat-khau-1' }, meta);
   const sid = [...store.sessionRows.keys()][0]!;
   return { auth, store, blocklist, first, sid, advance: (ms: number) => (nowMs += ms) };

@@ -22,6 +22,8 @@ export function mapPublicUser(user: UserRecord): PublicUser {
 
 /** Hồ sơ của chính người đang đăng nhập (GET/PATCH /auth/me): thêm thông tin cá nhân, không dùng cho danh sách nhân viên. */
 export interface MyProfile extends PublicUser {
+  /** Đã xác thực email (TF05D); chưa thì không đăng bài, bình luận được. */
+  emailVerified: boolean;
   phone: string | null;
   dateOfBirth: string | null;
   gender: UserRecord['personal']['gender'];
@@ -29,5 +31,5 @@ export interface MyProfile extends PublicUser {
 }
 
 export function mapMyProfile(user: UserRecord): MyProfile {
-  return { ...mapPublicUser(user), ...user.personal };
+  return { ...mapPublicUser(user), emailVerified: user.emailVerifiedAt !== null, ...user.personal };
 }
