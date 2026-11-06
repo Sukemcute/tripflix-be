@@ -246,6 +246,15 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     }
   });
 
+  it.each([
+    '/api/v1/posts',
+    `/api/v1/posts/${validPostId}/publish`,
+    `/api/v1/posts/${validPostId}/comments`,
+  ])('POST %s yêu cầu xác thực email', async (path) => {
+    const response = await http().post(path).set(bearer(userAToken)).expect(403);
+    expect(response.body).toMatchObject({ code: 'email_unverified' });
+  });
+
   it('PUT /api/v1/comments/:id/reaction không có token: 401 Unauthorized', async () => {
     await http().put(`/api/v1/comments/${validCommentId}/reaction`).expect(401);
   });

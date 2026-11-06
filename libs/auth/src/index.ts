@@ -12,11 +12,15 @@ export {
   AccessTokenGuard,
   Authenticated,
   CurrentUser,
+  EMAIL_UNVERIFIED_CODE,
+  EMAIL_UNVERIFIED_MESSAGE,
   FORBIDDEN_MESSAGE,
+  RequireVerifiedEmail,
   Roles,
   RolesGuard,
   SID_BLOCKLIST,
   UNAUTHORIZED_MESSAGE,
+  VerifiedEmailGuard,
 } from './guards.js';
 export { AuthModule, type AuthModuleAsyncOptions, type AuthModuleOptions } from './auth.module.js';
 export {

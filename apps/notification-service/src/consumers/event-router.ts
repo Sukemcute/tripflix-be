@@ -1,10 +1,12 @@
 import {
+  AccessEmailVerificationRequestedV1Schema,
   AccessPasswordResetRequestedV1Schema,
   AccessUserWelcomeEmailRequestedV1Schema,
   type EventEnvelope,
 } from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
 import type { Mailer } from '../outapp/mailer.js';
+import { buildEmailVerificationEmail } from '../outapp/email-verification.email.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
 import { buildWelcomeEmail } from '../outapp/welcome.email.js';
 
@@ -63,6 +65,10 @@ export class EventRouter {
     if (event.type === 'access.password_reset_requested') {
       const payload = AccessPasswordResetRequestedV1Schema.parse(event.payload);
       await this.mailer.send(buildPasswordResetEmail(payload));
+      result = 'handled';
+    } else if (event.type === 'access.email_verification_requested') {
+      const payload = AccessEmailVerificationRequestedV1Schema.parse(event.payload);
+      await this.mailer.send(buildEmailVerificationEmail(payload));
       result = 'handled';
     } else if (event.type === 'access.user.welcome_email_requested') {
       const payload = AccessUserWelcomeEmailRequestedV1Schema.parse(event.payload);

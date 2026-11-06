@@ -25,6 +25,9 @@ export const users = accessSchema.table(
     nationality: text('nationality'),
     role: text('role').notNull().default('member'),
     status: text('status').notNull().default('active'),
+    // Thời điểm chủ tài khoản chứng minh sở hữu email (TF05D): bấm link xác thực, đặt lại mật khẩu qua email,
+    // hoặc đăng nhập Google. Trống: chưa xác thực, chưa được đăng bài, bình luận.
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     createdAt: createdAtColumn(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -118,6 +121,27 @@ export const passwordResets = accessSchema.table(
     foreignKey({ name: 'fk_password_resets_user_id', columns: [t.userId], foreignColumns: [users.id] }).onDelete('cascade'),
     index('idx_password_resets_user_id').on(t.userId),
     index('idx_password_resets_expires_at').on(t.expiresAt),
+  ],
+);
+
+/**
+ * Link xác thực email (TF05D), cùng cách với password_resets: chỉ giữ SHA-256 của token, dùng một lần,
+ * sống 24 giờ. Mỗi lúc một người chỉ có một link chưa dùng (gửi lại thì xoá link cũ).
+ */
+export const emailVerifications = accessSchema.table(
+  'email_verifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    tokenHash: text('token_hash').notNull().unique('uq_email_verifications_token_hash'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAtColumn(),
+  },
+  (t) => [
+    foreignKey({ name: 'fk_email_verifications_user_id', columns: [t.userId], foreignColumns: [users.id] }).onDelete('cascade'),
+    index('idx_email_verifications_user_id').on(t.userId),
+    index('idx_email_verifications_expires_at').on(t.expiresAt),
   ],
 );
 

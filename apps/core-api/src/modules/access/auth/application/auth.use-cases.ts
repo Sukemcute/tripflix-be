@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserGuestMergedV1,
@@ -6,6 +6,14 @@ import type {
   AccessUserWelcomeEmailRequestedV1,
 } from '@tripflix/contracts';
 import { Transactional } from '@tripflix/db';
+import type { CoreEnv } from '../../../../platform/env.js';
+import { CORE_ENV } from '../../../../platform/tokens.js';
+import { EmailVerificationUseCases } from '../../account/application/email-verification.use-cases.js';
+import {
+  DEFAULT_REGISTER_MAX_PER_IP,
+  REGISTER_WINDOW_SECONDS,
+  TOO_MANY_SIGNUPS_MESSAGE,
+} from '../../account/domain/email-verification.js';
 import {
   EMAIL_TAKEN_MESSAGE,
   GOOGLE_LOGIN_FAILED_MESSAGE,
@@ -26,12 +34,14 @@ import {
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  ACTION_RATE_LIMITER,
   CLOCK,
   GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
   TOKEN_ISSUER,
   type AccessStore,
+  type ActionRateLimiter,
   type Clock,
   type GoogleIdentity,
   type GoogleIdTokenVerifier,
@@ -59,7 +69,9 @@ export interface TokenPair {
  */
 @Injectable()
 export class AuthUseCases {
+  private readonly logger = new Logger('AuthUseCases');
   private dummyHash?: Promise<string>;
+  private readonly registerMaxPerIp: number;
 
   constructor(
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
@@ -69,10 +81,25 @@ export class AuthUseCases {
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
     @Inject(CLOCK) private readonly now: Clock,
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleIdTokenVerifier,
-  ) {}
+    @Inject(ACTION_RATE_LIMITER) private readonly actionLimiter: ActionRateLimiter,
+    @Inject(EmailVerificationUseCases) private readonly emailVerification: EmailVerificationUseCases,
+    @Inject(CORE_ENV) env: CoreEnv,
+  ) {
+    // E2E dựng env tay có thể thiếu biến này: dùng mặc định như khi parse env.
+    this.registerMaxPerIp = (env.AUTH_REGISTER_MAX_PER_IP_HOUR as number | undefined) ?? DEFAULT_REGISTER_MAX_PER_IP;
+  }
 
   async register(input: { email: string; password: string; displayName: string }, meta: RequestMeta): Promise<PublicUser> {
     const email = normalizeEmail(input.email);
+    // Chống tạo tài khoản hàng loạt (TF05D): đếm theo IP trước khi băm argon2, tính cả lần trùng email.
+    // Redis lỗi thì vẫn cho đăng ký (gateway vẫn giới hạn theo IP), chỉ ghi cảnh báo.
+    const limit = await this.actionLimiter
+      .consume(`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS)
+      .catch((err: unknown) => {
+        this.logger.warn({ err }, 'Không đếm được số lần đăng ký theo IP, bỏ qua giới hạn lần này');
+        return null;
+      });
+    if (limit?.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, limit.retryAfterSeconds);
     const passwordHash = await this.hasher.hash(input.password);
     const user = await this.createMember({ email, passwordHash, displayName: input.displayName.trim() }, meta);
     if (!user) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
@@ -117,7 +144,8 @@ export class AuthUseCases {
    */
   async loginWithGoogle(input: { idToken: string; deviceName?: string | undefined }, meta: RequestMeta): Promise<TokenPair> {
     const identity = await this.google.verify(input.idToken);
-    const user = await this.resolveGoogleUser(identity, meta);
+    const { user, revokedSids } = await this.resolveGoogleUser(identity, meta);
+    await Promise.all(revokedSids.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
     if (user.status !== 'active') {
       await this.store.audit.record({ action: 'auth.login_failed', actorUserId: user.id, ...meta, meta: { provider: 'google' } });
       throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
@@ -176,19 +204,28 @@ export class AuthUseCases {
   }
 
   /**
-   * Thêm member, phát access.user.registered và yêu cầu gửi email chào mừng; gọi trong transaction đang mở,
+   * Thêm member, phát access.user.registered và yêu cầu gửi email; gọi trong transaction đang mở,
    * nên tài khoản không tạo được (email trùng, rollback) thì không có email.
+   * Mật khẩu: email chào mừng gộp link xác thực (TF05D). Google: email do Google xác minh, chỉ gửi chào mừng.
    */
   private async insertMember(
     input: { email: string; passwordHash: string | null; displayName: string },
     meta: RequestMeta,
     provider: 'password' | 'google',
   ): Promise<UserRecord | null> {
-    const created = await this.store.users.insert({ ...input, role: 'member' });
+    const created = await this.store.users.insert({
+      ...input,
+      role: 'member',
+      emailVerifiedAt: provider === 'google' ? this.now() : null,
+    });
     if (!created) return null;
     await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
     const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
     await this.store.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
+    if (provider === 'password') {
+      await this.emailVerification.issueInCurrentTransaction(created, 'signup', meta);
+      return created;
+    }
     const welcome: AccessUserWelcomeEmailRequestedV1 = {
       userId: created.id,
       email: created.email,
@@ -199,28 +236,55 @@ export class AuthUseCases {
     return created;
   }
 
-  /** Tìm hoặc tạo tài khoản cho danh tính Google; không liên kết vào tài khoản đang bị khoá. */
+  /**
+   * Tìm hoặc tạo tài khoản cho danh tính Google; không liên kết vào tài khoản đang bị khoá. Google đã xác minh
+   * email, nên tài khoản đi qua đây được đánh dấu đã xác thực (TF05D).
+   *
+   * Liên kết vào tài khoản mật khẩu CHƯA xác thực: mật khẩu đó có thể do người khác đặt trước bằng email của
+   * chủ thật (chiếm tài khoản trước, pre-account hijacking). Khi đó xoá mật khẩu và mọi phiên cũ; chủ thật
+   * muốn dùng mật khẩu thì đặt lại qua email.
+   */
   @Transactional('access')
-  private async resolveGoogleUser(identity: GoogleIdentity, meta: RequestMeta): Promise<UserRecord> {
+  private async resolveGoogleUser(
+    identity: GoogleIdentity,
+    meta: RequestMeta,
+  ): Promise<{ user: UserRecord; revokedSids: string[] }> {
     const linkedUserId = await this.store.identities.findUserId('google', identity.subject);
     if (linkedUserId) {
       const linked = await this.store.users.findById(linkedUserId);
-      if (linked) return linked;
+      if (linked) return { user: await this.ensureVerified(linked, meta), revokedSids: [] };
     }
     const email = normalizeEmail(identity.email);
     const link = { provider: 'google' as const, subject: identity.subject, email };
     const existing = await this.store.users.findByEmail(email);
     if (existing) {
-      if (existing.status !== 'active') return existing;
+      if (existing.status !== 'active') return { user: existing, revokedSids: [] };
       await this.linkIdentity({ ...link, userId: existing.id });
-      await this.store.audit.record({ action: 'auth.google_linked', actorUserId: existing.id, ...meta, meta: { email } });
-      return existing;
+      const isTakeoverRisk = existing.emailVerifiedAt === null && existing.passwordHash !== null;
+      const revokedSids = isTakeoverRisk ? await this.store.sessions.deleteByUser(existing.id) : [];
+      if (isTakeoverRisk) await this.store.users.updatePasswordHash(existing.id, null);
+      await this.store.audit.record({
+        action: 'auth.google_linked',
+        actorUserId: existing.id,
+        ...meta,
+        meta: { email, ...(isTakeoverRisk ? { clearedUnverifiedPassword: true, revokedSessions: revokedSids.length } : {}) },
+      });
+      const current = (await this.store.users.findById(existing.id)) ?? existing;
+      return { user: await this.ensureVerified(current, meta), revokedSids };
     }
     const created = await this.insertMember({ email, passwordHash: null, displayName: buildDisplayName(identity.name, email) }, meta, 'google');
     // Request khác vừa tạo cùng email: lỗi để client thử lại, lần sau sẽ vào nhánh liên kết ở trên.
     if (!created) throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
     await this.linkIdentity({ ...link, userId: created.id });
-    return created;
+    return { user: created, revokedSids: [] };
+  }
+
+  /** Gọi trong transaction đang mở: đăng nhập bằng Google chứng minh sở hữu email, đánh dấu đã xác thực nếu chưa. */
+  private async ensureVerified(user: UserRecord, meta: RequestMeta): Promise<UserRecord> {
+    if (user.emailVerifiedAt) return user;
+    const verified = (await this.store.users.markEmailVerified(user.id, this.now())) ?? user;
+    await this.store.audit.record({ action: 'auth.email_verified', actorUserId: user.id, ...meta, meta: { via: 'google' } });
+    return verified;
   }
 
   /** Hai request đăng nhập Google lần đầu cùng lúc: request thua thì ném lỗi để transaction của nó rollback. */
@@ -312,7 +376,7 @@ export class AuthUseCases {
   }
 
   private async issueTokenPair(user: UserRecord, sid: string, refreshToken: string): Promise<TokenPair> {
-    const access = await this.tokens.issue({ userId: user.id, role: user.role, sid });
+    const access = await this.tokens.issue({ userId: user.id, role: user.role, sid, emailVerified: user.emailVerifiedAt !== null });
     return { accessToken: access.token, refreshToken, tokenType: 'Bearer', expiresIn: access.expiresIn };
   }
 

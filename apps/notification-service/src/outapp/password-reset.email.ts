@@ -1,8 +1,7 @@
 import type { AccessPasswordResetRequestedV1 } from '@tripflix/contracts';
+import { escapeHtml } from './html.js';
 import type { EmailMessage } from './mailer.js';
 
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** Email đặt lại mật khẩu, tiếng Việt. Link dùng một lần, hết hạn sau 30 phút. */
 export function buildPasswordResetEmail(payload: AccessPasswordResetRequestedV1): EmailMessage {

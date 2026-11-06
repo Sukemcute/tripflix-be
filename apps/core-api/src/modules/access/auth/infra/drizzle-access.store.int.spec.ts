@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
@@ -178,7 +179,7 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     await db.update(accessOutboxEvents).set({ publishedAt: published(PUBLISHED_EVENT_RETENTION_MS + DAY) }).where(eq(accessOutboxEvents.id, oldId));
     await db.update(accessOutboxEvents).set({ publishedAt: published(DAY) }).where(eq(accessOutboxEvents.id, recentId));
 
-    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now });
     // Phiên hết hạn của các test trước cũng bị dọn, nên chỉ kiểm tối thiểu.
     expect(result.expiredSessions).toBeGreaterThanOrEqual(1);
     expect(result.publishedEvents).toBe(1);
@@ -192,9 +193,10 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(leftEvents.map((r) => r.id).sort()).toEqual([recentId, pendingId].sort());
 
     // Chạy lại không còn gì để dọn.
-    expect(await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now })).toEqual({
+    expect(await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now })).toEqual({
       expiredSessions: 0,
       expiredPasswordResets: 0,
+      expiredEmailVerifications: 0,
       publishedEvents: 0,
     });
   });
@@ -253,6 +255,62 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await violated({ email: 'ck-dup@example.com' })).toBe('uq_users_email');
   });
 
+  it('TF05D: insert có email_verified_at; markEmailVerified đặt khi trống, giữ mốc đầu tiên', async () => {
+    const google = await store.users.insert({ email: 'ev-google@example.com', passwordHash: null, displayName: 'G', role: 'member', emailVerifiedAt: new Date('2026-11-01T00:00:00Z') });
+    expect(google?.emailVerifiedAt?.toISOString()).toBe('2026-11-01T00:00:00.000Z');
+    const plain = await store.users.insert({ email: 'ev-plain@example.com', passwordHash: 'x', displayName: 'P', role: 'member' });
+    expect(plain?.emailVerifiedAt).toBeNull();
+    const first = await store.users.markEmailVerified(plain!.id, new Date('2026-11-06T01:00:00Z'));
+    expect(first?.emailVerifiedAt?.toISOString()).toBe('2026-11-06T01:00:00.000Z');
+    const second = await store.users.markEmailVerified(plain!.id, new Date('2026-11-07T01:00:00Z'));
+    expect(second?.emailVerifiedAt?.toISOString()).toBe('2026-11-06T01:00:00.000Z');
+    expect(await store.users.markEmailVerified('00000000-0000-4000-8000-000000000000', new Date())).toBeNull();
+    // Xoá mật khẩu (liên kết Google vào tài khoản chưa xác thực).
+    expect((await store.users.updatePasswordHash(plain!.id, null))?.passwordHash).toBeNull();
+  });
+
+  it('TF05D: email_verifications: 10 lệnh cùng tiêu một token chỉ 1 thắng; xoá token chưa dùng, token hết hạn; xoá user thì xoá token', async () => {
+    const user = await store.users.insert({ email: 'ev-token@example.com', passwordHash: 'x', displayName: 'T', role: 'member' });
+    const now = new Date();
+    await store.emailVerifications.insert({ userId: user!.id, tokenHash: 'ev-hash-1', expiresAt: new Date(now.getTime() + DAY) });
+    const results = await Promise.all(Array.from({ length: 10 }, () => store.emailVerifications.consume('ev-hash-1', new Date())));
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(await store.emailVerifications.findUsable('ev-hash-1', new Date())).toBeNull();
+
+    await store.emailVerifications.insert({ userId: user!.id, tokenHash: 'ev-hash-2', expiresAt: new Date(now.getTime() + DAY) });
+    await store.emailVerifications.insert({ userId: user!.id, tokenHash: 'ev-hash-old', expiresAt: new Date(now.getTime() - DAY) });
+    expect(await store.emailVerifications.findUsable('ev-hash-old', now)).toBeNull();
+    expect(await store.emailVerifications.findUsable('ev-hash-2', now)).toEqual({ userId: user!.id });
+    // Xoá token chưa dùng (gửi lại link): giữ token đã dùng.
+    expect(await store.emailVerifications.deleteUnusedByUser(user!.id)).toBe(2);
+    const left = await pool.query('select token_hash from access.email_verifications where user_id = $1', [user!.id]);
+    expect(left.rows.map((r) => r.token_hash)).toEqual(['ev-hash-1']);
+    // Bảng đặt lại mật khẩu không bị ảnh hưởng.
+    expect(await store.passwordResets.findUsable('ev-hash-1', now)).toBeNull();
+
+    await store.emailVerifications.insert({ userId: user!.id, tokenHash: 'ev-hash-exp', expiresAt: new Date(now.getTime() - 1000) });
+    expect(await store.emailVerifications.deleteExpired(now)).toBeGreaterThanOrEqual(1);
+    await pool.query('delete from access.users where id = $1', [user!.id]);
+    const cascade = await pool.query('select count(*)::int as n from access.email_verifications where user_id = $1', [user!.id]);
+    expect(cascade.rows[0].n).toBe(0);
+  });
+
+  it('TF05D: câu backfill trong migration: tài khoản đã liên kết Google thành đã xác thực, tài khoản chỉ có mật khẩu thì không', async () => {
+    const sqlFile = fileURLToPath(new URL('../../db/migrations/20261106032708_add_email_verifications/migration.sql', import.meta.url));
+    const backfill = readFileSync(sqlFile, 'utf8').split('--> statement-breakpoint').at(-1)!;
+    expect(backfill).toMatch(/UPDATE "access"\."users"/);
+    const withGoogle = await store.users.insert({ email: 'bf-google@example.com', passwordHash: 'x', displayName: 'G', role: 'member' });
+    const onlyPassword = await store.users.insert({ email: 'bf-password@example.com', passwordHash: 'x', displayName: 'P', role: 'member' });
+    await store.identities.insert({ provider: 'google', subject: 'bf-sub', userId: withGoogle!.id, email: 'bf-google@example.com' });
+    await pool.query(backfill);
+    expect((await store.users.findById(withGoogle!.id))?.emailVerifiedAt).toBeInstanceOf(Date);
+    expect((await store.users.findById(onlyPassword!.id))?.emailVerifiedAt).toBeNull();
+    // Chạy lại không đổi mốc đã có.
+    const before = (await store.users.findById(withGoogle!.id))?.emailVerifiedAt?.getTime();
+    await pool.query(backfill);
+    expect((await store.users.findById(withGoogle!.id))?.emailVerifiedAt?.getTime()).toBe(before);
+  });
+
   it('TF058: ràng buộc database chặn clientId sai dạng và danh sách audience rỗng', async () => {
     await expect(store.serviceClients.insert({ clientId: 'AI Service', secretHash: 'x', allowedAudiences: ['core-api'] })).rejects.toThrow();
     await expect(store.serviceClients.insert({ clientId: 'empty-aud', secretHash: 'x', allowedAudiences: [] })).rejects.toThrow();
@@ -282,7 +340,7 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.passwordResets.deleteUnusedByUser(user!.id)).toBe(1);
 
     await store.passwordResets.insert({ userId: user!.id, tokenHash: 'hash-expired', expiresAt: new Date(now.getTime() - 1000) });
-    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, db, now });
+    const result = await runAccessCleanup({ sessions: store.sessions, passwordResets: store.passwordResets, emailVerifications: store.emailVerifications, db, now });
     expect(result.expiredPasswordResets).toBeGreaterThanOrEqual(1);
     const left = await db.select({ tokenHash: passwordResets.tokenHash }).from(passwordResets).where(eq(passwordResets.userId, user!.id));
     expect(left.map((r) => r.tokenHash)).toEqual(['hash-used']);

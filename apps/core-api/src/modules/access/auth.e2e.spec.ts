@@ -94,9 +94,10 @@ describe('access E2E', () => {
     expect(reg.body).not.toHaveProperty('passwordHash');
     expect(store.userRows.get(reg.body.id)!.passwordHash).toMatch(/^\$argon2id\$/);
     // Đăng ký ghi đúng 2 sự kiện: access.user.registered (cho mọi module, không có email) và yêu cầu gửi email
-    // chào mừng (chỉ notification-service dùng, có email vì cần người nhận).
+    // xác thực kèm lời chào (chỉ notification-service dùng, có email vì cần người nhận).
     const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
-    expect(events.map((e) => e.type)).toEqual(['access.user.registered', 'access.user.welcome_email_requested']);
+    // TF05D: đăng ký bằng mật khẩu gửi email xác thực (gộp lời chào), không gửi email chào mừng riêng.
+    expect(events.map((e) => e.type)).toEqual(['access.user.registered', 'access.email_verification_requested']);
     expect(events[0]).toMatchObject({
       type: 'access.user.registered',
       version: 1,
@@ -104,14 +105,15 @@ describe('access E2E', () => {
       payload: { userId: reg.body.id, displayName: 'Khang' },
     });
     expect(JSON.stringify(events[0]!.payload)).not.toContain('@');
-    expect(events[1]!.payload).toEqual({ userId: reg.body.id, email: 'khang@example.com', displayName: 'Khang', provider: 'password' });
+    expect(events[1]!.payload).toMatchObject({ userId: reg.body.id, email: 'khang@example.com', displayName: 'Khang', reason: 'signup' });
+    expect((events[1]!.payload as { verifyUrl: string }).verifyUrl).toMatch(/\/xac-thuc-email\?token=[A-Za-z0-9_-]{40,}$/);
 
     const login = await http().post('/api/auth/login').send({ email: 'khang@example.com', password: PASSWORD }).expect(200);
     expect(login.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
     const { accessToken, refreshToken } = login.body as { accessToken: string; refreshToken: string };
 
     const me = await http().get('/api/auth/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
-    expect(me.body).toMatchObject({ id: reg.body.id, email: 'khang@example.com', role: 'member' });
+    expect(me.body).toMatchObject({ id: reg.body.id, email: 'khang@example.com', role: 'member', emailVerified: false });
 
     const refreshed = await http().post('/api/auth/refresh').send({ refreshToken }).expect(200);
     expect(refreshed.body.refreshToken).not.toBe(refreshToken);
@@ -138,7 +140,8 @@ describe('access E2E', () => {
       audience: 'tripflix',
     });
     expect(decodeProtectedHeader(accessToken)).toMatchObject({ alg: 'ES256', kid: jwks.body.keys[0].kid });
-    expect(Object.keys(payload).sort()).toEqual(['aud', 'exp', 'iat', 'iss', 'role', 'sid', 'sub']);
+    expect(Object.keys(payload).sort()).toEqual(['aud', 'ev', 'exp', 'iat', 'iss', 'role', 'sid', 'sub']);
+    expect(payload.ev).toBe(false);
     expect(payload.exp! - payload.iat!).toBe(900);
   });
 

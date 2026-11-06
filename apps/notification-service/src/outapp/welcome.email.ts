@@ -1,10 +1,10 @@
 import type { AccessUserWelcomeEmailRequestedV1 } from '@tripflix/contracts';
+import { escapeHtml } from './html.js';
 import type { EmailMessage } from './mailer.js';
 
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const BENEFITS = [
+/** Lợi ích liệt kê trong email chào mừng và email xác thực lúc đăng ký. */
+export const BENEFITS = [
   'Lưu chuyến đi và khách sạn bạn yêu thích',
   'Bình luận, chia sẻ trải nghiệm cùng cộng đồng',
   'Nhận gợi ý điểm đến, nơi ở đúng gu',

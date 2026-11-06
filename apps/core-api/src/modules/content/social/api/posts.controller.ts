@@ -13,7 +13,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, RequireVerifiedEmail, type AuthUser } from '@tripflix/auth';
 import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import {
   DeletedSocialItemDto,
@@ -52,9 +52,10 @@ export class PostsController {
 
   @Post('posts')
   @ApiBearerAuth()
-  @Authenticated()
+  @RequireVerifiedEmail()
   @ApiOperation({ summary: 'Tạo bản nháp bài đăng (FR1)' })
   @ApiResponse({ status: 201, description: 'Bản nháp đã được tạo thành công', type: SocialPostDto })
+  @ApiResponse({ status: 403, description: 'Email chưa được xác thực (email_unverified)' })
   async createDraft(@CurrentUser() user: AuthUser, @Body() dto: CreatePostDto) {
     return this.createDraftUseCase.execute({
       authorId: user.userId,
@@ -135,7 +136,7 @@ export class PostsController {
 
   @Post('posts/:id/publish')
   @ApiBearerAuth()
-  @Authenticated()
+  @RequireVerifiedEmail()
   @ApiOperation({ summary: 'Xuất bản bản nháp thành bài đăng công khai (FR2, FR3)' })
   @ApiResponse({
     status: 200,
@@ -143,6 +144,7 @@ export class PostsController {
     type: PublishedPostDto,
   })
   @ApiResponse({ status: 201, description: 'Bài đăng đã được xuất bản', type: PublishedPostDto })
+  @ApiResponse({ status: 403, description: 'Email chưa được xác thực (email_unverified)' })
   async publishPost(@Param('id') postId: string, @CurrentUser() user: AuthUser) {
     return this.publishPostUseCase.execute({
       postId,

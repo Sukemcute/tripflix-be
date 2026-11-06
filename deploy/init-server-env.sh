@@ -36,6 +36,12 @@ API_HOST=
 WEB_HOST=
 AUTH_WEB_ORIGINS=
 AUTH_PASSWORD_RESET_URL=
+AUTH_EMAIL_VERIFY_URL=
+
+# Gửi email qua Amazon SES (profile mail, deploy/SERVER.md Giai đoạn 4). Điền sau khi xác thực tên miền trên SES.
+SMTP_URL=
+MAIL_FROM=Tripflix <no-reply@tripflix.io.vn>
+WEB_APP_URL=
 
 # Tag image trên GHCR; nên đổi sang sha-<7 ký tự> để biết chính xác bản đang chạy.
 IMAGE_TAG=develop

@@ -80,6 +80,8 @@ export class UserDto {
 
 /** GET/PATCH /auth/me: hồ sơ của chính mình, có thông tin cá nhân (không có ở danh sách nhân viên). */
 export class MyProfileDto extends UserDto {
+  @ApiProperty({ description: 'Đã xác thực email (TF05D). false: chưa đăng bài, bình luận được; gửi lại link bằng POST /auth/email/verification' })
+  emailVerified!: boolean;
   @ApiProperty({ type: String, nullable: true, example: '0912345678' }) phone!: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true, example: '2000-05-20' }) dateOfBirth!: string | null;
   @ApiProperty({ enum: ['male', 'female', 'other'], nullable: true }) gender!: 'male' | 'female' | 'other' | null;

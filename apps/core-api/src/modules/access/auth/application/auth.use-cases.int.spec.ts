@@ -19,13 +19,18 @@ import { migrateModule, startPostgres, startRedis, type PostgresFixture, type Re
 import { Redis } from 'ioredis';
 import { ClsModule } from 'nestjs-cls';
 import type pg from 'pg';
+import { CORE_ENV } from '../../../../platform/tokens.js';
+import { EmailVerificationUseCases } from '../../account/application/email-verification.use-cases.js';
+import { INVALID_VERIFY_TOKEN_MESSAGE } from '../../account/domain/email-verification.js';
 import { accessOutboxEvents } from '../../db/schema/index.js';
+import { MemoryActionRateLimiter } from '../infra/memory/memory-action-rate-limiter.js';
 import { DrizzleAccessStore } from '../infra/drizzle-access.store.js';
 import { MemoryLoginRateLimiter } from '../infra/memory/memory-login-rate-limiter.js';
 import { AuthUseCases } from './auth.use-cases.js';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  ACTION_RATE_LIMITER,
   CLOCK,
   GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
@@ -47,6 +52,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
   let db: Db;
   let redis: Redis;
   let failingOutbox = false;
+  let verification: EmailVerificationUseCases;
 
   async function createUseCases() {
     @Global()
@@ -63,6 +69,9 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
       ],
       providers: [
         AuthUseCases,
+        EmailVerificationUseCases,
+        { provide: ACTION_RATE_LIMITER, useValue: new MemoryActionRateLimiter() },
+        { provide: CORE_ENV, useValue: {} },
         {
           provide: ACCESS_STORE,
           inject: [buildTransactionHostToken('access')],
@@ -86,6 +95,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
       ],
     }).compile();
     await moduleRef.init();
+    verification = moduleRef.get(EmailVerificationUseCases);
     return moduleRef.get(AuthUseCases);
   }
 
@@ -116,7 +126,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
     const user = await auth.register({ email: 'commit@example.com', password: 'mat-khau-1', displayName: 'commit@example.com' }, meta);
     expect(user.email).toBe('commit@example.com');
     expect(await countRows('users', 'commit@example.com')).toBe(1);
-    // access.user.registered và access.user.welcome_email_requested, cùng commit với user.
+    // access.user.registered và access.email_verification_requested (TF05D), cùng commit với user.
     expect(await countRows('outbox_events', 'commit@example.com')).toBe(2);
   });
 
@@ -155,7 +165,64 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
     await auth.register({ email: 'unsent@example.com', password: 'mat-khau-1', displayName: 'unsent@example.com' }, meta);
     expect(await deletePublishedBefore(db, accessOutboxEvents, new Date(Date.now() - 60_000))).toBe(0);
     expect(await deletePublishedBefore(db, accessOutboxEvents, new Date(Date.now() + 60_000))).toBeGreaterThanOrEqual(1);
-    // Sự kiện chưa gửi vẫn còn (registered và welcome_email_requested).
+    // Sự kiện chưa gửi vẫn còn (registered và email_verification_requested).
     expect(await countRows('outbox_events', 'unsent@example.com')).toBe(2);
+  });
+
+  /** Token gốc trong link của sự kiện xác thực email mới nhất (outbox thật). */
+  async function latestVerifyToken(email: string): Promise<string> {
+    const result = await pool.query(
+      `select payload->>'verifyUrl' as url from access.outbox_events
+       where type = 'access.email_verification_requested' and payload->>'email' = $1 order by occurred_at desc limit 1`,
+      [email],
+    );
+    return new URL(result.rows[0].url as string).searchParams.get('token')!;
+  }
+
+  it('TF05D: xác thực email trên Postgres thật; tài khoản bị khoá thì rollback, link chưa bị tiêu', async () => {
+    failingOutbox = false;
+    const auth = await createUseCases();
+    const user = await auth.register({ email: 'verify-tx@example.com', password: 'mat-khau-1', displayName: 'V' }, meta);
+    const token = await latestVerifyToken('verify-tx@example.com');
+    const verifiedAt = async () =>
+      (await pool.query('select email_verified_at from access.users where id = $1', [user.id])).rows[0].email_verified_at as Date | null;
+    const usedTokens = async () =>
+      (await pool.query('select count(*)::int as n from access.email_verifications where user_id = $1 and used_at is not null', [user.id])).rows[0]
+        .n as number;
+
+    await pool.query(`update access.users set status = 'locked' where id = $1`, [user.id]);
+    await expect(verification.verify({ token }, meta)).rejects.toThrow(INVALID_VERIFY_TOKEN_MESSAGE);
+    expect(await verifiedAt()).toBeNull();
+    expect(await usedTokens()).toBe(0);
+
+    await pool.query(`update access.users set status = 'active' where id = $1`, [user.id]);
+    await verification.verify({ token }, meta);
+    expect(await verifiedAt()).toBeInstanceOf(Date);
+    expect(await usedTokens()).toBe(1);
+    await expect(verification.verify({ token }, meta)).rejects.toThrow(INVALID_VERIFY_TOKEN_MESSAGE);
+  });
+
+  it('TF05D: 10 request cùng bấm một link: chỉ 1 thành công', async () => {
+    const auth = await createUseCases();
+    await auth.register({ email: 'verify-race@example.com', password: 'mat-khau-1', displayName: 'R' }, meta);
+    const token = await latestVerifyToken('verify-race@example.com');
+    const results = await Promise.allSettled(Array.from({ length: 10 }, () => verification.verify({ token }, meta)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  });
+
+  it('TF05D: gửi lại đồng thời chỉ giữ một liên kết chưa dùng', async () => {
+    const auth = await createUseCases();
+    const email = 'resend-race@example.com';
+    const user = await auth.register({ email, password: 'mat-khau-1', displayName: 'R' }, meta);
+    const original = await latestVerifyToken(email);
+
+    await expect(Promise.all([verification.resend(user.id, meta), verification.resend(user.id, meta)]))
+      .resolves.toEqual(['sent', 'sent']);
+    const pending = await pool.query(
+      'select count(*)::int as n from access.email_verifications where user_id = $1 and used_at is null',
+      [user.id],
+    );
+    expect(pending.rows[0].n).toBe(1);
+    await expect(verification.verify({ token: original }, meta)).rejects.toThrow(INVALID_VERIFY_TOKEN_MESSAGE);
   });
 });

@@ -33,6 +33,9 @@ try {
   const passwordHash = await new Argon2PasswordHasher().hash(env.SEED_PASSWORD);
   for (const account of ACCOUNTS) {
     const created = await store.users.insert({ ...account, passwordHash });
+    // Tài khoản mẫu @tripflix.local không nhận được thư: đánh dấu đã xác thực email (TF05D), kể cả khi đã có từ trước.
+    const user = created ?? (await store.users.findByEmail(account.email));
+    if (user && !user.emailVerifiedAt) await store.users.markEmailVerified(user.id, new Date());
     process.stdout.write(`${account.email} (${account.role}): ${created ? 'đã tạo' : 'đã có, giữ nguyên'}\n`);
   }
 } finally {

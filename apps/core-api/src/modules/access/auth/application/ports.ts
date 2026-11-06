@@ -13,6 +13,8 @@ export interface UserRecord {
   role: Role;
   status: 'active' | 'locked';
   createdAt: Date;
+  /** Lúc chứng minh sở hữu email (TF05D); null: chưa xác thực. */
+  emailVerifiedAt: Date | null;
   /** Thông tin cá nhân (TF06M), chỉ trả cho chủ tài khoản. */
   personal: PersonalInfo;
 }
@@ -88,7 +90,8 @@ export interface GoogleIdTokenVerifier {
   verify(idToken: string): Promise<GoogleIdentity>;
 }
 
-export interface PasswordResetRepository {
+/** Token dùng một lần gửi qua email (đặt lại mật khẩu, xác thực email): chỉ lưu SHA-256. */
+export interface OneTimeTokenRepository {
   insert(reset: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
   /** Xoá token chưa dùng của người dùng (khi có yêu cầu mới), trả số dòng đã xoá. */
   deleteUnusedByUser(userId: string): Promise<number>;
@@ -100,18 +103,28 @@ export interface PasswordResetRepository {
   deleteExpired(before: Date): Promise<number>;
 }
 
+export type PasswordResetRepository = OneTimeTokenRepository;
+export type EmailVerificationRepository = OneTimeTokenRepository;
+
 export interface UserRepository {
+  /** Khóa bản ghi người dùng đến cuối transaction. */
+  lockById(id: string): Promise<UserRecord | null>;
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
   /** Trả null khi email đã có người dùng. */
-  insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>): Promise<UserRecord | null>;
+  insert(
+    user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null },
+  ): Promise<UserRecord | null>;
   listStaff(): Promise<UserRecord[]>;
   /** Tìm theo email hoặc tên hiển thị (không phân biệt hoa thường), mới nhất trước. */
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
   updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
   updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
   updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;
-  updatePasswordHash(id: string, passwordHash: string): Promise<UserRecord | null>;
+  /** passwordHash null: xoá mật khẩu (tài khoản chỉ còn đăng nhập Google). */
+  updatePasswordHash(id: string, passwordHash: string | null): Promise<UserRecord | null>;
+  /** Đặt email_verified_at nếu đang trống (giữ mốc đầu tiên); trả người dùng sau khi đổi. */
+  markEmailVerified(id: string, at: Date): Promise<UserRecord | null>;
 }
 
 export interface SessionRepository {
@@ -146,6 +159,8 @@ export type AuditAction =
   | 'auth.password_reset_requested'
   | 'auth.google_linked'
   | 'auth.password_reset'
+  | 'auth.email_verification_requested'
+  | 'auth.email_verified'
   | 'service.token_failed'
   | 'service.client_created'
   | 'service.client_disabled'
@@ -179,6 +194,7 @@ export interface AccessStore {
   outbox: AccessOutbox;
   serviceClients: ServiceClientRepository;
   passwordResets: PasswordResetRepository;
+  emailVerifications: EmailVerificationRepository;
   identities: UserIdentityRepository;
 }
 
@@ -193,7 +209,8 @@ export interface IssuedAccessToken {
 }
 
 export interface TokenIssuer {
-  issue(claims: { userId: string; role: Role; sid: string }): Promise<IssuedAccessToken>;
+  /** emailVerified thành claim ev (TF05D): libs/auth RequireVerifiedEmail đọc claim này. */
+  issue(claims: { userId: string; role: Role; sid: string; emailVerified: boolean }): Promise<IssuedAccessToken>;
   /** Token service-to-service: typ=service, sub=clientId, aud=service nhận, sống SERVICE_TOKEN_TTL_SECONDS. */
   issueServiceToken(claims: { clientId: string; audience: string }): Promise<IssuedAccessToken>;
   /** Khoá công khai cho /.well-known/jwks.json. */

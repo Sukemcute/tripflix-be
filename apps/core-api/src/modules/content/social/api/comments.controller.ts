@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, RequireVerifiedEmail, type AuthUser } from '@tripflix/auth';
 import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import {
   DeletedSocialItemDto,
@@ -50,9 +50,10 @@ export class CommentsController {
 
   @Post('posts/:postId/comments')
   @ApiBearerAuth()
-  @Authenticated()
+  @RequireVerifiedEmail()
   @ApiOperation({ summary: 'Tạo bình luận mới trên bài đăng (FR11)' })
   @ApiResponse({ status: 201, description: 'Bình luận được tạo thành công', type: SocialCommentDto })
+  @ApiResponse({ status: 403, description: 'Email chưa được xác thực (email_unverified)' })
   async createComment(
     @Param('postId') postId: string,
     @CurrentUser() user: AuthUser,

@@ -17,12 +17,12 @@
 
 | API | Ai gọi | Kết quả |
 |---|---|---|
-| `POST /api/auth/register` `{ email, password, displayName }` | Ai cũng được | `201` người dùng. Luôn là `member`, trường `role` gửi lên bị bỏ qua. Email trùng: `409` |
+| `POST /api/auth/register` `{ email, password, displayName }` | Ai cũng được | `201` người dùng. Luôn là `member`, trường `role` gửi lên bị bỏ qua. Email trùng: `409`. Chưa xác thực email, nhận email chào mừng kèm link xác thực. Quá `AUTH_REGISTER_MAX_PER_IP_HOUR` (mặc định 5) lần mỗi giờ theo IP: `429` |
 | `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
 | `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
-| `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `phone`, `dateOfBirth`, `gender`, `nationality` (có thể `null`) |
+| `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `emailVerified`, `phone`, `dateOfBirth`, `gender`, `nationality` (có thể `null`) |
 | `PATCH /api/auth/me` `{ displayName?, phone?, dateOfBirth?, gender?, nationality? }` | Bearer access token | Hồ sơ sau khi sửa. Chỉ gửi trường muốn đổi, gửi `null` hoặc `""` để xoá (trừ tên). Sai định dạng: `400 { errors: [{ field, message }] }` (xem "Thông tin cá nhân" bên dưới) |
 | `POST /api/auth/password/change` `{ currentPassword, newPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
 | `GET /api/auth/sessions` | Bearer access token | Thiết bị đang đăng nhập: `{ id, deviceName, userAgent, createdAt, lastUsedAt, isCurrent }`, dùng gần nhất trước |
@@ -31,6 +31,8 @@
 | `GET /.well-known/jwks.json` | Gateway, service khác | Khoá công khai ES256. Nằm ngoài `/api` |
 | `POST /api/auth/password/forgot` `{ email }` | Ai cũng được | Luôn `202 { message }` cùng một câu, kể cả email không có tài khoản. Tài khoản đang hoạt động thì nhận email có link đặt lại (sống 30 phút). Quá 3 lần mỗi giờ theo email hoặc 20 lần theo IP: `429` |
 | `POST /api/auth/password/reset` `{ token, newPassword }` | Có link trong email | `204`. Đổi mật khẩu, thoát mọi thiết bị. Link sai, đã dùng, hết hạn hoặc tài khoản bị khoá: `400 "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"` |
+| `POST /api/auth/email/verify` `{ token }` | Có link trong email | `204`. Đánh dấu email đã xác thực. Link sai, đã dùng, hết hạn (24 giờ) hoặc tài khoản bị khoá: `400 "Liên kết xác thực email không hợp lệ hoặc đã hết hạn"`. Client đang đăng nhập gọi `refresh` để có access token mới `ev: true` |
+| `POST /api/auth/email/verification` | Bearer access token | `200 { status, message }`: `sent` (link mới, link cũ hết dùng được) hoặc `already_verified` (không gửi). Quá 3 lần mỗi giờ theo tài khoản hoặc 20 lần theo IP: `429` |
 | `POST /api/auth/service-token` `{ clientId, clientSecret, audience }` | Service khác (không phải người dùng) | `{ accessToken, tokenType: "Bearer", expiresIn: 300 }`. Sai bất kỳ thông tin nào: `401 "Thông tin service không đúng"`. Xem "Token giữa các service" |
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
@@ -39,7 +41,7 @@
 | `DELETE /api/admin/staff/{userId}` | `superadmin` | Thu hồi về `member` |
 | `POST /api/admin/users/{userId}/lock`, `/unlock` | `superadmin` | Khoá: không đăng nhập được. Mở khoá: đăng nhập lại được |
 
-Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền bằng `@Roles(...)` của `@tripflix/auth` (xem `libs/auth/README.md`).
+Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền bằng `@Roles(...)` của `@tripflix/auth` (xem `libs/auth/README.md`). Chưa xác thực email ở API có `@RequireVerifiedEmail()`: `403 { code: "email_unverified" }`.
 
 ## Token
 
@@ -57,6 +59,7 @@ Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền b�
 
 - App, web dùng Google Sign-In lấy **ID token** rồi gửi `POST /api/auth/google`. core-api tự kiểm chữ ký RS256 qua JWKS của Google, `iss` (`accounts.google.com`), `aud` thuộc `GOOGLE_CLIENT_IDS`, `exp`, `email_verified = true`. Không gọi API Google nào khác.
 - Thứ tự tìm tài khoản: đã liên kết `(google, sub)` → vào tài khoản đó; trùng email (Google đã xác minh) → liên kết; chưa có → tạo `member` không có mật khẩu, tên lấy từ `name` của Google. Tài khoản bị khoá: `401`, không liên kết thêm.
+- Đăng nhập Google đánh dấu email đã xác thực (TF05D). Liên kết vào tài khoản mật khẩu **chưa** xác thực thì xoá mật khẩu và mọi phiên cũ: mật khẩu đó có thể do người khác đặt trước bằng email của chủ thật (chiếm tài khoản trước). Audit `auth.google_linked` ghi `clearedUnverifiedPassword`.
 - Tài khoản chỉ có Google: đăng nhập bằng mật khẩu nhận lỗi chung; muốn có mật khẩu thì dùng "quên mật khẩu".
 - `X-Anon-Id`: app sinh một UUID cho khách chưa đăng nhập và gửi kèm mọi request. Đăng ký, đăng nhập (cả Google) thành công thì ghi `access.user.guest_merged` trong cùng transaction. Header sai dạng thì bỏ qua.
 
@@ -156,7 +159,8 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.locked` v1, `access.user.unlocked` v1 | Khoá, mở khoá | `{ userId, lockedBy }`, `{ userId, unlockedBy }` |
 | `access.user.profile_updated` v1 | Đổi tên hiển thị (gửi lại cùng tên, hoặc chỉ đổi thông tin cá nhân thì không phát) | `{ userId, displayName }`. Module nào lưu tên từ `access.user.registered` thì cập nhật theo |
 | `access.user.guest_merged` v1 | Đăng ký, đăng nhập hoặc đăng nhập Google thành công có header `X-Anon-Id` (UUID) | `{ anonId, userId }`, đúng một sự kiện mỗi lần. `discovery`, `feed` gộp gu đã ghi theo `anonId` vào `userId` |
-| `access.user.welcome_email_requested` v1 | Tạo tài khoản mới: đăng ký hoặc lần đầu đăng nhập Google (đăng nhập lại, liên kết Google vào tài khoản có sẵn thì không) | `{ userId, email, displayName, provider }`, `provider` là `password` hoặc `google`. Có email vì `notification-service` cần người nhận; chỉ `notification-service` dùng |
+| `access.user.welcome_email_requested` v1 | Lần đầu đăng nhập Google tạo tài khoản mới (đăng nhập lại, liên kết Google vào tài khoản có sẵn thì không). Từ TF05D, đăng ký bằng mật khẩu không phát sự kiện này | `{ userId, email, displayName, provider }`. Có email vì `notification-service` cần người nhận; chỉ `notification-service` dùng |
+| `access.email_verification_requested` v1 (TF05D) | Đăng ký bằng mật khẩu (`reason: "signup"`, email gộp lời chào) hoặc người dùng bấm gửi lại (`reason: "resend"`) | `{ userId, email, displayName, verifyUrl, expiresAt, reason }`. `verifyUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 
 ## Job dọn dẹp
@@ -164,7 +168,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 `auth/jobs/access-cleanup.job.ts`, chỉ chạy khi `APP_ROLE` là `worker` hoặc `all`: lúc khởi động rồi mỗi 24 giờ (`setInterval`).
 
 - Xoá phiên đã quá `expires_at`.
-- Xoá token đặt lại mật khẩu đã quá `expires_at` (đã dùng hay chưa).
+- Xoá token đặt lại mật khẩu và link xác thực email đã quá `expires_at` (đã dùng hay chưa).
 - Xoá dòng `access.outbox_events` đã gửi (`published_at`) quá 7 ngày. Dòng chưa gửi không bao giờ bị xoá.
 
 Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đều an toàn.
@@ -179,6 +183,8 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_JWT_AUDIENCE` | `tripflix` | Service kiểm token phải đặt giống |
 | `AUTH_WEB_ORIGINS` | `http://localhost:3100,http://localhost:3200` | Origin của web, admin: CORS và chống CSRF cho cookie. Mỗi phần tử là origin đầy đủ, không có `/` cuối |
 | `AUTH_PASSWORD_RESET_URL` | `http://localhost:3100/dat-lai-mat-khau` | Trang đặt lại mật khẩu của web. Link trong email là địa chỉ này kèm `?token=...` |
+| `AUTH_EMAIL_VERIFY_URL` | `http://localhost:3100/xac-thuc-email` | Trang xác thực email của web. Link trong email là địa chỉ này kèm `?token=...` |
+| `AUTH_REGISTER_MAX_PER_IP_HOUR` | `5` | Số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ. Máy dev, CI chạy e2e đặt cao (`.env.example`, `compose.yaml`: 1000) |
 | `GOOGLE_CLIENT_IDS` | trống | OAuth Client ID (Web, Android, iOS) trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google (`503`) |
 | `GOOGLE_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` | Khoá công khai của Google. Test đổi sang server JWKS giả |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |
@@ -245,3 +251,12 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 - Độ dài đếm theo ký tự Unicode: một emoji tính 1 ký tự.
 - DB vẫn có check riêng cho `users` (role, status, email chữ thường, phone, gender, nationality dạng `^[A-Z]{2}$`); test: `drizzle-access.store.int.spec.ts` (TF05C). Danh sách mã quốc gia chỉ kiểm ở API.
 - Test: `auth/api/validation.spec.ts` (từng schema, từng trường, các trường hợp biên), `auth/domain/text-rules.spec.ts`, `account/domain/countries.spec.ts`, `account/domain/personal-info.spec.ts`, `validation.e2e.spec.ts` (qua HTTP).
+
+## Xác thực email (TF05D)
+
+- Tài khoản đăng ký bằng mật khẩu bắt đầu ở trạng thái chưa xác thực (`users.email_verified_at` trống). Đã xác thực khi: bấm link trong email, đặt lại mật khẩu qua email, hoặc đăng nhập Google. Migration `20261106032708_add_email_verifications` đánh dấu tài khoản đã liên kết Google là đã xác thực; tài khoản chỉ có mật khẩu tạo trước đó phải xác thực lại. `pnpm db:seed` đánh dấu 3 tài khoản mẫu `@tripflix.local` (không nhận được thư).
+- Link dùng một lần và có hiệu lực 24 giờ. Bảng `email_verifications` lưu bản băm SHA-256 của token 256 bit. Khi gửi lại, link cũ hết hiệu lực. Các thao tác gửi lại và xác thực cùng khóa theo người dùng để xử lý tuần tự.
+- Access token có claim `ev` (true/false), đọc lại từ database mỗi lần cấp (đăng nhập, refresh). Tạo bản nháp, đăng bài và tạo bình luận yêu cầu `@RequireVerifiedEmail()` của `@tripflix/auth`. Nếu email chưa xác thực, API trả `403` với mã `email_unverified`. Phiên đã đăng nhập cần làm mới access token sau khi xác thực.
+- Đăng ký bằng mật khẩu giới hạn theo IP (`AUTH_REGISTER_MAX_PER_IP_HOUR`, Redis). Redis lỗi thì vẫn cho đăng ký, ghi cảnh báo; gateway vẫn giới hạn `POST /api/auth/register` 30 lần mỗi phút theo IP.
+- Audit: `auth.email_verification_requested` (`meta.reason`), `auth.email_verified` (`meta.via`: `link`, `google`).
+- Gửi email thật trên server: `deploy/SERVER.md`, Giai đoạn 4 (Amazon SES).

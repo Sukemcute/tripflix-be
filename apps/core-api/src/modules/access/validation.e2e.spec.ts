@@ -25,6 +25,8 @@ const env = {
   AUTH_JWT_ISSUER: 'tripflix-core',
   AUTH_JWT_AUDIENCE: 'tripflix',
   AUTH_PASSWORD_RESET_URL: 'https://tripflix.example/dat-lai-mat-khau',
+  // File này đăng ký nhiều tài khoản từ cùng một IP; giới hạn đăng ký kiểm ở email-verification.e2e.spec.ts.
+  AUTH_REGISTER_MAX_PER_IP_HOUR: 1000,
 } as CoreEnv;
 
 @Global()

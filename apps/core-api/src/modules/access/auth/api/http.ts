@@ -46,6 +46,7 @@ export class AccessErrorFilter implements ExceptionFilter {
         http = new ConflictException(err.message);
         break;
       case 'invalid_reset_token':
+      case 'invalid_verify_token':
       case 'wrong_password':
         // 400, không phải 401: client hiểu 401 là token hết hạn rồi tự làm mới hoặc đăng xuất.
         http = new BadRequestException(err.message);

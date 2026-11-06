@@ -5,6 +5,7 @@ import type {
   AccessStore,
   AuditEntry,
   NewSession,
+  OneTimeTokenRepository,
   ProfilePatch,
   SessionRecord,
   ServiceClientRecord,
@@ -25,13 +26,18 @@ export class MemoryAccessStore implements AccessStore {
   readonly users = {
     findByEmail: async (email: string) => [...this.userRows.values()].find((u) => u.email === email) ?? null,
     findById: async (id: string) => this.userRows.get(id) ?? null,
-    insert: async (user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'>) => {
+    lockById: async (id: string) => this.userRows.get(id) ?? null,
+    insert: async ({
+      emailVerifiedAt = null,
+      ...user
+    }: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null }) => {
       if ([...this.userRows.values()].some((u) => u.email === user.email)) return null;
       const row: UserRecord = {
         ...user,
         id: randomUUID(),
         status: 'active',
         createdAt: new Date(),
+        emailVerifiedAt,
         personal: { phone: null, dateOfBirth: null, gender: null, nationality: null },
       };
       this.userRows.set(row.id, row);
@@ -55,7 +61,12 @@ export class MemoryAccessStore implements AccessStore {
         personal: { ...row.personal, ...personal },
       });
     },
-    updatePasswordHash: async (id: string, passwordHash: string) => this.patchUser(id, { passwordHash }),
+    updatePasswordHash: async (id: string, passwordHash: string | null) => this.patchUser(id, { passwordHash }),
+    markEmailVerified: async (id: string, at: Date) => {
+      const row = this.userRows.get(id);
+      if (!row) return null;
+      return row.emailVerifiedAt ? row : this.patchUser(id, { emailVerifiedAt: at });
+    },
   };
 
   private patchUser(id: string, patch: Partial<UserRecord>): UserRecord | null {
@@ -125,31 +136,16 @@ export class MemoryAccessStore implements AccessStore {
     },
   };
 
-  readonly passwordResetRows: { userId: string; tokenHash: string; expiresAt: Date; usedAt: Date | null }[] = [];
+  readonly passwordResets = new MemoryOneTimeTokens();
+  readonly emailVerifications = new MemoryOneTimeTokens();
 
-  readonly passwordResets = {
-    insert: async (reset: { userId: string; tokenHash: string; expiresAt: Date }) => {
-      this.passwordResetRows.push({ ...reset, usedAt: null });
-    },
-    deleteUnusedByUser: async (userId: string) => this.removeResets((r) => r.userId === userId && !r.usedAt),
-    findUsable: async (tokenHash: string, now: Date) => {
-      const row = this.passwordResetRows.find((r) => r.tokenHash === tokenHash && !r.usedAt && r.expiresAt > now);
-      return row ? { userId: row.userId } : null;
-    },
-    consume: async (tokenHash: string, now: Date) => {
-      const row = this.passwordResetRows.find((r) => r.tokenHash === tokenHash && !r.usedAt && r.expiresAt > now);
-      if (!row) return null;
-      row.usedAt = now;
-      return { userId: row.userId };
-    },
-    deleteExpired: async (before: Date) => this.removeResets((r) => r.expiresAt < before),
-  };
+  /** Dòng của password_resets (test sửa trực tiếp, ví dụ cho hết hạn). */
+  get passwordResetRows(): OneTimeTokenRow[] {
+    return this.passwordResets.rows;
+  }
 
-  private removeResets(match: (r: { userId: string; usedAt: Date | null; expiresAt: Date }) => boolean): number {
-    const kept = this.passwordResetRows.filter((r) => !match(r));
-    const removed = this.passwordResetRows.length - kept.length;
-    this.passwordResetRows.splice(0, this.passwordResetRows.length, ...kept);
-    return removed;
+  get emailVerificationRows(): OneTimeTokenRow[] {
+    return this.emailVerifications.rows;
   }
 
   readonly identityRows: { provider: 'google'; subject: string; userId: string; email: string }[] = [];
@@ -173,4 +169,51 @@ export class MemoryAccessStore implements AccessStore {
       return envelope.eventId;
     },
   };
+}
+
+export interface OneTimeTokenRow {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
+
+/** password_resets, email_verifications trong bộ nhớ. */
+class MemoryOneTimeTokens implements OneTimeTokenRepository {
+  readonly rows: OneTimeTokenRow[] = [];
+
+  async insert(token: { userId: string; tokenHash: string; expiresAt: Date }) {
+    this.rows.push({ ...token, usedAt: null });
+  }
+
+  async deleteUnusedByUser(userId: string) {
+    return this.remove((r) => r.userId === userId && !r.usedAt);
+  }
+
+  async findUsable(tokenHash: string, now: Date) {
+    const row = this.find(tokenHash, now);
+    return row ? { userId: row.userId } : null;
+  }
+
+  async consume(tokenHash: string, now: Date) {
+    const row = this.find(tokenHash, now);
+    if (!row) return null;
+    row.usedAt = now;
+    return { userId: row.userId };
+  }
+
+  async deleteExpired(before: Date) {
+    return this.remove((r) => r.expiresAt < before);
+  }
+
+  private find(tokenHash: string, now: Date) {
+    return this.rows.find((r) => r.tokenHash === tokenHash && !r.usedAt && r.expiresAt > now);
+  }
+
+  private remove(match: (r: OneTimeTokenRow) => boolean): number {
+    const kept = this.rows.filter((r) => !match(r));
+    const removed = this.rows.length - kept.length;
+    this.rows.splice(0, this.rows.length, ...kept);
+    return removed;
+  }
 }

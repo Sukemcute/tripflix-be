@@ -11,6 +11,7 @@ export class AccessError extends Error {
       | 'staff_rule'
       | 'wrong_password'
       | 'invalid_reset_token'
+      | 'invalid_verify_token'
       | 'google_invalid'
       | 'google_not_configured',
     message: string,
