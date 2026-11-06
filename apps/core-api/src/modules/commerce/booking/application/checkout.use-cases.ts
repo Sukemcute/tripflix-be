@@ -92,7 +92,7 @@ export const decodeTripCursor = (cursor: string): { createdAt: Date; id: string 
 };
 
 const toItemViews = (items: OrderItemRecord[]): CheckoutView['items'] =>
-  items.map(({ orderId: _orderId, ...i }) => ({ ...i, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
+  items.map(({ orderId: _orderId, ...i }) => ({ ...i, propertyName: i.propertyName ?? null, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
 
 /** Giá hiện tại của một mục, đọc từ lịch trống (không tin giá client gửi). */
 export interface PricedItem extends NewOrderItem {

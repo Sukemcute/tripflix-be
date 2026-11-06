@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
-import { flightInventory, orderGuests, orderItems, orders, payments, refunds, roomInventory, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
+import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
 import type { OrderStatus } from '../domain/order-rules.js';
 import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
 
@@ -28,6 +28,9 @@ const mapOrder = (row: OrderRow): OrderRecord => ({
 });
 
 const mapItem = (row: OrderItemRow): OrderItemRecord => ({ ...row, productType: row.productType as 'room' | 'flight' });
+
+/** Mục phòng kèm tên khách sạn (vé bay là null); đọc lúc xem đơn nên không cần thêm cột. */
+const mapItemWithProperty = (row: { item: OrderItemRow; propertyName: string | null }): OrderItemRecord => ({ ...mapItem(row.item), propertyName: row.propertyName });
 
 const mapPayment = (row: PaymentRow): PaymentRecord => ({
   id: row.id,
@@ -127,7 +130,7 @@ export class DrizzleOrderStore implements OrderStore {
 
   async findItemsOfOrders(orderIds: string[]) {
     if (!orderIds.length) return [];
-    return (await this.db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItem);
+    return (await this.selectItemsWithProperty().where(inArray(orderItems.orderId, orderIds)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItemWithProperty);
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }) {
@@ -140,7 +143,15 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async findItems(orderId: string) {
-    return (await this.db.select().from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItem);
+    return (await this.selectItemsWithProperty().where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItemWithProperty);
+  }
+
+  private selectItemsWithProperty() {
+    return this.db
+      .select({ item: orderItems, propertyName: properties.name })
+      .from(orderItems)
+      .leftJoin(roomTypes, and(eq(orderItems.productType, 'room'), eq(roomTypes.id, orderItems.productId)))
+      .leftJoin(properties, eq(properties.id, roomTypes.propertyId));
   }
 
   async updateItemPrices(prices: { id: string; unitPrice: number; lineTotal: number }[]) {

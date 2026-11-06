@@ -23,6 +23,8 @@ export interface OrderItemRecord {
   productType: 'room' | 'flight';
   productId: string;
   productName: string;
+  /** Tên khách sạn của mục phòng; có khi đọc đơn, vé bay là null. */
+  propertyName?: string | null;
   date: string;
   nights: number;
   qty: number;
