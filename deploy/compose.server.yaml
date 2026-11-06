@@ -23,6 +23,8 @@ x-core-env: &core-env
   AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
   AUTH_EMAIL_VERIFY_URL: ${AUTH_EMAIL_VERIFY_URL:-http://localhost:3100/xac-thuc-email}
   AUTH_REGISTER_MAX_PER_IP_HOUR: ${AUTH_REGISTER_MAX_PER_IP_HOUR:-5}
+  # OAuth Client ID của Google (cách nhau bởi dấu phẩy). Trống: tắt đăng nhập Google, POST /api/auth/google trả 503.
+  GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
   AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
