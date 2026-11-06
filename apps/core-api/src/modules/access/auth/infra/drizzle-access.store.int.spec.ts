@@ -216,6 +216,43 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.serviceClients.findById('khong-co')).toBeNull();
   });
 
+  it('TF05C: mỗi ràng buộc check của users chặn đúng giá trị sai khi ghi thẳng SQL (bỏ qua API)', async () => {
+    const insertUser = (columns: Record<string, unknown>) => {
+      const row = { email: `ck-${Math.random().toString(36).slice(2)}@example.com`, display_name: 'Ck', ...columns };
+      const keys = Object.keys(row);
+      return pool.query(`insert into access.users (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')})`, Object.values(row));
+    };
+    const violated = async (columns: Record<string, unknown>) => {
+      const err = await insertUser(columns).then(
+        () => null,
+        (e: { constraint?: string; code?: string }) => e,
+      );
+      return err?.constraint ?? err?.code ?? null;
+    };
+
+    for (const [columns, constraint] of [
+      [{ role: 'admin' }, 'ck_users_role'],
+      [{ status: 'banned' }, 'ck_users_status'],
+      [{ email: 'Upper@Example.com' }, 'ck_users_email_lowercase'],
+      [{ gender: 'Male' }, 'ck_users_gender'],
+      [{ nationality: 'vn' }, 'ck_users_nationality'],
+      [{ nationality: 'VNM' }, 'ck_users_nationality'],
+      [{ phone: '1234567' }, 'ck_users_phone'],
+      [{ phone: '+84 912345678' }, 'ck_users_phone'],
+      [{ phone: '1234567890123456' }, 'ck_users_phone'],
+    ] as const) {
+      expect(await violated(columns), JSON.stringify(columns)).toBe(constraint);
+    }
+    // Ngày không có thật bị kiểu date của Postgres từ chối (22008: datetime_field_overflow).
+    expect(await violated({ date_of_birth: '2001-02-29' })).toBe('22008');
+    // Giá trị đúng ở biên đều ghi được.
+    expect(await violated({ phone: '12345678', nationality: 'VN', gender: 'other', date_of_birth: '2000-02-29' })).toBeNull();
+    expect(await violated({ phone: '+123456789012345' })).toBeNull();
+    // Trùng email (đã viết thường): uq_users_email.
+    await insertUser({ email: 'ck-dup@example.com' });
+    expect(await violated({ email: 'ck-dup@example.com' })).toBe('uq_users_email');
+  });
+
   it('TF058: ràng buộc database chặn clientId sai dạng và danh sách audience rỗng', async () => {
     await expect(store.serviceClients.insert({ clientId: 'AI Service', secretHash: 'x', allowedAudiences: ['core-api'] })).rejects.toThrow();
     await expect(store.serviceClients.insert({ clientId: 'empty-aud', secretHash: 'x', allowedAudiences: [] })).rejects.toThrow();

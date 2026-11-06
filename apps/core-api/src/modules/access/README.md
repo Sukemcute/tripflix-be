@@ -224,5 +224,24 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 
 - Số điện thoại, ngày sinh, giới tính, quốc tịch chỉ chủ tài khoản xem và sửa qua `GET/PATCH /auth/me`. Không có trong danh sách nhân viên, tìm người dùng của admin, phản hồi đăng ký/đăng nhập, và không lên event bus.
 - Audit `auth.profile_updated` chỉ ghi `meta.changedFields` (tên trường), không ghi giá trị; tên hiển thị vẫn ghi `oldDisplayName`, `newDisplayName`.
-- Kiểm tra (`account/domain/personal-info.ts`, `account/api/dto.ts`): số điện thoại bỏ dấu cách, chấm, gạch, ngoặc rồi phải có 8–15 chữ số (có thể `+` ở đầu); ngày sinh `YYYY-MM-DD`, tuổi 13–120 tại ngày gọi API; giới tính trong danh sách; quốc tịch 2 chữ cái, tự viết hoa.
+- Kiểm tra (`account/domain/personal-info.ts`, `account/api/dto.ts`): số điện thoại bỏ dấu cách, chấm, gạch, ngoặc rồi phải có 8–15 chữ số (có thể `+` ở đầu); ngày sinh `YYYY-MM-DD`, tuổi 13–120 tại ngày gọi API; giới tính trong danh sách; quốc tịch là mã ISO 3166-1 alpha-2 có thật (`account/domain/countries.ts`, 249 mã), tự viết hoa.
 
+## Kiểm dữ liệu đầu vào (TF05C)
+
+- Mọi body, query đi qua `ZodBody` (`auth/api/http.ts`). Sai thì `400 { message: "Dữ liệu gửi lên không hợp lệ", errors: [{ field, message }] }`, mỗi trường sai báo một lỗi, câu tiếng Việt. Câu mặc định tiếng Anh của zod được thay bằng `accessErrorMap` (`auth/api/validation.ts`), chỉ trong module này.
+- Không có body, body là mảng, chuỗi: một lỗi ở gốc (`field: ""`). JSON hỏng: 400 từ Express.
+- Trường lạ bị bỏ (ví dụ gửi `role`, `status` khi đăng ký hay `email` khi sửa hồ sơ thì không có tác dụng).
+- Các trường dùng chung (`auth/api/validation.ts`, quy tắc chữ ở `auth/domain/text-rules.ts`):
+
+| Trường | Quy tắc |
+| --- | --- |
+| Email đăng ký | Cắt khoảng trắng hai đầu rồi kiểm định dạng, tối đa 254 ký tự; lưu chữ thường |
+| Email đăng nhập, quên mật khẩu | Chỉ cần có (cắt khoảng trắng), không kiểm định dạng: sai thì nhận câu trả lời chung, không lộ email nào đã đăng ký |
+| Mật khẩu mới (đăng ký, đổi, đặt lại) | 8–128 ký tự, có ít nhất một ký tự không phải khoảng trắng (khoảng trắng gồm cả dấu cách không ngắt, zero-width). Không cắt khoảng trắng |
+| Mật khẩu hiện tại (đăng nhập, đổi mật khẩu) | 1–128 ký tự, để tài khoản tạo trước TF05C vẫn đăng nhập được |
+| Tên hiển thị | Chuẩn hoá Unicode NFC, cắt khoảng trắng, 1–50 ký tự, một dòng (không có xuống dòng, tab, ký tự điều khiển), có ít nhất một ký tự nhìn thấy. Không lọc HTML: web, app tự escape khi hiển thị. Tên lấy từ Google được làm sạch theo cùng quy tắc (`buildDisplayName`) |
+| Tên thiết bị | Ký tự điều khiển đổi thành dấu cách, tối đa 100 ký tự; trống thì lưu `null` |
+
+- Độ dài đếm theo ký tự Unicode: một emoji tính 1 ký tự.
+- DB vẫn có check riêng cho `users` (role, status, email chữ thường, phone, gender, nationality dạng `^[A-Z]{2}$`); test: `drizzle-access.store.int.spec.ts` (TF05C). Danh sách mã quốc gia chỉ kiểm ở API.
+- Test: `auth/api/validation.spec.ts` (từng schema, từng trường, các trường hợp biên), `auth/domain/text-rules.spec.ts`, `account/domain/countries.spec.ts`, `account/domain/personal-info.spec.ts`, `validation.e2e.spec.ts` (qua HTTP).
