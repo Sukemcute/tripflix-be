@@ -1992,7 +1992,8 @@
             "in": "query",
             "schema": {
               "enum": [
-                "for_you"
+                "for_you",
+                "hot"
               ],
               "type": "string"
             }
@@ -2013,7 +2014,7 @@
             "description": "tab, limit hoặc cursor không hợp lệ"
           }
         },
-        "summary": "Bảng tin video: chỉ gồm bài phát được, mới nhất trước. Khách cũng xem được.",
+        "summary": "Bảng tin video: chỉ gồm bài phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.",
         "tags": [
           "feed"
         ]

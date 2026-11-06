@@ -1,7 +1,8 @@
 import type { Db } from '@tripflix/db';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { bookmarks, mediaAssets, posts, reactions, renditions } from '../../db/schema/index.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
+import { HOT_SCORE_WEIGHTS } from '../domain/hot-score.js';
 import type { FeedPostRow, FeedStore } from '../application/ports.js';
 
 export class DrizzleFeedStore implements FeedStore {
@@ -12,6 +13,40 @@ export class DrizzleFeedStore implements FeedStore {
   }
 
   listPlayablePosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+    return this.selectPlayablePosts({
+      limit,
+      cursorFilter: after ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)` : undefined,
+      orderBy: [desc(posts.createdAt), desc(posts.id)],
+    });
+  }
+
+  listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+    // Cùng công thức với calculateHotScore, cursor lấy điểm từ hàm đó.
+    const hotScore = sql`(
+      ${posts.reactionTotal} * ${HOT_SCORE_WEIGHTS.like}::int
+      + ${posts.commentCount} * ${HOT_SCORE_WEIGHTS.comment}::int
+      + ${posts.bookmarkCount} * ${HOT_SCORE_WEIGHTS.save}::int
+      + ${posts.shareCount} * ${HOT_SCORE_WEIGHTS.share}::int
+    )`;
+    return this.selectPlayablePosts({
+      limit,
+      cursorFilter:
+        after?.score !== undefined
+          ? sql`(${hotScore}, ${posts.createdAt}, ${posts.id}) < (${after.score}::int, ${after.at}::timestamptz, ${after.id}::uuid)`
+          : undefined,
+      orderBy: [desc(hotScore), desc(posts.createdAt), desc(posts.id)],
+    });
+  }
+
+  private selectPlayablePosts({
+    limit,
+    cursorFilter,
+    orderBy,
+  }: {
+    limit: number;
+    cursorFilter: SQL | undefined;
+    orderBy: SQL[];
+  }): Promise<FeedPostRow[]> {
     return this.db
       .select({
         id: posts.id,
@@ -40,10 +75,10 @@ export class DrizzleFeedStore implements FeedStore {
             join ${renditions} on ${renditions.assetId} = ${mediaAssets.id}
             where ${mediaAssets.status} = 'ready'
           )`,
-          after ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)` : undefined,
+          cursorFilter,
         ),
       )
-      .orderBy(desc(posts.createdAt), desc(posts.id))
+      .orderBy(...orderBy)
       .limit(limit);
   }
 

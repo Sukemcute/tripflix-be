@@ -9,6 +9,12 @@ describe('feed cursor', () => {
     expect(decodeFeedCursor(encodeFeedCursor(VALID))).toEqual(VALID);
   });
 
+  it('giữ điểm của tab Đang hot, kể cả điểm 0', () => {
+    expect(decodeFeedCursor(encodeFeedCursor({ ...VALID, score: 0 }))).toEqual({ ...VALID, score: 0 });
+    expect(decodeFeedCursor(encodeRaw({ ...VALID, score: -1 }))).toBeNull();
+    expect(decodeFeedCursor(encodeRaw({ ...VALID, score: 1.5 }))).toBeNull();
+  });
+
   it.each([
     ['không phải base64 JSON', 'khong-hop-le'],
     ['thiếu id', encodeRaw({ at: VALID.at })],

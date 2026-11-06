@@ -4,6 +4,8 @@ import { z } from 'zod';
 export interface FeedCursor {
   at: string;
   id: string;
+  /** Chỉ tab Đang hot có điểm, vì tab này xếp theo điểm trước rồi mới tới thời gian. */
+  score?: number;
 }
 
 const AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
@@ -15,7 +17,11 @@ function isRealTimestamp(at: string): boolean {
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 23) === at.slice(0, 23);
 }
 
-const feedCursorSchema = z.object({ at: z.string().refine(isRealTimestamp), id: z.guid() });
+const feedCursorSchema = z.object({
+  at: z.string().refine(isRealTimestamp),
+  id: z.guid(),
+  score: z.number().int().nonnegative().optional(),
+});
 
 export function encodeFeedCursor(cursor: FeedCursor): string {
   return Buffer.from(JSON.stringify(cursor)).toString('base64url');
