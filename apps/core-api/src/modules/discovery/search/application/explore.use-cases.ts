@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { buildIndex } from '../domain/explore/build.js';
 import { searchExplore, type ExploreItem } from '../domain/explore/rank.js';
+import type { Understood } from '../domain/explore/query.js';
+import { paginate } from '../domain/stays.js';
 import { destOf } from '../domain/explore/text.js';
 import type { ExploreObject } from '../domain/explore/types.js';
 import { EXPLORE_CATALOG, EXPLORE_STORE, type ExploreCatalog, type ExploreHotel, type ExplorePost, type ExploreStore } from './ports.js';
@@ -8,10 +10,31 @@ import { EXPLORE_CATALOG, EXPLORE_STORE, type ExploreCatalog, type ExploreHotel,
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_PAGES = 1_000;
 const POST_KINDS = new Set(['post', 'plan', 'video']);
+/** Vùng của từng postType khi tìm bài; `all` gộp cả ba theo thứ tự engine xếp. */
+const POST_TYPE_KINDS = { all: ['plan', 'video', 'post'], plan: ['plan'], video: ['video'], post: ['post'] } as const;
+export type PostType = keyof typeof POST_TYPE_KINDS;
+export const POST_TYPES = Object.keys(POST_TYPE_KINDS) as PostType[];
+// ponytail: lấy tối đa chừng này bài khớp rồi cắt trang trong RAM; đủ cho vài nghìn bài, lớn hơn thì phân trang trong engine.
+const MAX_POST_RESULTS = 1_000;
 
 export interface ExploreQuery {
   q: string;
   loc?: { lat: number; lng: number } | null;
+}
+
+export interface PostSearchQuery {
+  q: string;
+  postType: PostType;
+  cursor?: string;
+  limit: number;
+}
+
+export interface PostSearchPage {
+  understood: ExploreResultPage['understood'];
+  items: ExploreResultItem[];
+  /** Số bài khớp (đã bỏ bài bị ẩn), trên mọi trang. */
+  total: number;
+  nextCursor: string | null;
 }
 
 export interface ExploreResultItem {
@@ -90,6 +113,18 @@ export function postToObject(p: ExplorePost): ExploreObject {
   };
 }
 
+const understoodOf = (u: Understood): ExploreResultPage['understood'] => ({
+  place: u.place, intents: u.intents, budget: u.budget, days: u.days, names: u.names, phrases: u.phrases, fixed: u.fixed,
+});
+
+/** Danh sách bài: lý do luôn có số ngày và lượt thích (engine chỉ ghi lượt thích cho bài viết thường). */
+function postReason({ obj, reason }: ExploreItem): string {
+  const why = reason ? [reason] : [];
+  if (obj.days && !reason.includes('ngày')) why.unshift(`${obj.days} ngày`);
+  if (!reason.includes('♥')) why.push(`♥ ${obj.likes ?? 0}`);
+  return why.join(' · ');
+}
+
 function toItem({ obj, reason }: ExploreItem): ExploreResultItem {
   return {
     id: obj.id,
@@ -133,15 +168,32 @@ export class ExploreUseCases {
     const postIds = [...new Set(all.filter((i) => POST_KINDS.has(i.obj.kind)).map((i) => i.obj.refId ?? ''))];
     const visible = postIds.length ? await this.catalog.findVisiblePostIds(postIds) : new Set<string>();
     const isShown = (i: ExploreItem) => !POST_KINDS.has(i.obj.kind) || visible.has(i.obj.refId ?? '');
-    const u = r.understood;
     return {
-      understood: { place: u.place, intents: u.intents, budget: u.budget, days: u.days, names: u.names, phrases: u.phrases, fixed: u.fixed },
+      understood: understoodOf(r.understood),
       nearUser: r.nearUser,
       // ponytail: total chưa trừ bài bị ẩn trong chu kỳ job (tối đa 10 phút); trừ khi cần đếm chính xác.
       sections: r.sections.map((s) => ({ kind: s.kind, label: s.label, total: s.total, items: s.items.filter(isShown).map(toItem) })),
       suggest: r.suggest.filter(isShown).map((i) => ({ ...toItem(i), section: i.section ?? '' })),
       dropped: r.dropped,
     };
+  }
+
+  /**
+   * Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang. Cùng engine với search(), chỉ lấy các vùng bài.
+   * Video kèm lộ trình nằm ở cả vùng Lộ trình và Video: với `all` chỉ trả một lần.
+   */
+  async searchPosts(query: PostSearchQuery): Promise<PostSearchPage> {
+    const kinds: readonly string[] = POST_TYPE_KINDS[query.postType];
+    const r = await searchExplore(this.store, query.q, { perSection: MAX_POST_RESULTS, fullKinds: kinds });
+    const seen = new Set<string>();
+    const found = r.sections
+      .filter((s) => kinds.includes(s.kind))
+      .flatMap((s) => s.items)
+      .filter((i) => !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)));
+    const visible = found.length ? await this.catalog.findVisiblePostIds(found.map((i) => i.obj.refId ?? '')) : new Set<string>();
+    const shown = found.filter((i) => visible.has(i.obj.refId ?? ''));
+    const page = paginate(shown, query.cursor, query.limit);
+    return { understood: understoodOf(r.understood), items: page.items.map((i) => toItem({ ...i, reason: postReason(i) })), total: shown.length, nextCursor: page.nextCursor };
   }
 
   /** Dựng lại toàn bộ chỉ mục từ commerce + content. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */

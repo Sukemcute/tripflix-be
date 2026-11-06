@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { STAY_SORTS, type StaySort } from '../domain/stays.js';
+import { POST_TYPES, type PostType } from '../application/explore.use-cases.js';
 import { SUGGEST_TYPES, type SuggestType } from '../domain/suggest-entity.js';
 
 // Schema zod để kiểm query; class bên dưới chỉ để Swagger sinh contracts/openapi.
@@ -51,6 +52,7 @@ export const ListStaysQuerySchema = z
     adults: z.coerce.number().int().min(1),
     rooms: OptionalIntSchema(1, 99),
     minStars: OptionalIntSchema(1, 5),
+    stars: OptionalIntSchema(1, 5),
     priceMin: OptionalIntSchema(0, Number.MAX_SAFE_INTEGER),
     priceMax: OptionalIntSchema(0, Number.MAX_SAFE_INTEGER),
     sort: z.enum(STAY_SORTS as [StaySort, ...StaySort[]]).default('price'),
@@ -155,4 +157,37 @@ export class ExploreResponseDto {
   @ApiProperty({ type: [ExploreSuggestItemDto], description: 'Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp' })
   suggest!: ExploreSuggestItemDto[];
   @ApiProperty({ type: [String], example: ['dịp', 'lễ'], description: 'Từ đã bỏ qua để ra gợi ý khác' }) dropped!: string[];
+}
+
+// ---------------- POST /api/search/posts (tìm bài trên app và web Cảm hứng)
+
+export const SearchPostsRequestSchema = z.object({
+  q: z.string().trim().min(1, 'Nhập điều muốn tìm').max(200),
+  postType: z.enum(POST_TYPES as [PostType, ...PostType[]]).default('all'),
+  cursor: z.string().regex(/^\d+$/, 'cursor lấy từ nextCursor của trang trước').nullish().transform((c) => c ?? undefined),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+export class SearchPostsRequestDto {
+  @ApiProperty({ example: 'lịch trình đà lạt 3n2đ dưới 3tr', description: 'Câu người dùng gõ (1–200 ký tự)' }) q!: string;
+  @ApiProperty({
+    enum: POST_TYPES,
+    required: false,
+    default: 'all',
+    description: 'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường',
+  })
+  postType?: PostType;
+  @ApiProperty({ type: String, required: false, nullable: true, description: '`nextCursor` của trang trước' }) cursor?: string | null;
+  @ApiProperty({ required: false, default: 20, description: '1–50' }) limit?: number;
+}
+
+export class SearchPostsResponseDto {
+  @ApiProperty({ type: ExploreUnderstoodDto, description: 'Máy hiểu câu thế nào (hiện dạng chip)' }) understood!: ExploreUnderstoodDto;
+  @ApiProperty({
+    type: [ExploreItemDto],
+    description: 'Bài đã xếp theo mức khớp, đã bỏ bài bị ẩn. `reason` luôn có số ngày (nếu có lộ trình) và lượt thích',
+  })
+  items!: ExploreItemDto[];
+  @ApiProperty({ example: 12, description: 'Số bài khớp trên mọi trang' }) total!: number;
+  @ApiProperty({ type: String, nullable: true, description: 'Con trỏ trang sau; null = hết' }) nextCursor!: string | null;
 }

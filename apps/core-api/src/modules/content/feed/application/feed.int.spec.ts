@@ -129,6 +129,63 @@ describe('Feed trên Postgres thật', () => {
     await expect(readAllPages(20)).resolves.toEqual([newest, middle, oldest]);
   });
 
+  describe('tab hot', () => {
+    async function setCounts(postId: string, counts: { likes?: number; comments?: number; saves?: number; shares?: number }) {
+      await pool.query(
+        'update content.posts set reaction_total = $2, comment_count = $3, bookmark_count = $4, share_count = $5 where id = $1',
+        [postId, counts.likes ?? 0, counts.comments ?? 0, counts.saves ?? 0, counts.shares ?? 0],
+      );
+    }
+
+    async function readHotPages(limit: number) {
+      const ids: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const after = cursor ? decodeFeedCursor(cursor) : null;
+        const page = await feed.getPage({ tab: 'hot', limit, after, viewerId: null });
+        ids.push(...page.items.map((item) => item.postId));
+        cursor = page.nextCursor;
+      } while (cursor);
+      return ids;
+    }
+
+    it('xếp theo trọng số thích 1, bình luận 2, lưu 3, chia sẻ 4; bằng điểm thì mới nhất trước', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const noEngagement = await insertPost([asset], { createdAt: '2026-11-05T00:00:00Z' });
+      const threeLikes = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
+      const oneShare = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
+      const oneSave = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
+      const oneComment = await insertPost([asset], { createdAt: '2026-11-04T00:00:00Z' });
+      await setCounts(threeLikes, { likes: 3 });
+      await setCounts(oneShare, { shares: 1 });
+      await setCounts(oneSave, { saves: 1 });
+      await setCounts(oneComment, { comments: 1 });
+
+      await expect(readHotPages(20)).resolves.toEqual([oneShare, oneSave, threeLikes, oneComment, noEngagement]);
+    });
+
+    it('sang trang không lặp, không rớt bài khi nhiều bài trùng điểm và trùng thời điểm', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const createdAt = '2026-11-05T10:00:00.123456Z';
+      const sameScore = await Promise.all(Array.from({ length: 5 }, () => insertPost([asset], { createdAt })));
+      const top = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
+      await setCounts(top, { likes: 10 });
+
+      const ids = await readHotPages(2);
+
+      expect(ids[0]).toBe(top);
+      expect(ids.slice(1).sort()).toEqual([...sameScore].sort());
+    });
+
+    it('vẫn lọc bài không phát được', async () => {
+      const playable = await insertPost([await insertAsset('ready', [360])]);
+      const processing = await insertPost([await insertAsset('processing')]);
+      await setCounts(processing, { likes: 100 });
+
+      await expect(readHotPages(20)).resolves.toEqual([playable]);
+    });
+  });
+
   it('sang trang không lặp, không rớt bài khi nhiều bài trùng thời điểm tới micro-giây', async () => {
     const asset = await insertAsset('ready', [360]);
     const createdAt = '2026-11-05T10:00:00.123456Z';

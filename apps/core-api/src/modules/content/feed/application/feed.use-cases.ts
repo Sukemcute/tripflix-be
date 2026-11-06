@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
+import { calculateHotScore } from '../domain/hot-score.js';
 import { FEED_STORE, type FeedPostRow, type FeedStore } from './ports.js';
+
+export const FEED_TABS = ['for_you', 'hot'] as const;
+export type FeedTab = (typeof FEED_TABS)[number];
 
 export interface FeedCard {
   postId: string;
@@ -22,7 +26,7 @@ export interface FeedPage {
   nextCursor: string | null;
 }
 
-/** Bản đầu của F1: bài mới nhất. Xếp hạng, snapshot, các tab khác thuộc các phần sau (docs/09 mục 3 đến 5). */
+/** Bản đầu của F1: for_you lấy bài mới nhất, hot lấy theo bộ đếm tương tác. Trending, snapshot, tab following thuộc các phần sau (docs/09 mục 3 đến 5). */
 @Injectable()
 export class FeedUseCases {
   constructor(
@@ -30,8 +34,15 @@ export class FeedUseCases {
     @Inject(MediaFacade) private readonly media: MediaFacade,
   ) {}
 
-  async getPage(query: { limit: number; after: FeedCursor | null; viewerId: string | null }): Promise<FeedPage> {
-    const rows = await this.store.listPlayablePosts({ limit: query.limit + 1, after: query.after });
+  async getPage(query: {
+    tab?: FeedTab;
+    limit: number;
+    after: FeedCursor | null;
+    viewerId: string | null;
+  }): Promise<FeedPage> {
+    const isHot = query.tab === 'hot';
+    const listQuery = { limit: query.limit + 1, after: query.after };
+    const rows = await (isHot ? this.store.listHotPosts(listQuery) : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, query.limit);
     const postIds = pageRows.map((row) => row.id);
     const [playback, liked, saved] = await Promise.all([
@@ -54,7 +65,14 @@ export class FeedUseCases {
     const last = pageRows.at(-1);
     return {
       items,
-      nextCursor: rows.length > query.limit && last ? encodeFeedCursor({ at: last.cursorAt, id: last.id }) : null,
+      nextCursor:
+        rows.length > query.limit && last
+          ? encodeFeedCursor({
+              at: last.cursorAt,
+              id: last.id,
+              ...(isHot ? { score: calculateHotScore(last) } : {}),
+            })
+          : null,
     };
   }
 }
