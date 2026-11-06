@@ -28,3 +28,10 @@
 
 - Thay đổi ở `content/social` của Thành. Dũng xác nhận đã báo Thành và đồng ý thực hiện.
 - Việc triển khai cần phối hợp với bản web TF05D và cấu hình SMTP trên môi trường đích.
+
+## Cập nhật luồng đăng ký bằng mã
+
+- API cấp mã chỉ lưu yêu cầu xác thực và phát sự kiện gửi email. Mã gồm 8 chữ số và hết hạn sau 10 phút. Yêu cầu mới thay mã cũ.
+- API đăng ký kiểm lại mật khẩu 12–128 ký tự, từ chối các mẫu dễ đoán và bắt buộc mã hợp lệ cho đúng địa chỉ email. Tạo tài khoản và tiêu mã trong cùng transaction. Tài khoản có email đã xác thực ngay khi tạo.
+- Kiểm thử bằng Chromium và Mailpit đã xác nhận rằng mật khẩu yếu bị chặn, gọi thẳng API thiếu mã bị từ chối và đăng nhập chưa được phép trước khi nhập đúng mã.
+- Test tích hợp Access qua 28/28 bài với Postgres và Redis thật. Hai yêu cầu đồng thời dùng cùng mã chỉ tạo được một tài khoản.
