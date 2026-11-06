@@ -51,6 +51,7 @@ export const ListStaysQuerySchema = z
     adults: z.coerce.number().int().min(1),
     rooms: OptionalIntSchema(1, 99),
     minStars: OptionalIntSchema(1, 5),
+    stars: OptionalIntSchema(1, 5),
     priceMin: OptionalIntSchema(0, Number.MAX_SAFE_INTEGER),
     priceMax: OptionalIntSchema(0, Number.MAX_SAFE_INTEGER),
     sort: z.enum(STAY_SORTS as [StaySort, ...StaySort[]]).default('price'),

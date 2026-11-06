@@ -21,7 +21,8 @@ export class StaysController {
       '',
       '- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.',
       '- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.',
-      '- Lọc `minStars`, `priceMin`/`priceMax` theo giá một đêm một phòng. `sort=price` (mặc định, rẻ trước) hoặc `stars` (nhiều sao trước).',
+      '- Lọc `minStars` (từ X sao trở lên), `stars` (đúng X sao; gửi cả hai thì áp cả hai), `priceMin`/`priceMax` theo giá một đêm một phòng.',
+      '- `sort=price` (mặc định, rẻ trước), `price_desc` (đắt trước) hoặc `stars` (nhiều sao trước).',
       '- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.',
     ].join('\n'),
   })
@@ -31,7 +32,8 @@ export class StaysController {
   @ApiQuery({ name: 'checkOut', example: '2026-12-03' })
   @ApiQuery({ name: 'adults', example: 2 })
   @ApiQuery({ name: 'rooms', required: false, description: 'Bỏ trống thì commerce tự tính theo số khách' })
-  @ApiQuery({ name: 'minStars', required: false, example: 4 })
+  @ApiQuery({ name: 'minStars', required: false, example: 4, description: 'Từ X sao trở lên' })
+  @ApiQuery({ name: 'stars', required: false, example: 3, description: 'Đúng X sao (1–5)' })
   @ApiQuery({ name: 'priceMin', required: false, description: 'VND, một đêm một phòng' })
   @ApiQuery({ name: 'priceMax', required: false, example: 2_000_000, description: 'VND, một đêm một phòng' })
   @ApiQuery({ name: 'sort', required: false, enum: STAY_SORTS })

@@ -13,11 +13,13 @@ export interface StayResult {
   totalPrice: number;
 }
 
-export type StaySort = 'price' | 'stars';
-export const STAY_SORTS: readonly StaySort[] = ['price', 'stars'];
+export type StaySort = 'price' | 'price_desc' | 'stars';
+export const STAY_SORTS: readonly StaySort[] = ['price', 'price_desc', 'stars'];
 
 export interface StayFilter {
   minStars?: number;
+  /** Đúng một hạng sao (khác minStars là "từ X sao trở lên"). */
+  stars?: number;
   priceMin?: number;
   priceMax?: number;
 }
@@ -34,18 +36,23 @@ export function resolvePlaceSlugs(placeId: string): string[] | null {
 }
 
 const byPrice = (a: StayResult, b: StayResult) => a.unitPrice - b.unitPrice || a.name.localeCompare(b.name, 'vi');
+// Cùng giá thì vẫn theo tên A→Z, để thứ tự giữa các trang ổn định.
+const byPriceDesc = (a: StayResult, b: StayResult) => b.unitPrice - a.unitPrice || a.name.localeCompare(b.name, 'vi');
 const byStars = (a: StayResult, b: StayResult) => (b.stars ?? 0) - (a.stars ?? 0) || byPrice(a, b);
 
-/** Lọc theo hạng sao tối thiểu và khoảng giá một đêm, rồi sắp xếp. Không đổi mảng gốc. */
+const COMPARE: Record<StaySort, (a: StayResult, b: StayResult) => number> = { price: byPrice, price_desc: byPriceDesc, stars: byStars };
+
+/** Lọc theo hạng sao (tối thiểu hoặc đúng mức) và khoảng giá một đêm, rồi sắp xếp. Không đổi mảng gốc. */
 export function filterAndSortStays(stays: readonly StayResult[], filter: StayFilter, sort: StaySort): StayResult[] {
   return stays
     .filter(
       (s) =>
         (filter.minStars === undefined || (s.stars ?? 0) >= filter.minStars) &&
+        (filter.stars === undefined || s.stars === filter.stars) &&
         (filter.priceMin === undefined || s.unitPrice >= filter.priceMin) &&
         (filter.priceMax === undefined || s.unitPrice <= filter.priceMax),
     )
-    .sort(sort === 'stars' ? byStars : byPrice);
+    .sort(COMPARE[sort]);
 }
 
 /**
