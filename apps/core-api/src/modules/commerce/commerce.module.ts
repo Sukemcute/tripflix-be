@@ -14,10 +14,12 @@ import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
 import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
+import { FlightsController } from './inventory/api/flights.controller.js';
 import { HotelsController } from './inventory/api/hotels.controller.js';
 import { CalendarAdminUseCases } from './inventory/application/calendar-admin.use-cases.js';
 import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
 import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
+import { FlightSearchUseCases } from './inventory/application/flight-search.use-cases.js';
 import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
 import { ReviewUseCases } from './inventory/application/review.use-cases.js';
 import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type MediaUrl, type Today } from './inventory/application/ports.js';
@@ -69,7 +71,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
     }),
   ],
-  controllers: [HotelsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController],
+  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController],
   providers: [
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     { provide: ORDER_STORE, useClass: DrizzleOrderStore },
@@ -90,6 +92,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     { provide: MEDIA_URL, inject: [CORE_ENV], useFactory: (env: CoreEnv) => buildMediaUrl(env.MEDIA_CDN_URL) },
     CatalogUseCases,
     HotelDetailUseCases,
+    FlightSearchUseCases,
     ReviewUseCases,
     CalendarUseCases,
     CalendarAdminUseCases,

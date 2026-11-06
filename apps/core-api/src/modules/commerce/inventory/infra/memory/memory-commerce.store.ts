@@ -69,6 +69,22 @@ export class MemoryCommerceStore implements CommerceStore {
     },
     findFlightsByIds: async (ids) => this.flights.filter((f) => ids.includes(f.id)),
     findFlightsByKeys: async (keys) => this.flights.filter((f) => keys.includes(f.flightKey)).sort((a, b) => a.flightKey.localeCompare(b.flightKey) || a.defaultPrice - b.defaultPrice),
+    findFlightsByRoute: async (fromAirport, toAirport) =>
+      this.flights
+        .filter((f) => f.fromAirport === fromAirport && f.toAirport === toAirport)
+        .sort((a, b) => (a.departTime ?? '').localeCompare(b.departTime ?? '') || a.flightKey.localeCompare(b.flightKey) || a.defaultPrice - b.defaultPrice),
+    listFlightRoutes: async () => {
+      const routes = new Map<string, { fromAirport: string; toAirport: string; destinationSlug: string; destinationName: string; keys: Set<string> }>();
+      for (const f of this.flights) {
+        const id = `${f.fromAirport}|${f.toAirport}|${f.destinationSlug}`;
+        const route = routes.get(id) ?? { fromAirport: f.fromAirport, toAirport: f.toAirport, destinationSlug: f.destinationSlug, destinationName: f.destinationName, keys: new Set<string>() };
+        route.keys.add(f.flightKey);
+        routes.set(id, route);
+      }
+      return [...routes.values()]
+        .map(({ keys, ...route }) => ({ ...route, flightCount: keys.size }))
+        .sort((a, b) => a.fromAirport.localeCompare(b.fromAirport) || a.toAirport.localeCompare(b.toAirport));
+    },
   };
 
   readonly calendar: CalendarRepository = {
