@@ -4,7 +4,7 @@ import type { AuthUser } from '@tripflix/auth';
 import type { z } from 'zod';
 import { ZodBody } from '../../media/api/http.js';
 import { OptionalAuthenticated, OptionalCurrentUser } from '../../social/api/optional-auth.guard.js';
-import { FeedUseCases, type FeedPage } from '../application/feed.use-cases.js';
+import { FEED_TABS, FeedUseCases, type FeedPage } from '../application/feed.use-cases.js';
 import { FEED_DEFAULT_LIMIT, FEED_MAX_LIMIT, FeedPageDto, FeedQuerySchema } from './dto.js';
 
 @ApiTags('feed')
@@ -14,8 +14,11 @@ export class FeedController {
 
   @Get()
   @OptionalAuthenticated()
-  @ApiOperation({ summary: 'Bảng tin video: chỉ gồm bài phát được, mới nhất trước. Khách cũng xem được.' })
-  @ApiQuery({ name: 'tab', required: false, enum: ['for_you'] })
+  @ApiOperation({
+    summary:
+      'Bảng tin video: chỉ gồm bài phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.',
+  })
+  @ApiQuery({ name: 'tab', required: false, enum: FEED_TABS })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: FEED_DEFAULT_LIMIT, description: `Tối đa ${FEED_MAX_LIMIT}` })
   @ApiQuery({ name: 'cursor', required: false, type: String })
   @ApiOkResponse({ type: FeedPageDto })
@@ -24,6 +27,11 @@ export class FeedController {
     @Query(new ZodBody(FeedQuerySchema)) query: z.infer<typeof FeedQuerySchema>,
     @OptionalCurrentUser() user?: AuthUser,
   ): Promise<FeedPage> {
-    return this.feed.getPage({ limit: query.limit, after: query.cursor ?? null, viewerId: user?.userId ?? null });
+    return this.feed.getPage({
+      tab: query.tab,
+      limit: query.limit,
+      after: query.cursor ?? null,
+      viewerId: user?.userId ?? null,
+    });
   }
 }

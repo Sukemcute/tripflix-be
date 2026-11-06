@@ -1,28 +1,36 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MEDIA_QUALITY_LEVELS, type MediaAspect, type MediaQualityLevel } from '@tripflix/contracts';
 import { z } from 'zod';
+import { FEED_TABS } from '../application/feed.use-cases.js';
 import { decodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 
 export const FEED_DEFAULT_LIMIT = 10;
 export const FEED_MAX_LIMIT = 20;
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
-export const FeedQuerySchema = z.object({
-  // Bản đầu chỉ có một tab. Báo lỗi với tab khác, không âm thầm trả nhầm nội dung.
-  tab: z.literal('for_you').default('for_you'),
-  limit: z.coerce.number().int().min(1).max(FEED_MAX_LIMIT).default(FEED_DEFAULT_LIMIT),
-  cursor: z
-    .string()
-    .transform((value, ctx): FeedCursor => {
-      const cursor = decodeFeedCursor(value);
-      if (!cursor) {
-        ctx.addIssue({ code: 'custom', message: 'Cursor không hợp lệ' });
-        return z.NEVER;
-      }
-      return cursor;
-    })
-    .optional(),
-});
+export const FeedQuerySchema = z
+  .object({
+    // Chưa có tab following. Báo lỗi với tab khác, không âm thầm trả nhầm nội dung.
+    tab: z.enum(FEED_TABS).default('for_you'),
+    limit: z.coerce.number().int().min(1).max(FEED_MAX_LIMIT).default(FEED_DEFAULT_LIMIT),
+    cursor: z
+      .string()
+      .transform((value, ctx): FeedCursor => {
+        const cursor = decodeFeedCursor(value);
+        if (!cursor) {
+          ctx.addIssue({ code: 'custom', message: 'Cursor không hợp lệ' });
+          return z.NEVER;
+        }
+        return cursor;
+      })
+      .optional(),
+  })
+  .superRefine((query, ctx) => {
+    // Cursor của tab này dùng ở tab kia sẽ cắt danh sách sai vị trí.
+    if (query.cursor && (query.tab === 'hot') !== (query.cursor.score !== undefined)) {
+      ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor không thuộc tab này' });
+    }
+  });
 
 class FeedAuthorDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
