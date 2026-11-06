@@ -27,6 +27,11 @@ x-core-env: &core-env
   S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
   S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
   MEDIA_CDN_URL: ${MEDIA_CDN_URL:?}
+  VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+  VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+  VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  # Không để trống: core-api kiểm biến này là URL, chuỗi rỗng làm app không khởi động được.
+  VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-https://tripflix.io.vn/payments/vnpay/return}
 
 services:
   # ---------- Giai đoạn 1: database, Redis ----------
