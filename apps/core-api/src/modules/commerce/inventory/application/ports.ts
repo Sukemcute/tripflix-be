@@ -70,6 +70,18 @@ export interface CatalogRepository {
   listFlights(filter: { destinationSlug?: string; afterKey?: string; limit: number }): Promise<FlightRecord[]>;
   findFlightsByIds(ids: string[]): Promise<FlightRecord[]>;
   findFlightsByKeys(flightKeys: string[]): Promise<FlightRecord[]>;
+  /** Mọi hạng ghế của các chuyến bay đúng tuyến (mã sân bay đi, đến). */
+  findFlightsByRoute(fromAirport: string, toAirport: string): Promise<FlightRecord[]>;
+  /** Các tuyến đang có chuyến, kèm số chuyến (không đếm trùng hạng ghế). */
+  listFlightRoutes(): Promise<FlightRouteRecord[]>;
+}
+
+export interface FlightRouteRecord {
+  fromAirport: string;
+  toAirport: string;
+  destinationSlug: string;
+  destinationName: string;
+  flightCount: number;
 }
 
 export interface CalendarRepository {

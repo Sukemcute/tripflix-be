@@ -76,6 +76,19 @@ describe('DrizzleCommerceStore trên Postgres thật', () => {
     expect(result!.isFound).toBe(true);
   });
 
+  it('tìm chuyến bay: tuyến nào cũng tìm ra đúng chuyến của tuyến đó; số chuyến khớp dữ liệu seed', async () => {
+    const store = new DrizzleCommerceStore({ tx: db });
+    const routes = await store.catalog.listFlightRoutes();
+    expect(routes.length).toBeGreaterThan(0);
+    const { rows } = await pool.query<{ n: number }>('select count(distinct flight_key)::int as n from commerce.flights');
+    expect(routes.reduce((sum, r) => sum + r.flightCount, 0)).toBe(rows[0]!.n);
+    const route = routes[0]!;
+    const found = await store.catalog.findFlightsByRoute(route.fromAirport, route.toAirport);
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((f) => f.fromAirport === route.fromAirport && f.toAirport === route.toAirport)).toBe(true);
+    expect(new Set(found.map((f) => f.flightKey)).size).toBe(route.flightCount);
+  });
+
   it('CHECK của database chặn bán quá kể cả khi code sai', async () => {
     await expect(pool.query(`update commerce.room_inventory set sold = total + 1 where room_type_id = $1 and date = $2`, [roomTypeId, '2026-12-05'])).rejects.toThrow(/ck_room_inventory_not_oversold/);
   });

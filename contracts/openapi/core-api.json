@@ -2438,6 +2438,149 @@
         ]
       }
     },
+    "/api/flights": {
+      "get": {
+        "operationId": "FlightsController_search",
+        "parameters": [
+          {
+            "description": "Mã sân bay đi (IATA)",
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "SGN",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mã sân bay đến (IATA)",
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "example": "CXR",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày bay",
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "passengers",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightSearchResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/api/flights/routes": {
+      "get": {
+        "operationId": "FlightsController_listRoutes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FlightRouteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/api/flights/{id}": {
+      "get": {
+        "operationId": "FlightsController_getFlight",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ngày bay",
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "example": "2026-12-01",
+              "type": "string"
+            }
+          },
+          {
+            "required": false,
+            "name": "passengers",
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightOfferDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có chuyến bay này"
+          }
+        },
+        "tags": [
+          "flights"
+        ]
+      }
+    },
     "/api/admin/commerce/room-types/{id}/calendar": {
       "get": {
         "operationId": "AdminCalendarController_getRoomCalendar",
@@ -6605,6 +6748,234 @@
           "page",
           "limit",
           "total"
+        ]
+      },
+      "FlightSearchEchoDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "to": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "passengers": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "date",
+          "passengers"
+        ]
+      },
+      "FlightDestinationDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "nha-trang"
+          },
+          "name": {
+            "type": "string",
+            "example": "Nha Trang"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ]
+      },
+      "FlightFareQuoteDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ECO",
+            "description": "Gửi vào ratePlanCode khi POST /checkout"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tiết kiệm · không hoàn vé"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "freeCancelDays": {
+            "type": "number",
+            "description": "Hoàn vé miễn phí trước ngày bay bao nhiêu ngày"
+          },
+          "pricePerPerson": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé (VND); null khi không bán được"
+          },
+          "totalPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Cả nhóm hành khách (VND); null khi không bán được"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isRefundable",
+          "freeCancelDays",
+          "pricePerPerson",
+          "totalPrice"
+        ]
+      },
+      "FlightOfferDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "P-f-hl-02--Y",
+            "description": "Gửi vào productId khi POST /checkout (checkIn = ngày bay)"
+          },
+          "flightKey": {
+            "type": "string",
+            "example": "P-f-hl-02",
+            "description": "Mã chuyến; các hạng ghế của cùng chuyến chung mã này"
+          },
+          "name": {
+            "type": "string",
+            "example": "Bay Sài Gòn – Nha Trang sớm"
+          },
+          "airline": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "departTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "06:20"
+          },
+          "arriveTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "07:30"
+          },
+          "cabinName": {
+            "type": "string",
+            "example": "Phổ thông"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/FlightDestinationDto"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "NOT_ON_SALE",
+              "STOP_SELL",
+              "SOLD_OUT"
+            ]
+          },
+          "remaining": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ghế thật còn lại ngày đó"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé rẻ nhất (VND)"
+          },
+          "fares": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightFareQuoteDto"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "flightKey",
+          "name",
+          "airline",
+          "fromAirport",
+          "toAirport",
+          "departTime",
+          "arriveTime",
+          "cabinName",
+          "destination",
+          "isAvailable",
+          "reason",
+          "remaining",
+          "priceFrom",
+          "fares"
+        ]
+      },
+      "FlightSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "$ref": "#/components/schemas/FlightSearchEchoDto"
+          },
+          "flights": {
+            "description": "Còn ghế lên trước, rồi theo giờ bay, rồi giá",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightOfferDto"
+            }
+          }
+        },
+        "required": [
+          "query",
+          "flights"
+        ]
+      },
+      "FlightRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "destinationSlug": {
+            "type": "string",
+            "example": "nha-trang"
+          },
+          "destinationName": {
+            "type": "string",
+            "example": "Nha Trang"
+          },
+          "flightCount": {
+            "type": "number",
+            "example": 3,
+            "description": "Số chuyến bay trên tuyến (mỗi chuyến có thể nhiều hạng ghế)"
+          }
+        },
+        "required": [
+          "fromAirport",
+          "toAirport",
+          "destinationSlug",
+          "destinationName",
+          "flightCount"
         ]
       },
       "AdminRoomDayDto": {

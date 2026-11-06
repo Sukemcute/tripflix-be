@@ -140,6 +140,29 @@ class DrizzleCatalogRepository implements CatalogRepository {
     const rows = await this.db.select().from(flights).where(inArray(flights.flightKey, flightKeys)).orderBy(asc(flights.flightKey), asc(flights.defaultPrice));
     return rows.map(mapFlight);
   }
+
+  async findFlightsByRoute(fromAirport: string, toAirport: string) {
+    const rows = await this.db
+      .select()
+      .from(flights)
+      .where(and(eq(flights.fromAirport, fromAirport), eq(flights.toAirport, toAirport)))
+      .orderBy(asc(flights.departTime), asc(flights.flightKey), asc(flights.defaultPrice));
+    return rows.map(mapFlight);
+  }
+
+  async listFlightRoutes() {
+    return this.db
+      .select({
+        fromAirport: flights.fromAirport,
+        toAirport: flights.toAirport,
+        destinationSlug: flights.destinationSlug,
+        destinationName: flights.destinationName,
+        flightCount: sql<number>`count(distinct ${flights.flightKey})::int`,
+      })
+      .from(flights)
+      .groupBy(flights.fromAirport, flights.toAirport, flights.destinationSlug, flights.destinationName)
+      .orderBy(asc(flights.fromAirport), asc(flights.toAirport));
+  }
 }
 
 class DrizzleCalendarRepository implements CalendarRepository {

@@ -139,6 +139,10 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Xong khi đăng ký tài khoản mới trên `https://tripflix.io.vn` thì nhận được email "Chào mừng bạn đến với Tripflix, hãy xác nhận email" ở Gmail (không vào Spam), và bấm "Quên mật khẩu" cũng nhận được email.
 
+## VNPay sandbox
+
+Thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` vào `.env.server`, không commit và không gửi qua chat. Thiếu một trong hai thì các API VNPay trả 404. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web, đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
+
 ## Vận hành
 
 ```bash
