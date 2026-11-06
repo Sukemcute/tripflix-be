@@ -110,6 +110,7 @@ class CheckoutItemDto {
   @ApiProperty({ enum: ['room', 'flight'] }) productType!: string;
   @ApiProperty() productId!: string;
   @ApiProperty() productName!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Tên khách sạn của mục phòng; vé bay là null' }) propertyName!: string | null;
   @ApiProperty({ format: 'date' }) date!: string;
   @ApiProperty({ format: 'date' }) dateTo!: string;
   @ApiProperty() nights!: number;
