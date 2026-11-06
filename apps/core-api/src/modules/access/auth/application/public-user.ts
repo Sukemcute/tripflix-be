@@ -19,3 +19,15 @@ export function mapPublicUser(user: UserRecord): PublicUser {
     createdAt: user.createdAt.toISOString(),
   };
 }
+
+/** Hồ sơ của chính người đang đăng nhập (GET/PATCH /auth/me): thêm thông tin cá nhân, không dùng cho danh sách nhân viên. */
+export interface MyProfile extends PublicUser {
+  phone: string | null;
+  dateOfBirth: string | null;
+  gender: UserRecord['personal']['gender'];
+  nationality: string | null;
+}
+
+export function mapMyProfile(user: UserRecord): MyProfile {
+  return { ...mapPublicUser(user), ...user.personal };
+}

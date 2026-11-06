@@ -1,6 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { NewOutboxEvent } from '@tripflix/outbox';
 import type { JWK } from 'jose';
+import type { PersonalInfo } from '../../account/domain/personal-info.js';
 import type { RefreshState } from '../domain/refresh-rotation.js';
 
 export interface UserRecord {
@@ -12,7 +13,12 @@ export interface UserRecord {
   role: Role;
   status: 'active' | 'locked';
   createdAt: Date;
+  /** Thông tin cá nhân (TF06M), chỉ trả cho chủ tài khoản. */
+  personal: PersonalInfo;
 }
+
+/** Các trường hồ sơ chủ tài khoản tự sửa; trường nào không có thì giữ nguyên. */
+export type ProfilePatch = Partial<Pick<UserRecord, 'displayName'> & PersonalInfo>;
 
 export interface SessionRecord extends RefreshState {
   id: string;
@@ -104,7 +110,7 @@ export interface UserRepository {
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
   updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
   updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
-  updateDisplayName(id: string, displayName: string): Promise<UserRecord | null>;
+  updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;
   updatePasswordHash(id: string, passwordHash: string): Promise<UserRecord | null>;
 }
 

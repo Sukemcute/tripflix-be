@@ -70,6 +70,14 @@ export class UserDto {
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
 }
 
+/** GET/PATCH /auth/me: hồ sơ của chính mình, có thông tin cá nhân (không có ở danh sách nhân viên). */
+export class MyProfileDto extends UserDto {
+  @ApiProperty({ type: String, nullable: true, example: '0912345678' }) phone!: string | null;
+  @ApiProperty({ type: String, format: 'date', nullable: true, example: '2000-05-20' }) dateOfBirth!: string | null;
+  @ApiProperty({ enum: ['male', 'female', 'other'], nullable: true }) gender!: 'male' | 'female' | 'other' | null;
+  @ApiProperty({ type: String, nullable: true, example: 'VN' }) nationality!: string | null;
+}
+
 export class JwksDto {
   @ApiProperty({ type: 'array', items: { type: 'object' } }) keys!: Record<string, unknown>[];
 }

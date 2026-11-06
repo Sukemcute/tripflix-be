@@ -42,7 +42,7 @@ import {
   type TokenIssuer,
   type UserRecord,
 } from './ports.js';
-import { mapPublicUser, type PublicUser } from './public-user.js';
+import { mapMyProfile, mapPublicUser, type MyProfile, type PublicUser } from './public-user.js';
 import { createRefreshToken, hashRefreshToken } from './refresh-token.js';
 
 export interface TokenPair {
@@ -158,10 +158,10 @@ export class AuthUseCases {
     await this.blocklist.block(user.sid, Math.max(remaining, 1));
   }
 
-  async getMe(userId: string): Promise<PublicUser> {
+  async getMe(userId: string): Promise<MyProfile> {
     const user = await this.store.users.findById(userId);
     if (!user) throw new AccessError('not_found', 'Không tìm thấy người dùng');
-    return mapPublicUser(user);
+    return mapMyProfile(user);
   }
 
   /** Đăng ký công khai luôn là member; nhân viên do superadmin cấp. Trả null khi email đã có. */
