@@ -2230,6 +2230,42 @@
         ]
       }
     },
+    "/api/search/posts": {
+      "post": {
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.",
+        "operationId": "ExploreController_searchPosts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPostsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPostsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` rỗng hoặc dài hơn 200 ký tự, `postType`, `cursor`, `limit` sai"
+          }
+        },
+        "summary": "Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/recommendations/home": {
       "get": {
         "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi, mỗi nơi 2 khách sạn: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do \"Rẻ hơn X% so với …\".\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
@@ -5796,6 +5832,76 @@
           "sections",
           "suggest",
           "dropped"
+        ]
+      },
+      "SearchPostsRequestDto": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "example": "lịch trình đà lạt 3n2đ dưới 3tr",
+            "description": "Câu người dùng gõ (1–200 ký tự)"
+          },
+          "postType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "plan",
+              "video",
+              "post"
+            ],
+            "default": "all",
+            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường"
+          },
+          "cursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "`nextCursor` của trang trước"
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "description": "1–50"
+          }
+        },
+        "required": [
+          "q"
+        ]
+      },
+      "SearchPostsResponseDto": {
+        "type": "object",
+        "properties": {
+          "understood": {
+            "description": "Máy hiểu câu thế nào (hiện dạng chip)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreUnderstoodDto"
+              }
+            ]
+          },
+          "items": {
+            "description": "Bài đã xếp theo mức khớp, đã bỏ bài bị ẩn. `reason` luôn có số ngày (nếu có lộ trình) và lượt thích",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreItemDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số bài khớp trên mọi trang"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Con trỏ trang sau; null = hết"
+          }
+        },
+        "required": [
+          "understood",
+          "items",
+          "total",
+          "nextCursor"
         ]
       },
       "HomeProvinceDto": {

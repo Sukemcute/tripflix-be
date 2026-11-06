@@ -276,6 +276,7 @@ async function searchSections(
   u0: Understood | null,
   perSection: number,
   user: LatLon | null,
+  full: ReadonlySet<string> | null,
 ): Promise<{ query: string; understood: Understood; sections: ExploreSection[] }> {
   const center = u.place ? await st.center(u.place) : null;
   const groups = new Map<string, Row[]>();
@@ -286,7 +287,7 @@ async function searchSections(
   }
   const out: ExploreSection[] = SECTIONS.map(([k, label]) => {
     const rows = [...(groups.get(k) ?? [])].sort((a, b) => Number(a.near > 0) - Number(b.near > 0) || b.rank - a.rank); // đúng nơi trước
-    const n = u.intents.includes(k) || !u.intents.length ? perSection : 3;
+    const n = (full ? full.has(k) : u.intents.includes(k) || !u.intents.length) ? perSection : 3;
     return {
       kind: k,
       label,
@@ -307,17 +308,21 @@ async function searchSections(
   return { query: q, understood: u, sections: out };
 }
 
-/** loc = vị trí người dùng (tuỳ chọn). Chỉ dùng khi câu không nói rõ nơi: kết quả gần người dùng được xếp lên. */
+/**
+ * loc = vị trí người dùng (tuỳ chọn). Chỉ dùng khi câu không nói rõ nơi: kết quả gần người dùng được xếp lên.
+ * fullKinds = các vùng luôn lấy đủ perSection mục (mặc định: vùng câu nhắm tới), vd tìm bài chỉ cần vùng bài.
+ */
 export async function searchExplore(
   source: ExploreSource,
   q: string,
-  options: { perSection?: number; loc?: LatLon | null } = {},
+  options: { perSection?: number; loc?: LatLon | null; fullKinds?: readonly string[] } = {},
 ): Promise<ExploreResult> {
+  const full = options.fullKinds ? new Set(options.fullKinds) : null;
   const perSection = options.perSection ?? 6;
   const st = new Stats(source);
   const [u, u0] = await understand(q, st);
   const user = options.loc && !u.place ? options.loc : null;
-  const r = await searchSections(st, q, u, u0, perSection, user);
+  const r = await searchSections(st, q, u, u0, perSection, user, full);
   // Vùng người dùng muốn không có gì đáp ứng đủ câu -> giữ "không có kết quả phù hợp", thêm "Các gợi ý khác" ở cuối:
   // tìm lại chỉ theo nơi + ý muốn + ngân sách (bỏ mọi từ), xếp theo chất lượng. Câu không có nơi, không có ý muốn thì không đoán.
   const kinds = u.intents.length ? u.intents : SECTIONS.map(([k]) => k);
@@ -329,7 +334,7 @@ export async function searchExplore(
       matched: u.matched.filter(([, typ]) => typ !== 'concept'),
     };
     const n = u.intents.length ? perSection : 2;
-    const again = await searchSections(st, q, loose, null, perSection, user);
+    const again = await searchSections(st, q, loose, null, perSection, user, full);
     suggest = again.sections.filter((s) => kinds.includes(s.kind)).flatMap((s) => s.items.slice(0, n).map((i) => ({ ...i, section: s.label })));
     dropped = u.terms.map((t) => t.split(' ').map((w) => u.accents[w] ?? w).join(' ')); // 'mua he' -> 'mùa hè'
   }
