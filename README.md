@@ -101,7 +101,7 @@ pnpm lint && pnpm typecheck && pnpm test
 apps/
   core-api/              # 5 module: access, content, discovery, commerce, analytics (README trong từng module)
   notification-service/  # khung, chưa có consumer
-  video-worker/          # khung, image có FFmpeg
+  video-worker/          # chuyển mã video bằng FFmpeg, chạy trên Node; sẽ chuyển sang Go
 libs/
   auth/  config/  contracts/  db/  event-bus/  observability/   # đã có
   outbox/  idempotency/  storage/  testing/                    # chưa làm, xem README từng thư mục

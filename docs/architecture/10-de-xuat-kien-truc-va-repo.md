@@ -124,11 +124,11 @@ flowchart TB
 |---|---|---|---|---|
 | `core-api` | BE | NestJS | Postgres `core` (5 schema, gồm `commerce`, `analytics`) | Lõi nghiệp vụ và kho sự kiện |
 | `notification-service` | BE | NestJS, BullMQ, Socket.IO | Postgres `notification` (database riêng) | Nhận sự kiện từ mọi module, tải theo đợt, scale ngang riêng |
-| `video-worker` | BE | Node + FFmpeg | Không; ghi kết quả vào S3, báo về core bằng sự kiện | CPU nặng, scale riêng |
+| `video-worker` | BE | Node + FFmpeg; sẽ chuyển sang Go + FFmpeg (chưa làm) | Không; ghi kết quả vào S3, báo về core bằng sự kiện | CPU nặng, scale riêng |
 | `ai-service` | AI | Python, FastAPI | Không giữ dữ liệu nghiệp vụ | Ecosystem Python, vòng đánh giá riêng |
 | `mobile`, `web`, `admin` | FE | Expo, Next.js | — | Mobile/web là Front Office; admin là Back Office, API được role guard |
 
-`video-worker` và `notification-service` build từ cùng monorepo BE với `core-api` (dùng chung `libs/`), mỗi cái một entrypoint và một Dockerfile.
+`video-worker` và `notification-service` build từ cùng monorepo BE với `core-api` (dùng chung `libs/`), mỗi cái một entrypoint và một Dockerfile. Khi chuyển sang Go, `video-worker` không dùng chung `libs/` được nữa, nên phải giữ nguyên định dạng sự kiện và cấu trúc thư mục HLS.
 
 ### 3.2. Năm module trong `core-api`
 
