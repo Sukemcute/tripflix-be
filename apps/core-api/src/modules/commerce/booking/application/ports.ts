@@ -6,6 +6,9 @@ export interface OrderRecord {
   status: OrderStatus;
   total: number;
   adults: number;
+  /** Vé bay: trẻ em 2–11 tuổi (chiếm ghế) và em bé dưới 2 tuổi (không chiếm ghế). */
+  children: number;
+  infants: number;
   sourcePostId: string | null;
   contactName: string | null;
   contactPhone: string | null;
@@ -94,7 +97,7 @@ export interface OrderStore {
   listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }): Promise<OrderRecord[]>;
   /** Mục của nhiều đơn trong một câu truy vấn. */
   findItemsOfOrders(orderIds: string[]): Promise<OrderItemRecord[]>;
-  insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
+  insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
   insertItems(orderId: string, items: NewOrderItem[]): Promise<void>;
   findItems(orderId: string): Promise<OrderItemRecord[]>;
   updateItemPrices(prices: { id: string; unitPrice: number; lineTotal: number }[]): Promise<void>;

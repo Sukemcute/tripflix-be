@@ -3,6 +3,11 @@
 export const MAX_NIGHTS = 14;
 export const MAX_ROOMS = 9;
 export const MAX_ADULTS = 9;
+/** Ghế tối đa của một lượt đặt vé bay: người lớn + trẻ em (em bé ngồi lòng người lớn, không chiếm ghế). */
+export const MAX_SEATS = 9;
+/** Trẻ em 2–11 tuổi trả 75% giá vé người lớn, em bé dưới 2 tuổi trả 10% (TF29). */
+export const CHILD_FARE_FACTOR = 0.75;
+export const INFANT_FARE_FACTOR = 0.1;
 
 /** Gói giá: hệ số nhân với giá gốc của ngày. */
 export interface PricePlan {
@@ -91,14 +96,47 @@ export function quoteStay(input: { days: RoomDay[]; checkIn: string; checkOut: s
   return { isAvailable: true, remaining, nights, totalPrice, pricePerNight: Math.round(totalPrice / nights / input.rooms), plan: input.plan };
 }
 
-/** Bay được ngày đó với số khách không. */
-export function quoteFlight(input: { day: FlightDay | undefined; passengers: number; plan: PricePlan }): StayQuote {
+/** Nhóm hành khách của một lượt bay. */
+export interface PassengerMix {
+  adults: number;
+  children: number;
+  infants: number;
+}
+
+/** Số ghế cần giữ: em bé ngồi lòng người lớn nên không tính. */
+export const countSeats = (mix: PassengerMix) => mix.adults + mix.children;
+
+/** Lỗi đầu tiên của nhóm khách, kèm tên trường; null khi hợp lệ. */
+export function findPassengerMixError(mix: PassengerMix): { field: 'adults' | 'children' | 'infants'; message: string } | null {
+  const isCount = (value: number, max: number) => Number.isInteger(value) && value >= 0 && value <= max;
+  if (!isCount(mix.adults, MAX_ADULTS) || mix.adults < 1) return { field: 'adults', message: `Số người lớn từ 1 đến ${MAX_ADULTS}.` };
+  if (!isCount(mix.children, MAX_SEATS - 1)) return { field: 'children', message: `Số trẻ em từ 0 đến ${MAX_SEATS - 1}.` };
+  if (countSeats(mix) > MAX_SEATS) return { field: 'children', message: `Người lớn và trẻ em tối đa ${MAX_SEATS} ghế.` };
+  if (!isCount(mix.infants, mix.adults)) return { field: 'infants', message: 'Mỗi em bé cần một người lớn đi kèm.' };
+  return null;
+}
+
+/** Giá một vé của từng loại khách, từ giá người lớn của gói; làm tròn 10.000đ như giá người lớn. */
+export const calculatePassengerFares = (adultPrice: number) => ({
+  adult: adultPrice,
+  child: roundToTenThousand(adultPrice * CHILD_FARE_FACTOR),
+  infant: roundToTenThousand(adultPrice * INFANT_FARE_FACTOR),
+});
+
+/**
+ * Bay được ngày đó với nhóm khách không. passengers là số người lớn; trẻ em chiếm ghế, em bé không.
+ * pricePerNight là giá một vé người lớn, totalPrice là cả nhóm.
+ */
+export function quoteFlight(input: { day: FlightDay | undefined; passengers: number; children?: number; infants?: number; plan: PricePlan }): StayQuote {
+  const children = input.children ?? 0;
+  const infants = input.infants ?? 0;
   if (!input.day) return { isAvailable: false, reason: 'NOT_ON_SALE' };
   if (input.day.isStopSell) return { isAvailable: false, reason: 'STOP_SELL' };
   const remaining = countRemaining(input.day);
-  if (remaining < input.passengers) return { isAvailable: false, reason: 'SOLD_OUT', remaining };
-  const pricePerPerson = calculatePlanPrice(input.day.price, input.plan);
-  return { isAvailable: true, remaining, nights: 1, totalPrice: pricePerPerson * input.passengers, pricePerNight: pricePerPerson, plan: input.plan };
+  if (remaining < input.passengers + children) return { isAvailable: false, reason: 'SOLD_OUT', remaining };
+  const fares = calculatePassengerFares(calculatePlanPrice(input.day.price, input.plan));
+  const totalPrice = fares.adult * input.passengers + fares.child * children + fares.infant * infants;
+  return { isAvailable: true, remaining, nights: 1, totalPrice, pricePerNight: fares.adult, plan: input.plan };
 }
 
 /** Số phòng tối thiểu để đủ chỗ cho cả nhóm. */

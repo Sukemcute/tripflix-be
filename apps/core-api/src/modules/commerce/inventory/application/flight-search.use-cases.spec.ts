@@ -74,6 +74,26 @@ describe('FlightSearchUseCases.searchFlights', () => {
     ];
     for (const query of bad) await expect(flights.searchFlights(query)).rejects.toMatchObject({ code: 'invalid_query' });
   });
+
+  it('trẻ em chiếm ghế, em bé không: giá từng loại khách và tổng cả nhóm', async () => {
+    const { flights } = await setup();
+    // 1 người lớn + 1 trẻ em = 2 ghế: F1 (2 ghế) vẫn bán; thêm 1 em bé không tốn ghế.
+    const result = await flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, passengers: 1, children: 1, infants: 1 });
+    const economy = result.flights.find((f) => f.productId === 'F1--Y')!;
+    expect(economy).toMatchObject({ isAvailable: true, priceFrom: 900_000 });
+    // 900.000 + 680.000 (75% = 675.000 làm tròn) + 90.000.
+    expect(economy.fares[0]).toMatchObject({ pricePerPerson: 900_000, childPrice: 680_000, infantPrice: 90_000, totalPrice: 1_670_000 });
+    // 1 người lớn + 2 trẻ em = 3 ghế: F1 hết chỗ, giá trẻ em cũng null.
+    const three = await flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, passengers: 1, children: 2 });
+    expect(three.flights.find((f) => f.productId === 'F1--Y')).toMatchObject({ isAvailable: false, reason: 'SOLD_OUT' });
+    expect(three.flights.find((f) => f.productId === 'F1--Y')!.fares[0]).toMatchObject({ childPrice: null, infantPrice: null });
+  });
+
+  it('nhóm khách sai thì báo lỗi đúng trường', async () => {
+    const { flights } = await setup();
+    await expect(flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, passengers: 1, infants: 2 })).rejects.toMatchObject({ code: 'invalid_query', field: 'infants' });
+    await expect(flights.searchFlights({ from: 'SGN', to: 'CXR', date: DATE, passengers: 5, children: 5 })).rejects.toMatchObject({ code: 'invalid_query', field: 'children' });
+  });
 });
 
 describe('FlightSearchUseCases.getFlightOffer', () => {

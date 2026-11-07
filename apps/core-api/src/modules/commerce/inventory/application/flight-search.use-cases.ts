@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
-import { MAX_ADULTS, addDays, countNights, isIsoDate, quoteFlight, type UnavailableReason } from '../domain/sales-rules.js';
+import { MAX_SEATS, addDays, calculatePassengerFares, countNights, findPassengerMixError, isIsoDate, quoteFlight, type PassengerMix, type UnavailableReason } from '../domain/sales-rules.js';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type FlightRouteRecord, type Today } from './ports.js';
 
 const DEFAULT_PASSENGERS = 1;
@@ -10,22 +10,27 @@ const MAX_CALENDAR_DAYS = 31;
 export const FLIGHT_SORTS = ['recommended', 'price', 'departure', 'duration'] as const;
 export type FlightSort = (typeof FLIGHT_SORTS)[number];
 
-export interface FlightSearchQuery {
+/** passengers là số người lớn; trẻ em (2–11 tuổi) chiếm ghế, em bé (dưới 2 tuổi) ngồi lòng người lớn. */
+interface PassengerQuery {
+  passengers?: number;
+  children?: number;
+  infants?: number;
+}
+
+export interface FlightSearchQuery extends PassengerQuery {
   from: string;
   to: string;
   date: string;
-  passengers?: number;
   /** recommended (mặc định): còn ghế trước, rồi giờ bay, rồi giá. */
   sort?: FlightSort;
 }
 
-export interface FlightCalendarQuery {
+export interface FlightCalendarQuery extends PassengerQuery {
   from: string;
   to: string;
   /** Ngày đầu và ngày cuối (tính cả hai), tối đa 31 ngày. */
   start: string;
   end: string;
-  passengers?: number;
 }
 
 export interface FlightCalendarResult {
@@ -34,9 +39,8 @@ export interface FlightCalendarResult {
   days: { date: string; priceFrom: number | null; isAvailable: boolean }[];
 }
 
-export interface FlightOfferQuery {
+export interface FlightOfferQuery extends PassengerQuery {
   date: string;
-  passengers?: number;
 }
 
 export interface FlightFareQuote {
@@ -44,9 +48,12 @@ export interface FlightFareQuote {
   name: string;
   isRefundable: boolean;
   freeCancelDays: number;
-  /** Giá một vé; null khi hạng ghế không bán được ngày này. */
+  /** Giá một vé người lớn; null khi hạng ghế không bán được ngày này. */
   pricePerPerson: number | null;
-  /** Cả nhóm hành khách; null khi không bán được. */
+  /** Giá một vé trẻ em (75%) và em bé (10%); null khi không bán được. */
+  childPrice: number | null;
+  infantPrice: number | null;
+  /** Cả nhóm hành khách (người lớn, trẻ em, em bé); null khi không bán được. */
   totalPrice: number | null;
   /** Hành lý xách tay và ký gửi, kg mỗi khách; null khi dữ liệu chưa có. */
   carryOnKg: number | null;
@@ -127,13 +134,13 @@ export class FlightSearchUseCases {
     if (!AIRPORT_CODE.test(from)) throw new CommerceError('invalid_query', 'Mã sân bay đi gồm 3 chữ cái, ví dụ SGN.', 'from');
     if (!AIRPORT_CODE.test(to)) throw new CommerceError('invalid_query', 'Mã sân bay đến gồm 3 chữ cái, ví dụ CXR.', 'to');
     if (from === to) throw new CommerceError('invalid_query', 'Sân bay đi và đến phải khác nhau.', 'to');
-    const passengers = this.validate(query);
+    const mix = this.validate(query);
     const flights = await this.store.catalog.findFlightsByRoute(from, to);
     const sort = query.sort ?? 'recommended';
     if (!FLIGHT_SORTS.includes(sort)) throw new CommerceError('invalid_query', `sort là một trong ${FLIGHT_SORTS.join(', ')}.`, 'sort');
-    const offers = await this.quote(flights, query.date, passengers);
+    const offers = await this.quote(flights, query.date, mix);
     offers.sort(compareOffers(sort));
-    return { query: { from, to, date: query.date, passengers }, flights: offers };
+    return { query: { from, to, date: query.date, passengers: mix.adults }, flights: offers };
   }
 
   /** Giá một vé rẻ nhất từng ngày trên tuyến, để vẽ dải ngày "From 1.804k". Một lần đọc lịch cho cả khoảng. */
@@ -143,7 +150,7 @@ export class FlightSearchUseCases {
     if (!AIRPORT_CODE.test(from)) throw new CommerceError('invalid_query', 'Mã sân bay đi gồm 3 chữ cái, ví dụ SGN.', 'from');
     if (!AIRPORT_CODE.test(to)) throw new CommerceError('invalid_query', 'Mã sân bay đến gồm 3 chữ cái, ví dụ CXR.', 'to');
     if (from === to) throw new CommerceError('invalid_query', 'Sân bay đi và đến phải khác nhau.', 'to');
-    const passengers = this.validate({ date: query.start, passengers: query.passengers }, 'start');
+    const mix = this.validate({ ...query, date: query.start }, 'start');
     if (!isIsoDate(query.end) || query.end < query.start || countNights(query.start, query.end) + 1 > MAX_CALENDAR_DAYS) {
       throw new CommerceError('invalid_query', `Ngày cuối phải từ ngày đầu trở đi, tối đa ${MAX_CALENDAR_DAYS} ngày.`, 'end');
     }
@@ -151,12 +158,12 @@ export class FlightSearchUseCases {
     const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), query.start, query.end);
     const dates = Array.from({ length: countNights(query.start, query.end) + 1 }, (_, i) => addDays(query.start, i));
     return {
-      query: { from, to, start: query.start, end: query.end, passengers },
+      query: { from, to, start: query.start, end: query.end, passengers: mix.adults },
       days: dates.map((date) => {
         const prices = flights.flatMap((flight) => {
           const day = days.get(flight.id)?.find((d) => d.date === date);
           return flight.farePlans.flatMap((plan) => {
-            const quote = quoteFlight({ day, passengers, plan });
+            const quote = quoteFlight({ day, passengers: mix.adults, children: mix.children, infants: mix.infants, plan });
             return quote.isAvailable ? [quote.pricePerNight] : [];
           });
         });
@@ -166,24 +173,26 @@ export class FlightSearchUseCases {
   }
 
   async getFlightOffer(productId: string, query: FlightOfferQuery): Promise<FlightOffer> {
-    const passengers = this.validate(query);
+    const mix = this.validate(query);
     const [flight] = await this.store.catalog.findFlightsByIds([productId]);
     if (!flight) throw new CommerceError('not_found', 'Không có chuyến bay này.');
-    return (await this.quote([flight], query.date, passengers))[0]!;
+    return (await this.quote([flight], query.date, mix))[0]!;
   }
 
-  private validate(query: { date: string; passengers?: number }, dateField = 'date'): number {
-    const passengers = query.passengers ?? DEFAULT_PASSENGERS;
+  private validate(query: PassengerQuery & { date: string }, dateField = 'date'): PassengerMix {
+    const mix = { adults: query.passengers ?? DEFAULT_PASSENGERS, children: query.children ?? 0, infants: query.infants ?? 0 };
     if (!isIsoDate(query.date) || query.date < this.today()) throw new CommerceError('invalid_query', 'Ngày bay phải từ hôm nay trở đi.', dateField);
-    if (!Number.isInteger(passengers) || passengers < 1 || passengers > MAX_ADULTS) throw new CommerceError('invalid_query', `Số hành khách từ 1 đến ${MAX_ADULTS}.`, 'passengers');
-    return passengers;
+    if (!Number.isInteger(mix.adults) || mix.adults < 1 || mix.adults > MAX_SEATS) throw new CommerceError('invalid_query', `Số hành khách từ 1 đến ${MAX_SEATS}.`, 'passengers');
+    const error = findPassengerMixError(mix);
+    if (error) throw new CommerceError('invalid_query', error.message, error.field);
+    return mix;
   }
 
-  private async quote(flights: FlightRecord[], date: string, passengers: number): Promise<FlightOffer[]> {
+  private async quote(flights: FlightRecord[], date: string, mix: PassengerMix): Promise<FlightOffer[]> {
     const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), date, date);
     return flights.map((flight): FlightOffer => {
       const day = days.get(flight.id)?.[0];
-      const quotes = flight.farePlans.map((plan) => ({ plan, quote: quoteFlight({ day, passengers, plan }) }));
+      const quotes = flight.farePlans.map((plan) => ({ plan, quote: quoteFlight({ day, passengers: mix.adults, children: mix.children, infants: mix.infants, plan }) }));
       const first = quotes[0]?.quote;
       const prices = quotes.flatMap(({ quote }) => (quote.isAvailable ? [quote.pricePerNight] : []));
       return {
@@ -213,6 +222,8 @@ export class FlightSearchUseCases {
           isRefundable: plan.refundable,
           freeCancelDays: plan.freeCancelDays,
           pricePerPerson: quote.isAvailable ? quote.pricePerNight : null,
+          childPrice: quote.isAvailable ? calculatePassengerFares(quote.pricePerNight).child : null,
+          infantPrice: quote.isAvailable ? calculatePassengerFares(quote.pricePerNight).infant : null,
           totalPrice: quote.isAvailable ? quote.totalPrice : null,
           carryOnKg: plan.carryOnKg ?? null,
           checkedKg: plan.checkedKg ?? null,

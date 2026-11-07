@@ -14,6 +14,9 @@ export const orders = commerceSchema.table(
     status: text('status').notNull().default('pending'),
     total: bigint('total', { mode: 'number' }).notNull(),
     adults: smallint('adults').notNull(),
+    // Vé bay: trẻ em 2–11 tuổi chiếm ghế, em bé dưới 2 tuổi ngồi lòng người lớn (TF29).
+    children: smallint('children').notNull().default(0),
+    infants: smallint('infants').notNull().default(0),
     sourcePostId: text('source_post_id'),
     contactName: text('contact_name'),
     contactPhone: text('contact_phone'),
@@ -32,6 +35,8 @@ export const orders = commerceSchema.table(
     check('ck_orders_status', sql`${t.status} in ('pending', 'paying', 'paid', 'cancelled', 'expired')`),
     check('ck_orders_total', sql`${t.total} > 0`),
     check('ck_orders_adults', sql`${t.adults} between 1 and 9`),
+    check('ck_orders_children', sql`${t.children} >= 0 and ${t.adults} + ${t.children} <= 9`),
+    check('ck_orders_infants', sql`${t.infants} between 0 and ${t.adults}`),
     index('idx_orders_user_id').on(t.userId, t.createdAt),
     index('idx_orders_hold').on(t.status, t.holdExpiresAt),
     // Mỗi tài khoản một giỏ đang giữ: chống một người giữ nhiều giỏ để giam chỗ.

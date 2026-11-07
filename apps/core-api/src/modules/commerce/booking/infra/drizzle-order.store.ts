@@ -16,6 +16,8 @@ const mapOrder = (row: OrderRow): OrderRecord => ({
   status: row.status as OrderStatus,
   total: row.total,
   adults: row.adults,
+  children: row.children,
+  infants: row.infants,
   sourcePostId: row.sourcePostId,
   contactName: row.contactName,
   contactPhone: row.contactPhone,
@@ -133,7 +135,7 @@ export class DrizzleOrderStore implements OrderStore {
     return (await this.selectItemsWithProperty().where(inArray(orderItems.orderId, orderIds)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItemWithProperty);
   }
 
-  async insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }) {
+  async insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }) {
     const [row] = await this.db.insert(orders).values(order).returning({ id: orders.id });
     return row!.id;
   }

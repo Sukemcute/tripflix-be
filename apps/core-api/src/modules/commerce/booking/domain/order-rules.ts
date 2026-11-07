@@ -13,14 +13,46 @@ export interface GuestInput {
   birthdate: string | null;
 }
 
+/** Loại hành khách vé bay; hành khách nhập theo thứ tự người lớn, trẻ em, em bé. */
+export type PassengerType = 'adult' | 'child' | 'infant';
+
+export const listPassengerTypes = (mix: { adults: number; children: number; infants: number }): PassengerType[] => [
+  ...Array<PassengerType>(mix.adults).fill('adult'),
+  ...Array<PassengerType>(mix.children).fill('child'),
+  ...Array<PassengerType>(mix.infants).fill('infant'),
+];
+
+/** Tuổi tròn năm của người sinh ngày birthdate tính tới ngày date (YYYY-MM-DD). */
+export function countAgeOn(birthdate: string, date: string): number {
+  const age = Number(date.slice(0, 4)) - Number(birthdate.slice(0, 4));
+  return date.slice(5) < birthdate.slice(5) ? age - 1 : age;
+}
+
+/** Tuổi tại ngày bay đúng loại khách: người lớn từ 12 tuổi, trẻ em 2–11, em bé dưới 2. */
+export function isAgeOfPassengerType(type: PassengerType, age: number): boolean {
+  if (type === 'adult') return age >= 12;
+  if (type === 'child') return age >= 2 && age <= 11;
+  return age >= 0 && age < 2;
+}
+
 export interface ContactInput {
   fullName: string;
   phone: string;
   email: string | null;
 }
 
-/** Tên trường sai, để trả về client đánh dấu ô nhập. Rỗng là hợp lệ. */
-export function findInvalidGuestFields(input: { contact: ContactInput; guests: GuestInput[]; passengersRequired: number; today: string }): string[] {
+/**
+ * Tên trường sai, để trả về client đánh dấu ô nhập. Rỗng là hợp lệ.
+ * Có passengerTypes và travelDate thì kiểm thêm tuổi tại ngày bay đúng loại khách của từng hành khách.
+ */
+export function findInvalidGuestFields(input: {
+  contact: ContactInput;
+  guests: GuestInput[];
+  passengersRequired: number;
+  today: string;
+  passengerTypes?: PassengerType[];
+  travelDate?: string;
+}): string[] {
   const invalid: string[] = [];
   if (!input.contact.fullName.trim()) invalid.push('contact.fullName');
   if (!/^0\d{9,10}$/.test(input.contact.phone.replace(/\s/g, ''))) invalid.push('contact.phone');
@@ -29,7 +61,9 @@ export function findInvalidGuestFields(input: { contact: ContactInput; guests: G
     if (input.guests.length !== input.passengersRequired) invalid.push('guests');
     input.guests.forEach((g, i) => {
       if (!g.fullName.trim()) invalid.push(`guests[${i}].fullName`);
-      if (!g.birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(g.birthdate) || g.birthdate > input.today) invalid.push(`guests[${i}].birthdate`);
+      const type = input.passengerTypes?.[i];
+      const isWrongAge = !!(g.birthdate && type && input.travelDate && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, input.travelDate)));
+      if (!g.birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(g.birthdate) || g.birthdate > input.today || isWrongAge) invalid.push(`guests[${i}].birthdate`);
     });
   }
   return invalid;
