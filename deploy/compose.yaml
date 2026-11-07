@@ -147,6 +147,31 @@ services:
         - { action: sync, path: '${AI_REPO:-../../tripflix-ai}/app', target: /srv/app }
         - { action: rebuild, path: '${AI_REPO:-../../tripflix-ai}/uv.lock' }
 
+  # Worker tóm tắt bài viết: nghe stream:core.content. Cùng image với ai-service (build dùng lại cache).
+  # Chỉ chạy khi bật profile ai (pnpm stack:ai); stack:down tắt cùng các service khác.
+  ai-summary-worker:
+    profiles: [ai]
+    build: { context: '${AI_REPO:-../../tripflix-ai}', target: dev }
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.summary_worker']
+    environment:
+      CORE_API_URL: http://core-api:3000
+      REDIS_URL: redis://redis:6379
+      # Dev mặc định fake (không gọi LLM thật); đặt LLM_PROVIDER trong deploy/.env để đổi.
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERVICE_CLIENT_SECRET: ${SERVICE_CLIENT_SECRET:-}
+      SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
+      # logging của Python chỉ nhận chữ hoa (DEBUG, INFO), không dùng chung LOG_LEVEL=debug của BE.
+      LOG_LEVEL: ${AI_WORKER_LOG_LEVEL:-INFO}
+    depends_on:
+      redis: { condition: service_started }
+    restart: unless-stopped
+    develop:
+      watch:
+        - { action: sync+restart, path: '${AI_REPO:-../../tripflix-ai}/app', target: /app/app }
+        - { action: rebuild, path: '${AI_REPO:-../../tripflix-ai}/uv.lock' }
+
   # ---------- Web, admin (profile fe) — build từ repo tripflix-fe đặt cạnh ----------
   web:
     profiles: [fe]
