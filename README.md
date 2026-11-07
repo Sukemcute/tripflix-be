@@ -17,14 +17,17 @@ Backend Tripflix: `core-api` (modular monolith 5 module), `notification-service`
    └─ tripflix-ai/
    ```
 
-4. Trong `tripflix-be`: `pnpm install`, rồi chép `deploy/.env.example` thành `deploy/.env` và điền `DEV_NAME`, key AWS dev (nếu làm phần media), `OPENAI_API_KEY` (nếu chạy AI).
+4. Trong `tripflix-be`: `pnpm install`, rồi chép `deploy/.env.example` thành `deploy/.env` và điền `DEV_NAME`, key AWS dev (nếu làm phần media), `LLM_PROVIDER` và `OPENAI_API_KEY` (nếu chạy AI; code ở máy thì để `LLM_PROVIDER=fake`, không cần key).
 
 ## Chạy
 
 | Lệnh | Dùng khi |
 |---|---|
-| `pnpm stack:up` | Chạy cả hệ thống trong Docker (BE, AI, web, admin, gateway) |
+| `pnpm stack:up` | Chạy hệ thống trong Docker (BE, web, admin, gateway), **không có AI** cho nhanh |
 | `pnpm stack:watch` | Như trên, sửa code thì container tự cập nhật |
+| `pnpm stack:ai` | Bật thêm AI (ai-service + ai-summary-worker) lên stack đang chạy |
+| `pnpm stack:ai:down` | Tắt riêng AI, BE vẫn chạy |
+| `pnpm stack:full`, `pnpm stack:watch:full` | Cả hệ thống kèm AI |
 | `pnpm stack:be` | Chỉ BE + gateway |
 | `pnpm stack:infra` | Chỉ Postgres, Redis, Mailpit; app của mình chạy trên máy bằng `pnpm dev` |
 | `pnpm stack:tools` | Adminer, RedisInsight |
