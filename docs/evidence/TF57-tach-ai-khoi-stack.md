@@ -12,17 +12,23 @@
   - `stack:up`, `stack:watch` bỏ profile `ai`.
   - Thêm `stack:ai` (bật AI lên stack đang chạy), `stack:ai:down` (tắt riêng AI), `stack:full`, `stack:watch:full` (cả hệ thống kèm AI).
   - `stack:down`, `stack:reset` giữ profile `ai` nên vẫn tắt cả AI.
+- `ai-summary-worker` dùng `LLM_PROVIDER` mặc định `fake` và `LOG_LEVEL` riêng (`AI_WORKER_LOG_LEVEL`, mặc định `INFO`).
 - `deploy/.env.example`: thêm `LLM_PROVIDER=fake`, `LLM_MODEL`, `SERVICE_CLIENT_SECRET`, `SUMMARY_LLM_KILL` (worker bắt buộc có `LLM_PROVIDER`).
 - README của `tripflix-be`, `tripflix-fe`, `tripflix-ai`: cập nhật bảng lệnh và cách bật/tắt AI.
 
 ## Kết quả kiểm tra
-- `docker compose -f deploy/compose.yaml --profile be --profile ai --profile fe --profile gateway --profile tools config -q`: hợp lệ.
-- `docker compose -f deploy/compose.yaml --profile ai config --services`: có `ai-service`, `ai-summary-worker`.
+- `docker compose ... config -q` (đủ 5 profile): hợp lệ. `--profile be --profile fe --profile gateway config --services` (tức `stack:up`): không có `ai-service`, `ai-summary-worker`. Profile của `stack:down` có cả hai.
 - `prettier --check` trên `package.json` và README FE: pass. `deploy/compose.yaml`, README BE vốn đã lệch format trên `develop`, không sửa thêm.
-- Không đổi code TypeScript/Python nên không chạy lại `pnpm test`. **Chưa chạy thử** `pnpm stack:ai` trên stack thật.
+- Chạy thật trên stack local (2026-11-07):
+  - Lần đầu `ai-summary-worker` restart liên tục vì 2 lỗi, đã sửa trong compose: thiếu `LLM_PROVIDER` (giờ mặc định `fake` cho dev) và `LOG_LEVEL=debug` viết thường mà `logging` của Python không nhận (giờ dùng `AI_WORKER_LOG_LEVEL`, mặc định `INFO`).
+  - Sau khi sửa: log `summary worker ... listening on stream:core.content`, container ở trạng thái Up.
+  - `pnpm stack:ai:down`: `ai-service`, `ai-summary-worker` dừng; `core-api` vẫn healthy, `GET :3000/health` trả 200.
+  - `pnpm stack:ai`: hai service AI chạy lại.
+- Không chạy `pnpm stack:down` để khỏi tắt stack đang dùng; kiểm bằng `config --services` như trên.
+- Không đổi code TypeScript/Python nên không chạy lại `pnpm test`.
 
 ## Cách kiểm lại
-1. Thêm `LLM_PROVIDER=fake` vào `deploy/.env`.
+1. (Tuỳ chọn) đặt `LLM_PROVIDER` trong `deploy/.env`; không đặt thì dev dùng `fake`.
 2. Nếu còn container cũ: `docker rm -f tripflix-ai-summary-worker`.
 3. `pnpm stack:up` → `pnpm stack:ps` không có `ai-service`, `ai-summary-worker`.
 4. `pnpm stack:ai` → hai service AI chạy; `docker logs tripflix-ai-summary-worker-1` có dòng `listening on stream:core.content`.
