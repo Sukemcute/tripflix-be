@@ -32,7 +32,7 @@ describe('HomeRecommendationUseCases', () => {
     const picks = await useCases.recommendForHome({ recentPlaceIds: ['lam-dong'], limit: 8 });
     await useCases.recommendForHome({ recentPlaceIds: [], limit: 8 });
 
-    expect(picks.map((p) => p.hotelId)).toEqual(['a', 'b']);
+    expect(picks.map((p) => p.hotels[0]?.hotelId)).toEqual(['a', 'b']);
     expect(listCatalog).toHaveBeenCalledTimes(2);
     expect(listCatalog).toHaveBeenCalledWith(expect.objectContaining({ type: 'hotel', days: 30, limit: 200 }));
   });

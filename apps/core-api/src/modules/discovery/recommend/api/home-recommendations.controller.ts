@@ -14,33 +14,49 @@ export const HomeRecommendationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(8),
 });
 
-class HomeReasonDto {
+export class HomeReasonDto {
   @ApiProperty({ enum: ['recent_place', 'good_deal'], description: 'recent_place: nơi vừa tìm · good_deal: rẻ hơn trung vị cùng hạng sao' })
   code!: HomeReasonCode;
-  @ApiProperty({ example: 'Vì bạn vừa tìm Đà Lạt', description: 'Câu hiện dưới thẻ, tiếng Việt' }) text!: string;
+  @ApiProperty({ example: 'Vì bạn vừa tìm Đà Lạt', description: 'Câu hiện dưới thẻ, tiếng Việt' })
+  text!: string;
 }
 
-class HomeProvinceDto {
+export class HomeProvinceDto {
   @ApiProperty({ example: 'da-lat' }) slug!: string;
   @ApiProperty({ example: 'Đà Lạt' }) name!: string;
 }
 
-export class HomePickDto {
-  @ApiProperty({ example: 'P-vn-h-da-lat-3', description: 'Mã khách sạn của commerce; mở trang chi tiết bằng mã này' }) hotelId!: string;
-  @ApiProperty({ example: 'Swiss-Belresort Tuyền Lâm' }) name!: string;
-  @ApiProperty({ type: String, nullable: true }) thumbnail!: string | null;
-  @ApiProperty({ type: Number, nullable: true, example: 5 }) stars!: number | null;
+export class HomeStayPickDto {
+  @ApiProperty({ example: 'P-vn-h-da-lat-3', description: 'Mã khách sạn của commerce; mở trang chi tiết bằng mã này' })
+  hotelId!: string;
+  @ApiProperty({ example: 'Swiss-Belresort Tuyền Lâm' })
+  name!: string;
+  @ApiProperty({ type: String, nullable: true })
+  thumbnail!: string | null;
+  @ApiProperty({ type: Number, nullable: true, example: 5 })
+  stars!: number | null;
   @ApiProperty({ type: String, nullable: true, example: 'Mường Thanh', description: 'Chuỗi khách sạn; null nếu độc lập' })
   brand!: string | null;
-  @ApiProperty({ type: HomeProvinceDto }) province!: HomeProvinceDto;
   @ApiProperty({ example: 2_750_000, description: 'Giá thấp nhất một đêm một phòng trong 30 ngày tới (VND), hiện "từ X/đêm"' })
   priceFrom!: number;
-  @ApiProperty({ type: HomeReasonDto }) reason!: HomeReasonDto;
+  @ApiProperty({ type: HomeReasonDto })
+  reason!: HomeReasonDto;
+}
+
+export class HomeDestinationPickDto {
+  @ApiProperty({ type: HomeProvinceDto })
+  province!: HomeProvinceDto;
+  @ApiProperty({ type: [HomeStayPickDto], description: 'Danh sách khách sạn có deal hời tại điểm đến (deal tốt nhất đứng đầu)' })
+  hotels!: HomeStayPickDto[];
+  @ApiProperty({ example: 8, description: 'Tổng số khách sạn có deal hời tại điểm đến' })
+  totalDealsCount!: number;
+  @ApiProperty({ example: 7, description: 'Số deal hời khác ngoài deal tốt nhất (dùng để hiển thị: còn ít nhất X khách sạn có deal hời nữa)' })
+  otherDealsCount!: number;
 }
 
 export class HomeRecommendationsDto {
-  @ApiProperty({ type: [HomePickDto], description: 'Có thể rỗng: chưa có nơi vừa tìm và không có khách sạn nào giá tốt' })
-  items!: HomePickDto[];
+  @ApiProperty({ type: [HomeDestinationPickDto], description: 'Danh sách gợi ý điểm đến và khách sạn deal hời trang chủ' })
+  items!: HomeDestinationPickDto[];
 }
 
 /** Khối "Gợi ý dành cho bạn" trên trang chủ web. Công khai; không theo dõi người dùng ở server. */
@@ -51,12 +67,13 @@ export class HomeRecommendationsController {
 
   @Get('home')
   @ApiOperation({
-    summary: 'Gợi ý khách sạn cho trang chủ web, mỗi gợi ý kèm lý do ngắn',
+    summary: 'Gợi ý điểm đến và khách sạn deal hời cho trang chủ web',
     description: [
       'Công khai, không cần đăng nhập. Server không lưu gì về người dùng.',
       '',
-      `- \`recentPlaceIds\`: các nơi người dùng vừa chọn ở \`/api/suggest\` (\`refId\` của dòng \`place\`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa ${MAX_RECENT_PLACES} nơi, mỗi nơi 2 khách sạn: lý do "Vì bạn vừa tìm …".`,
-      '- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do "Rẻ hơn X% so với …".',
+      `- \`recentPlaceIds\`: các nơi người dùng vừa chọn ở \`/api/suggest\` (\`refId\` của dòng \`place\`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa ${MAX_RECENT_PLACES} nơi: lý do "Vì bạn vừa tìm …".`,
+      '- Phần còn lại là các điểm đến có khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%: lý do "Rẻ hơn X% so với …".',
+      '- Mỗi điểm đến trả về danh sách khách sạn tốt nhất (`hotels`) kèm số lượng deal còn lại (`otherDealsCount`).',
       '- Giá là "từ X/đêm" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.',
     ].join('\n'),
   })

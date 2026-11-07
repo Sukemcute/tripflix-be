@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CommerceFacade } from '../../../commerce/index.js';
-import { pickHomeRecommendations, type HomeCandidate, type HomePick } from '../domain/home-picks.js';
+import { pickHomeRecommendations, type HomeCandidate, type HomeDestinationPick } from '../domain/home-picks.js';
 
 /** Phần của CommerceFacade mà luồng này dùng; test truyền bản giả. */
 export type HomeCommerce = Pick<CommerceFacade, 'listCatalog'>;
@@ -14,10 +14,9 @@ const MAX_CATALOG_PAGES = 50;
 @Injectable()
 export class HomeRecommendationUseCases {
   private cache: { loadedAt: number; candidates: HomeCandidate[] } | null = null;
-
   constructor(@Inject(CommerceFacade) private readonly commerce: HomeCommerce) {}
 
-  async recommendForHome(query: { recentPlaceIds: readonly string[]; limit: number }): Promise<HomePick[]> {
+  async recommendForHome(query: { recentPlaceIds: readonly string[]; limit: number }): Promise<HomeDestinationPick[]> {
     return pickHomeRecommendations(await this.loadCandidates(), query.recentPlaceIds, query.limit);
   }
 

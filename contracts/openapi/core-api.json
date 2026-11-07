@@ -2365,7 +2365,7 @@
     },
     "/api/recommendations/home": {
       "get": {
-        "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi, mỗi nơi 2 khách sạn: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%, mỗi tỉnh một khách sạn: lý do \"Rẻ hơn X% so với …\".\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
+        "description": "Công khai, không cần đăng nhập. Server không lưu gì về người dùng.\n\n- `recentPlaceIds`: các nơi người dùng vừa chọn ở `/api/suggest` (`refId` của dòng `place`), web tự nhớ ở trình duyệt, mới nhất trước. Dùng tối đa 3 nơi: lý do \"Vì bạn vừa tìm …\".\n- Phần còn lại là các điểm đến có khách sạn rẻ hơn giá trung bình cùng hạng sao từ 10%: lý do \"Rẻ hơn X% so với …\".\n- Mỗi điểm đến trả về danh sách khách sạn tốt nhất (`hotels`) kèm số lượng deal còn lại (`otherDealsCount`).\n- Giá là \"từ X/đêm\" trong 30 ngày tới; còn phòng và giá thật cho ngày cụ thể xem ở trang chi tiết hoặc `/api/stays`.",
         "operationId": "HomeRecommendationsController_recommendForHome",
         "parameters": [
           {
@@ -2402,7 +2402,7 @@
             "description": "`limit` ngoài 1–20 hoặc quá 10 nơi"
           }
         },
-        "summary": "Gợi ý khách sạn cho trang chủ web, mỗi gợi ý kèm lý do ngắn",
+        "summary": "Gợi ý điểm đến và khách sạn deal hời cho trang chủ web",
         "tags": [
           "discovery"
         ]
@@ -6213,7 +6213,7 @@
           "text"
         ]
       },
-      "HomePickDto": {
+      "HomeStayPickDto": {
         "type": "object",
         "properties": {
           "hotelId": {
@@ -6240,9 +6240,6 @@
             "example": "Mường Thanh",
             "description": "Chuỗi khách sạn; null nếu độc lập"
           },
-          "province": {
-            "$ref": "#/components/schemas/HomeProvinceDto"
-          },
           "priceFrom": {
             "type": "number",
             "example": 2750000,
@@ -6258,19 +6255,49 @@
           "thumbnail",
           "stars",
           "brand",
-          "province",
           "priceFrom",
           "reason"
+        ]
+      },
+      "HomeDestinationPickDto": {
+        "type": "object",
+        "properties": {
+          "province": {
+            "$ref": "#/components/schemas/HomeProvinceDto"
+          },
+          "hotels": {
+            "description": "Danh sách khách sạn có deal hời tại điểm đến (deal tốt nhất đứng đầu)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomeStayPickDto"
+            }
+          },
+          "totalDealsCount": {
+            "type": "number",
+            "example": 8,
+            "description": "Tổng số khách sạn có deal hời tại điểm đến"
+          },
+          "otherDealsCount": {
+            "type": "number",
+            "example": 7,
+            "description": "Số deal hời khác ngoài deal tốt nhất (dùng để hiển thị: còn ít nhất X khách sạn có deal hời nữa)"
+          }
+        },
+        "required": [
+          "province",
+          "hotels",
+          "totalDealsCount",
+          "otherDealsCount"
         ]
       },
       "HomeRecommendationsDto": {
         "type": "object",
         "properties": {
           "items": {
-            "description": "Có thể rỗng: chưa có nơi vừa tìm và không có khách sạn nào giá tốt",
+            "description": "Danh sách gợi ý điểm đến và khách sạn deal hời trang chủ",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/HomePickDto"
+              "$ref": "#/components/schemas/HomeDestinationPickDto"
             }
           }
         },
