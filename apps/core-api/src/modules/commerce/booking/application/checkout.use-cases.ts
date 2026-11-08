@@ -8,9 +8,9 @@ import {
   HOLDS_PER_HOUR,
   MAX_ITEMS_PER_ORDER,
   POLICY_VERSION,
-  findInvalidGuestFields,
   hasCompleteGuests,
   isHoldExpired,
+  listGuestFieldErrors,
   listPassengerTypes,
   type ContactInput,
   type PassengerType,
@@ -303,8 +303,10 @@ export class CheckoutUseCases {
     const items = await this.orders.findItems(orderId);
     const passengerTypes = listRequiredPassengers(order, items);
     const passengersRequired = passengerTypes.length;
-    const invalid = findInvalidGuestFields({ ...input, passengersRequired, today: this.today(), passengerTypes, travelDates: findTravelDates(items) });
-    if (invalid.length) throw new CommerceError('invalid_query', 'Thông tin khách chưa đủ hoặc chưa đúng.', invalid[0], { fields: invalid, passengersRequired });
+    const errors = listGuestFieldErrors({ ...input, passengersRequired, today: this.today(), passengerTypes, travelDates: findTravelDates(items) });
+    // Trả mọi trường sai kèm câu cụ thể để client báo đúng ô, không chỉ một câu chung.
+    if (errors.length)
+      throw new CommerceError('invalid_query', 'Thông tin khách chưa đủ hoặc chưa đúng.', errors[0]!.field, { errors, fields: errors.map((e) => e.field), passengersRequired });
     await this.orders.updateOrder(orderId, { contactName: input.contact.fullName.trim(), contactPhone: input.contact.phone.replace(/\s/g, ''), contactEmail: input.contact.email?.trim() || null });
     // Lưu loại khách cùng từng người, để xuất vé, email, chuyến đi của tôi không phải dựa vào thứ tự.
     await this.orders.replaceGuests(

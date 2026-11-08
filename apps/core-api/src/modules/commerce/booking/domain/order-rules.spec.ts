@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countAgeOn, findInvalidGuestFields, isAgeOfPassengerType, listPassengerTypes } from './order-rules.js';
+import { countAgeOn, findInvalidGuestFields, isAgeOfPassengerType, listGuestFieldErrors, listPassengerTypes } from './order-rules.js';
 
 const contact = { fullName: 'Người Đặt', phone: '0901234567', email: null };
 const TODAY = '2026-12-01';
@@ -73,5 +73,46 @@ describe('hành khách theo loại', () => {
 
   it('không có loại khách thì giữ cách kiểm cũ: chỉ cần ngày sinh hợp lệ', () => {
     expect(findInvalidGuestFields({ contact, guests: [{ fullName: 'Bé', birthdate: '2025-06-01' }], passengersRequired: 1, today: TODAY })).toEqual([]);
+  });
+});
+
+describe('câu báo lỗi theo từng trường', () => {
+  it('người lớn sinh hôm nay: báo đúng ô ngày sinh, nói rõ phải đủ 12 tuổi', () => {
+    expect(
+      listGuestFieldErrors({
+        contact,
+        guests: [{ fullName: 'Lê Hoàng Tuấn', birthdate: TODAY }],
+        passengersRequired: 1,
+        today: TODAY,
+        passengerTypes: ['adult'],
+        travelDates: { first: TRAVEL, last: TRAVEL },
+      }),
+    ).toEqual([{ field: 'guests[0].birthdate', message: 'Hành khách 1 là người lớn, phải đủ 12 tuổi vào ngày bay.' }]);
+  });
+
+  it('trả đủ mọi trường sai, mỗi trường một câu riêng', () => {
+    const errors = listGuestFieldErrors({
+      contact: { fullName: ' ', phone: '12345', email: 'sai' },
+      guests: [
+        { fullName: '', birthdate: null },
+        { fullName: 'Bé', birthdate: '2027-01-01' },
+      ],
+      passengersRequired: 2,
+      today: TODAY,
+    });
+    expect(errors).toEqual([
+      { field: 'contact.fullName', message: 'Nhập họ tên người liên hệ.' },
+      { field: 'contact.phone', message: 'Số điện thoại gồm 10–11 số, bắt đầu bằng 0.' },
+      { field: 'contact.email', message: 'Email chưa đúng định dạng.' },
+      { field: 'guests[0].fullName', message: 'Nhập họ tên hành khách 1.' },
+      { field: 'guests[0].birthdate', message: 'Nhập ngày sinh hành khách 1 (YYYY-MM-DD).' },
+      { field: 'guests[1].birthdate', message: 'Ngày sinh hành khách 2 không được sau hôm nay.' },
+    ]);
+  });
+
+  it('thiếu hành khách thì báo cần nhập đủ số khách', () => {
+    expect(listGuestFieldErrors({ contact, guests: [], passengersRequired: 2, today: TODAY })).toEqual([
+      { field: 'guests', message: 'Cần nhập đủ 2 hành khách.' },
+    ]);
   });
 });
