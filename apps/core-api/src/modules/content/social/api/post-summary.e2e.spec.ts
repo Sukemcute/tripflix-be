@@ -334,6 +334,23 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
     await http().get('/api/v1/posts/018d9f20-0000-7000-8000-000000000099/ai-summary').expect(404);
   });
 
+  it('GET công khai không trả safety.pendingWarnings (cảnh báo "nghe nói" chờ kiểm duyệt)', async () => {
+    const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+    const warnings = [{ categories: ['ngo_doc'], commentIds: ['c1'] }];
+    await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({
+        status: 'ready',
+        summary: 'Tóm tắt có cảnh báo an toàn',
+        safety: { warnings, pendingWarnings: [{ categories: ['tai_nan'], commentIds: ['c2'] }] },
+      })
+      .expect(200);
+
+    const res = await http().get(`/api/v1/posts/${validPostId}/ai-summary`).expect(200);
+    expect(res.body.safety).toEqual({ warnings });
+  });
+
   it('cho phép summary để trống khi status là no_comments hoặc insufficient_data: 200 OK', async () => {
     const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
 

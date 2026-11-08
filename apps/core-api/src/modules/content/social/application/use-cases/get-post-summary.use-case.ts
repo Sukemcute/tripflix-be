@@ -52,7 +52,19 @@ export class GetPostSummaryUseCase {
 
     return {
       ...summary,
+      safety: query.isStaff ? summary.safety : withoutPendingWarnings(summary.safety),
       isStale,
     };
   }
+}
+
+/**
+ * Cảnh báo an toàn dạng "nghe nói" (safety.pendingWarnings) chờ kiểm duyệt nên chỉ moderator
+ * và superadmin thấy; người xem khác chỉ nhận safety.warnings đã công khai.
+ */
+function withoutPendingWarnings(safety: PostSummaryRecord['safety']): PostSummaryRecord['safety'] {
+  if (typeof safety !== 'object' || safety === null || Array.isArray(safety)) return safety;
+  if (!('pendingWarnings' in safety)) return safety;
+  const { pendingWarnings: _pending, ...rest } = safety as Record<string, unknown>;
+  return rest;
 }

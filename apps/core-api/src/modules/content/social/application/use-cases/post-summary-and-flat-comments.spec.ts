@@ -339,6 +339,30 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       ).rejects.toThrow(PostNotFoundException);
     });
 
+    it('ẩn safety.pendingWarnings với người xem thường, moderator vẫn thấy', async () => {
+      const safety = {
+        warnings: [{ categories: ['ngo_doc'], commentIds: ['c1'] }],
+        pendingWarnings: [{ categories: ['tai_nan'], commentIds: ['c2'] }],
+      };
+      mockPostSummaryRepo.findByPostId.mockResolvedValue({
+        postId,
+        summary: 'Tóm tắt bài viết',
+        keyTakeaways: [],
+        safety,
+        commentCountAtSummary: 5,
+        generatedAt: null,
+      });
+      const useCase = new GetPostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
+
+      const forGuest = await useCase.execute({ postId });
+      const forMember = await useCase.execute({ postId, viewerId: 'member-1' });
+      const forModerator = await useCase.execute({ postId, viewerId: 'mod-1', isStaff: true });
+
+      expect(forGuest?.safety).toEqual({ warnings: safety.warnings });
+      expect(forMember?.safety).toEqual({ warnings: safety.warnings });
+      expect(forModerator?.safety).toEqual(safety);
+    });
+
     it('trả về null khi bài viết chưa có tóm tắt', async () => {
       mockPostSummaryRepo.findByPostId.mockResolvedValue(null);
 
