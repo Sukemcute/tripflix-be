@@ -13,10 +13,13 @@
   - Kiểm còn ghế theo số ghế người lớn + trẻ em.
 - `POST /checkout` nhận thêm `children`, `infants`.
   - Vé bay giữ `adults + children` ghế (`qty`).
-  - Đơn lưu số trẻ em, em bé qua migration `20261107144425_add_order_passenger_types`: 2 cột mặc định 0 và ràng buộc kiểm tra. Đơn cũ không bị ảnh hưởng.
+  - Đơn lưu số trẻ em, em bé qua migration `20261108064122_add_order_passenger_types`: 2 cột mặc định 0 và ràng buộc kiểm tra. Đơn cũ không bị ảnh hưởng.
+  - Dòng vé bay: `unitPrice` là giá một vé người lớn, kèm `childUnitPrice`, `infantUnitPrice` (cột mới của `order_items`, phòng là null). `lineTotal` là cả nhóm, không phải `unitPrice × qty`. Thanh toán tính lại giá thì cập nhật cả ba đơn giá.
+  - Giỏ chỉ có phòng mà gửi `children`/`infants` > 0 thì trả 400, vì phòng chỉ tính theo người lớn.
 - Hành khách phải nhập gồm cả 3 loại.
   - `CheckoutDto` trả thêm `children`, `infants`, `passengerTypes` (loại của từng hành khách theo thứ tự); `TripDto` trả thêm `children`, `infants`.
-  - `PUT /checkout/:id/guests` kiểm tuổi tại ngày bay đầu tiên: người lớn từ 12 tuổi, trẻ em 2–11, em bé dưới 2.
+  - `PUT /checkout/:id/guests` kiểm tuổi theo chặng: người lớn từ 12 tuổi ở chặng đầu; trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối; em bé dưới 2 tuổi tới chặng cuối (bé lên 2 tuổi giữa chuyến khứ hồi phải đi vé trẻ em có ghế).
+  - Loại khách lưu cùng từng hành khách (cột `order_guests.passenger_type`), không phải suy ra từ thứ tự.
 - Thanh toán tính lại giá theo đủ 3 loại khách.
 - Mọi thay đổi API chỉ thêm trường; đã chạy `pnpm contracts:build`.
 
@@ -26,12 +29,14 @@
 | Chọn được người lớn, trẻ em, em bé khi tìm và đặt vé | Có | `flight-search.use-cases.spec.ts`: "trẻ em chiếm ghế, em bé không…"; `checkout.int.spec.ts`: "vé bay có trẻ em, em bé…" |
 | Giá trẻ em 75%, em bé 10% | Có | `sales-rules.spec.ts`: 2 người lớn + 1 trẻ em + 1 em bé = 4.280.000 với giá 1.500.000; API thật trên stack local: 2.530.000 / 1.900.000 / 250.000, tổng 7.210.000 |
 | Em bé không chiếm ghế, mỗi em bé một người lớn, tối đa 9 ghế | Có | `findPassengerMixError` test; integration: giữ đúng 3 ghế cho 2 người lớn + 1 trẻ em + 1 em bé; `infants > adults` trả 400 trường `infants` |
-| Ngày sinh đúng loại khách tại ngày bay | Có | `order-rules.spec.ts`; integration: em bé 3 tuổi trả 400 `guests[3].birthdate` |
+| Ngày sinh đúng loại khách theo chặng | Có | `order-rules.spec.ts` (gồm lên 2 tuổi giữa chuyến khứ hồi, sinh 29/02); integration: em bé 3 tuổi trả 400 `guests[3].birthdate` |
+| Đơn giá dòng vé bay đúng từng loại khách, loại khách lưu cùng hành khách | Có | integration: `unitPrice`/`childUnitPrice`/`infantUnitPrice` khớp giá gói, `order_guests.passenger_type` = adult, adult, child, infant |
+| Giỏ chỉ có phòng không nhận trẻ em, em bé | Có | integration: 400 trường `children` |
 | Đơn cũ, vé chỉ có người lớn, khách sạn không đổi | Có | Toàn bộ test commerce cũ vẫn pass; migration chỉ thêm cột mặc định 0 |
 
 ## Kết quả kiểm tra
-- `vitest run src/modules/commerce`: 9 file, 58 test pass (thêm `order-rules.spec.ts` và test mới trong `sales-rules.spec.ts`, `flight-search.use-cases.spec.ts`).
-- `vitest --config vitest.int.config.ts` checkout + expire-holds (Testcontainers Postgres): pass, gồm test tích hợp mới.
+- `vitest run src/modules/commerce`: 9 file, 61 test pass (thêm `order-rules.spec.ts` và test mới trong `sales-rules.spec.ts`, `flight-search.use-cases.spec.ts`).
+- `vitest --config vitest.int.config.ts` checkout + expire-holds (Testcontainers Postgres): 40/40 pass, gồm test tích hợp mới.
 - `pnpm test` toàn core-api: 643 pass, 1 skip. 2 test `access` (auth/staff e2e) bị quá 5 giây khi chạy cùng cả bộ; chạy riêng pass 12/12, không liên quan thay đổi này.
 - `pnpm lint` (core-api): exit 0, không có cảnh báo ở commerce. `typecheck` pass. `node tools/check-boundaries.mjs`: không vi phạm.
 - Chạy thật: build lại `core-api` và `migrate` trên stack local, web nhánh FE tương ứng đặt được đơn 2 người lớn + 1 trẻ em + 1 em bé, đơn giữ 3 ghế, tổng 7.210.000.
@@ -45,4 +50,4 @@
 - Ảnh giao diện web đính kèm ở PR FE.
 
 ## Ảnh hưởng tới phần của người khác
-- Có: module `commerce` (Thắng, backup Bảo). Gồm thêm trường API, migration mới cho `commerce.orders`, đổi tham số `CheckoutUseCases.priceItems` từ số người lớn sang nhóm khách (chỉ dùng trong commerce: checkout và payment). Cần Thắng review trước khi merge.
+- Có: module `commerce` (Thắng, backup Bảo). Thắng đã review vòng 1; 5 góp ý đã sửa (đơn giá vé bay, tuổi theo chặng, lưu loại khách, chặn trẻ em/em bé ở giỏ chỉ có phòng, phần vặt). Gồm thêm trường API, migration mới cho `commerce.orders`, `order_items`, `order_guests`, đổi tham số `CheckoutUseCases.priceItems` từ số người lớn sang nhóm khách (chỉ dùng trong commerce: checkout và payment). Cần Thắng review trước khi merge.

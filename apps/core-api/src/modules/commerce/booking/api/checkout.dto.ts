@@ -72,8 +72,8 @@ class CheckoutItemRequestDto {
 
 export class CheckoutRequestDto {
   @ApiProperty({ minimum: 1, maximum: 9 }) adults!: number;
-  @ApiPropertyOptional({ minimum: 0, maximum: 8, default: 0, description: 'Vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9' }) children?: number;
-  @ApiPropertyOptional({ minimum: 0, maximum: 9, default: 0, description: 'Vé bay: em bé dưới 2 tuổi, không chiếm ghế, giá 10%; không quá số người lớn' }) infants?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: 8, default: 0, description: 'Chỉ khi giỏ có vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9' }) children?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: 9, default: 0, description: 'Chỉ khi giỏ có vé bay: em bé dưới 2 tuổi (tới chặng cuối), không chiếm ghế, giá 10%; không quá số người lớn' }) infants?: number;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Bài đăng dẫn tới đơn này (Đặt y chang)' }) sourcePostId?: string | null;
   @ApiProperty({ type: [CheckoutItemRequestDto] }) items!: CheckoutItemRequestDto[];
 }
@@ -119,7 +119,9 @@ class CheckoutItemDto {
   @ApiProperty({ format: 'date' }) dateTo!: string;
   @ApiProperty() nights!: number;
   @ApiProperty() qty!: number;
-  @ApiProperty({ description: 'Một đêm một phòng / một vé (VND)' }) unitPrice!: number;
+  @ApiProperty({ description: 'Phòng: một đêm một phòng. Vé bay: một vé người lớn (VND). Vé bay có trẻ em, em bé thì lineTotal khác unitPrice × qty' }) unitPrice!: number;
+  @ApiProperty({ type: Number, nullable: true, description: 'Vé bay: một vé trẻ em (VND); phòng là null' }) childUnitPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Vé bay: một vé em bé (VND); phòng là null. lineTotal = unitPrice × adults + childUnitPrice × children + infantUnitPrice × infants' }) infantUnitPrice!: number | null;
   @ApiProperty() lineTotal!: number;
   @ApiProperty() ratePlanCode!: string;
   @ApiProperty() ratePlanName!: string;
@@ -141,7 +143,7 @@ export class CheckoutDto {
   @ApiProperty({ type: [CheckoutItemDto] }) items!: CheckoutItemDto[];
   @ApiProperty() isGuestInfoComplete!: boolean;
   @ApiProperty({ description: 'Số hành khách cần nhập (0 khi không có vé bay)' }) passengersRequired!: number;
-  @ApiProperty({ enum: ['adult', 'child', 'infant'], isArray: true, description: 'Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm tại ngày bay đầu tiên (người lớn từ 12, trẻ em 2–11, em bé dưới 2)' }) passengerTypes!: string[];
+  @ApiProperty({ enum: ['adult', 'child', 'infant'], isArray: true, description: 'Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm theo chặng: người lớn từ 12 tuổi ở chặng đầu, trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối, em bé dưới 2 tuổi tới chặng cuối' }) passengerTypes!: string[];
   @ApiProperty() policyVersion!: string;
 }
 

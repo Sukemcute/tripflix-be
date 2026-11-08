@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
-import { MAX_SEATS, addDays, calculatePassengerFares, countNights, findPassengerMixError, isIsoDate, quoteFlight, type PassengerMix, type UnavailableReason } from '../domain/sales-rules.js';
+import { addDays, calculatePassengerFares, countNights, findPassengerMixError, isIsoDate, quoteFlight, type PassengerMix, type UnavailableReason } from '../domain/sales-rules.js';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type FlightRouteRecord, type Today } from './ports.js';
 
 const DEFAULT_PASSENGERS = 1;
@@ -182,9 +182,9 @@ export class FlightSearchUseCases {
   private validate(query: PassengerQuery & { date: string }, dateField = 'date'): PassengerMix {
     const mix = { adults: query.passengers ?? DEFAULT_PASSENGERS, children: query.children ?? 0, infants: query.infants ?? 0 };
     if (!isIsoDate(query.date) || query.date < this.today()) throw new CommerceError('invalid_query', 'Ngày bay phải từ hôm nay trở đi.', dateField);
-    if (!Number.isInteger(mix.adults) || mix.adults < 1 || mix.adults > MAX_SEATS) throw new CommerceError('invalid_query', `Số hành khách từ 1 đến ${MAX_SEATS}.`, 'passengers');
     const error = findPassengerMixError(mix);
-    if (error) throw new CommerceError('invalid_query', error.message, error.field);
+    // Lỗi số người lớn trả về trường passengers, đúng tên tham số của API tìm chuyến.
+    if (error) throw new CommerceError('invalid_query', error.message, error.field === 'adults' ? 'passengers' : error.field);
     return mix;
   }
 
@@ -192,7 +192,10 @@ export class FlightSearchUseCases {
     const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), date, date);
     return flights.map((flight): FlightOffer => {
       const day = days.get(flight.id)?.[0];
-      const quotes = flight.farePlans.map((plan) => ({ plan, quote: quoteFlight({ day, passengers: mix.adults, children: mix.children, infants: mix.infants, plan }) }));
+      const quotes = flight.farePlans.map((plan) => {
+        const quote = quoteFlight({ day, passengers: mix.adults, children: mix.children, infants: mix.infants, plan });
+        return { plan, quote, fares: quote.isAvailable ? calculatePassengerFares(quote.pricePerNight) : null };
+      });
       const first = quotes[0]?.quote;
       const prices = quotes.flatMap(({ quote }) => (quote.isAvailable ? [quote.pricePerNight] : []));
       return {
@@ -216,14 +219,14 @@ export class FlightSearchUseCases {
         remaining: first ? (first.remaining ?? null) : null,
         priceFrom: prices.length ? Math.min(...prices) : null,
         isPriceTaxIncluded: true,
-        fares: quotes.map(({ plan, quote }) => ({
+        fares: quotes.map(({ plan, quote, fares }) => ({
           code: plan.code,
           name: plan.name,
           isRefundable: plan.refundable,
           freeCancelDays: plan.freeCancelDays,
           pricePerPerson: quote.isAvailable ? quote.pricePerNight : null,
-          childPrice: quote.isAvailable ? calculatePassengerFares(quote.pricePerNight).child : null,
-          infantPrice: quote.isAvailable ? calculatePassengerFares(quote.pricePerNight).infant : null,
+          childPrice: fares?.child ?? null,
+          infantPrice: fares?.infant ?? null,
           totalPrice: quote.isAvailable ? quote.totalPrice : null,
           carryOnKg: plan.carryOnKg ?? null,
           checkedKg: plan.checkedKg ?? null,

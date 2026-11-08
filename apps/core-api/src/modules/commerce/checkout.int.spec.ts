@@ -302,6 +302,13 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     const fare = offer.body.fares[0] as { code: string; pricePerPerson: number; childPrice: number; infantPrice: number; totalPrice: number };
     expect(fare.totalPrice).toBe(fare.pricePerPerson * 2 + fare.childPrice + fare.infantPrice);
 
+    const roomsOnly = await http()
+      .post('/api/checkout')
+      .set({ ...user.auth, ...key() })
+      .send({ adults: 1, children: 1, items: [{ productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 }] });
+    expect(roomsOnly.status).toBe(400);
+    expect(roomsOnly.body.errors).toEqual([expect.objectContaining({ field: 'children' })]);
+
     const tooManyInfants = await http().post('/api/checkout').set({ ...user.auth, ...key() }).send({ adults: 1, infants: 2, items: [{ productId: flightId, checkIn }] });
     expect(tooManyInfants.status).toBe(400);
     expect(tooManyInfants.body.errors).toEqual([expect.objectContaining({ field: 'infants' })]);
@@ -312,7 +319,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
       .send({ adults: 2, children: 1, infants: 1, items: [{ productId: flightId, checkIn, ratePlanCode: fare.code }] });
     expect(held.status, JSON.stringify(held.body)).toBe(201);
     expect(held.body).toMatchObject({ adults: 2, children: 1, infants: 1, total: fare.totalPrice, passengersRequired: 4, passengerTypes: ['adult', 'adult', 'child', 'infant'] });
-    expect(held.body.items[0].qty).toBe(3);
+    // Đơn giá là giá người lớn, kèm giá trẻ em, em bé; tổng dòng = cả nhóm (không phải đơn giá × qty).
+    expect(held.body.items[0]).toMatchObject({ qty: 3, unitPrice: fare.pricePerPerson, childUnitPrice: fare.childPrice, infantUnitPrice: fare.infantPrice, lineTotal: fare.totalPrice });
     expect((await seats()) - heldBefore).toBe(3);
 
     const travelYear = Number(checkIn.slice(0, 4));
@@ -331,6 +339,13 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect(wrongAge.body.errors).toEqual([expect.objectContaining({ field: 'guests[3].birthdate' })]);
     const infantBirthdate = addDays(TODAY_DATE, -100);
     await http().put(`/api/checkout/${held.body.orderId}/guests`).set(user.auth).send(guests(infantBirthdate)).expect(200);
+    const saved = await pool.query<{ full_name: string; passenger_type: string }>('select full_name, passenger_type from commerce.order_guests where order_id = $1 order by passenger_type, full_name', [held.body.orderId]);
+    expect(saved.rows.map((g) => [g.full_name, g.passenger_type])).toEqual([
+      ['Bố', 'adult'],
+      ['Mẹ', 'adult'],
+      ['Con', 'child'],
+      ['Em bé', 'infant'],
+    ]);
     expect((await http().get(`/api/checkout/${held.body.orderId}`).set(user.auth).expect(200)).body.isGuestInfoComplete).toBe(true);
     await http().post(`/api/checkout/${held.body.orderId}/cancel`).set({ ...user.auth, ...key() }).expect(200);
     expect(await seats()).toBe(heldBefore);

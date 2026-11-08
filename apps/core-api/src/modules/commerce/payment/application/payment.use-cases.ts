@@ -166,7 +166,12 @@ export class PaymentUseCases {
     });
     let total = order.total;
     if (repriced) {
-      await this.orders.updateItemPrices(items.map((item, i) => ({ id: item.id, unitPrice: repriced[i]!.unitPrice, lineTotal: repriced[i]!.lineTotal })));
+      await this.orders.updateItemPrices(
+        items.map((item, i) => {
+          const { unitPrice, childUnitPrice, infantUnitPrice, lineTotal } = repriced[i]!;
+          return { id: item.id, unitPrice, childUnitPrice, infantUnitPrice, lineTotal };
+        }),
+      );
       total = repriced.reduce((sum, p) => sum + p.lineTotal, 0);
       await this.orders.updateOrder(orderId, { total });
     }

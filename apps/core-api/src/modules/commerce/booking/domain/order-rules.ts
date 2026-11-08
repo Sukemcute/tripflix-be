@@ -28,11 +28,15 @@ export function countAgeOn(birthdate: string, date: string): number {
   return date.slice(5) < birthdate.slice(5) ? age - 1 : age;
 }
 
-/** Tuổi tại ngày bay đúng loại khách: người lớn từ 12 tuổi, trẻ em 2–11, em bé dưới 2. */
-export function isAgeOfPassengerType(type: PassengerType, age: number): boolean {
-  if (type === 'adult') return age >= 12;
-  if (type === 'child') return age >= 2 && age <= 11;
-  return age >= 0 && age < 2;
+/**
+ * Tuổi đúng loại khách cho cả chuyến, ageAtFirst và ageAtLast là tuổi ở chặng bay đầu và cuối:
+ * người lớn từ 12 tuổi ở chặng đầu; em bé dưới 2 tuổi tới chặng cuối (không giữ ghế cho bé ở chặng nào);
+ * trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối (bé lên 2 giữa chuyến phải có ghế).
+ */
+export function isAgeOfPassengerType(type: PassengerType, ageAtFirst: number, ageAtLast = ageAtFirst): boolean {
+  if (type === 'adult') return ageAtFirst >= 12;
+  if (type === 'child') return ageAtFirst <= 11 && ageAtLast >= 2;
+  return ageAtFirst >= 0 && ageAtLast < 2;
 }
 
 export interface ContactInput {
@@ -43,7 +47,7 @@ export interface ContactInput {
 
 /**
  * Tên trường sai, để trả về client đánh dấu ô nhập. Rỗng là hợp lệ.
- * Có passengerTypes và travelDate thì kiểm thêm tuổi tại ngày bay đúng loại khách của từng hành khách.
+ * Có passengerTypes và travelDates thì kiểm thêm tuổi theo chặng đúng loại khách của từng hành khách.
  */
 export function findInvalidGuestFields(input: {
   contact: ContactInput;
@@ -51,7 +55,8 @@ export function findInvalidGuestFields(input: {
   passengersRequired: number;
   today: string;
   passengerTypes?: PassengerType[];
-  travelDate?: string;
+  /** Ngày bay đầu và cuối của đơn (một chặng thì hai ngày như nhau). */
+  travelDates?: { first: string; last: string };
 }): string[] {
   const invalid: string[] = [];
   if (!input.contact.fullName.trim()) invalid.push('contact.fullName');
@@ -62,7 +67,8 @@ export function findInvalidGuestFields(input: {
     input.guests.forEach((g, i) => {
       if (!g.fullName.trim()) invalid.push(`guests[${i}].fullName`);
       const type = input.passengerTypes?.[i];
-      const isWrongAge = !!(g.birthdate && type && input.travelDate && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, input.travelDate)));
+      const dates = input.travelDates;
+      const isWrongAge = !!(g.birthdate && type && dates && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, dates.first), countAgeOn(g.birthdate, dates.last)));
       if (!g.birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(g.birthdate) || g.birthdate > input.today || isWrongAge) invalid.push(`guests[${i}].birthdate`);
     });
   }

@@ -56,7 +56,11 @@ export const orderItems = commerceSchema.table(
     date: date('date', { mode: 'string' }).notNull(),
     nights: smallint('nights').notNull(),
     qty: smallint('qty').notNull(),
+    /** Phòng: một đêm một phòng. Vé bay: một vé người lớn. */
     unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
+    /** Vé bay: một vé trẻ em và em bé; phòng là null. lineTotal = người lớn + trẻ em + em bé theo nhóm khách của đơn. */
+    childUnitPrice: bigint('child_unit_price', { mode: 'number' }),
+    infantUnitPrice: bigint('infant_unit_price', { mode: 'number' }),
     lineTotal: bigint('line_total', { mode: 'number' }).notNull(),
     ratePlanCode: text('rate_plan_code').notNull(),
     ratePlanName: text('rate_plan_name').notNull(),
@@ -81,10 +85,13 @@ export const orderGuests = commerceSchema.table(
     orderId: uuid('order_id').notNull(),
     fullName: text('full_name').notNull(),
     birthdate: date('birthdate', { mode: 'string' }),
+    /** Vé bay: adult, child, infant; khách lưu trú của đơn chỉ có phòng là null. */
+    passengerType: text('passenger_type'),
   },
   (t) => [
     foreignKey({ name: 'fk_order_guests_order_id', columns: [t.orderId], foreignColumns: [orders.id] }),
     index('idx_order_guests_order_id').on(t.orderId),
+    check('ck_order_guests_passenger_type', sql`${t.passengerType} in ('adult', 'child', 'infant')`),
   ],
 );
 

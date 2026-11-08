@@ -7702,14 +7702,14 @@
             "minimum": 0,
             "maximum": 8,
             "default": 0,
-            "description": "Vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9"
+            "description": "Chỉ khi giỏ có vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9"
           },
           "infants": {
             "type": "number",
             "minimum": 0,
             "maximum": 9,
             "default": 0,
-            "description": "Vé bay: em bé dưới 2 tuổi, không chiếm ghế, giá 10%; không quá số người lớn"
+            "description": "Chỉ khi giỏ có vé bay: em bé dưới 2 tuổi (tới chặng cuối), không chiếm ghế, giá 10%; không quá số người lớn"
           },
           "sourcePostId": {
             "type": "string",
@@ -7768,7 +7768,17 @@
           },
           "unitPrice": {
             "type": "number",
-            "description": "Một đêm một phòng / một vé (VND)"
+            "description": "Phòng: một đêm một phòng. Vé bay: một vé người lớn (VND). Vé bay có trẻ em, em bé thì lineTotal khác unitPrice × qty"
+          },
+          "childUnitPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vé bay: một vé trẻ em (VND); phòng là null"
+          },
+          "infantUnitPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vé bay: một vé em bé (VND); phòng là null. lineTotal = unitPrice × adults + childUnitPrice × children + infantUnitPrice × infants"
           },
           "lineTotal": {
             "type": "number"
@@ -7803,6 +7813,8 @@
           "nights",
           "qty",
           "unitPrice",
+          "childUnitPrice",
+          "infantUnitPrice",
           "lineTotal",
           "ratePlanCode",
           "ratePlanName",
@@ -7869,7 +7881,7 @@
           },
           "passengerTypes": {
             "type": "array",
-            "description": "Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm tại ngày bay đầu tiên (người lớn từ 12, trẻ em 2–11, em bé dưới 2)",
+            "description": "Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm theo chặng: người lớn từ 12 tuổi ở chặng đầu, trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối, em bé dưới 2 tuổi tới chặng cuối",
             "items": {
               "type": "string",
               "enum": [
