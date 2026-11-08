@@ -28,21 +28,25 @@ const catalog = [
 describe('pickHomeRecommendations', () => {
   it('nơi vừa tìm đứng trước: tỉnh gồm điểm đến con, nhiều sao trước, tối đa 2 mỗi nơi', () => {
     const picks = pickHomeRecommendations(catalog, ['lam-dong'], 8);
-    expect(picks.slice(0, 2).map((p) => [p.hotelId, p.reason.text])).toEqual([
+    expect(picks.slice(0, 2).map((p) => [p.hotels[0]!.hotelId, p.hotels[0]!.reason.text])).toEqual([
       ['dl-5', 'Vì bạn vừa tìm Lâm Đồng'],
       ['ld-4', 'Vì bạn vừa tìm Lâm Đồng'],
     ]);
   });
 
-  it('giá tốt: chỉ khi rẻ hơn trung vị cùng hạng từ 10%, mỗi tỉnh một khách sạn, lý do ghi đúng phần trăm', () => {
+  it('giá tốt: chỉ khi rẻ hơn trung vị cùng hạng từ 10%, mỗi tỉnh một danh sách deal, lý do ghi đúng phần trăm', () => {
     const picks = pickHomeRecommendations(catalog, [], 8);
-    expect(picks.map((p) => p.hotelId)).toEqual(['cheap4']);
-    expect(picks[0]!.reason).toEqual({ code: 'good_deal', text: 'Rẻ hơn 40% so với giá trung bình khách sạn 4 sao' });
+    expect(picks.map((p) => p.hotels[0]!.hotelId)).toEqual(['cheap4']);
+    expect(picks[0]!.hotels[0]!.reason).toEqual({ code: 'good_deal', text: 'Rẻ hơn 40% so với giá trung bình khách sạn 4 sao' });
+    expect(picks[0]!.totalDealsCount).toBe(2);
+    expect(picks[0]!.otherDealsCount).toBe(1);
+    expect(picks[0]!.hotels.map((h) => h.hotelId)).toEqual(['cheap4', 'cheap4-same-place']);
   });
 
   it('bỏ nơi lạ và trùng, không lặp khách sạn, cắt theo limit', () => {
     const picks = pickHomeRecommendations(catalog, ['atlantis', 'nha-trang', 'nha-trang'], 2);
-    expect(picks.map((p) => [p.hotelId, p.reason.code])).toEqual([
+    expect(picks[0]!.province.slug).toBe('nha-trang');
+    expect(picks[0]!.hotels.map((h) => [h.hotelId, h.reason.code])).toEqual([
       ['cheap4', 'recent_place'],
       ['cheap4-same-place', 'recent_place'],
     ]);
@@ -60,7 +64,7 @@ describe('pickHomeRecommendations', () => {
       hotel('w', 'hue', 5, 3_000_000),
     ];
     // Trung vị 5 sao = 2.125.000. brand null là độc lập nên không bị giới hạn.
-    expect(pickHomeRecommendations(chain, [], 8).map((p) => p.hotelId)).toEqual(['mt-a', 'indie-a', 'indie-b']);
+    expect(pickHomeRecommendations(chain, [], 8).map((p) => p.hotels[0]!.hotelId)).toEqual(['mt-a', 'indie-a', 'indie-b']);
   });
 
   it('không có nơi vừa tìm, không có giá tốt thì rỗng', () => {
