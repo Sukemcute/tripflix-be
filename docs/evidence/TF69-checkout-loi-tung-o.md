@@ -13,12 +13,12 @@
 |---|---|---|
 | Người lớn ngày sinh dưới 12 tuổi: báo "phải đủ 12 tuổi vào ngày bay" đúng hành khách | Đạt | `order-rules.spec.ts` › "người lớn sinh hôm nay: báo đúng ô ngày sinh…" |
 | Thiếu tên, số điện thoại sai, email sai: báo đúng ô | Đạt | `order-rules.spec.ts` › "trả đủ mọi trường sai, mỗi trường một câu riêng" |
-| Lỗi 400 có `errors[]` đủ các trường sai kèm câu cụ thể | Đạt (unit) / chưa chạy (int) | `checkout.int.spec.ts` đã thêm kiểm `errors` và `fields`; chưa chạy ở máy vì Docker Desktop lỗi, chờ CI |
+| Lỗi 400 có `errors[]` đủ các trường sai kèm câu cụ thể | Đạt | `checkout.int.spec.ts` kiểm body lỗi 400 có `errors` (field + câu cụ thể) và `fields` |
 | Test pass | Đạt | xem bên dưới |
 
 ## Kết quả kiểm tra
 - `pnpm turbo run lint typecheck test --affected`: 49/49 task pass; core-api 59 file test pass, 650 test pass, 1 skip có sẵn.
-- `pnpm --filter @tripflix/core-api test:int`: chưa chạy được ở máy (Docker Desktop trả 500), CI sẽ chạy.
+- `vitest run --config vitest.int.config.ts src/modules/commerce` (Postgres, Redis thật qua Testcontainers): 3 file, 47 test pass; riêng `checkout.int.spec.ts` 22 test pass.
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/core-api exec vitest run src/modules/commerce/booking/domain/order-rules.spec.ts`
