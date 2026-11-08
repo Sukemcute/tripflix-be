@@ -45,11 +45,23 @@ export interface ContactInput {
   email: string | null;
 }
 
+/** Một trường sai kèm câu báo cho người dùng biết sai ở đâu, sửa thế nào. */
+export interface GuestFieldError {
+  field: string;
+  message: string;
+}
+
+const AGE_MESSAGES: Record<PassengerType, string> = {
+  adult: 'là người lớn, phải đủ 12 tuổi vào ngày bay',
+  child: 'là trẻ em, phải từ 2 đến 11 tuổi vào ngày bay',
+  infant: 'là em bé, phải dưới 2 tuổi tới ngày bay chặng cuối',
+};
+
 /**
- * Tên trường sai, để trả về client đánh dấu ô nhập. Rỗng là hợp lệ.
+ * Các trường sai kèm câu báo cụ thể, để client hiện lỗi ngay ở ô nhập. Rỗng là hợp lệ.
  * Có passengerTypes và travelDates thì kiểm thêm tuổi theo chặng đúng loại khách của từng hành khách.
  */
-export function findInvalidGuestFields(input: {
+export function listGuestFieldErrors(input: {
   contact: ContactInput;
   guests: GuestInput[];
   passengersRequired: number;
@@ -57,22 +69,31 @@ export function findInvalidGuestFields(input: {
   passengerTypes?: PassengerType[];
   /** Ngày bay đầu và cuối của đơn (một chặng thì hai ngày như nhau). */
   travelDates?: { first: string; last: string };
-}): string[] {
-  const invalid: string[] = [];
-  if (!input.contact.fullName.trim()) invalid.push('contact.fullName');
-  if (!/^0\d{9,10}$/.test(input.contact.phone.replace(/\s/g, ''))) invalid.push('contact.phone');
-  if (input.contact.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.contact.email)) invalid.push('contact.email');
+}): GuestFieldError[] {
+  const errors: GuestFieldError[] = [];
+  if (!input.contact.fullName.trim()) errors.push({ field: 'contact.fullName', message: 'Nhập họ tên người liên hệ.' });
+  if (!/^0\d{9,10}$/.test(input.contact.phone.replace(/\s/g, ''))) errors.push({ field: 'contact.phone', message: 'Số điện thoại gồm 10–11 số, bắt đầu bằng 0.' });
+  if (input.contact.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.contact.email)) errors.push({ field: 'contact.email', message: 'Email chưa đúng định dạng.' });
   if (input.passengersRequired > 0) {
-    if (input.guests.length !== input.passengersRequired) invalid.push('guests');
+    if (input.guests.length !== input.passengersRequired) errors.push({ field: 'guests', message: `Cần nhập đủ ${input.passengersRequired} hành khách.` });
     input.guests.forEach((g, i) => {
-      if (!g.fullName.trim()) invalid.push(`guests[${i}].fullName`);
+      const guest = `hành khách ${i + 1}`;
+      if (!g.fullName.trim()) errors.push({ field: `guests[${i}].fullName`, message: `Nhập họ tên ${guest}.` });
+      const field = `guests[${i}].birthdate`;
       const type = input.passengerTypes?.[i];
       const dates = input.travelDates;
-      const isWrongAge = !!(g.birthdate && type && dates && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, dates.first), countAgeOn(g.birthdate, dates.last)));
-      if (!g.birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(g.birthdate) || g.birthdate > input.today || isWrongAge) invalid.push(`guests[${i}].birthdate`);
+      if (!g.birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(g.birthdate)) errors.push({ field, message: `Nhập ngày sinh ${guest} (YYYY-MM-DD).` });
+      else if (g.birthdate > input.today) errors.push({ field, message: `Ngày sinh ${guest} không được sau hôm nay.` });
+      else if (type && dates && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, dates.first), countAgeOn(g.birthdate, dates.last)))
+        errors.push({ field, message: `Hành khách ${i + 1} ${AGE_MESSAGES[type]}.` });
     });
   }
-  return invalid;
+  return errors;
+}
+
+/** Tên trường sai, để trả về client đánh dấu ô nhập. Rỗng là hợp lệ. */
+export function findInvalidGuestFields(input: Parameters<typeof listGuestFieldErrors>[0]): string[] {
+  return listGuestFieldErrors(input).map((e) => e.field);
 }
 
 /** Đã đủ thông tin để trả tiền: luôn cần người liên hệ; có vé bay thì cần đủ từng hành khách kèm ngày sinh. */

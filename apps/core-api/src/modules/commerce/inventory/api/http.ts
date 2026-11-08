@@ -41,7 +41,8 @@ export class CommerceErrorFilter implements ExceptionFilter {
         http = new HttpException({ statusCode: HttpStatus.PAYMENT_REQUIRED, message: err.message, errors, ...err.details }, HttpStatus.PAYMENT_REQUIRED);
         break;
       default:
-        http = new BadRequestException({ message: err.message, errors });
+        // details (nếu có) có thể thay errors bằng danh sách đủ các trường sai.
+        http = new BadRequestException({ message: err.message, errors, ...err.details });
     }
     res.status(http.getStatus()).json(http.getResponse());
   }

@@ -336,7 +336,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     // Em bé 3 tuổi vào ngày bay là trẻ em, không phải em bé.
     const wrongAge = await http().put(`/api/checkout/${held.body.orderId}/guests`).set(user.auth).send(guests(`${travelYear - 3}-01-01`));
     expect(wrongAge.status).toBe(400);
-    expect(wrongAge.body.errors).toEqual([expect.objectContaining({ field: 'guests[3].birthdate' })]);
+    expect(wrongAge.body.errors).toEqual([{ field: 'guests[3].birthdate', message: 'Hành khách 4 là em bé, phải dưới 2 tuổi tới ngày bay chặng cuối.' }]);
+    expect(wrongAge.body.fields).toEqual(['guests[3].birthdate']);
     const infantBirthdate = addDays(TODAY_DATE, -100);
     await http().put(`/api/checkout/${held.body.orderId}/guests`).set(user.auth).send(guests(infantBirthdate)).expect(200);
     const saved = await pool.query<{ full_name: string; passenger_type: string }>('select full_name, passenger_type from commerce.order_guests where order_id = $1 order by passenger_type, full_name', [held.body.orderId]);
