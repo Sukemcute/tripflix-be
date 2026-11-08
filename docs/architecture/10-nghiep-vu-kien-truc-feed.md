@@ -118,8 +118,8 @@ flowchart LR
   App -->|"phát HLS, không qua Gateway"| CDN
   App -->|"PUT file ký sẵn, không qua Gateway"| S3
   CDN -->|"OAC, chỉ đọc videos/*"| S3
-  Feed -->|"Redis Streams: media.transcode_requested"| VW
-  VW -->|"Redis Streams: media.rendition_ready / transcode_failed"| Feed
+  Feed -->|"Redis Streams: content.media.transcode_requested"| VW
+  VW -->|"Redis Streams: media.rendition.completed / transcode_failed"| Feed
   VW -->|"đọc gốc, ghi HLS"| S3
   Feed -->|"gọi hàm"| Content
   Feed -->|"gọi hàm"| Reco
@@ -163,7 +163,7 @@ flowchart TB
 | F4 Ingest | Nhận sự kiện xem, chuẩn hoá thành tín hiệu. Dùng chung với Analytics | `POST /events` (lô ≤ 50), nghe `post.*`, `booking.confirmed` |
 | F5 Scorer | Cộng dồn điểm có bán rã, gộp theo đơn vị | Job 5 phút; cấp `trending.top`, `trending.scoreOf` |
 | F6 Anti-abuse | Chỉnh trọng số khi ghi, quét đột biến sau mỗi lần F5 chạy | Phát `trending.suspicious` |
-| F7 Media | Cấp link tải lên nhiều phần, kiểm file, giao việc chuyển mã, trả link phát và ảnh bìa | `POST /media/uploads`, `POST /media/uploads/:assetId/parts` (ký thêm link cho phần còn thiếu), `POST /media/uploads/:assetId/complete`; phát `media.transcode_requested` cho worker; nghe `media.rendition_ready`, `media.transcode_failed`; phát `media.ready`, `media.failed` |
+| F7 Media | Cấp link tải lên nhiều phần, kiểm file, giao việc chuyển mã, trả link phát và ảnh bìa | `POST /media/uploads`, `POST /media/uploads/:assetId/parts` (ký thêm link cho phần còn thiếu), `POST /media/uploads/:assetId/complete`; phát `content.media.transcode_requested` cho worker; nghe `media.rendition.completed`, `media.transcode.failed`; phát `media.ready`, `media.failed` |
 
 ### 3.3 Thành phần trong app
 
@@ -199,15 +199,15 @@ sequenceDiagram
   Note over A,S3: Mất mạng: app gọi POST /media/uploads/{assetId}/parts để ký lại link cho phần còn thiếu
   A->>F7: POST /media/uploads/{assetId}/complete (danh sách ETag)
   F7->>S3: CompleteMultipartUpload, HEAD kiểm đúng dung lượng
-  F7-->>W: Redis Streams: media.transcode_requested (qua outbox)
+  F7-->>W: Redis Streams: content.media.transcode_requested (qua outbox)
   A->>C: tạo bài kèm videoAssetId (status = processing)
   W->>S3: ghi ảnh bìa 3 cỡ, mức 360p, master.m3u8 chỉ có 360p
-  W-->>F7: Redis Streams: media.rendition_ready (360p, hlsPrefix, thời lượng, tỷ lệ khung)
+  W-->>F7: Redis Streams: media.rendition.completed (360p, hlsPrefix, thời lượng, tỷ lệ khung)
   F7->>F7: media_asset.status = ready, levels = [360]
   F7-->>C: event media.ready
   C->>C: bài chuyển sang published, đã xem được ở 360p
   W->>S3: ghi mức 540p (và 720p nếu có), ghi đè master.m3u8 đủ các mức
-  W-->>F7: Redis Streams: media.rendition_ready (540p, 720p)
+  W-->>F7: Redis Streams: media.rendition.completed (540p, 720p)
   F7->>F7: cập nhật levels
 ```
 
@@ -274,15 +274,16 @@ videos/{assetId}/r{n}/poster_{360,540,720}.jpg ← ảnh bìa 3 cỡ theo chiề
 
 Worker là service riêng, **không có quyền vào PostgreSQL** của monolith. Nó chỉ đọc và ghi Redis Streams và S3.
 
-- Không còn bảng `transcode_job`. Hàng đợi là stream `media.transcode`, trạng thái nằm ở `media_asset.status`.
+- Không còn bảng `transcode_job`. Hàng đợi là stream `stream:media`, trạng thái nằm ở `media_asset.status`.
 - Worker đọc stream qua consumer group `video-worker`. Xong việc thì `XACK`. Nếu worker chết giữa chừng, việc còn treo trong danh sách chờ (PEL) và được worker khác nhận lại (`XAUTOCLAIM`) khi đã im lặng quá 2 phút.
 - **Báo còn sống:** video 5 phút có thể chuyển mã lâu hơn ngưỡng nhận lại. Trong lúc làm, cứ 30 giây worker gọi `XCLAIM` việc đó cho chính nó (kèm `JUSTID`) để đặt lại thời gian im lặng. Nhờ vậy worker khác chỉ nhận lại việc khi worker cũ thật sự đã chết, không phải khi nó đang làm lâu.
-- **Đăng sớm ở 360p:** worker làm mức 360p trước, ghi master chỉ có 360p rồi phát `media.rendition_ready`. F7 chuyển `ready` ngay, bài được đăng mà không phải chờ cả 3 mức. Các mức cao hơn xong dần, mỗi mức phát thêm một `media.rendition_ready`.
-- Thử tối đa 3 lần (đếm theo số lần giao của Redis). Quá 3 lần thì worker phát `media.transcode_failed`, F7 chuyển `failed` và phát `media.failed`.
-- Redis có thể giao một việc nhiều lần, nên worker ghi vào thư mục `r{n}` mới. F7 xử lý `media.rendition_ready` theo cặp `(assetId, mức)`: mức đã có trong `levels` thì bỏ qua, và chỉ phát `media.ready` một lần.
-- Worker không có DB nên không có outbox: nó phát `media.rendition_ready` và `media.transcode_failed` thẳng lên Redis Streams (`XADD`), rồi mới `XACK` việc. Nếu chết giữa hai bước, việc được giao lại và F7 loại trùng như trên.
+- **Đăng sớm ở 360p:** worker làm mức 360p trước, ghi master chỉ có 360p rồi phát `media.rendition.completed`. F7 chuyển `ready` ngay, bài được đăng mà không phải chờ cả 3 mức. Các mức cao hơn xong dần, mỗi mức phát thêm một `media.rendition.completed`.
+- Thử tối đa 3 lần (đếm theo số lần giao của Redis). Quá 3 lần thì worker phát `media.transcode.failed`, F7 chuyển `failed` và phát `media.failed`.
+- Redis có thể giao một việc nhiều lần, nên worker ghi vào thư mục `r{n}` mới. F7 xử lý `media.rendition.completed` theo cặp `(assetId, mức)`: mức đã có trong `levels` thì bỏ qua, và chỉ phát `media.ready` một lần.
+- Worker không có DB nên không có outbox: nó phát `media.rendition.completed` và `media.transcode.failed` thẳng lên Redis Streams (`XADD`), rồi mới `XACK` việc. Nếu chết giữa hai bước, việc được giao lại và F7 loại trùng như trên.
 - Nếu 360p xong mà mức cao hơn lỗi quá 3 lần, bài vẫn giữ `ready` ở 360p, F7 ghi `error` để xem lại. Chỉ khi 360p lỗi mới chuyển `failed`.
 - Video 5 phút chuyển mã lâu hơn nhiều so với clip thử. Mỗi worker chạy tối đa 1 việc cùng lúc; cần nhiều hơn thì thêm worker vào cùng consumer group.
+- **Chỗ còn hở (chưa làm):** nếu một video làm worker chết mỗi lần chạy, ví dụ vì hết RAM, worker không kịp phát `media.transcode.failed`. Quá 5 lần giao, việc vào `stream:dead-letter` mà chưa có ai đọc, nên video nằm ở `processing` mãi. Hướng sửa: `core-api` quét video `processing` quá lâu rồi chuyển `failed`; worker có timeout cho mỗi việc và dọn thư mục tạm khi khởi động.
 
 ### 5.4 Event
 
@@ -291,8 +292,8 @@ Worker là service riêng, **không có quyền vào PostgreSQL** của monolith
 | Nghe | `post.liked`, `post.unliked`, `post.commented`, `post.saved`, `post.unsaved`, `post.shared` | Thanh |
 | Nghe | `booking.confirmed` (có `sourcePostId`) | Thắng |
 | Phát | `media.ready`, `media.failed` | Thanh |
-| Phát | `media.transcode_requested` | Video Processing Worker |
-| Nghe | `media.rendition_ready` (mỗi mức một lần), `media.transcode_failed` | Video Processing Worker |
+| Phát | `content.media.transcode_requested` | Video Processing Worker |
+| Nghe | `media.rendition.completed` (mỗi mức một lần), `media.transcode.failed` | Video Processing Worker |
 | Phát | `trending.suspicious` | Trang |
 
 Mọi event ghi vào bảng `outbox` trong cùng transaction với dữ liệu, rồi relay đẩy lên Redis Streams. Mỗi module nghe bằng một consumer group riêng. Redis Streams giao **ít nhất một lần**, nên hàm xử lý event của Feed loại trùng theo `eventId`.
@@ -383,6 +384,7 @@ flowchart LR
 | D10 | Video không đi qua API Gateway | Tránh Rate Limiting và tải băng thông lên Gateway | Bảo vệ file video bằng OAC và link ký sẵn, không bằng Gateway | Đề xuất |
 | D11 | Ảnh bìa làm sẵn 3 cỡ (rộng 360, 540, 720) lúc chuyển mã | Mentor chọn làm sẵn thay vì resize động | Thêm 3 file mỗi video | Chốt |
 | D12 | Video tối đa 5 phút | Leader và nhóm chốt | Chuyển mã lâu hơn, file gốc lớn hơn, bắt buộc tải nhiều phần | Chốt |
+| D13 | Viết lại Video Processing Worker bằng Go, vẫn gọi lệnh `ffmpeg` | Mentor giao tối ưu worker và ưu tiên đổi ngôn ngữ. Go dự kiến tốn ít RAM hơn, build ra một file chạy, học và bảo trì dễ hơn Rust | Không kỳ vọng encode nhanh hơn, vì FFmpeg vẫn làm phần nặng. Không dùng chung được `libs/`, phải viết lại phần nhận việc qua Redis và phần S3 | Chốt ngôn ngữ, chưa làm |
 
 Các phương án đã cân nhắc và bỏ: Mux, Bunny (mentor chọn S3), MinIO + Cloudflare (phải tự vận hành; điều khoản Cloudflare hạn chế video ở gói thường). MinIO vẫn dùng được cho môi trường local. Cloudflare R2 là phương án khi cần giảm phí băng thông.
 

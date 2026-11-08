@@ -528,7 +528,7 @@ Mỗi app một Dockerfile. App TypeScript build với context là gốc repo, �
 | App | Base image | Các stage |
 |---|---|---|
 | `core-api`, `notification-service` | `node:24-slim` | `prune` (`turbo prune <app> --docker`, chỉ lấy phần monorepo app cần) → `deps` (`pnpm install --frozen-lockfile`, cache pnpm store) → **`dev`** (toàn bộ mã nguồn, chạy chế độ watch) → `build` → **`prod`** (chỉ `dist` + dependency production, chạy bằng user không phải root) |
-| `video-worker` | `node:24-slim` + FFmpeg | Như trên |
+| `video-worker` | `node:24-slim` + FFmpeg | Như trên. Sẽ đổi base image và các stage khi chuyển sang Go (chưa làm) |
 | `web`, `admin` | `node:24-slim` | `prune` → `deps` → **`dev`** (`next dev`) → `build` (`next build`, output `standalone`) → **`prod`** (chỉ thư mục `standalone` + static) |
 | `ai-service` | `python:3.13-slim` + `uv` | `deps` (`uv sync --locked --no-install-project`, cache uv) → **`dev`** (`fastapi dev`, tự reload) → **`prod`** (`uv sync --no-dev`, `fastapi run`) |
 
