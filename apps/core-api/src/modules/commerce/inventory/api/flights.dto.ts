@@ -1,16 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
-import { MAX_ADULTS } from '../domain/sales-rules.js';
+import { MAX_ADULTS, MAX_SEATS } from '../domain/sales-rules.js';
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD');
 const AirportCodeSchema = z.string().trim().regex(/^[A-Za-z]{3}$/, 'Mã sân bay gồm 3 chữ cái');
 const UNAVAILABLE_REASONS = ['NOT_ON_SALE', 'STOP_SELL', 'SOLD_OUT'];
+// Trẻ em chiếm ghế (tổng với người lớn tối đa MAX_SEATS), em bé không quá số người lớn: use case kiểm phần ràng buộc chéo.
+const ChildrenSchema = z.coerce.number().int().min(0).max(MAX_SEATS - 1).optional();
+const InfantsSchema = z.coerce.number().int().min(0).max(MAX_ADULTS).optional();
 
 export const FlightSearchQuerySchema = z.object({
   from: AirportCodeSchema,
   to: AirportCodeSchema,
   date: IsoDateSchema,
   passengers: z.coerce.number().int().min(1).max(MAX_ADULTS).optional(),
+  children: ChildrenSchema,
+  infants: InfantsSchema,
   sort: z.enum(['recommended', 'price', 'departure', 'duration']).optional(),
 });
 
@@ -20,18 +25,24 @@ export const FlightCalendarQuerySchema = z.object({
   start: IsoDateSchema,
   end: IsoDateSchema,
   passengers: z.coerce.number().int().min(1).max(MAX_ADULTS).optional(),
+  children: ChildrenSchema,
+  infants: InfantsSchema,
 });
 
 export const FlightOfferQuerySchema = z.object({
   date: IsoDateSchema,
   passengers: z.coerce.number().int().min(1).max(MAX_ADULTS).optional(),
+  children: ChildrenSchema,
+  infants: InfantsSchema,
 });
 
 export class FlightSearchQueryDto {
   @ApiProperty({ example: 'SGN', description: 'Mã sân bay đi (IATA)' }) from!: string;
   @ApiProperty({ example: 'CXR', description: 'Mã sân bay đến (IATA)' }) to!: string;
   @ApiProperty({ format: 'date', example: '2026-12-01', description: 'Ngày bay' }) date!: string;
-  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1 }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1, description: 'Số người lớn' }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_SEATS - 1, default: 0, description: 'Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế' }) children?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_ADULTS, default: 0, description: 'Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn' }) infants?: number;
   @ApiPropertyOptional({ enum: ['recommended', 'price', 'departure', 'duration'], default: 'recommended', description: 'recommended: còn ghế trước, rồi giờ bay, rồi giá. Chuyến hết ghế luôn ở cuối.' }) sort?: string;
 }
 
@@ -40,7 +51,9 @@ export class FlightCalendarQueryDto {
   @ApiProperty({ example: 'SGN' }) to!: string;
   @ApiProperty({ format: 'date', example: '2026-12-01', description: 'Ngày đầu' }) start!: string;
   @ApiProperty({ format: 'date', example: '2026-12-07', description: 'Ngày cuối (tính cả ngày này), tối đa 31 ngày' }) end!: string;
-  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1 }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1, description: 'Số người lớn' }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_SEATS - 1, default: 0, description: 'Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế' }) children?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_ADULTS, default: 0, description: 'Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn' }) infants?: number;
 }
 
 class FlightCalendarDayDto {
@@ -64,7 +77,9 @@ export class FlightCalendarResultDto {
 
 export class FlightOfferQueryDto {
   @ApiProperty({ format: 'date', example: '2026-12-01', description: 'Ngày bay' }) date!: string;
-  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1 }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: MAX_ADULTS, default: 1, description: 'Số người lớn' }) passengers?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_SEATS - 1, default: 0, description: 'Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế' }) children?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: MAX_ADULTS, default: 0, description: 'Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn' }) infants?: number;
 }
 
 export class FlightRouteDto {
@@ -85,8 +100,10 @@ class FlightFareQuoteDto {
   @ApiProperty({ example: 'Tiết kiệm · không hoàn vé' }) name!: string;
   @ApiProperty() isRefundable!: boolean;
   @ApiProperty({ description: 'Hoàn vé miễn phí trước ngày bay bao nhiêu ngày' }) freeCancelDays!: number;
-  @ApiProperty({ type: Number, nullable: true, description: 'Giá một vé (VND); null khi không bán được' }) pricePerPerson!: number | null;
-  @ApiProperty({ type: Number, nullable: true, description: 'Cả nhóm hành khách (VND); null khi không bán được' }) totalPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Giá một vé người lớn (VND); null khi không bán được' }) pricePerPerson!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Giá một vé trẻ em 2–11 tuổi (75%, VND); null khi không bán được' }) childPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Giá một vé em bé dưới 2 tuổi (10%, VND); null khi không bán được' }) infantPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Cả nhóm: người lớn, trẻ em, em bé (VND); null khi không bán được' }) totalPrice!: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 7, description: 'Hành lý xách tay (kg/khách)' }) carryOnKg!: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 20, description: 'Hành lý ký gửi (kg/khách); 0 là không có' }) checkedKg!: number | null;
 }

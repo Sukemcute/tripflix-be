@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
-import type { OrderStatus } from '../domain/order-rules.js';
+import type { OrderStatus, PassengerType } from '../domain/order-rules.js';
 import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
 
 /** host.tx là transaction đang mở của commerce, hoặc kết nối thường; test truyền { tx: db }. */
@@ -16,6 +16,8 @@ const mapOrder = (row: OrderRow): OrderRecord => ({
   status: row.status as OrderStatus,
   total: row.total,
   adults: row.adults,
+  children: row.children,
+  infants: row.infants,
   sourcePostId: row.sourcePostId,
   contactName: row.contactName,
   contactPhone: row.contactPhone,
@@ -133,7 +135,7 @@ export class DrizzleOrderStore implements OrderStore {
     return (await this.selectItemsWithProperty().where(inArray(orderItems.orderId, orderIds)).orderBy(asc(orderItems.date), asc(orderItems.id))).map(mapItemWithProperty);
   }
 
-  async insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }) {
+  async insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }) {
     const [row] = await this.db.insert(orders).values(order).returning({ id: orders.id });
     return row!.id;
   }
@@ -154,8 +156,8 @@ export class DrizzleOrderStore implements OrderStore {
       .leftJoin(properties, eq(properties.id, roomTypes.propertyId));
   }
 
-  async updateItemPrices(prices: { id: string; unitPrice: number; lineTotal: number }[]) {
-    for (const p of prices) await this.db.update(orderItems).set({ unitPrice: p.unitPrice, lineTotal: p.lineTotal }).where(eq(orderItems.id, p.id));
+  async updateItemPrices(prices: { id: string; unitPrice: number; childUnitPrice: number | null; infantUnitPrice: number | null; lineTotal: number }[]) {
+    for (const { id, ...price } of prices) await this.db.update(orderItems).set(price).where(eq(orderItems.id, id));
   }
 
   async setItemConfirmationCodes(codes: { id: string; code: string }[]) {
@@ -166,7 +168,7 @@ export class DrizzleOrderStore implements OrderStore {
     await this.db.update(orders).set({ ...patch, updatedAt: new Date() }).where(eq(orders.id, orderId));
   }
 
-  async replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null }[]) {
+  async replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null; passengerType: PassengerType | null }[]) {
     await this.db.delete(orderGuests).where(eq(orderGuests.orderId, orderId));
     if (guests.length) await this.db.insert(orderGuests).values(guests.map((g) => ({ ...g, orderId })));
   }

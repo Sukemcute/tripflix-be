@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type Today } from '../../inventory/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
-import { MAX_ADULTS, MAX_NIGHTS, addDays, countNights, isIsoDate, quoteFlight, quoteStay, type PricePlan } from '../../inventory/domain/sales-rules.js';
+import { MAX_NIGHTS, addDays, calculatePassengerFares, countNights, countSeats, findPassengerMixError, isIsoDate, quoteFlight, quoteStay, type PassengerMix, type PricePlan } from '../../inventory/domain/sales-rules.js';
 import {
   HOLD_MINUTES,
   HOLDS_PER_HOUR,
@@ -11,7 +11,9 @@ import {
   findInvalidGuestFields,
   hasCompleteGuests,
   isHoldExpired,
+  listPassengerTypes,
   type ContactInput,
+  type PassengerType,
   type OrderStatus,
   type GuestInput,
 } from '../domain/order-rules.js';
@@ -23,13 +25,16 @@ export interface CheckoutItemInput {
   checkIn: string;
   /** Bắt buộc với phòng. */
   checkOut?: string;
-  /** Số phòng; vé bay luôn bằng số khách. */
+  /** Số phòng; vé bay luôn bằng số ghế (người lớn + trẻ em). */
   qty?: number;
   ratePlanCode?: string;
 }
 
 export interface CheckoutInput {
   adults: number;
+  /** Chỉ dùng cho vé bay: trẻ em chiếm ghế, giá 75%; em bé ngồi lòng người lớn, giá 10%. */
+  children?: number;
+  infants?: number;
   items: CheckoutItemInput[];
   sourcePostId?: string | null;
 }
@@ -40,11 +45,15 @@ export interface CheckoutView {
   holdExpiresAt: string;
   total: number;
   adults: number;
+  children: number;
+  infants: number;
   confirmationCode: string | null;
   cancelReason: string | null;
   items: (Omit<OrderItemRecord, 'orderId'> & { dateTo: string })[];
   isGuestInfoComplete: boolean;
   passengersRequired: number;
+  /** Loại của từng hành khách cần nhập, đúng thứ tự gửi guests; rỗng khi không có vé bay. */
+  passengerTypes: PassengerType[];
   policyVersion: string;
 }
 
@@ -53,6 +62,8 @@ export interface TripView {
   status: OrderRecord['status'];
   total: number;
   adults: number;
+  children: number;
+  infants: number;
   confirmationCode: string | null;
   cancelReason: string | null;
   holdExpiresAt: string;
@@ -91,6 +102,19 @@ export const decodeTripCursor = (cursor: string): { createdAt: Date; id: string 
   throw new CommerceError('invalid_query', 'Con trỏ trang không hợp lệ.');
 };
 
+/** Nhóm hành khách đã lưu của đơn. */
+export const passengerMixOf = (order: Pick<OrderRecord, 'adults' | 'children' | 'infants'>): PassengerMix => ({ adults: order.adults, children: order.children, infants: order.infants });
+
+/** Hành khách phải nhập: có vé bay thì mọi người lớn, trẻ em, em bé; chỉ có phòng thì không ai. */
+export const listRequiredPassengers = (order: Pick<OrderRecord, 'adults' | 'children' | 'infants'>, items: Pick<OrderItemRecord, 'productType'>[]): PassengerType[] =>
+  items.some((i) => i.productType === 'flight') ? listPassengerTypes(passengerMixOf(order)) : [];
+
+/** Ngày bay đầu và cuối của đơn: tuổi từng loại khách xét theo cả chuyến (khứ hồi có thể qua sinh nhật). */
+function findTravelDates(items: Pick<OrderItemRecord, 'productType' | 'date'>[]): { first: string; last: string } | undefined {
+  const dates = items.filter((i) => i.productType === 'flight').map((i) => i.date).sort();
+  return dates.length ? { first: dates[0]!, last: dates.at(-1)! } : undefined;
+}
+
 const toItemViews = (items: OrderItemRecord[]): CheckoutView['items'] =>
   items.map(({ orderId: _orderId, ...i }) => ({ ...i, propertyName: i.propertyName ?? null, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
 
@@ -128,9 +152,15 @@ export class CheckoutUseCases {
 
   @Transactional('commerce')
   private async holdAndCreateOrder(userId: string, input: CheckoutInput): Promise<string> {
-    if (!Number.isInteger(input.adults) || input.adults < 1 || input.adults > MAX_ADULTS) throw new CommerceError('invalid_query', `Số khách từ 1 đến ${MAX_ADULTS}.`, 'adults');
+    const mix = { adults: input.adults, children: input.children ?? 0, infants: input.infants ?? 0 };
+    const mixError = findPassengerMixError(mix);
+    if (mixError) throw new CommerceError('invalid_query', mixError.message, mixError.field);
     if (!input.items.length || input.items.length > MAX_ITEMS_PER_ORDER) throw new CommerceError('invalid_query', `Giỏ có từ 1 đến ${MAX_ITEMS_PER_ORDER} mục.`, 'items');
-    const priced = await this.priceItems(input.items, input.adults);
+    const priced = await this.priceItems(input.items, mix);
+    // Phòng chỉ tính theo người lớn: trẻ em, em bé chỉ có nghĩa khi giỏ có vé bay.
+    if ((mix.children > 0 || mix.infants > 0) && !priced.some((p) => p.productType === 'flight')) {
+      throw new CommerceError('invalid_query', 'Trẻ em và em bé chỉ áp dụng cho vé máy bay.', mix.children > 0 ? 'children' : 'infants');
+    }
 
     await this.orders.lockUser(userId);
     const now = this.now();
@@ -157,7 +187,7 @@ export class CheckoutUseCases {
     const orderId = await this.orders.insertOrder({
       userId,
       total,
-      adults: input.adults,
+      ...mix,
       sourcePostId: input.sourcePostId ?? null,
       holdExpiresAt: new Date(now.getTime() + HOLD_MINUTES * 60_000),
     });
@@ -165,8 +195,12 @@ export class CheckoutUseCases {
     return orderId;
   }
 
-  /** Tính giá và kiểm luật bán từng mục từ lịch trống; một mục không đặt được thì báo lý do, chưa giữ gì. */
-  async priceItems(items: CheckoutItemInput[], adults: number): Promise<PricedItem[]> {
+  /**
+   * Tính giá và kiểm luật bán từng mục từ lịch trống; một mục không đặt được thì báo lý do, chưa giữ gì.
+   * Phòng tính theo người lớn như trước; vé bay giữ ghế cho người lớn + trẻ em và tính giá cả em bé.
+   */
+  async priceItems(items: CheckoutItemInput[], mix: PassengerMix): Promise<PricedItem[]> {
+    const { adults } = mix;
     const ids = items.map((i) => i.productId);
     const [roomTypes, flights] = await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
     const today = this.today();
@@ -187,13 +221,29 @@ export class CheckoutUseCases {
         const quote = quoteStay({ days, checkIn: item.checkIn, checkOut: item.checkOut, rooms: qty, plan });
         if (!quote.isAvailable) throw new CommerceError('conflict', `${room.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: room.id });
         const nights = countNights(item.checkIn, item.checkOut);
-        out.push(this.toPriced({ productType: 'room', productId: room.id, productName: room.name, date: item.checkIn, nights, qty, lineTotal: quote.totalPrice, plan }));
+        out.push(this.toPriced({ productType: 'room', productId: room.id, productName: room.name, date: item.checkIn, nights, qty, lineTotal: quote.totalPrice, unitPrice: Math.round(quote.totalPrice / qty / nights), plan }));
       } else if (flight) {
         const plan = this.findPlan(flight.farePlans, item.ratePlanCode);
         const day = ((await this.catalog.calendar.loadFlightDays([flight.id], item.checkIn, item.checkIn)).get(flight.id) ?? [])[0];
-        const quote = quoteFlight({ day, passengers: adults, plan });
+        const quote = quoteFlight({ day, passengers: adults, children: mix.children, infants: mix.infants, plan });
         if (!quote.isAvailable) throw new CommerceError('conflict', `${flight.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: flight.id });
-        out.push(this.toPriced({ productType: 'flight', productId: flight.id, productName: `${flight.name} · ${flight.cabinName}`, date: item.checkIn, nights: 1, qty: adults, lineTotal: quote.totalPrice, plan }));
+        // Đơn giá vé bay là giá người lớn, kèm giá trẻ em, em bé: lineTotal / qty không phải giá của loại khách nào.
+        const fares = calculatePassengerFares(quote.pricePerNight);
+        out.push(
+          this.toPriced({
+            productType: 'flight',
+            productId: flight.id,
+            productName: `${flight.name} · ${flight.cabinName}`,
+            date: item.checkIn,
+            nights: 1,
+            qty: countSeats(mix),
+            lineTotal: quote.totalPrice,
+            unitPrice: fares.adult,
+            childUnitPrice: fares.child,
+            infantUnitPrice: fares.infant,
+            plan,
+          }),
+        );
       } else {
         throw new CommerceError('not_found', `Không có sản phẩm ${item.productId}.`, 'items');
       }
@@ -207,7 +257,19 @@ export class CheckoutUseCases {
     return plan;
   }
 
-  private toPriced(i: { productType: 'room' | 'flight'; productId: string; productName: string; date: string; nights: number; qty: number; lineTotal: number; plan: PricePlan }): PricedItem {
+  private toPriced(i: {
+    productType: 'room' | 'flight';
+    productId: string;
+    productName: string;
+    date: string;
+    nights: number;
+    qty: number;
+    lineTotal: number;
+    unitPrice: number;
+    childUnitPrice?: number;
+    infantUnitPrice?: number;
+    plan: PricePlan;
+  }): PricedItem {
     const item = {
       productType: i.productType,
       productId: i.productId,
@@ -215,7 +277,9 @@ export class CheckoutUseCases {
       date: i.date,
       nights: i.nights,
       qty: i.qty,
-      unitPrice: Math.round(i.lineTotal / i.qty / i.nights),
+      unitPrice: i.unitPrice,
+      childUnitPrice: i.childUnitPrice ?? null,
+      infantUnitPrice: i.infantUnitPrice ?? null,
       lineTotal: i.lineTotal,
       ratePlanCode: i.plan.code,
       ratePlanName: i.plan.name,
@@ -236,11 +300,19 @@ export class CheckoutUseCases {
     const order = await this.ownOrder(userId, orderId, { lock: true });
     if (order.status === 'paying') throw new CommerceError('conflict', 'Đơn đang được thanh toán, không sửa thông tin khách được.');
     this.assertPending(order);
-    const passengersRequired = (await this.orders.findItems(orderId)).some((i) => i.productType === 'flight') ? order.adults : 0;
-    const invalid = findInvalidGuestFields({ ...input, passengersRequired, today: this.today() });
+    const items = await this.orders.findItems(orderId);
+    const passengerTypes = listRequiredPassengers(order, items);
+    const passengersRequired = passengerTypes.length;
+    const invalid = findInvalidGuestFields({ ...input, passengersRequired, today: this.today(), passengerTypes, travelDates: findTravelDates(items) });
     if (invalid.length) throw new CommerceError('invalid_query', 'Thông tin khách chưa đủ hoặc chưa đúng.', invalid[0], { fields: invalid, passengersRequired });
     await this.orders.updateOrder(orderId, { contactName: input.contact.fullName.trim(), contactPhone: input.contact.phone.replace(/\s/g, ''), contactEmail: input.contact.email?.trim() || null });
-    await this.orders.replaceGuests(orderId, input.guests.filter((g) => g.fullName.trim()).map((g) => ({ fullName: g.fullName.trim(), birthdate: g.birthdate })));
+    // Lưu loại khách cùng từng người, để xuất vé, email, chuyến đi của tôi không phải dựa vào thứ tự.
+    await this.orders.replaceGuests(
+      orderId,
+      input.guests
+        .map((g, i) => ({ fullName: g.fullName.trim(), birthdate: g.birthdate, passengerType: passengerTypes[i] ?? null }))
+        .filter((g) => g.fullName),
+    );
     return { orderId, isGuestInfoComplete: true };
   }
 
@@ -255,18 +327,22 @@ export class CheckoutUseCases {
   async getCheckout(userId: string, orderId: string): Promise<CheckoutView> {
     const order = await this.ownOrder(userId, orderId);
     const items = await this.orders.findItems(orderId);
-    const passengersRequired = items.some((i) => i.productType === 'flight') ? order.adults : 0;
+    const passengerTypes = listRequiredPassengers(order, items);
+    const passengersRequired = passengerTypes.length;
     return {
       orderId: order.id,
       status: order.status,
       holdExpiresAt: order.holdExpiresAt.toISOString(),
       total: order.total,
       adults: order.adults,
+      children: order.children,
+      infants: order.infants,
       confirmationCode: order.confirmationCode,
       cancelReason: order.cancelReason,
       items: toItemViews(items),
       isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates: await this.orders.findGuestBirthdates(orderId), passengersRequired }),
       passengersRequired,
+      passengerTypes,
       policyVersion: POLICY_VERSION,
     };
   }
@@ -288,6 +364,8 @@ export class CheckoutUseCases {
         status: order.status,
         total: order.total,
         adults: order.adults,
+        children: order.children,
+        infants: order.infants,
         confirmationCode: order.confirmationCode,
         cancelReason: order.cancelReason,
         holdExpiresAt: order.holdExpiresAt.toISOString(),

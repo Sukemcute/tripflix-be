@@ -2553,6 +2553,7 @@
             }
           },
           {
+            "description": "Số người lớn",
             "required": false,
             "name": "passengers",
             "in": "query",
@@ -2560,6 +2561,30 @@
               "minimum": 1,
               "maximum": 9,
               "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế",
+            "required": false,
+            "name": "children",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 8,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn",
+            "required": false,
+            "name": "infants",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9,
+              "default": 0,
               "type": "number"
             }
           },
@@ -2642,6 +2667,7 @@
             }
           },
           {
+            "description": "Số người lớn",
             "required": false,
             "name": "passengers",
             "in": "query",
@@ -2649,6 +2675,30 @@
               "minimum": 1,
               "maximum": 9,
               "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế",
+            "required": false,
+            "name": "children",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 8,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn",
+            "required": false,
+            "name": "infants",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9,
+              "default": 0,
               "type": "number"
             }
           }
@@ -2718,6 +2768,7 @@
             }
           },
           {
+            "description": "Số người lớn",
             "required": false,
             "name": "passengers",
             "in": "query",
@@ -2725,6 +2776,30 @@
               "minimum": 1,
               "maximum": 9,
               "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9 ghế",
+            "required": false,
+            "name": "children",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 8,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Em bé dưới 2 tuổi, ngồi lòng người lớn (không chiếm ghế), giá 10%; không quá số người lớn",
+            "required": false,
+            "name": "infants",
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9,
+              "default": 0,
               "type": "number"
             }
           }
@@ -7127,12 +7202,22 @@
           "pricePerPerson": {
             "type": "number",
             "nullable": true,
-            "description": "Giá một vé (VND); null khi không bán được"
+            "description": "Giá một vé người lớn (VND); null khi không bán được"
+          },
+          "childPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé trẻ em 2–11 tuổi (75%, VND); null khi không bán được"
+          },
+          "infantPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Giá một vé em bé dưới 2 tuổi (10%, VND); null khi không bán được"
           },
           "totalPrice": {
             "type": "number",
             "nullable": true,
-            "description": "Cả nhóm hành khách (VND); null khi không bán được"
+            "description": "Cả nhóm: người lớn, trẻ em, em bé (VND); null khi không bán được"
           },
           "carryOnKg": {
             "type": "number",
@@ -7153,6 +7238,8 @@
           "isRefundable",
           "freeCancelDays",
           "pricePerPerson",
+          "childPrice",
+          "infantPrice",
           "totalPrice",
           "carryOnKg",
           "checkedKg"
@@ -7616,7 +7703,7 @@
           },
           "qty": {
             "type": "number",
-            "description": "Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số khách"
+            "description": "Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số ghế (người lớn + trẻ em)"
           },
           "ratePlanCode": {
             "type": "string",
@@ -7636,6 +7723,20 @@
             "type": "number",
             "minimum": 1,
             "maximum": 9
+          },
+          "children": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 8,
+            "default": 0,
+            "description": "Chỉ khi giỏ có vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9"
+          },
+          "infants": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9,
+            "default": 0,
+            "description": "Chỉ khi giỏ có vé bay: em bé dưới 2 tuổi (tới chặng cuối), không chiếm ghế, giá 10%; không quá số người lớn"
           },
           "sourcePostId": {
             "type": "string",
@@ -7694,7 +7795,17 @@
           },
           "unitPrice": {
             "type": "number",
-            "description": "Một đêm một phòng / một vé (VND)"
+            "description": "Phòng: một đêm một phòng. Vé bay: một vé người lớn (VND). Vé bay có trẻ em, em bé thì lineTotal khác unitPrice × qty"
+          },
+          "childUnitPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vé bay: một vé trẻ em (VND); phòng là null"
+          },
+          "infantUnitPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vé bay: một vé em bé (VND); phòng là null. lineTotal = unitPrice × adults + childUnitPrice × children + infantUnitPrice × infants"
           },
           "lineTotal": {
             "type": "number"
@@ -7729,6 +7840,8 @@
           "nights",
           "qty",
           "unitPrice",
+          "childUnitPrice",
+          "infantUnitPrice",
           "lineTotal",
           "ratePlanCode",
           "ratePlanName",
@@ -7764,6 +7877,14 @@
           "adults": {
             "type": "number"
           },
+          "children": {
+            "type": "number",
+            "description": "Trẻ em 2–11 tuổi (vé bay)"
+          },
+          "infants": {
+            "type": "number",
+            "description": "Em bé dưới 2 tuổi (vé bay)"
+          },
           "confirmationCode": {
             "type": "string",
             "nullable": true
@@ -7785,6 +7906,18 @@
             "type": "number",
             "description": "Số hành khách cần nhập (0 khi không có vé bay)"
           },
+          "passengerTypes": {
+            "type": "array",
+            "description": "Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm theo chặng: người lớn từ 12 tuổi ở chặng đầu, trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối, em bé dưới 2 tuổi tới chặng cuối",
+            "items": {
+              "type": "string",
+              "enum": [
+                "adult",
+                "child",
+                "infant"
+              ]
+            }
+          },
           "policyVersion": {
             "type": "string"
           }
@@ -7795,11 +7928,14 @@
           "holdExpiresAt",
           "total",
           "adults",
+          "children",
+          "infants",
           "confirmationCode",
           "cancelReason",
           "items",
           "isGuestInfoComplete",
           "passengersRequired",
+          "passengerTypes",
           "policyVersion"
         ]
       },
@@ -7825,6 +7961,14 @@
           },
           "adults": {
             "type": "number"
+          },
+          "children": {
+            "type": "number",
+            "description": "Trẻ em 2–11 tuổi (vé bay)"
+          },
+          "infants": {
+            "type": "number",
+            "description": "Em bé dưới 2 tuổi (vé bay)"
           },
           "confirmationCode": {
             "type": "string",
@@ -7872,6 +8016,8 @@
           "status",
           "total",
           "adults",
+          "children",
+          "infants",
           "confirmationCode",
           "cancelReason",
           "holdExpiresAt",

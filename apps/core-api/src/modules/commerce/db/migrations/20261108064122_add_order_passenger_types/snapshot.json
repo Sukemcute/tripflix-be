@@ -1,0 +1,272 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "90667ccb-998c-450a-bcb9-a5491386fcb6",
+  "prevIds": [
+    "6ab43875-32e1-4da2-a424-55c09e47fac6"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "order_guests",
+        "passenger_type"
+      ],
+      "writes": [
+        "s|col|commerce.order_guests.passenger_type",
+        "n|col|commerce.order_guests.passenger_type",
+        "e|col|commerce.order_guests.passenger_type"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_guests",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "order_items",
+        "child_unit_price"
+      ],
+      "writes": [
+        "s|col|commerce.order_items.child_unit_price",
+        "n|col|commerce.order_items.child_unit_price",
+        "e|col|commerce.order_items.child_unit_price"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_items",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "order_items",
+        "infant_unit_price"
+      ],
+      "writes": [
+        "s|col|commerce.order_items.infant_unit_price",
+        "n|col|commerce.order_items.infant_unit_price",
+        "e|col|commerce.order_items.infant_unit_price"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_items",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "orders",
+        "children"
+      ],
+      "writes": [
+        "s|col|commerce.orders.children",
+        "n|col|commerce.orders.children",
+        "e|col|commerce.orders.children"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "orders",
+        "infants"
+      ],
+      "writes": [
+        "s|col|commerce.orders.infants",
+        "n|col|commerce.orders.infants",
+        "e|col|commerce.orders.infants"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "order_guests"
+      ],
+      "writes": [
+        "s|ck|commerce.order_guests.ck_order_guests_passenger_type",
+        "n|ck|commerce.order_guests.ck_order_guests_passenger_type",
+        "e|ck|commerce.order_guests.ck_order_guests_passenger_type",
+        "n|con|commerce.order_guests.ck_order_guests_passenger_type"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_guests",
+        "n|sch|commerce",
+        "n|col|commerce.order_guests.passenger_type"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "orders"
+      ],
+      "writes": [
+        "s|ck|commerce.orders.ck_orders_children",
+        "n|ck|commerce.orders.ck_orders_children",
+        "e|ck|commerce.orders.ck_orders_children",
+        "n|con|commerce.orders.ck_orders_children"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce",
+        "n|col|commerce.orders.children",
+        "n|col|commerce.orders.adults"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "orders"
+      ],
+      "writes": [
+        "s|ck|commerce.orders.ck_orders_infants",
+        "n|ck|commerce.orders.ck_orders_infants",
+        "e|ck|commerce.orders.ck_orders_infants",
+        "n|con|commerce.orders.ck_orders_infants"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce",
+        "n|col|commerce.orders.infants",
+        "n|col|commerce.orders.adults"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_guests",
+        "name": "passenger_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_items",
+        "name": "child_unit_price",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_items",
+        "name": "infant_unit_price",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "children",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "infants",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_guests",
+        "name": "ck_order_guests_passenger_type",
+        "value": "\"passenger_type\" in ('adult', 'child', 'infant')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "ck_orders_children",
+        "value": "\"children\" >= 0 and \"adults\" + \"children\" <= 9",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "ck_orders_infants",
+        "value": "\"infants\" between 0 and \"adults\"",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

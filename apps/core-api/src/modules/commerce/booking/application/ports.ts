@@ -1,4 +1,4 @@
-import type { OrderStatus } from '../domain/order-rules.js';
+import type { OrderStatus, PassengerType } from '../domain/order-rules.js';
 
 export interface OrderRecord {
   id: string;
@@ -6,6 +6,9 @@ export interface OrderRecord {
   status: OrderStatus;
   total: number;
   adults: number;
+  /** Vé bay: trẻ em 2–11 tuổi (chiếm ghế) và em bé dưới 2 tuổi (không chiếm ghế). */
+  children: number;
+  infants: number;
   sourcePostId: string | null;
   contactName: string | null;
   contactPhone: string | null;
@@ -28,7 +31,11 @@ export interface OrderItemRecord {
   date: string;
   nights: number;
   qty: number;
+  /** Phòng: một đêm một phòng. Vé bay: một vé người lớn. */
   unitPrice: number;
+  /** Vé bay: một vé trẻ em, em bé; phòng là null. */
+  childUnitPrice: number | null;
+  infantUnitPrice: number | null;
   lineTotal: number;
   ratePlanCode: string;
   ratePlanName: string;
@@ -94,13 +101,13 @@ export interface OrderStore {
   listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }): Promise<OrderRecord[]>;
   /** Mục của nhiều đơn trong một câu truy vấn. */
   findItemsOfOrders(orderIds: string[]): Promise<OrderItemRecord[]>;
-  insertOrder(order: { userId: string; total: number; adults: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
+  insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
   insertItems(orderId: string, items: NewOrderItem[]): Promise<void>;
   findItems(orderId: string): Promise<OrderItemRecord[]>;
-  updateItemPrices(prices: { id: string; unitPrice: number; lineTotal: number }[]): Promise<void>;
+  updateItemPrices(prices: { id: string; unitPrice: number; childUnitPrice: number | null; infantUnitPrice: number | null; lineTotal: number }[]): Promise<void>;
   setItemConfirmationCodes(codes: { id: string; code: string }[]): Promise<void>;
   updateOrder(orderId: string, patch: Partial<Pick<OrderRecord, 'status' | 'total' | 'contactName' | 'contactPhone' | 'contactEmail' | 'confirmationCode' | 'cancelReason' | 'paidAt'>> & { policyVersion?: string; policyAcceptedAt?: Date; cancelledAt?: Date }): Promise<void>;
-  replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null }[]): Promise<void>;
+  replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null; passengerType: PassengerType | null }[]): Promise<void>;
   findGuestBirthdates(orderId: string): Promise<(string | null)[]>;
 
   /**

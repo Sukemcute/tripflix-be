@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import type { OutboxWriter } from '@tripflix/outbox';
-import { CheckoutUseCases, listSortedCells, type CheckoutView } from '../../booking/application/checkout.use-cases.js';
+import { CheckoutUseCases, listRequiredPassengers, listSortedCells, passengerMixOf, type CheckoutView } from '../../booking/application/checkout.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type OrderStore, type PaymentRecord } from '../../booking/application/ports.js';
 import {
   MAX_FAILED_PAYMENTS,
@@ -147,7 +147,7 @@ export class PaymentUseCases {
     }
     this.checkout.assertPending(order);
     const items = await this.orders.findItems(orderId);
-    const passengersRequired = items.some((i) => i.productType === 'flight') ? order.adults : 0;
+    const passengersRequired = listRequiredPassengers(order, items).length;
     if (!hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates: await this.orders.findGuestBirthdates(orderId), passengersRequired })) {
       throw new CommerceError('invalid_query', 'Chưa đủ thông tin khách.', 'guests');
     }
@@ -158,7 +158,7 @@ export class PaymentUseCases {
     // Tính lại giá từ lịch trống: giá có thể đổi trong lúc giữ chỗ (admin sửa lịch).
     const repriced = await this.checkout.priceItems(
       items.map((i) => ({ productId: i.productId, checkIn: i.date, checkOut: i.productType === 'room' ? addDays(i.date, i.nights) : undefined, qty: i.productType === 'room' ? i.qty : undefined, ratePlanCode: i.ratePlanCode })),
-      order.adults,
+      passengerMixOf(order),
     ).catch((error: unknown) => {
       // Giữ chỗ rồi thì luật bán (CTA, ngừng bán) không chặn được nữa: chỉ lấy giá mới, chỗ đã có.
       if (error instanceof CommerceError && error.code === 'conflict') return null;
@@ -166,7 +166,12 @@ export class PaymentUseCases {
     });
     let total = order.total;
     if (repriced) {
-      await this.orders.updateItemPrices(items.map((item, i) => ({ id: item.id, unitPrice: repriced[i]!.unitPrice, lineTotal: repriced[i]!.lineTotal })));
+      await this.orders.updateItemPrices(
+        items.map((item, i) => {
+          const { unitPrice, childUnitPrice, infantUnitPrice, lineTotal } = repriced[i]!;
+          return { id: item.id, unitPrice, childUnitPrice, infantUnitPrice, lineTotal };
+        }),
+      );
       total = repriced.reduce((sum, p) => sum + p.lineTotal, 0);
       await this.orders.updateOrder(orderId, { total });
     }

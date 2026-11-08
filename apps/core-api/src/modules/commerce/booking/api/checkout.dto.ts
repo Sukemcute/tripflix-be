@@ -7,6 +7,8 @@ const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY
 export const CheckoutRequestSchema = z
   .object({
     adults: z.number().int().min(1).max(9),
+    children: z.number().int().min(0).max(8).optional(),
+    infants: z.number().int().min(0).max(9).optional(),
     sourcePostId: z.string().max(100).nullish(),
     items: z
       .array(
@@ -64,12 +66,14 @@ class CheckoutItemRequestDto {
   @ApiProperty({ example: 'P-h-dn-01--DLX', description: 'Mã loại phòng hoặc mã hạng ghế' }) productId!: string;
   @ApiProperty({ format: 'date', description: 'Ngày nhận phòng / ngày bay' }) checkIn!: string;
   @ApiPropertyOptional({ format: 'date', description: 'Ngày trả phòng (bắt buộc với phòng)' }) checkOut?: string;
-  @ApiPropertyOptional({ description: 'Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số khách' }) qty?: number;
+  @ApiPropertyOptional({ description: 'Số phòng; bỏ trống thì tự tính theo số khách. Vé bay luôn bằng số ghế (người lớn + trẻ em)' }) qty?: number;
   @ApiPropertyOptional({ example: 'RO', description: 'Mặc định gói đầu tiên' }) ratePlanCode?: string;
 }
 
 export class CheckoutRequestDto {
   @ApiProperty({ minimum: 1, maximum: 9 }) adults!: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: 8, default: 0, description: 'Chỉ khi giỏ có vé bay: trẻ em 2–11 tuổi, chiếm ghế, giá 75%; cộng người lớn tối đa 9' }) children?: number;
+  @ApiPropertyOptional({ minimum: 0, maximum: 9, default: 0, description: 'Chỉ khi giỏ có vé bay: em bé dưới 2 tuổi (tới chặng cuối), không chiếm ghế, giá 10%; không quá số người lớn' }) infants?: number;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Bài đăng dẫn tới đơn này (Đặt y chang)' }) sourcePostId?: string | null;
   @ApiProperty({ type: [CheckoutItemRequestDto] }) items!: CheckoutItemRequestDto[];
 }
@@ -115,7 +119,9 @@ class CheckoutItemDto {
   @ApiProperty({ format: 'date' }) dateTo!: string;
   @ApiProperty() nights!: number;
   @ApiProperty() qty!: number;
-  @ApiProperty({ description: 'Một đêm một phòng / một vé (VND)' }) unitPrice!: number;
+  @ApiProperty({ description: 'Phòng: một đêm một phòng. Vé bay: một vé người lớn (VND). Vé bay có trẻ em, em bé thì lineTotal khác unitPrice × qty' }) unitPrice!: number;
+  @ApiProperty({ type: Number, nullable: true, description: 'Vé bay: một vé trẻ em (VND); phòng là null' }) childUnitPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Vé bay: một vé em bé (VND); phòng là null. lineTotal = unitPrice × adults + childUnitPrice × children + infantUnitPrice × infants' }) infantUnitPrice!: number | null;
   @ApiProperty() lineTotal!: number;
   @ApiProperty() ratePlanCode!: string;
   @ApiProperty() ratePlanName!: string;
@@ -130,11 +136,14 @@ export class CheckoutDto {
   @ApiProperty({ format: 'date-time' }) holdExpiresAt!: string;
   @ApiProperty() total!: number;
   @ApiProperty() adults!: number;
+  @ApiProperty({ description: 'Trẻ em 2–11 tuổi (vé bay)' }) children!: number;
+  @ApiProperty({ description: 'Em bé dưới 2 tuổi (vé bay)' }) infants!: number;
   @ApiProperty({ type: String, nullable: true }) confirmationCode!: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason!: string | null;
   @ApiProperty({ type: [CheckoutItemDto] }) items!: CheckoutItemDto[];
   @ApiProperty() isGuestInfoComplete!: boolean;
   @ApiProperty({ description: 'Số hành khách cần nhập (0 khi không có vé bay)' }) passengersRequired!: number;
+  @ApiProperty({ enum: ['adult', 'child', 'infant'], isArray: true, description: 'Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm theo chặng: người lớn từ 12 tuổi ở chặng đầu, trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối, em bé dưới 2 tuổi tới chặng cuối' }) passengerTypes!: string[];
   @ApiProperty() policyVersion!: string;
 }
 
@@ -175,6 +184,8 @@ export class TripDto {
   @ApiProperty({ enum: ['pending', 'paying', 'paid', 'cancelled', 'expired'] }) status!: string;
   @ApiProperty() total!: number;
   @ApiProperty() adults!: number;
+  @ApiProperty({ description: 'Trẻ em 2–11 tuổi (vé bay)' }) children!: number;
+  @ApiProperty({ description: 'Em bé dưới 2 tuổi (vé bay)' }) infants!: number;
   @ApiProperty({ type: String, nullable: true }) confirmationCode!: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason!: string | null;
   @ApiProperty({ format: 'date-time' }) holdExpiresAt!: string;
