@@ -17,7 +17,9 @@ import {
   ACCESS_STORE,
   CLOCK,
   LOGIN_RATE_LIMITER,
+  PASSWORD_HASHER,
 } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { hashRefreshToken } from './auth/application/refresh-token.js';
 import { INVALID_CREDENTIALS_MESSAGE } from './auth/domain/credentials.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
@@ -63,6 +65,8 @@ describe('access E2E', () => {
       .useValue(store)
       .overrideProvider(ACTION_RATE_LIMITER)
       .useValue(new MemoryActionRateLimiter())
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter(() => nowMs))
       .overrideProvider(ACCESS_SID_BLOCKLIST)
