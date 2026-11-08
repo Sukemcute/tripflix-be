@@ -12,7 +12,8 @@ import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
 import { FORGOT_ACCEPTED_MESSAGE, INVALID_RESET_TOKEN_MESSAGE } from './account/domain/password-reset.js';
-import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, ACTION_RATE_LIMITER, LOGIN_RATE_LIMITER } from './auth/application/ports.js';
+import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, ACTION_RATE_LIMITER, LOGIN_RATE_LIMITER, PASSWORD_HASHER } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 import { MemoryActionRateLimiter } from './auth/infra/memory/memory-action-rate-limiter.js';
 import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
@@ -55,6 +56,8 @@ describe('TF057: quên và đặt lại mật khẩu', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACTION_RATE_LIMITER)

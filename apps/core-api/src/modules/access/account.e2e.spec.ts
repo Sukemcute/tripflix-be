@@ -12,7 +12,8 @@ import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
 import { WRONG_CURRENT_PASSWORD_MESSAGE } from './account/application/account.use-cases.js';
-import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER } from './auth/application/ports.js';
+import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER, PASSWORD_HASHER } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
 
@@ -51,6 +52,8 @@ describe('TF055: tài khoản của tôi', () => {
       .useValue(store)
       .overrideProvider(ACTION_RATE_LIMITER)
       .useValue(new MemoryActionRateLimiter())
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)

@@ -12,7 +12,8 @@ import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
-import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER } from './auth/application/ports.js';
+import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER, PASSWORD_HASHER } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { INVALID_CREDENTIALS_MESSAGE } from './auth/domain/credentials.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
@@ -51,6 +52,8 @@ describe('TF054: quản lý nhân viên và khoá tài khoản', () => {
       .useValue(store)
       .overrideProvider(ACTION_RATE_LIMITER)
       .useValue(new MemoryActionRateLimiter())
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)

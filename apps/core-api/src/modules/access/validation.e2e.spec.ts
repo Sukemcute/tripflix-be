@@ -16,7 +16,9 @@ import {
   ACCESS_STORE,
   ACTION_RATE_LIMITER,
   LOGIN_RATE_LIMITER,
+  PASSWORD_HASHER,
 } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 import { MemoryActionRateLimiter } from './auth/infra/memory/memory-action-rate-limiter.js';
 import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
@@ -63,6 +65,8 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
     })
       .overrideProvider(ACCESS_STORE)
       .useValue(store)
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
       .overrideProvider(LOGIN_RATE_LIMITER)
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACTION_RATE_LIMITER)

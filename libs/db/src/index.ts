@@ -24,13 +24,22 @@ export interface PoolOptions {
 
 /** Mỗi module một pool, đăng nhập bằng user Postgres chỉ có quyền trên schema của module đó. */
 export function createPool({ url, max, applicationName }: PoolOptions): pg.Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString: url,
     max,
     application_name: applicationName,
     connectionTimeoutMillis: 3_000,
     idleTimeoutMillis: 30_000,
   });
+  // Máy chủ cắt một kết nối đang rảnh (khởi động lại DB, tắt container test: 57P01) thì pg phát 'error' trên pool.
+  // Không có listener thì Node coi là lỗi không bắt và dừng tiến trình. pg đã tự bỏ client hỏng, query sau mở kết nối mới.
+  pool.on('error', (error: Error & { code?: string }) => warnIdleClientError(applicationName, error));
+  return pool;
+}
+
+/** Ghi cảnh báo khi một kết nối rảnh của pool bị lỗi; tách riêng để test được. */
+export function warnIdleClientError(applicationName: string, error: Error & { code?: string }): void {
+  process.emitWarning(`Kết nối rảnh của pool ${applicationName} bị ngắt (${error.code ?? 'không mã'}): ${error.message}`, { code: 'TRIPFLIX_PG_IDLE_ERROR' });
 }
 
 export function createDb(pool: pg.Pool) {
