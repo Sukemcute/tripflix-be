@@ -8,18 +8,46 @@ on:
 permissions:
   contents: read
   packages: write
+  # changes đọc lần publish thành công gần nhất.
+  actions: read
+
+# Merge mới vào develop, main thì huỷ lần publish cũ đang chạy: changes của lần mới so với lần thành công
+# gần nhất nên vẫn build đủ phần thay đổi của lần bị huỷ. Tag không huỷ.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/') }}
 
 jobs:
   # CI đỏ thì không build image, để server không kéo phải bản lỗi.
   check:
     uses: ./.github/workflows/ci.yml
 
+  # Chỉ build image của app có thay đổi; đổi libs/ hay file gốc thì build lại cả ba. Server staging kéo tag develop,
+  # nên app không đổi giữ nguyên image cũ. Mỗi image tốn khoảng 2 phút Actions và một bản trong GHCR.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      apps: ${{ steps.pick.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          bash .github/scripts/changed-images.sh
+          "core-api notification-service video-worker"
+          '^(libs/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|tsconfig\.base\.json$|\.nvmrc$|\.github/workflows/publish\.yml$|\.github/scripts/)'
+
   image:
-    needs: check
+    needs: [check, changes]
+    if: needs.changes.outputs.apps != '[]'
     strategy:
       fail-fast: false
       matrix:
-        app: [core-api, notification-service, video-worker]
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
