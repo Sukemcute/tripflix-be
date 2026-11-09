@@ -92,6 +92,46 @@ describe('EventRouter', () => {
     expect(mailer.sent).toHaveLength(1);
   });
 
+  const paidPayload = (contactEmail: string | null) => ({
+    orderId: randomUUID(),
+    userId: randomUUID(),
+    total: 2_850_000,
+    sourcePostId: null,
+    items: [
+      { productType: 'room', productId: 'P-1', date: '2026-12-01', nights: 2, qty: 1 },
+      { productType: 'flight', productId: 'F-1', date: '2026-12-03', nights: 1, qty: 3 },
+    ],
+    confirmationCode: 'TF-ABC123',
+    contactName: 'An <b>',
+    contactEmail,
+  });
+
+  it('commerce.order.paid thì gửi email xác nhận đúng nội dung, giao lại không gửi lần hai', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const event = createEvent('commerce.order.paid', paidPayload('an@example.com'));
+    await expect(router.route(event)).resolves.toBe('handled');
+    await expect(router.route(event)).resolves.toBe('duplicate');
+    expect(mailer.sent).toHaveLength(1);
+    const mail = mailer.sent[0]!;
+    expect(mail.to).toBe('an@example.com');
+    expect(mail.subject).toContain('TF-ABC123');
+    expect(mail.text).toContain('2.850.000đ');
+    expect(mail.text).toContain('nhận phòng 01/12/2026 · 2 đêm · 1 phòng');
+    expect(mail.text).toContain('ngày bay 03/12/2026 · 3 ghế');
+    expect(mail.html).toContain('An &lt;b&gt;');
+    expect(mail.html).not.toContain('An <b>');
+  });
+
+  it('commerce.order.paid không có email liên hệ thì không gửi, vẫn đánh dấu đã xử lý', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const event = createEvent('commerce.order.paid', paidPayload(null));
+    await expect(router.route(event)).resolves.toBe('ignored');
+    await expect(router.route(event)).resolves.toBe('duplicate');
+    expect(mailer.sent).toHaveLength(0);
+  });
+
   it('sự kiện chưa có việc thì chỉ ghi log đã nhận', async () => {
     const mailer = new MemoryMailer();
     const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
