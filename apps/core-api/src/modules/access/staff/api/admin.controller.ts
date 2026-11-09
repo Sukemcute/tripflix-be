@@ -25,6 +25,8 @@ import { StaffUseCases } from '../application/staff.use-cases.js';
 import {
   AdminUserDto,
   AdminUserPageDto,
+  CreateUserDto,
+  CreateUserRequestSchema,
   GrantStaffDto,
   GrantStaffRequestSchema,
   SearchUsersQuerySchema,
@@ -68,6 +70,20 @@ export class AdminController {
     @Query(new ZodBody(SearchUsersQuerySchema)) query: z.infer<typeof SearchUsersQuerySchema>,
   ) {
     return this.staff.searchUsers(actor, query);
+  }
+
+  /** Tạo tài khoản nhân sự mới (chỉ superadmin). */
+  @Post('users')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('superadmin')
+  @ApiBody({ type: CreateUserDto })
+  @ApiOkResponse({ type: AdminUserDto })
+  createStaff(
+    @CurrentUser() actor: AuthUser,
+    @Body(new ZodBody(CreateUserRequestSchema)) body: z.infer<typeof CreateUserRequestSchema>,
+    @Req() req: Request,
+  ) {
+    return this.staff.createStaff(actor, body, readRequestMeta(req));
   }
 
   /** Cấp quyền kiểm duyệt viên. Mọi phiên của người đó bị thu hồi để token mang role mới. */
