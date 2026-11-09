@@ -50,9 +50,10 @@ WEB_APP_URL=
 CORE_API_TAG=develop
 NOTIFICATION_TAG=develop
 
-# Tóm tắt AI (profile ai, deploy/SERVER.md Giai đoạn 5). Secret tạo bằng auth:create-service-client.
+# AI (profile ai, deploy/SERVER.md Giai đoạn 5): tóm tắt dùng DeepSeek, kiểm duyệt dùng OpenAI. Secret tạo bằng auth:create-service-client.
 AI_TAG=develop
 DEEPSEEK_API_KEY=
+OPENAI_API_KEY=
 AI_SERVICE_CLIENT_SECRET=
 ENV
 echo "Đã tạo $target (quyền 600). Còn phải điền AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY."

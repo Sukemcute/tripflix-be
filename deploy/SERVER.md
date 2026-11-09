@@ -139,9 +139,13 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
-## Giai đoạn 5: tóm tắt AI (TF14)
+## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt)
 
-Chỉ chạy `ai-summary-worker`, image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public). `ai-service` hiện chỉ có `/health` nên chưa cần. Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
+Hai service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-service` nhận `POST /moderate` từ core-api.
+
+### Tóm tắt bình luận
+
+Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
 
 1. Tạo service client, ghi secret thẳng vào `.env.server`, không in ra màn hình. Secret chỉ tạo được một lần; client `ai-service` đã có thì lệnh báo lỗi, khi đó hỏi người đang giữ secret.
 
@@ -161,6 +165,27 @@ dc --profile ai logs -f ai-summary-worker
 ```
 
 Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` rồi chạy lại lệnh `up`. Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
+
+### Kiểm duyệt (`ai-service`)
+
+core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway không có đường tới ai-service, nên chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 384 MB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
+
+1. Nhập key OpenAI thẳng vào `.env.server`, không gửi qua chat, không in ra màn hình:
+
+```bash
+cd ~/tripflix-be
+read -rs k && printf 'OPENAI_API_KEY=%s\n' "$k" >> deploy/.env.server && unset k
+grep -c '^OPENAI_API_KEY=.' deploy/.env.server   # 1 là đạt
+```
+
+2. Chạy, rồi gọi thử từ core-api không kèm token: `401` là ai-service chạy, core-api tới được và đã chặn người gọi lạ.
+
+```bash
+dc --profile ai up -d --wait ai-service
+dc --profile api exec -T core-api node -e "fetch('http://ai-service:8000/moderate',{method:'POST'}).then(r=>console.log(r.status))"
+```
+
+Thiếu key thì `/moderate` trả `503` và core giữ bước lọc regex. Thu hồi key: xoá dòng `OPENAI_API_KEY` rồi chạy lại lệnh `up`.
 
 ## Đăng nhập Google
 
