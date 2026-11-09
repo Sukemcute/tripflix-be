@@ -10,6 +10,8 @@ export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
 export interface ExploreStore extends ExploreSource {
   /** Thay toàn bộ chỉ mục trong một transaction. false = worker khác đang dựng, bỏ lượt này. */
   replaceAll(index: BuiltIndex): Promise<boolean>;
+  /** Xoá tài liệu theo id (`post:<uuid>`). Id không có trong chỉ mục thì bỏ qua. */
+  deleteDocuments(ids: string[]): Promise<void>;
 }
 
 /** Khách sạn cho tìm khám phá. Thật: CommerceFacade.listCatalog (CatalogHotel). */

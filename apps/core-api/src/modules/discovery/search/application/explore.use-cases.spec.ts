@@ -31,11 +31,19 @@ const post = (id: string, title: string, extra: Partial<ExplorePost> = {}): Expl
   ...extra,
 });
 
+/** Chỉ mục trong RAM: replaceAll và deleteDocuments đổi đúng tập tài liệu mà search đọc. */
 class FakeStore extends MemoryExploreSource implements ExploreStore {
   saved: BuiltIndex | null = null;
+  constructor(private readonly live: BuiltIndex) {
+    super(live);
+  }
   async replaceAll(index: BuiltIndex) {
     this.saved = index;
+    this.live.docs = [...index.docs];
     return true;
+  }
+  async deleteDocuments(ids: string[]) {
+    this.live.docs = this.live.docs.filter((d) => !ids.includes(d.id));
   }
 }
 
@@ -46,7 +54,7 @@ function setup(hotels: ExploreHotel[], posts: ExplorePost[], hidden: string[] = 
     listPosts: async () => ({ items: posts, nextCursor: null }),
     findVisiblePostIds: async (ids) => new Set(ids.filter((id) => !hidden.includes(id))),
   };
-  return { store, explore: new ExploreUseCases(store, catalog) };
+  return { store, catalog, explore: new ExploreUseCases(store, catalog) };
 }
 
 describe('ExploreUseCases', () => {
@@ -102,5 +110,52 @@ describe('ExploreUseCases', () => {
     const { explore, store } = setup([hotel('H1', 'A', 'Huế')], [post('P1', 'B')]);
     expect(await explore.rebuildIndex()).toBe(2);
     expect(store.saved!.docs.map((d) => d.id)).toEqual(['hotel:H1', 'post:P1']);
+  });
+
+  describe('TF33: gỡ bài ẩn khỏi chỉ mục', () => {
+    const trip = { destinationName: 'Đà Nẵng', daysCount: 3, estimatedCostPerPerson: 2_500_000 };
+    const plans = [post('P1', 'Trọn bộ lịch trình Đà Nẵng 3N2Đ', { tripAttachment: trip }), post('P2', 'Lịch trình Đà Nẵng 3 ngày', { tripAttachment: trip })];
+    const planTotal = async (explore: ExploreUseCases) =>
+      (await explore.search({ q: 'lịch trình đà nẵng 3n2đ' })).sections.find((s) => s.kind === 'plan')!.total;
+
+    it('ẩn bài rồi dropHidden: total giảm ngay, gọi lại vẫn vậy', async () => {
+      const hidden: string[] = [];
+      const { explore } = setup([], plans, hidden);
+      expect(await planTotal(explore)).toBe(2);
+      hidden.push('P2');
+      expect(await planTotal(explore)).toBe(2); // chưa gỡ: total còn dư bài ẩn (lỗi cũ)
+      expect(await explore.dropHidden(['P2'])).toBe(1);
+      expect(await planTotal(explore)).toBe(1);
+      await explore.dropHidden(['P2']);
+      expect(await planTotal(explore)).toBe(1);
+    });
+
+    it('bài còn hiện (vd vừa restore) thì không bị gỡ', async () => {
+      const { explore } = setup([], plans);
+      expect(await explore.dropHidden(['P1', 'P2'])).toBe(0);
+      expect(await planTotal(explore)).toBe(2);
+    });
+
+    it('bài bị ẩn sau lúc job đọc mà bị ghi lại vẫn bị gỡ ngay sau khi dựng xong', async () => {
+      const hidden: string[] = [];
+      const { explore, store, catalog } = setup([], plans, hidden);
+      catalog.listPosts = async () => {
+        const page = { items: plans, nextCursor: null }; // job đọc lúc P2 còn hiện
+        hidden.push('P2'); // admin ẩn P2 ngay sau đó
+        return page;
+      };
+      expect(await explore.rebuildIndex()).toBe(2);
+      expect(store.saved!.docs.map((d) => d.id)).toContain('post:P2'); // replaceAll đã ghi lại P2
+      expect(await planTotal(explore)).toBe(1);
+    });
+
+    it('dọn sau khi dựng lỗi thì vẫn giữ chỉ mục mới', async () => {
+      const { explore, store, catalog } = setup([], plans);
+      catalog.findVisiblePostIds = async () => {
+        throw new Error('content down');
+      };
+      expect(await explore.rebuildIndex()).toBe(2);
+      expect(store.saved!.docs).toHaveLength(2);
+    });
   });
 });
