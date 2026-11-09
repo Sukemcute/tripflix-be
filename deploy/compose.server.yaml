@@ -78,7 +78,7 @@ services:
   # ---------- Giai đoạn 2: core-api ----------
   migrate:
     profiles: [api]
-    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${IMAGE_TAG:-develop}
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${CORE_API_TAG:-${IMAGE_TAG:-develop}}
     logging: *logging
     command: ['node', 'dist/cli/migrate.js']
     environment: *core-env
@@ -87,7 +87,7 @@ services:
 
   core-api:
     profiles: [api]
-    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${IMAGE_TAG:-develop}
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${CORE_API_TAG:-${IMAGE_TAG:-develop}}
     restart: unless-stopped
     logging: *logging
     environment:
@@ -110,7 +110,7 @@ services:
   # Profile riêng, bật khi đã có SMTP_URL; thiếu thì service dừng lúc khởi động với lỗi rõ ràng, profile khác chạy như cũ.
   notification-service:
     profiles: [mail]
-    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/notification-service:${IMAGE_TAG:-develop}
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/notification-service:${NOTIFICATION_TAG:-${IMAGE_TAG:-develop}}
     restart: unless-stopped
     logging: *logging
     environment:
@@ -135,6 +135,37 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+
+  # ---------- Giai đoạn 5: tóm tắt AI (TF14, repo tripflix-ai) ----------
+  # Chỉ chạy worker: ai-service hiện chỉ có /health, app đọc tóm tắt qua core-api.
+  # Worker nghe bình luận trên stream:core.content, gom 60 giây mỗi bài rồi gọi DeepSeek, ghi kết quả về core-api
+  # bằng service token (client ai-service, deploy/SERVER.md mục Tóm tắt AI). Lần đầu chạy đọc lại cả sự kiện cũ trong stream.
+  # Bộ phân loại bình luận cần ~2 nhân và ~820 MB RAM với 2 luồng. Máy chỉ 2 vCPU dùng chung với core-api,
+  # nên mặc định giới hạn 1 nhân, 1 luồng; số luồng phải bằng số nhân được cấp.
+  ai-summary-worker:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.summary_worker']
+    environment:
+      CORE_API_URL: http://core-api:3000
+      REDIS_URL: redis://redis:6379
+      # Thiếu key thì worker dừng lúc khởi động với lỗi DEEPSEEK_API_KEY is empty.
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      LLM_MODEL: ${LLM_MODEL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      SERVICE_CLIENT_ID: ai-service
+      SERVICE_CLIENT_SECRET: ${AI_SERVICE_CLIENT_SECRET:-}
+      # true = không gọi DeepSeek (tắt khẩn cấp, ví dụ khi tốn tiền bất thường).
+      SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
+      CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
+      LOG_LEVEL: INFO
+    cpus: ${AI_WORKER_CPUS:-1}
+    mem_limit: 1536m
+    depends_on:
+      redis: { condition: service_healthy }
 
   # Dữ liệu mẫu, chạy tay một lần. Image production không có file seed và cli/seed chặn NODE_ENV=production,
   # nên service này build stage dev từ mã nguồn trên server.

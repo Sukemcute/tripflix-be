@@ -139,6 +139,29 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
+## Giai đoạn 5: tóm tắt AI (TF14)
+
+Chỉ chạy `ai-summary-worker`, image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public). `ai-service` hiện chỉ có `/health` nên chưa cần. Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
+
+1. Tạo service client, ghi secret thẳng vào `.env.server`, không in ra màn hình. Secret chỉ tạo được một lần; client `ai-service` đã có thì lệnh báo lỗi, khi đó hỏi người đang giữ secret.
+
+```bash
+cd ~/tripflix-be
+dc --profile api run --rm --no-deps -T core-api node dist/cli/service-client.js create ai-service core-api \
+  | sed -n 's/^SERVICE_CLIENT_SECRET=/AI_SERVICE_CLIENT_SECRET=/p' >> deploy/.env.server
+grep -c '^AI_SERVICE_CLIENT_SECRET=.' deploy/.env.server   # 1 là đạt
+```
+
+2. Trong `.env.server` cần `DEEPSEEK_API_KEY` (không gửi qua chat) và `AI_TAG=sha-<7 ký tự>`. Ghim `AI_TAG` thì thêm tag đó vào `GHCR_KEEP_TAGS` của repo `tripflix-ai`.
+3. Chạy và xem log:
+
+```bash
+dc --profile ai up -d ai-summary-worker
+dc --profile ai logs -f ai-summary-worker
+```
+
+Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` rồi chạy lại lệnh `up`. Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
+
 ## Đăng nhập Google
 
 Backend kiểm ID token của Google theo `GOOGLE_CLIENT_IDS`. Web gắn `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vào bundle lúc build. Thiếu một trong hai thì không đăng nhập bằng Google được: backend trả `503`, web không hiện nút.
@@ -168,7 +191,9 @@ dc --profile api logs -f core-api
 dc --profile api --profile gateway --profile mail pull && dc --profile api --profile gateway --profile mail up -d --wait   # cập nhật bản mới, migrate chạy lại trước API
 ```
 
-`IMAGE_TAG` trong `.env.server` chọn bản chạy. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy.
+`CORE_API_TAG` (core-api và migrate) và `NOTIFICATION_TAG` (notification-service) trong `.env.server` chọn bản chạy. Mỗi app một biến vì CI chỉ build image của app có thay đổi, nên sha mới nhất của app này có thể không có ở app kia. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy. Biến nào chưa đặt thì dùng `IMAGE_TAG` cũ, không có cả hai thì dùng `develop`.
+
+Đổi bản ghim thì cập nhật luôn biến repo `GHCR_KEEP_TAGS` (Settings → Secrets and variables → Actions → Variables), để workflow dọn GHCR hằng tuần không xoá bản đang chạy. Nhiều tag cách nhau bằng dấu cách.
 
 `docker compose down -v` xoá luôn database. Chưa có backup thì không chạy lệnh này trên server.
 

@@ -46,7 +46,13 @@ SMTP_URL=
 MAIL_FROM=Tripflix <no-reply@tripflix.io.vn>
 WEB_APP_URL=
 
-# Tag image trên GHCR; nên đổi sang sha-<7 ký tự> để biết chính xác bản đang chạy.
-IMAGE_TAG=develop
+# Tag image trên GHCR, mỗi app một biến vì CI chỉ build app có thay đổi. Nên đổi sang sha-<7 ký tự> để biết chính xác bản đang chạy.
+CORE_API_TAG=develop
+NOTIFICATION_TAG=develop
+
+# Tóm tắt AI (profile ai, deploy/SERVER.md Giai đoạn 5). Secret tạo bằng auth:create-service-client.
+AI_TAG=develop
+DEEPSEEK_API_KEY=
+AI_SERVICE_CLIENT_SECRET=
 ENV
 echo "Đã tạo $target (quyền 600). Còn phải điền AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY."
