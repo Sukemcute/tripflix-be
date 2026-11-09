@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { NEW_PASSWORD_MAX, PASSWORD_MAX, PASSWORD_MIN } from '../domain/credentials.js';
 import { isCommonRegistrationPassword, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
+import { isKnownCountry } from '../../account/domain/countries.js';
+import { GENDERS, isAllowedAge, MAX_AGE, MIN_AGE } from '../../account/domain/personal-info.js';
 import {
   DEVICE_NAME_MAX,
   DISPLAY_NAME_MAX,
@@ -103,6 +105,22 @@ export const displayNameField = () =>
     .max(DISPLAY_NAME_MAX, `Tên hiển thị tối đa ${DISPLAY_NAME_MAX} ký tự`)
     .refine((v) => !hasControlChars(v), { message: 'Tên hiển thị chỉ được viết trên một dòng', ...whenValid })
     .refine(hasVisibleChar, { message: 'Tên hiển thị không được để trống', ...whenValid });
+
+/** Ngày sinh YYYY-MM-DD, tuổi tính theo ngày hiện tại khi gọi API (dùng khi đăng ký và khi sửa hồ sơ). */
+export const dateOfBirthField = () =>
+  z.iso
+    .date('Ngày sinh không hợp lệ (YYYY-MM-DD)')
+    .refine((d) => isAllowedAge(d, new Date()), { message: `Tuổi phải từ ${MIN_AGE} đến ${MAX_AGE}`, ...whenValid });
+
+export const genderField = () => z.enum(GENDERS, 'Giới tính là male, female hoặc other');
+
+/** Mã quốc gia ISO 3166-1 alpha-2; nhận chữ thường, khoảng trắng hai đầu. */
+export const nationalityField = () =>
+  z
+    .string('Quốc tịch là mã quốc gia 2 chữ cái (ví dụ VN)')
+    .trim()
+    .toUpperCase()
+    .refine(isKnownCountry, 'Quốc tịch là mã quốc gia 2 chữ cái (ví dụ VN)');
 
 /** Tên thiết bị do app gửi: bỏ ký tự điều khiển, tối đa 100 ký tự; trống thì coi như không gửi. */
 export const deviceNameField = () =>

@@ -5,6 +5,7 @@ import type {
   AccessStore,
   AuditEntry,
   NewSession,
+  NewUser,
   OneTimeTokenRepository,
   RegistrationChallenge,
   ProfilePatch,
@@ -24,16 +25,16 @@ export class MemoryAccessStore implements AccessStore {
   >();
   readonly auditRows: AuditEntry[] = [];
 
+  /** Mốc đồng ý điều khoản theo userId (UserRecord không mang trường này). */
+  readonly acceptedTerms = new Map<string, { version: string; acceptedAt: Date }>();
+
   readonly users = {
     findByEmail: async (email: string) => [...this.userRows.values()].find((u) => u.email === email) ?? null,
     findById: async (id: string) => this.userRows.get(id) ?? null,
     findByIds: async (ids: string[]) =>
       ids.map((id) => this.userRows.get(id)).filter((u): u is UserRecord => u !== undefined),
     lockById: async (id: string) => this.userRows.get(id) ?? null,
-    insert: async ({
-      emailVerifiedAt = null,
-      ...user
-    }: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null }) => {
+    insert: async ({ emailVerifiedAt = null, personal, terms, ...user }: NewUser) => {
       if ([...this.userRows.values()].some((u) => u.email === user.email)) return null;
       const row: UserRecord = {
         ...user,
@@ -41,8 +42,9 @@ export class MemoryAccessStore implements AccessStore {
         status: 'active',
         createdAt: new Date(),
         emailVerifiedAt,
-        personal: { phone: null, dateOfBirth: null, gender: null, nationality: null },
+        personal: { phone: null, dateOfBirth: null, gender: null, nationality: null, ...personal },
       };
+      if (terms) this.acceptedTerms.set(row.id, terms);
       this.userRows.set(row.id, row);
       return row;
     },

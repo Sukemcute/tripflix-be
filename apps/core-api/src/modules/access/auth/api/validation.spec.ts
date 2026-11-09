@@ -55,6 +55,10 @@ const register = (patch: Record<string, unknown>) => ({
   displayName: 'Lan',
   registrationId: '9784c96c-801f-4d05-b8ee-a6284bcf1935',
   code: '48162357',
+  dateOfBirth: '2000-05-20',
+  gender: 'female',
+  nationality: 'VN',
+  acceptTerms: true,
   ...patch,
 });
 
@@ -74,6 +78,10 @@ describe('TF05C: câu lỗi chung (accessErrorMap)', () => {
       { field: 'displayName', message: 'Thiếu trường này' },
       { field: 'registrationId', message: 'Yêu cầu gửi mã xác thực email trước khi đăng ký' },
       { field: 'code', message: 'Thiếu trường này' },
+      { field: 'dateOfBirth', message: 'Ngày sinh không hợp lệ (YYYY-MM-DD)' },
+      { field: 'gender', message: 'Giới tính là male, female hoặc other' },
+      { field: 'nationality', message: 'Quốc tịch là mã quốc gia 2 chữ cái (ví dụ VN)' },
+      { field: 'acceptTerms', message: 'Bạn cần đồng ý Điều khoản sử dụng và Chính sách bảo mật để đăng ký' },
     ]);
   });
 
@@ -264,7 +272,63 @@ describe('TF05C: đăng ký (RegisterRequestSchema)', () => {
       RegisterRequestSchema,
       register({ role: 'superadmin', status: 'active', id: 'x', passwordHash: 'y' }),
     );
-    expect(Object.keys(data).sort()).toEqual(['code', 'displayName', 'email', 'password', 'registrationId']);
+    expect(Object.keys(data).sort()).toEqual([
+      'acceptTerms',
+      'code',
+      'dateOfBirth',
+      'displayName',
+      'email',
+      'gender',
+      'nationality',
+      'password',
+      'registrationId',
+    ]);
+  });
+
+  describe('TF06O: thông tin cá nhân và đồng ý điều khoản khi đăng ký', () => {
+    it('quốc tịch nhận chữ thường, khoảng trắng hai đầu và chuẩn về mã in hoa', () => {
+      expect(ok(RegisterRequestSchema, register({ nationality: ' vn ' })).nationality).toBe('VN');
+    });
+
+    it('từ chối mã quốc gia không có thật hoặc sai dạng', () => {
+      for (const nationality of ['XX', 'VNM', 'V', '', 42]) {
+        expect(onlyError(RegisterRequestSchema, register({ nationality }), 'nationality')).toBe(
+          'Quốc tịch là mã quốc gia 2 chữ cái (ví dụ VN)',
+        );
+      }
+    });
+
+    it('giới tính chỉ nhận male, female, other', () => {
+      for (const gender of ['male', 'female', 'other']) ok(RegisterRequestSchema, register({ gender }));
+      for (const gender of ['Nam', 'MALE', '', null]) {
+        expect(onlyError(RegisterRequestSchema, register({ gender }), 'gender')).toBe(
+          'Giới tính là male, female hoặc other',
+        );
+      }
+    });
+
+    it('ngày sinh: sai dạng, ngày không có thật, tuổi ngoài giới hạn đều bị từ chối', () => {
+      for (const dateOfBirth of ['20/05/2000', '2000-02-30', '', null]) {
+        expect(onlyError(RegisterRequestSchema, register({ dateOfBirth }), 'dateOfBirth')).toBe(
+          'Ngày sinh không hợp lệ (YYYY-MM-DD)',
+        );
+      }
+      const nextYear = String(new Date().getFullYear() + 1);
+      expect(onlyError(RegisterRequestSchema, register({ dateOfBirth: `${nextYear}-01-01` }), 'dateOfBirth')).toMatch(
+        /^Tuổi phải từ \d+ đến \d+$/,
+      );
+      expect(onlyError(RegisterRequestSchema, register({ dateOfBirth: '1850-01-01' }), 'dateOfBirth')).toMatch(
+        /^Tuổi phải từ \d+ đến \d+$/,
+      );
+    });
+
+    it('phải tick đồng ý điều khoản: false, "true", thiếu đều bị từ chối', () => {
+      for (const acceptTerms of [false, 'true', 1, undefined]) {
+        expect(onlyError(RegisterRequestSchema, register({ acceptTerms }), 'acceptTerms')).toBe(
+          'Bạn cần đồng ý Điều khoản sử dụng và Chính sách bảo mật để đăng ký',
+        );
+      }
+    });
   });
 
   it('nhiều trường sai cùng lúc: báo đủ từng trường', () => {
