@@ -43,7 +43,9 @@ class FakeStore extends MemoryExploreSource implements ExploreStore {
     return true;
   }
   async deleteDocuments(ids: string[]) {
+    const before = this.live.docs.length;
     this.live.docs = this.live.docs.filter((d) => !ids.includes(d.id));
+    return before - this.live.docs.length;
   }
 }
 
@@ -118,7 +120,7 @@ describe('ExploreUseCases', () => {
     const planTotal = async (explore: ExploreUseCases) =>
       (await explore.search({ q: 'lịch trình đà nẵng 3n2đ' })).sections.find((s) => s.kind === 'plan')!.total;
 
-    it('ẩn bài rồi dropHidden: total giảm ngay, gọi lại vẫn vậy', async () => {
+    it('ẩn bài rồi dropHidden: total giảm ngay, gọi lại không gỡ thêm', async () => {
       const hidden: string[] = [];
       const { explore } = setup([], plans, hidden);
       expect(await planTotal(explore)).toBe(2);
@@ -126,7 +128,7 @@ describe('ExploreUseCases', () => {
       expect(await planTotal(explore)).toBe(2); // chưa gỡ: total còn dư bài ẩn (lỗi cũ)
       expect(await explore.dropHidden(['P2'])).toBe(1);
       expect(await planTotal(explore)).toBe(1);
-      await explore.dropHidden(['P2']);
+      expect(await explore.dropHidden(['P2'])).toBe(0); // đã gỡ rồi: báo 0 để log không ghi "Đã gỡ" lần nữa
       expect(await planTotal(explore)).toBe(1);
     });
 

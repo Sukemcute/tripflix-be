@@ -218,12 +218,14 @@ export class ExploreUseCases {
     return index.docs.length;
   }
 
-  /** Gỡ khỏi chỉ mục những bài trong postIds không còn hiện công khai. Gọi lại nhiều lần vẫn cho cùng kết quả. */
+  /**
+   * Gỡ khỏi chỉ mục những bài trong postIds không còn hiện công khai, trả số bài thật sự bị gỡ
+   * (0 nếu bài ẩn đã không còn trong chỉ mục). Gọi lại nhiều lần vẫn cho cùng chỉ mục.
+   */
   async dropHidden(postIds: string[]): Promise<number> {
     if (!postIds.length) return 0;
     const visible = await this.catalog.findVisiblePostIds(postIds);
     const hidden = postIds.filter((id) => !visible.has(id));
-    await this.store.deleteDocuments(hidden.map((id) => `post:${id}`));
-    return hidden.length;
+    return this.store.deleteDocuments(hidden.map((id) => `post:${id}`));
   }
 }
