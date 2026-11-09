@@ -28,6 +28,8 @@ export class DeleteCommentUseCase {
     if (!record) {
       throw new CommentNotFoundException(command.commentId);
     }
+    // Cùng thứ tự khóa với add/hide để không tạo phản hồi mới trong lúc cascade.
+    await this.postRepository.findByIdForUpdate(record.postId);
 
     const domainComment = new Comment({
       id: record.id,
@@ -50,7 +52,10 @@ export class DeleteCommentUseCase {
     }
 
     // Giảm bộ đếm comment của bài viết đúng bằng số bản ghi đã soft-delete
-    await this.postRepository.incrementCounter(record.postId, 'commentCount', -deletedRecords.length);
+    const visibleDeletedCount = deletedRecords.filter((rec) => rec.status === 'visible').length;
+    if (visibleDeletedCount > 0) {
+      await this.postRepository.incrementCounter(record.postId, 'commentCount', -visibleDeletedCount);
+    }
 
     // Ghi sự kiện outbox content.comment.deleted cho từng bản ghi bị xóa (phục vụ AI worker tóm tắt lại)
     for (const deletedRec of deletedRecords) {

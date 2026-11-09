@@ -51,7 +51,10 @@ export const AccessUserUnlockedV1Schema = z.object({ userId: z.uuid(), unlockedB
 export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 
 /** access.user.profile_updated v1: người dùng đổi tên hiển thị. Module nào lưu tên từ access.user.registered thì cập nhật theo. */
-export const AccessUserProfileUpdatedV1Schema = z.object({ userId: z.uuid(), displayName: z.string().min(1) });
+export const AccessUserProfileUpdatedV1Schema = z.object({
+  userId: z.uuid(),
+  displayName: z.string().min(1),
+});
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 
 /**
@@ -86,7 +89,9 @@ export const CommerceOrderPaidV1Schema = z.object({
         .optional(),
     }),
   ),
-  guests: z.array(z.object({ fullName: z.string(), passengerType: z.enum(['adult', 'child', 'infant']).nullable() })).optional(),
+  guests: z
+    .array(z.object({ fullName: z.string(), passengerType: z.enum(['adult', 'child', 'infant']).nullable() }))
+    .optional(),
   confirmationCode: z.string().nullable().optional(),
   contactName: z.string().nullable().optional(),
   contactEmail: z.string().nullable().optional(),
@@ -231,7 +236,9 @@ export const AccessRegistrationAttemptedExistingV1Schema = z.object({
   displayName: z.string().min(1),
   hasPassword: z.boolean(),
 });
-export type AccessRegistrationAttemptedExistingV1 = z.infer<typeof AccessRegistrationAttemptedExistingV1Schema>;
+export type AccessRegistrationAttemptedExistingV1 = z.infer<
+  typeof AccessRegistrationAttemptedExistingV1Schema
+>;
 
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
@@ -250,7 +257,51 @@ export const ContentMediaFailedV1Schema = z.object({
 export type ContentMediaFailedV1 = z.infer<typeof ContentMediaFailedV1Schema>;
 
 /** Các schema được xuất ra contracts/events/*.schema.json cho repo khác dùng. */
+export const ContentCommentHiddenV1Schema = z.object({
+  postId: z.uuid(),
+  commentId: z.uuid(),
+  authorId: z.uuid(),
+});
+export const ContentCommentRestoredV1Schema = ContentCommentHiddenV1Schema;
+export const ContentPostHiddenV1Schema = z.object({
+  postId: z.uuid(),
+  authorId: z.uuid(),
+  previousStatus: z.string(),
+  postStatus: z.string(),
+  actionId: z.uuid(),
+  reasonCode: z.string(),
+  hiddenAt: z.iso.datetime(),
+});
+export const ContentPostRestoredV1Schema = ContentPostHiddenV1Schema;
+export const ContentModerationDecidedV1Schema = z.object({
+  caseId: z.uuid(),
+  targetType: z.enum(['post', 'comment']),
+  targetId: z.uuid(),
+  postId: z.uuid(),
+  authorId: z.uuid(),
+  action: z.enum(['hide', 'restore', 'remove', 'dismiss']),
+  reasonCode: z.string(),
+  isAutomatic: z.boolean(),
+});
+export const ContentReportCreatedV1Schema = z.object({
+  reportId: z.uuid(),
+  caseId: z.uuid(),
+  targetType: z.enum(['post', 'comment']),
+  targetId: z.uuid(),
+  postId: z.uuid(),
+  reasonCode: z.string(),
+});
+export type ContentModerationDecidedV1 = z.infer<typeof ContentModerationDecidedV1Schema>;
+export type ContentCommentHiddenV1 = z.infer<typeof ContentCommentHiddenV1Schema>;
+export type ContentCommentRestoredV1 = z.infer<typeof ContentCommentRestoredV1Schema>;
+
 export const exportedSchemas: Record<string, z.ZodType> = {
+  'content.comment.hidden.v1': ContentCommentHiddenV1Schema,
+  'content.comment.restored.v1': ContentCommentRestoredV1Schema,
+  'content.post.hidden.v1': ContentPostHiddenV1Schema,
+  'content.post.restored.v1': ContentPostRestoredV1Schema,
+  'content.moderation.decided.v1': ContentModerationDecidedV1Schema,
+  'content.report.created.v1': ContentReportCreatedV1Schema,
   'event-envelope.v1': eventEnvelopeSchema,
   'role.v1': roleSchema,
   'access.user.registered.v1': AccessUserRegisteredV1Schema,

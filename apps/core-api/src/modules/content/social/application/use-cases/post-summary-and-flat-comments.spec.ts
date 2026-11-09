@@ -56,12 +56,15 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       findById: vi.fn().mockResolvedValue(mockPost),
       incrementCounter: vi.fn().mockResolvedValue(undefined),
     };
+    mockPostRepo.findByIdForUpdate = mockPostRepo.findById;
     mockCommentRepo = {
       create: vi.fn(),
       findById: vi.fn(),
       findByPostId: vi.fn().mockResolvedValue([]),
       countByPostId: vi.fn().mockResolvedValue(0),
       hasDiscussionChangedSince: vi.fn().mockResolvedValue(false),
+      hasUnavailableSince: vi.fn().mockResolvedValue(false),
+      findVisibleIds: vi.fn().mockResolvedValue([]),
     };
     mockPostSummaryRepo = {
       findByPostId: vi.fn(),
@@ -239,6 +242,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         content: null,
         safety: null,
         inputHash: 'hash-abc',
+        sourceCommentIds: null,
         commentCountAtSummary: 25,
         promptVersion: null,
         modelName: null,
@@ -298,7 +302,13 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const result = await useCase.execute(postId);
 
       // post có commentCount: 5 và summary có commentCountAtSummary: 5, thảo luận không đổi -> isStale: false
-      expect(result).toEqual({ ...mockSummaryRecord, isStale: false });
+      expect(result).toEqual({
+        ...mockSummaryRecord,
+        content: undefined,
+        safety: undefined,
+        sourceCommentIds: null,
+        isStale: false,
+      });
     });
 
     it('bật isStale: true khi có comment mới hoặc comment cũ bị sửa nội dung sau thời điểm generatedAt', async () => {
@@ -320,7 +330,13 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const result = await useCase.execute(postId);
 
       // Thảo luận đã bị sửa đổi sau generatedAt -> isStale: true
-      expect(result).toEqual({ ...mockSummaryRecord, isStale: true });
+      expect(result).toEqual({
+        ...mockSummaryRecord,
+        content: undefined,
+        safety: undefined,
+        sourceCommentIds: null,
+        isStale: true,
+      });
     });
 
     it('từ chối xem tóm tắt nếu bài viết ở trạng thái draft và người xem không phải tác giả', async () => {
@@ -352,8 +368,9 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         commentCountAtSummary: 5,
         generatedAt: null,
       });
-      const useCase = new GetPostSummaryUseCase(mockPostRepo, mockPostSummaryRepo);
+      const useCase = new GetPostSummaryUseCase(mockPostRepo, mockPostSummaryRepo, mockCommentRepo);
 
+      mockCommentRepo.findVisibleIds.mockResolvedValue(['c1', 'c2']);
       const forGuest = await useCase.execute({ postId });
       const forMember = await useCase.execute({ postId, viewerId: 'member-1' });
       const forModerator = await useCase.execute({ postId, viewerId: 'mod-1', isStaff: true });

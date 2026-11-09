@@ -22,10 +22,7 @@ import {
 } from '../index.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
-import type {
-  PostRecord,
-  CommentRecord,
-} from '../../../db/schema/index.js';
+import type { PostRecord, CommentRecord } from '../../../db/schema/index.js';
 
 describe('Social Application Use Cases', () => {
   beforeAll(async () => {
@@ -97,6 +94,7 @@ describe('Social Application Use Cases', () => {
       incrementCounter: vi.fn(),
       updateReactionCounts: vi.fn(),
     };
+    mockPostRepo.findByIdForUpdate = mockPostRepo.findById;
     mockCommentRepo = {
       create: vi.fn(),
       findById: vi.fn(),
@@ -265,11 +263,7 @@ describe('Social Application Use Cases', () => {
       mockReactionRepo.findByPostAndUser.mockResolvedValue({ type: 'like' });
       mockBookmarkRepo.isBookmarked.mockResolvedValue(true);
 
-      const useCase = new GetPostDetailUseCase(
-        mockPostRepo,
-        mockReactionRepo,
-        mockBookmarkRepo,
-      );
+      const useCase = new GetPostDetailUseCase(mockPostRepo, mockReactionRepo, mockBookmarkRepo);
 
       const result = await useCase.execute({ postId, viewerId: otherUserId });
 
@@ -291,11 +285,7 @@ describe('Social Application Use Cases', () => {
         reactionTotal: 1,
       });
 
-      const useCase = new SetReactionUseCase(
-        mockPostRepo,
-        mockReactionRepo,
-        mockOutbox,
-      );
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
 
       const result = await useCase.execute({ postId, userId: otherUserId, type: 'like' });
 
@@ -325,11 +315,7 @@ describe('Social Application Use Cases', () => {
         reactionTotal: 0,
       });
 
-      const useCase = new SetReactionUseCase(
-        mockPostRepo,
-        mockReactionRepo,
-        mockOutbox,
-      );
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
 
       const result = await useCase.execute({ postId, userId: otherUserId, type: null });
 
@@ -346,6 +332,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-1',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Bài viết hay quá!',
         likeCount: 0,
@@ -358,11 +347,7 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(post);
       mockCommentRepo.create.mockResolvedValue(commentRecord);
 
-      const useCase = new AddCommentUseCase(
-        mockPostRepo,
-        mockCommentRepo,
-        mockOutbox,
-      );
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
 
       const result = await useCase.execute({
         postId,
@@ -407,6 +392,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-own',
         postId,
         authorId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Tác giả tự bình luận',
         likeCount: 0,
@@ -437,6 +425,9 @@ describe('Social Application Use Cases', () => {
         id: 'reply-1',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: 'root-comment-id',
         body: 'Đây là câu trả lời',
         likeCount: 0,
@@ -449,11 +440,7 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(post);
       mockCommentRepo.findById.mockResolvedValue(parentReplyRecord);
 
-      const useCase = new AddCommentUseCase(
-        mockPostRepo,
-        mockCommentRepo,
-        mockOutbox,
-      );
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
 
       await expect(
         useCase.execute({
@@ -470,6 +457,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-1',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Nội dung ban đầu',
         likeCount: 0,
@@ -521,6 +511,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-1',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Bình luận sắp xóa',
         likeCount: 0,
@@ -559,6 +552,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-root',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Bình luận gốc có phản hồi',
         likeCount: 0,
@@ -572,6 +568,9 @@ describe('Social Application Use Cases', () => {
         id: 'reply-1',
         postId,
         authorId: authorId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: 'comm-root',
         body: 'Phản hồi 1',
         likeCount: 0,
@@ -585,6 +584,9 @@ describe('Social Application Use Cases', () => {
         id: 'reply-2',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: 'comm-root',
         body: 'Phản hồi 2',
         likeCount: 0,
@@ -595,11 +597,7 @@ describe('Social Application Use Cases', () => {
       };
 
       mockCommentRepo.findById.mockResolvedValue(rootCommentRecord);
-      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([
-        rootCommentRecord,
-        childReply1,
-        childReply2,
-      ]);
+      mockCommentRepo.softDeleteWithReplies.mockResolvedValue([rootCommentRecord, childReply1, childReply2]);
 
       const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
       const result = await useCase.execute({ commentId: 'comm-root', userId: otherUserId });
@@ -615,6 +613,9 @@ describe('Social Application Use Cases', () => {
         id: 'comm-race',
         postId,
         authorId: otherUserId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Bình luận sắp xóa',
         likeCount: 0,
@@ -628,9 +629,7 @@ describe('Social Application Use Cases', () => {
       mockCommentRepo.softDeleteWithReplies.mockResolvedValue([]); // Đua lệnh: request khác đã xóa trước
 
       const useCase = new DeleteCommentUseCase(mockCommentRepo, mockPostRepo, mockOutbox);
-      await expect(
-        useCase.execute({ commentId: 'comm-race', userId: otherUserId }),
-      ).rejects.toThrow();
+      await expect(useCase.execute({ commentId: 'comm-race', userId: otherUserId })).rejects.toThrow();
       expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
     });
   });
@@ -638,9 +637,7 @@ describe('Social Application Use Cases', () => {
   describe('Bookmark & Share Use Cases', () => {
     it('bookmark bài viết tăng bookmarkCount', async () => {
       const post = samplePostRecord({ status: 'published', bookmarkCount: 5 });
-      mockPostRepo.findById
-        .mockResolvedValueOnce(post)
-        .mockResolvedValueOnce({ ...post, bookmarkCount: 6 });
+      mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, bookmarkCount: 6 });
       mockBookmarkRepo.isBookmarked.mockResolvedValue(false);
 
       const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
@@ -654,9 +651,7 @@ describe('Social Application Use Cases', () => {
 
     it('ghi nhận lượt chia sẻ tăng shareCount và ghi outbox content.post.shared', async () => {
       const post = samplePostRecord({ status: 'published', shareCount: 10 });
-      mockPostRepo.findById
-        .mockResolvedValueOnce(post)
-        .mockResolvedValueOnce({ ...post, shareCount: 11 });
+      mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, shareCount: 11 });
 
       const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox);
       const result = await useCase.execute({ postId, userId: otherUserId });
@@ -694,11 +689,7 @@ describe('Social Application Use Cases', () => {
         createdAt: new Date(),
       });
 
-      const useCase = new AdminModeratePostUseCase(
-        mockPostRepo,
-        mockModerationRepo,
-        mockOutbox,
-      );
+      const useCase = new AdminModeratePostUseCase(mockPostRepo, mockModerationRepo, mockOutbox);
 
       const result = await useCase.execute({
         postId,

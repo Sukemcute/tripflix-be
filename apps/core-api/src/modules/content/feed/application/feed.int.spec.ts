@@ -1,6 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createDb, createPool } from '@tripflix/db';
+import {
+  MODULES,
+  buildDrizzleToken,
+  buildTransactionHostToken,
+  createDb,
+  createPool,
+  createTransactionalPlugins,
+  type ModuleTransactionHost,
+} from '@tripflix/db';
+import { Global, Module } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { ClsModule } from 'nestjs-cls';
+import { OutboxWriter } from '@tripflix/outbox';
+import { contentOutboxEvents } from '../../db/schema/index.js';
+import { ModerationRepository } from '../../moderation/infra/moderation.repository.js';
+import { ChangeVisibilityUseCase } from '../../moderation/application/change-visibility.use-case.js';
+import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
+import { DeleteCommentUseCase } from '../../social/application/use-cases/delete-comment.use-case.js';
+import { PostRepository } from '../../social/infra/post.repository.js';
+import { CommentRepository } from '../../social/infra/comment.repository.js';
+import { ModerationActionRepository } from '../../social/infra/moderation-action.repository.js';
 import { InMemoryObjectStorage } from '@tripflix/storage';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import type pg from 'pg';
@@ -18,6 +38,9 @@ describe('Feed trên Postgres thật', () => {
   let postgres: PostgresFixture;
   let pool: pg.Pool;
   let feed: FeedUseCases;
+  let moduleRef: TestingModule;
+  let visibility: ChangeVisibilityUseCase;
+  let deleteComment: DeleteCommentUseCase;
 
   async function insertAsset(status: string, levels: number[] = []): Promise<string> {
     const id = randomUUID();
@@ -25,7 +48,14 @@ describe('Feed trên Postgres thật', () => {
     await pool.query(
       `insert into content.media_assets (id, owner_id, status, mime_type, file_size_bytes, source_key, hls_prefix, aspect, duration_sec)
        values ($1, $2, $3, 'video/mp4', 1, $4, $5, $6, 40)`,
-      [id, OWNER_ID, status, `dev/test/uploads/${id}/original.mp4`, ready ? `dev/test/videos/${id}/r1` : null, ready ? '9:16' : null],
+      [
+        id,
+        OWNER_ID,
+        status,
+        `dev/test/uploads/${id}/original.mp4`,
+        ready ? `dev/test/videos/${id}/r1` : null,
+        ready ? '9:16' : null,
+      ],
     );
     for (const level of levels) {
       await pool.query('insert into content.renditions (asset_id, level) values ($1, $2)', [id, level]);
@@ -33,7 +63,10 @@ describe('Feed trên Postgres thật', () => {
     return id;
   }
 
-  async function insertPost(mediaIds: string[], options: { status?: string; visibility?: string; createdAt?: string; deleted?: boolean } = {}) {
+  async function insertPost(
+    mediaIds: string[],
+    options: { status?: string; visibility?: string; createdAt?: string; deleted?: boolean } = {},
+  ) {
     const id = randomUUID();
     await pool.query(
       `insert into content.posts (id, author_id, post_type, title, status, visibility, media_ids, created_at, deleted_at)
@@ -73,9 +106,35 @@ describe('Feed trên Postgres thật', () => {
     });
     pool = createPool({ url, max: 3, applicationName: 'feed-int-test' });
     const db = createDb(pool);
+    @Global()
+    @Module({
+      providers: MODULES.map((name) => ({ provide: buildDrizzleToken(name), useValue: db })),
+      exports: MODULES.map(buildDrizzleToken),
+    })
+    class TestDrizzleModule {}
+    moduleRef = await Test.createTestingModule({
+      imports: [
+        TestDrizzleModule,
+        ClsModule.forRoot({ global: true, plugins: createTransactionalPlugins([TestDrizzleModule]) }),
+      ],
+    }).compile();
+    await moduleRef.init();
+    const tx = moduleRef.get<ModuleTransactionHost>(buildTransactionHostToken('content'));
+    const posts = new PostRepository(() => tx.tx);
+    const outbox = new OutboxWriter(() => tx.tx, contentOutboxEvents, 'core-api/content');
+    visibility = new ChangeVisibilityUseCase(
+      new ModerationRepository(() => tx.tx),
+      posts,
+      outbox,
+      new AdminModeratePostUseCase(posts, new ModerationActionRepository(() => tx.tx), outbox),
+    );
+    deleteComment = new DeleteCommentUseCase(new CommentRepository(() => tx.tx), posts, outbox);
     feed = new FeedUseCases(
       new DrizzleFeedStore(() => db),
-      new MediaFacade(new DrizzleMediaAssetStore(() => db), new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' })),
+      new MediaFacade(
+        new DrizzleMediaAssetStore(() => db),
+        new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' }),
+      ),
     );
   }, 120_000);
 
@@ -84,6 +143,7 @@ describe('Feed trên Postgres thật', () => {
   });
 
   afterAll(async () => {
+    await moduleRef?.close();
     await pool?.end();
     await postgres?.stop();
   });
@@ -130,7 +190,62 @@ describe('Feed trên Postgres thật', () => {
   });
 
   describe('tab hot', () => {
-    async function setCounts(postId: string, counts: { likes?: number; comments?: number; saves?: number; shares?: number }) {
+    it('hai bài cùng điểm: ẩn bình luận làm đổi thứ tự hot; xoá bình luận hidden không đổi bộ đếm', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const first = await insertPost([asset], { createdAt: '2026-11-05T00:00:00Z' });
+      const second = await insertPost([asset], { createdAt: '2026-11-04T00:00:00Z' });
+      await setCounts(first, { comments: 1 });
+      await setCounts(second, { comments: 1 });
+      const commentId = randomUUID();
+      await pool.query(
+        "insert into content.comments (id, post_id, author_id, body) values ($1,$2,$3,'Bình luận')",
+        [commentId, first, OWNER_ID],
+      );
+      await expect(readHotPages(20)).resolves.toEqual([first, second]);
+      await visibility.execute({
+        targetType: 'comment',
+        targetId: commentId,
+        action: 'hide',
+        actorId: OWNER_ID,
+        actorType: 'staff',
+        reasonCode: 'HARASSMENT',
+      });
+      await expect(readHotPages(20)).resolves.toEqual([second, first]);
+      await deleteComment.execute({ commentId, userId: OWNER_ID });
+      expect(
+        (await pool.query('select comment_count from content.posts where id=$1', [first])).rows[0]
+          .comment_count,
+      ).toBe(0);
+      await expect(readHotPages(20)).resolves.toEqual([second, first]);
+    });
+    it('ẩn bài loại khỏi cả for_you và hot ngay sau transaction', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const postId = await insertPost([asset]);
+      for (const tab of ['for_you', 'hot'] as const)
+        expect(
+          (await feed.getPage({ tab, limit: 20, after: null, viewerId: null })).items.map(
+            (item) => item.postId,
+          ),
+        ).toContain(postId);
+      await visibility.execute({
+        targetType: 'post',
+        targetId: postId,
+        action: 'hide',
+        actorId: OWNER_ID,
+        actorType: 'staff',
+        reasonCode: 'OTHER',
+      });
+      for (const tab of ['for_you', 'hot'] as const)
+        expect(
+          (await feed.getPage({ tab, limit: 20, after: null, viewerId: null })).items.map(
+            (item) => item.postId,
+          ),
+        ).not.toContain(postId);
+    });
+    async function setCounts(
+      postId: string,
+      counts: { likes?: number; comments?: number; saves?: number; shares?: number },
+    ) {
       await pool.query(
         'update content.posts set reaction_total = $2, comment_count = $3, bookmark_count = $4, share_count = $5 where id = $1',
         [postId, counts.likes ?? 0, counts.comments ?? 0, counts.saves ?? 0, counts.shares ?? 0],
@@ -161,13 +276,21 @@ describe('Feed trên Postgres thật', () => {
       await setCounts(oneSave, { saves: 1 });
       await setCounts(oneComment, { comments: 1 });
 
-      await expect(readHotPages(20)).resolves.toEqual([oneShare, oneSave, threeLikes, oneComment, noEngagement]);
+      await expect(readHotPages(20)).resolves.toEqual([
+        oneShare,
+        oneSave,
+        threeLikes,
+        oneComment,
+        noEngagement,
+      ]);
     });
 
     it('sang trang không lặp, không rớt bài khi nhiều bài trùng điểm và trùng thời điểm', async () => {
       const asset = await insertAsset('ready', [360]);
       const createdAt = '2026-11-05T10:00:00.123456Z';
-      const sameScore = await Promise.all(Array.from({ length: 5 }, () => insertPost([asset], { createdAt })));
+      const sameScore = await Promise.all(
+        Array.from({ length: 5 }, () => insertPost([asset], { createdAt })),
+      );
       const top = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
       await setCounts(top, { likes: 10 });
 
@@ -208,7 +331,10 @@ describe('Feed trên Postgres thật', () => {
     const asset = await insertAsset('ready', [360]);
     const liked = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
     const saved = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
-    await pool.query(`insert into content.reactions (post_id, user_id, type) values ($1, $2, 'like')`, [liked, VIEWER_ID]);
+    await pool.query(`insert into content.reactions (post_id, user_id, type) values ($1, $2, 'like')`, [
+      liked,
+      VIEWER_ID,
+    ]);
     await pool.query('insert into content.bookmarks (post_id, user_id) values ($1, $2)', [saved, VIEWER_ID]);
 
     const viewerPage = await feed.getPage({ limit: 20, after: null, viewerId: VIEWER_ID });

@@ -25,6 +25,7 @@ import {
 import { PostSummaryController } from './post-summary.controller.js';
 import { GetPostSummaryUseCase, SavePostSummaryUseCase } from '../application/index.js';
 import { PostRepository } from '../infra/post.repository.js';
+import { CommentRepository } from '../infra/comment.repository.js';
 import { PostSummaryRepository } from '../infra/post-summary.repository.js';
 import type { PostRecord, PostSummaryRecord } from '../../db/schema/index.js';
 
@@ -44,6 +45,14 @@ class FakePlatformModule {}
 @Module({
   controllers: [PostSummaryController],
   providers: [
+    {
+      provide: CommentRepository,
+      useValue: {
+        hasDiscussionChangedSince: async () => false,
+        hasUnavailableSince: async () => false,
+        findVisibleIds: async (_postId: string, ids: string[]) => ids,
+      },
+    },
     {
       provide: PostRepository,
       useValue: {
@@ -90,6 +99,7 @@ class FakePlatformModule {}
             content: data.content ?? null,
             safety: data.safety ?? null,
             inputHash: data.inputHash ?? null,
+            sourceCommentIds: data.sourceCommentIds ?? null,
             commentCountAtSummary: data.commentCountAtSummary ?? 0,
             promptVersion: data.promptVersion ?? null,
             modelName: data.modelName ?? null,
@@ -115,9 +125,12 @@ class FakePlatformModule {}
     },
     {
       provide: GetPostSummaryUseCase,
-      inject: [PostRepository, PostSummaryRepository],
-      useFactory: (postRepo: PostRepository, summaryRepo: PostSummaryRepository) =>
-        new GetPostSummaryUseCase(postRepo, summaryRepo),
+      inject: [PostRepository, PostSummaryRepository, CommentRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        summaryRepo: PostSummaryRepository,
+        comments: CommentRepository,
+      ) => new GetPostSummaryUseCase(postRepo, summaryRepo, comments),
     },
   ],
 })
@@ -288,7 +301,11 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
   });
 
   it('token người dùng bị từ chối ở API @ServiceOnly: 401 Unauthorized', async () => {
-    await registerTestAccount(app, { email: 'member@example.com', password: 'mat-khau-an-toan-123', displayName: 'Thành' });
+    await registerTestAccount(app, {
+      email: 'member@example.com',
+      password: 'mat-khau-an-toan-123',
+      displayName: 'Thành',
+    });
 
     const userLogin = await http()
       .post('/api/auth/login')
@@ -349,6 +366,29 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
 
     const res = await http().get(`/api/v1/posts/${validPostId}/ai-summary`).expect(200);
     expect(res.body.safety).toEqual({ warnings });
+  });
+
+  it.each([undefined, [], ['11111111-1111-4111-8111-111111111111']])(
+    'sourceCommentIds roundtrip PUT/GET: %j',
+    async (sourceCommentIds) => {
+      const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+      await http()
+        .put(`/api/v1/posts/${validPostId}/ai-summary`)
+        .set(bearer(aiToken))
+        .send({ summary: 'Bản có metadata nguồn', sourceCommentIds, generatedAt: new Date().toISOString() })
+        .expect(200);
+      const result = await http().get(`/api/v1/posts/${validPostId}/ai-summary`).expect(200);
+      expect(result.body.sourceCommentIds).toEqual(sourceCommentIds ?? null);
+    },
+  );
+
+  it('sourceCommentIds sai UUID bị từ chối', async () => {
+    const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+    await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({ summary: 'Nguồn sai', sourceCommentIds: ['not-a-uuid'] })
+      .expect(400);
   });
 
   it('cho phép summary để trống khi status là no_comments hoặc insufficient_data: 200 OK', async () => {

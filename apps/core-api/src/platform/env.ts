@@ -30,14 +30,31 @@ function isOrigin(value: string): boolean {
 const WebOriginsSchema = z
   .string()
   .default(DEFAULT_WEB_ORIGINS.join(','))
-  .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean))
-  .pipe(z.array(z.string().refine(isOrigin, 'phải là origin dạng http(s)://host[:port], không có đường dẫn hay dấu / cuối')));
+  .transform((v) =>
+    v
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  )
+  .pipe(
+    z.array(
+      z
+        .string()
+        .refine(isOrigin, 'phải là origin dạng http(s)://host[:port], không có đường dẫn hay dấu / cuối'),
+    ),
+  );
 
 export const coreEnvSchema = baseEnvSchema
   .extend({
     APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
     PORT: z.coerce.number().int().positive().default(3000),
     REDIS_URL: z.string().default('redis://localhost:6379'),
+    AI_SERVICE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
+    CORE_API_INTERNAL_URL: z.url().default('http://localhost:3000'),
+    MODERATION_SERVICE_CLIENT_SECRET: OptionalStringSchema,
+    MODERATION_AI_THRESHOLD: z.coerce.number().min(0).max(1).default(0.8),
+    MODERATION_REPORT_THRESHOLD: z.coerce.number().int().min(1).default(3),
+    MODERATION_ALLOWED_DOMAINS: z.string().default('tripflix.vn,maps.google.com,maps.app.goo.gl'),
     DATABASE_URL_ACCESS: z.string(),
     DATABASE_URL_CONTENT: z.string(),
     DATABASE_URL_DISCOVERY: z.string(),
@@ -58,7 +75,12 @@ export const coreEnvSchema = baseEnvSchema
     GOOGLE_CLIENT_IDS: z
       .string()
       .default('')
-      .transform((v) => v.split(',').map((id) => id.trim()).filter(Boolean)),
+      .transform((v) =>
+        v
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
     GOOGLE_JWKS_URL: z.url().default(DEFAULT_GOOGLE_JWKS_URL),
     // Media trên S3. Có giá trị mặc định để máy chưa cấu hình AWS vẫn khởi động được; key AWS do SDK tự đọc.
     AWS_REGION: z.string().default('ap-southeast-2'),

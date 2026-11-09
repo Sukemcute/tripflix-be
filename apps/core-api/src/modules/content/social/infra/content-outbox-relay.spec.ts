@@ -35,6 +35,16 @@ describe('ContentOutboxRelay', () => {
     expect(streamFn({ type: 'content.comment.created' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.comment.updated' } as any)).toBe(STREAMS.content);
     expect(streamFn({ type: 'content.comment.deleted' } as any)).toBe(STREAMS.content);
+    for (const type of [
+      'content.comment.hidden',
+      'content.comment.restored',
+      'content.post.hidden',
+      'content.post.restored',
+      'content.moderation.decided',
+      'content.report.created',
+    ]) {
+      expect(streamFn({ type } as any)).toBe(STREAMS.content);
+    }
     expect(streamFn({ type: 'content.reaction.updated' } as any)).toBe(STREAMS.content);
 
     // Báo lỗi nếu gặp loại sự kiện lạ không thuộc content outbox (theo yêu cầu anh Dũng)

@@ -10,6 +10,7 @@ import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
 import { FeedModule } from './feed/feed.module.js';
 import { MediaModule } from './media/media.module.js';
+import { ModerationModule } from './moderation/moderation.module.js';
 import {
   AdminPostsController,
   BookmarksController,
@@ -71,7 +72,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
-  imports: [MediaModule, FeedModule, AccessModule],
+  imports: [MediaModule, FeedModule, AccessModule, ModerationModule],
   controllers: [
     PostsController,
     ReactionsController,
@@ -177,11 +178,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: PublishPostUseCase,
       inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT],
-      useFactory: (
-        postRepo: PostRepository,
-        outbox: ContentOutbox,
-        commerceService: CommerceServicePort,
-      ) => new PublishPostUseCase(postRepo, outbox, commerceService),
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, commerceService: CommerceServicePort) =>
+        new PublishPostUseCase(postRepo, outbox, commerceService),
     },
     {
       provide: DeletePostUseCase,
@@ -211,11 +209,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: SetReactionUseCase,
       inject: [PostRepository, ReactionRepository, CONTENT_OUTBOX],
-      useFactory: (
-        postRepo: PostRepository,
-        reactionRepo: ReactionRepository,
-        outbox: ContentOutbox,
-      ) => new SetReactionUseCase(postRepo, reactionRepo, outbox),
+      useFactory: (postRepo: PostRepository, reactionRepo: ReactionRepository, outbox: ContentOutbox) =>
+        new SetReactionUseCase(postRepo, reactionRepo, outbox),
     },
     {
       provide: GetPostStatsUseCase,
@@ -225,26 +220,20 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: AddCommentUseCase,
       inject: [PostRepository, CommentRepository, CONTENT_OUTBOX],
-      useFactory: (
-        postRepo: PostRepository,
-        commentRepo: CommentRepository,
-        outbox: ContentOutbox,
-      ) => new AddCommentUseCase(postRepo, commentRepo, outbox),
+      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox) =>
+        new AddCommentUseCase(postRepo, commentRepo, outbox),
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository, CONTENT_OUTBOX],
-      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox) =>
-        new EditCommentUseCase(commentRepo, outbox),
+      inject: [CommentRepository, CONTENT_OUTBOX, PostRepository],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox, postRepo: PostRepository) =>
+        new EditCommentUseCase(commentRepo, outbox, postRepo),
     },
     {
       provide: DeleteCommentUseCase,
       inject: [CommentRepository, PostRepository, CONTENT_OUTBOX],
-      useFactory: (
-        commentRepo: CommentRepository,
-        postRepo: PostRepository,
-        outbox: ContentOutbox,
-      ) => new DeleteCommentUseCase(commentRepo, postRepo, outbox),
+      useFactory: (commentRepo: CommentRepository, postRepo: PostRepository, outbox: ContentOutbox) =>
+        new DeleteCommentUseCase(commentRepo, postRepo, outbox),
     },
     {
       provide: ListCommentsUseCase,
@@ -258,20 +247,19 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: SetCommentReactionUseCase,
-      inject: [CommentRepository, CommentReactionRepository, CONTENT_OUTBOX],
+      inject: [CommentRepository, CommentReactionRepository, CONTENT_OUTBOX, PostRepository],
       useFactory: (
         commentRepo: CommentRepository,
         commentReactionRepo: CommentReactionRepository,
         outbox: ContentOutbox,
-      ) => new SetCommentReactionUseCase(commentRepo, commentReactionRepo, outbox),
+        postRepo: PostRepository,
+      ) => new SetCommentReactionUseCase(commentRepo, commentReactionRepo, outbox, postRepo),
     },
     {
       provide: BookmarkPostUseCase,
       inject: [PostRepository, BookmarkRepository],
-      useFactory: (
-        postRepo: PostRepository,
-        bookmarkRepo: BookmarkRepository,
-      ) => new BookmarkPostUseCase(postRepo, bookmarkRepo),
+      useFactory: (postRepo: PostRepository, bookmarkRepo: BookmarkRepository) =>
+        new BookmarkPostUseCase(postRepo, bookmarkRepo),
     },
     {
       provide: ListBookmarksUseCase,
@@ -288,11 +276,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: AdminModeratePostUseCase,
       inject: [PostRepository, ModerationActionRepository, CONTENT_OUTBOX],
-      useFactory: (
-        postRepo: PostRepository,
-        modRepo: ModerationActionRepository,
-        outbox: ContentOutbox,
-      ) => new AdminModeratePostUseCase(postRepo, modRepo, outbox),
+      useFactory: (postRepo: PostRepository, modRepo: ModerationActionRepository, outbox: ContentOutbox) =>
+        new AdminModeratePostUseCase(postRepo, modRepo, outbox),
     },
     {
       provide: GetMyReactionUseCase,
@@ -307,10 +292,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: GetAdminPostDetailUseCase,
       inject: [PostRepository, ModerationActionRepository],
-      useFactory: (
-        postRepo: PostRepository,
-        modRepo: ModerationActionRepository,
-      ) => new GetAdminPostDetailUseCase(postRepo, modRepo),
+      useFactory: (postRepo: PostRepository, modRepo: ModerationActionRepository) =>
+        new GetAdminPostDetailUseCase(postRepo, modRepo),
     },
     {
       provide: SavePostSummaryUseCase,
@@ -321,8 +304,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     {
       provide: GetPostSummaryUseCase,
       inject: [PostRepository, PostSummaryRepository, CommentRepository],
-      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository, commentRepo: CommentRepository) =>
-        new GetPostSummaryUseCase(postRepo, postSummaryRepo, commentRepo),
+      useFactory: (
+        postRepo: PostRepository,
+        postSummaryRepo: PostSummaryRepository,
+        commentRepo: CommentRepository,
+      ) => new GetPostSummaryUseCase(postRepo, postSummaryRepo, commentRepo),
     },
 
     // 6. Guard cho optional authentication
