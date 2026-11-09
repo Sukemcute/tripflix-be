@@ -5,6 +5,7 @@ import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
 import { OutboxWriter } from '@tripflix/outbox';
 import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import { AccessFacade, AccessModule } from '../access/index.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
 import { FeedModule } from './feed/feed.module.js';
@@ -23,6 +24,8 @@ import {
   AdminModeratePostUseCase,
   BookmarkPostUseCase,
   COMMERCE_SERVICE_PORT,
+  USER_DIRECTORY_PORT,
+  type UserDirectoryPort,
   CONTENT_OUTBOX,
   CreateDraftUseCase,
   DeleteCommentUseCase,
@@ -68,7 +71,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
-  imports: [MediaModule, FeedModule],
+  imports: [MediaModule, FeedModule, AccessModule],
   controllers: [
     PostsController,
     ReactionsController,
@@ -142,6 +145,13 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
           },
         };
       },
+    },
+    {
+      provide: USER_DIRECTORY_PORT,
+      inject: [AccessFacade],
+      useFactory: (access: AccessFacade): UserDirectoryPort => ({
+        getDisplayNames: (userIds) => access.getDisplayNames(userIds),
+      }),
     },
     {
       provide: COMMERCE_SERVICE_PORT,
@@ -238,12 +248,13 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListCommentsUseCase,
-      inject: [PostRepository, CommentRepository, CommentReactionRepository],
+      inject: [PostRepository, CommentRepository, CommentReactionRepository, USER_DIRECTORY_PORT],
       useFactory: (
         postRepo: PostRepository,
         commentRepo: CommentRepository,
         commentReactionRepo: CommentReactionRepository,
-      ) => new ListCommentsUseCase(postRepo, commentRepo, commentReactionRepo),
+        userDirectory: UserDirectoryPort,
+      ) => new ListCommentsUseCase(postRepo, commentRepo, commentReactionRepo, userDirectory),
     },
     {
       provide: SetCommentReactionUseCase,
