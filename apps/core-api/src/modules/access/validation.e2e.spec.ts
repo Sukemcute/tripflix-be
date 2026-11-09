@@ -1,4 +1,5 @@
-import { prepareTestRegistration, registerTestAccount } from '../../platform/registration.fixture.js';
+import { prepareTestRegistration, registerTestAccount, SIGNUP_PROFILE } from '../../platform/registration.fixture.js';
+import { TERMS_VERSION } from './auth/domain/registration.js';
 import 'reflect-metadata';
 import { Global, type INestApplication, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -130,6 +131,10 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
       'displayName',
       'registrationId',
       'code',
+      'dateOfBirth',
+      'gender',
+      'nationality',
+      'acceptTerms',
     ]);
   });
 
@@ -162,6 +167,31 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
     expect(store.userRows.get(reg.body.id)).toMatchObject({ role: 'member', status: 'active' });
   });
 
+  it('TF06O: đăng ký lưu ngày sinh, giới tính, quốc tịch và phiên bản điều khoản đã đồng ý', async () => {
+    const before = Date.now();
+    const reg = await registerTestAccount(app, {
+      email: 'profile-signup@example.com',
+      password: PASSWORD,
+      displayName: 'Lan',
+      dateOfBirth: '1999-12-31',
+      gender: 'other',
+      nationality: 'jp',
+      acceptTerms: true,
+    });
+    expect(store.userRows.get(reg.body.id)?.personal).toEqual({
+      phone: null,
+      dateOfBirth: '1999-12-31',
+      gender: 'other',
+      nationality: 'JP',
+    });
+    const terms = store.acceptedTerms.get(reg.body.id);
+    expect(terms?.version).toBe(TERMS_VERSION);
+    expect(terms?.acceptedAt.getTime()).toBeGreaterThanOrEqual(before);
+    // Thông tin cá nhân không lên event bus (như TF06M).
+    const events = store.outboxRows.filter((e) => e.userId === reg.body.id);
+    expect(JSON.stringify(events)).not.toContain('1999-12-31');
+  });
+
   it.each([
     ['mật khẩu toàn dấu cách', { password: ' '.repeat(12) }, ['password']],
     ['mật khẩu toàn ký tự zero-width', { password: ZWSP.repeat(12) }, ['password']],
@@ -169,12 +199,25 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
     ['tên vô hình', { displayName: ZWSP }, ['displayName']],
     ['email sai', { email: 'lan@' }, ['email']],
     ['sai cả ba', { email: 1, password: '1', displayName: '' }, ['email', 'password', 'displayName']],
+    ['chưa đồng ý điều khoản', { acceptTerms: false }, ['acceptTerms']],
+    ['thiếu ngày sinh, giới tính, quốc tịch', { dateOfBirth: undefined, gender: undefined, nationality: undefined }, [
+      'dateOfBirth',
+      'gender',
+      'nationality',
+    ]],
   ])('đăng ký: %s → 400 đúng trường, không tạo tài khoản', async (_, patch, fields) => {
     const before = store.userRows.size;
     const proof = await prepareTestRegistration(app, "unused@example.com");
     const res = await http()
       .post('/api/auth/register')
-      .send({ email: `reject-${Date.now()}@example.com`, password: PASSWORD, displayName: 'Lan', ...proof, ...patch })
+      .send({
+        email: `reject-${Date.now()}@example.com`,
+        password: PASSWORD,
+        displayName: 'Lan',
+        ...SIGNUP_PROFILE,
+        ...proof,
+        ...patch,
+      })
       .expect(400);
     expectFieldErrors(res.body, fields);
     expect(store.userRows.size).toBe(before);

@@ -23,6 +23,9 @@ export const users = accessSchema.table(
     dateOfBirth: date('date_of_birth', { mode: 'string' }),
     gender: text('gender'),
     nationality: text('nationality'),
+    // Bản Điều khoản sử dụng đã đồng ý và lúc đồng ý (TF06O). Trống: tài khoản tạo trước đó hoặc qua Google.
+    termsVersion: text('terms_version'),
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     role: text('role').notNull().default('member'),
     status: text('status').notNull().default('active'),
     // Thời điểm chủ tài khoản chứng minh sở hữu email (TF05D): bấm link xác thực, đặt lại mật khẩu qua email,

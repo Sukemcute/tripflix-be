@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { TERMS_VERSION } from '../domain/registration.js';
+import { SIGNUP_PROFILE } from '../../../../platform/registration.fixture.js';
 import { fileURLToPath } from 'node:url';
 import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -126,7 +128,14 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
       "select payload->>'code' as code from access.outbox_events where type = 'access.registration_code_requested' and user_id = $1",
       [registrationId],
     );
-    return { email, password: 'mot-mat-khau-an-toan', displayName, registrationId, code: result.rows[0].code as string };
+    return {
+      email,
+      password: 'mot-mat-khau-an-toan',
+      displayName,
+      registrationId,
+      code: result.rows[0].code as string,
+      ...SIGNUP_PROFILE,
+    };
   }
 
   async function seedLegacyUser(email: string, displayName: string) {
@@ -142,6 +151,13 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
     const user = await auth.register(await prepareSignup(auth, 'commit@example.com'), meta);
     expect(user.email).toBe('commit@example.com');
     expect(await countRows('users', 'commit@example.com')).toBe(1);
+    // TF06O: thông tin cá nhân và mốc đồng ý điều khoản ghi cùng lúc tạo tài khoản.
+    const saved = await pool.query(
+      'select date_of_birth::text as dob, gender, nationality, terms_version, terms_accepted_at from access.users where email = $1',
+      ['commit@example.com'],
+    );
+    expect(saved.rows[0]).toMatchObject({ dob: '2000-05-20', gender: 'female', nationality: 'VN', terms_version: TERMS_VERSION });
+    expect(saved.rows[0].terms_accepted_at).toBeInstanceOf(Date);
     // access.user.registered và access.user.welcome_email_requested, cùng commit với user.
     expect(await countRows('outbox_events', 'commit@example.com')).toBe(2);
   });

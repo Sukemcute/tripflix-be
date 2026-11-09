@@ -102,15 +102,16 @@ describe('TF055: tài khoản của tôi', () => {
   it('TF06M: GET/PATCH /auth/me có thông tin cá nhân; chuẩn hoá, xoá được; không lên event bus, audit không chứa giá trị', async () => {
     const { userId, phone } = await createAccountOnTwoDevices('personal@example.com');
     const me = (await http().get('/api/auth/me').set(as(phone.accessToken)).expect(200)).body;
-    expect(me).toMatchObject({ id: userId, phone: null, dateOfBirth: null, gender: null, nationality: null });
+    // Đăng ký (TF06O) đã có ngày sinh, giới tính, quốc tịch; số điện thoại để sau.
+    expect(me).toMatchObject({ id: userId, phone: null, dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN' });
 
     const res = await http()
       .patch('/api/auth/me')
       .set(as(phone.accessToken))
-      .send({ phone: '0912 345.678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'vn' })
+      .send({ phone: '0912 345.678', dateOfBirth: '1998-03-15', gender: 'male', nationality: 'jp' })
       .expect(200);
-    expect(res.body).toMatchObject({ displayName: 'Khang', phone: '0912345678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN' });
-    expect((await http().get('/api/auth/me').set(as(phone.accessToken)).expect(200)).body).toMatchObject({ phone: '0912345678', nationality: 'VN' });
+    expect(res.body).toMatchObject({ displayName: 'Khang', phone: '0912345678', dateOfBirth: '1998-03-15', gender: 'male', nationality: 'JP' });
+    expect((await http().get('/api/auth/me').set(as(phone.accessToken)).expect(200)).body).toMatchObject({ phone: '0912345678', nationality: 'JP' });
 
     // Chỉ đổi thông tin cá nhân: không phát access.user.profile_updated; audit chỉ ghi tên trường.
     expect(store.outboxRows.filter((e) => e.type === 'access.user.profile_updated' && e.userId === userId)).toHaveLength(0);
@@ -121,7 +122,7 @@ describe('TF055: tài khoản của tôi', () => {
 
     // Xoá bằng "" hoặc null; trường không gửi giữ nguyên.
     const cleared = await http().patch('/api/auth/me').set(as(phone.accessToken)).send({ phone: '', gender: null }).expect(200);
-    expect(cleared.body).toMatchObject({ phone: null, gender: null, dateOfBirth: '2000-05-20', nationality: 'VN' });
+    expect(cleared.body).toMatchObject({ phone: null, gender: null, dateOfBirth: '1998-03-15', nationality: 'JP' });
 
     // Đổi tên cùng lúc với thông tin cá nhân: phát sự kiện, chỉ có tên.
     await http().patch('/api/auth/me').set(as(phone.accessToken)).send({ displayName: 'Lan', phone: '+84912345678' }).expect(200);
