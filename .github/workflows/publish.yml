@@ -22,7 +22,7 @@ jobs:
   check:
     uses: ./.github/workflows/ci.yml
 
-  # Chỉ build image của app có thay đổi; đổi libs/ hay file gốc thì build lại cả ba. Server staging kéo tag develop,
+  # Chỉ build image của app có thay đổi; đổi libs/ hay file gốc thì build lại cả ba. Server ghim sha riêng cho từng app,
   # nên app không đổi giữ nguyên image cũ. Mỗi image tốn khoảng 2 phút Actions và một bản trong GHCR.
   changes:
     runs-on: ubuntu-latest
@@ -80,3 +80,19 @@ jobs:
           # Mỗi app một scope cache, để ba image không ghi đè cache của nhau.
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
+
+  # Server chạy core-api, notification-service đúng commit (sha-xxxxxxx), nên chỉ deploy app có image mới lần này.
+  # Chỉ bật khi biến repo API_AUTO_DEPLOY=true (Settings → Secrets and variables → Actions → Variables).
+  # Đặt false để tắt ngay, ví dụ trong lúc demo; image vẫn được build như cũ.
+  deploy-api:
+    needs: [image, changes]
+    if: >-
+      github.ref == 'refs/heads/develop' && vars.API_AUTO_DEPLOY == 'true' &&
+      (contains(fromJSON(needs.changes.outputs.apps), 'core-api') ||
+      contains(fromJSON(needs.changes.outputs.apps), 'notification-service'))
+    uses: ./.github/workflows/deploy-api.yml
+    with:
+      apps: ${{ join(fromJSON(needs.changes.outputs.apps), ' ') }}
+      commit: ${{ github.sha }}
+    secrets:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
