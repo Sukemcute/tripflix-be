@@ -32,6 +32,7 @@ import {
   REGISTRATION_CODE_COOLDOWN_MESSAGE,
   REGISTRATION_CODE_COOLDOWN_SECONDS,
   REGISTRATION_CODE_TTL_MS,
+  TERMS_VERSION,
 } from '../domain/registration.js';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
@@ -54,6 +55,7 @@ import {
   type GoogleIdentity,
   type GoogleIdTokenVerifier,
   type LoginRateLimiter,
+  type NewUser,
   type PasswordHasher,
   type RequestMeta,
   type SessionRecord,
@@ -62,6 +64,19 @@ import {
 } from './ports.js';
 import { mapMyProfile, mapPublicUser, type MyProfile, type PublicUser } from './public-user.js';
 import { createRefreshToken, hashRefreshToken } from './refresh-token.js';
+import type { Gender } from '../../account/domain/personal-info.js';
+
+/** Đăng ký bằng mật khẩu, đã qua RegisterRequestSchema (thông tin cá nhân bắt buộc, đã đồng ý điều khoản). */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  displayName: string;
+  registrationId: string;
+  code: string;
+  dateOfBirth: string;
+  gender: Gender;
+  nationality: string;
+}
 
 export interface TokenPair {
   accessToken: string;
@@ -140,7 +155,7 @@ export class AuthUseCases {
     await this.store.outbox.add({ type: 'access.registration_code_requested', userId: id, payload });
   }
 
-  async register(input: { email: string; password: string; displayName: string; registrationId: string; code: string }, meta: RequestMeta): Promise<PublicUser> {
+  async register(input: RegisterInput, meta: RequestMeta): Promise<PublicUser> {
     const email = normalizeEmail(input.email);
     await this.checkRegistrationLimit(
       [`register-code:ip:${meta.ip}`, 30, 600],
@@ -152,7 +167,14 @@ export class AuthUseCases {
     }
     const passwordHash = await this.hasher.hash(input.password);
     const user = await this.createVerifiedMember(
-      { email, passwordHash, displayName: input.displayName.trim(), registrationId: input.registrationId },
+      {
+        email,
+        passwordHash,
+        displayName: input.displayName.trim(),
+        registrationId: input.registrationId,
+        personal: { dateOfBirth: input.dateOfBirth, gender: input.gender, nationality: input.nationality },
+        terms: { version: TERMS_VERSION, acceptedAt: this.now() },
+      },
       meta,
     );
     return mapPublicUser(user);
@@ -253,7 +275,7 @@ export class AuthUseCases {
   /** Tiêu mã và tạo tài khoản trong cùng transaction. */
   @Transactional('access')
   private async createVerifiedMember(
-    input: { email: string; passwordHash: string; displayName: string; registrationId: string },
+    input: Omit<NewUser, 'role' | 'emailVerifiedAt'> & { passwordHash: string; registrationId: string },
     meta: RequestMeta,
   ): Promise<UserRecord> {
     const { registrationId, ...credentials } = input;
@@ -272,7 +294,7 @@ export class AuthUseCases {
    * Chỉ gọi sau khi xác thực email bằng mã đăng ký hoặc danh tính Google.
    */
   private async insertMember(
-    input: { email: string; passwordHash: string | null; displayName: string },
+    input: Omit<NewUser, 'role' | 'emailVerifiedAt'>,
     meta: RequestMeta,
     provider: 'password' | 'google',
   ): Promise<UserRecord | null> {

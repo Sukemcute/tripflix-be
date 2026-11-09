@@ -33,6 +33,7 @@ import type {
   SessionRotation,
   IdentityProvider,
   UserIdentityRepository,
+  NewUser,
   UserRecord,
   UserRepository,
 } from '../application/ports.js';
@@ -92,8 +93,9 @@ class DrizzleUserRepository implements UserRepository {
     return row ? mapUserRow(row) : null;
   }
 
-  async insert(user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null }) {
-    const [row] = await this.db.insert(users).values(user).onConflictDoNothing({ target: users.email }).returning();
+  async insert({ personal, terms, ...user }: NewUser) {
+    const values = { ...user, ...personal, termsVersion: terms?.version, termsAcceptedAt: terms?.acceptedAt };
+    const [row] = await this.db.insert(users).values(values).onConflictDoNothing({ target: users.email }).returning();
     return row ? mapUserRow(row) : null;
   }
 

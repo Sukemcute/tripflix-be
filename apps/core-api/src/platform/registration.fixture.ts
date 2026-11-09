@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ACCESS_STORE, CLOCK, PASSWORD_HASHER, type AccessStore, type Clock, type PasswordHasher } from '../modules/access/index.js';
 
+/** Thông tin cá nhân hợp lệ, bắt buộc khi đăng ký (TF06O); test nào cần giá trị khác thì ghi đè. */
+export const SIGNUP_PROFILE = {
+  dateOfBirth: '2000-05-20',
+  gender: 'female',
+  nationality: 'VN',
+  acceptTerms: true,
+} as const;
+
 export async function prepareTestRegistration(app: INestApplication, email: string) {
   const code = '48162357';
   const registrationId = randomUUID();
@@ -23,7 +31,11 @@ export async function registerTestAccount(
   headers: Record<string, string> = {},
 ): Promise<request.Response> {
   const proof = await prepareTestRegistration(app, input.email);
-  return request(app.getHttpServer()).post('/api/auth/register').set(headers).send({ ...input, ...proof }).expect(status);
+  return request(app.getHttpServer())
+    .post('/api/auth/register')
+    .set(headers)
+    .send({ ...SIGNUP_PROFILE, ...input, ...proof })
+    .expect(status);
 }
 
 /** Fixture cho tài khoản đã được tạo trước luồng đăng ký bằng mã. */

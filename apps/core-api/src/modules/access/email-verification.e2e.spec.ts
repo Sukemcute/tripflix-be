@@ -12,7 +12,7 @@ import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
 import { EmailVerificationUseCases } from './account/application/email-verification.use-cases.js';
-import { seedLegacyAccount } from '../../platform/registration.fixture.js';
+import { seedLegacyAccount, SIGNUP_PROFILE } from '../../platform/registration.fixture.js';
 import {
   REGISTRATION_CODE_COOLDOWN_MESSAGE,
   REGISTRATION_CODE_COOLDOWN_SECONDS,
@@ -174,7 +174,7 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     const messages = store.outboxRows.filter((event) => event.type === 'access.registration_code_requested' && event.payload.email === email);
     expect(messages).toHaveLength(2);
     const code = messages[1]!.payload.code as string;
-    const payload = { ...credentials, registrationId: second.body.registrationId, code };
+    const payload = { ...credentials, ...SIGNUP_PROFILE, registrationId: second.body.registrationId, code };
     const wrongCode = code === '00000000' ? '00000001' : '00000000';
     expect(store.registrationChallengeRows.get(email)?.codeHash).not.toContain(code);
     expect(await store.users.findByEmail(email)).toBeNull();
@@ -241,7 +241,10 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     const challenge = store.registrationChallengeRows.get(email)!;
     challenge.expiresAt = new Date(Date.now() - 1);
     const code = store.outboxRows.find((event) => event.type === 'access.registration_code_requested' && event.payload.email === email)!.payload.code;
-    await http().post('/api/auth/register').send({ ...credentials, code, registrationId: requested.body.registrationId }).expect(400);
+    await http()
+      .post('/api/auth/register')
+      .send({ ...credentials, ...SIGNUP_PROFILE, code, registrationId: requested.body.registrationId })
+      .expect(400);
     expect(await store.users.findByEmail(email)).toBeNull();
   });
 

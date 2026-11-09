@@ -3,11 +3,20 @@ import { ROLES, type Role } from '@tripflix/contracts';
 import { z } from 'zod';
 import { NEW_PASSWORD_MAX } from '../domain/credentials.js';
 import { DISPLAY_NAME_MAX } from '../domain/text-rules.js';
-import { INVALID_REGISTRATION_CODE, REGISTRATION_CODE_PATTERN, REGISTRATION_PASSWORD_MIN } from '../domain/registration.js';
+import {
+  INVALID_REGISTRATION_CODE,
+  REGISTRATION_CODE_PATTERN,
+  REGISTRATION_PASSWORD_MIN,
+  TERMS_REQUIRED_MESSAGE,
+} from '../domain/registration.js';
+import { GENDERS } from '../../account/domain/personal-info.js';
 import {
   currentPasswordField,
+  dateOfBirthField,
   deviceNameField,
   displayNameField,
+  genderField,
+  nationalityField,
   lookupEmailField,
   registrationPasswordField,
   signupEmailField,
@@ -24,6 +33,12 @@ export const RegisterRequestSchema = RegistrationCodeRequestSchema.extend({
   displayName: displayNameField(),
   registrationId: z.uuid('Yêu cầu gửi mã xác thực email trước khi đăng ký'),
   code: z.string().regex(REGISTRATION_CODE_PATTERN, INVALID_REGISTRATION_CODE),
+  // Thông tin cá nhân bắt buộc khi đăng ký bằng mật khẩu (TF06O); cùng luật với PATCH /auth/me.
+  dateOfBirth: dateOfBirthField(),
+  gender: genderField(),
+  nationality: nationalityField(),
+  // Phải tick "đã đọc và đồng ý"; phiên bản điều khoản do BE ghi (TERMS_VERSION), không tin client.
+  acceptTerms: z.literal(true, TERMS_REQUIRED_MESSAGE),
 });
 
 export const LoginRequestSchema = z.object({
@@ -65,6 +80,12 @@ export class RegisterDto extends RegistrationCodeDto {
   @ApiProperty({ maxLength: DISPLAY_NAME_MAX, example: 'Khang' }) displayName!: string;
   @ApiProperty({ format: 'uuid' }) registrationId!: string;
   @ApiProperty({ pattern: REGISTRATION_CODE_PATTERN.source }) code!: string;
+  @ApiProperty({ type: String, format: 'date', example: '2000-05-20' }) dateOfBirth!: string;
+  @ApiProperty({ enum: GENDERS }) gender!: (typeof GENDERS)[number];
+  @ApiProperty({ minLength: 2, maxLength: 2, example: 'VN', description: 'Mã quốc gia ISO 3166-1 alpha-2' })
+  nationality!: string;
+  @ApiProperty({ enum: [true], description: 'Đã đọc và đồng ý Điều khoản sử dụng, Chính sách bảo mật' })
+  acceptTerms!: true;
 }
 
 export class LoginDto {

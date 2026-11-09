@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f3b1ae53-c5e0-408b-8b7d-2e41a937c4d2",
+  "prevIds": [
+    "071d6539-479b-4802-bfd7-078c07ccb668"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "terms_version"
+      ],
+      "writes": [
+        "s|col|access.users.terms_version",
+        "n|col|access.users.terms_version",
+        "e|col|access.users.terms_version"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "terms_accepted_at"
+      ],
+      "writes": [
+        "s|col|access.users.terms_accepted_at",
+        "n|col|access.users.terms_accepted_at",
+        "e|col|access.users.terms_accepted_at"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "terms_version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "terms_accepted_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

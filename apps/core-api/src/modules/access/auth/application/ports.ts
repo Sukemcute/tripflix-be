@@ -106,6 +106,13 @@ export interface OneTimeTokenRepository {
 export type PasswordResetRepository = OneTimeTokenRepository;
 export type EmailVerificationRepository = OneTimeTokenRepository;
 
+/** Người dùng mới; thông tin cá nhân và mốc đồng ý điều khoản chỉ có khi đăng ký bằng mật khẩu (TF06O). */
+export type NewUser = Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & {
+  emailVerifiedAt?: Date | null;
+  personal?: Pick<PersonalInfo, 'dateOfBirth' | 'gender' | 'nationality'>;
+  terms?: { version: string; acceptedAt: Date };
+};
+
 export interface UserRepository {
   /** Khóa bản ghi người dùng đến cuối transaction. */
   lockById(id: string): Promise<UserRecord | null>;
@@ -114,9 +121,7 @@ export interface UserRepository {
   /** Nhiều người dùng theo id; id không tồn tại thì bỏ qua. */
   findByIds(ids: string[]): Promise<UserRecord[]>;
   /** Trả null khi email đã có người dùng. */
-  insert(
-    user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null },
-  ): Promise<UserRecord | null>;
+  insert(user: NewUser): Promise<UserRecord | null>;
   listStaff(): Promise<UserRecord[]>;
   /** Tìm theo email hoặc tên hiển thị (không phân biệt hoa thường), mới nhất trước. */
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
