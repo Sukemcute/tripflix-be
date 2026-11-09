@@ -4241,6 +4241,11 @@
           "authorId": {
             "type": "string"
           },
+          "authorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên hiển thị của tác giả"
+          },
           "postType": {
             "type": "string",
             "enum": [

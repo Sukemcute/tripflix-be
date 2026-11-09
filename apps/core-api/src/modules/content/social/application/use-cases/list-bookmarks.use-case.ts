@@ -2,6 +2,7 @@ import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { PostRecord } from '../../../db/schema/index.js';
+import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListBookmarksQuery {
   userId: string;
@@ -9,8 +10,12 @@ export interface ListBookmarksQuery {
   cursor?: string;
 }
 
+export type EnrichedBookmarkPostItem = PostRecord & {
+  authorName: string | null;
+};
+
 export interface ListBookmarksResult {
-  items: PostRecord[];
+  items: EnrichedBookmarkPostItem[];
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -19,6 +24,7 @@ export class ListBookmarksUseCase {
   constructor(
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly postRepository: PostRepository,
+    private readonly userDirectory?: UserDirectoryPort,
   ) {}
 
   async execute(query: ListBookmarksQuery): Promise<ListBookmarksResult> {
@@ -48,12 +54,26 @@ export class ListBookmarksUseCase {
       }
     }
 
+    let authorNames = new Map<string, string>();
+    if (items.length > 0 && this.userDirectory) {
+      try {
+        authorNames = await this.userDirectory.getDisplayNames(items.map((p) => p.authorId));
+      } catch {
+        authorNames = new Map();
+      }
+    }
+
+    const enrichedItems: EnrichedBookmarkPostItem[] = items.map((post) => ({
+      ...post,
+      authorName: authorNames.get(post.authorId) ?? null,
+    }));
+
     const lastBookmark = pageRecords[pageRecords.length - 1];
     const nextCursor =
       hasMore && lastBookmark ? encodeCursor(lastBookmark.createdAt, lastBookmark.id) : null;
 
     return {
-      items,
+      items: enrichedItems,
       nextCursor,
       hasMore,
     };

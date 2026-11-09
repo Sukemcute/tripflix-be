@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { buildTransactionHostToken, type ModuleTransactionHost } from '@tripflix/db';
+import { AccessModule } from '../../access/index.js';
 import { MediaModule } from '../media/media.module.js';
 import { OptionalAuthGuard } from '../social/api/optional-auth.guard.js';
 import { FeedController } from './api/feed.controller.js';
@@ -9,7 +10,7 @@ import { DrizzleFeedStore } from './infra/drizzle-feed.store.js';
 
 /** Phần con feed của content. Test thay database bằng overrideProvider(FEED_STORE). */
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, AccessModule],
   controllers: [FeedController],
   providers: [
     FeedUseCases,

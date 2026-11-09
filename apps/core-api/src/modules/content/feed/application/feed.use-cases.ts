@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { AccessFacade } from '../../../access/index.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 import { calculateHotScore } from '../domain/hot-score.js';
@@ -32,6 +33,7 @@ export class FeedUseCases {
   constructor(
     @Inject(FEED_STORE) private readonly store: FeedStore,
     @Inject(MediaFacade) private readonly media: MediaFacade,
+    @Optional() @Inject(AccessFacade) private readonly access?: AccessFacade,
   ) {}
 
   async getPage(query: {
@@ -45,10 +47,13 @@ export class FeedUseCases {
     const rows = await (isHot ? this.store.listHotPosts(listQuery) : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, query.limit);
     const postIds = pageRows.map((row) => row.id);
-    const [playback, liked, saved] = await Promise.all([
+    const [playback, liked, saved, authorNames] = await Promise.all([
       this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)),
       query.viewerId ? this.store.findLikedPostIds(query.viewerId, postIds) : [],
       query.viewerId ? this.store.findSavedPostIds(query.viewerId, postIds) : [],
+      this.access
+        ? this.access.getDisplayNames(pageRows.map((r) => r.authorId)).catch(() => new Map<string, string>())
+        : new Map<string, string>(),
     ]);
     const likedIds = new Set(liked);
     const savedIds = new Set(saved);
@@ -59,7 +64,7 @@ export class FeedUseCases {
       const video = mediaId ? playback[mediaId] : undefined;
       if (!video) return [];
       const viewerState = query.viewerId ? { liked: likedIds.has(row.id), saved: savedIds.has(row.id) } : null;
-      return [buildCard(row, video, viewerState)];
+      return [buildCard(row, video, viewerState, authorNames.get(row.authorId) ?? null)];
     });
 
     const last = pageRows.at(-1);
@@ -77,11 +82,15 @@ export class FeedUseCases {
   }
 }
 
-function buildCard(row: FeedPostRow, video: PlaybackInfo, viewerState: FeedCard['viewerState']): FeedCard {
+function buildCard(
+  row: FeedPostRow,
+  video: PlaybackInfo,
+  viewerState: FeedCard['viewerState'],
+  authorName: string | null = null,
+): FeedCard {
   return {
     postId: row.id,
-    // Tên, ảnh đại diện thuộc module access, hiện chưa có hàm cho module khác đọc.
-    author: { id: row.authorId, name: null, avatarUrl: null, isKol: false },
+    author: { id: row.authorId, name: authorName, avatarUrl: null, isKol: false },
     video,
     title: row.title,
     caption: row.body,

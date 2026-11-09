@@ -15,6 +15,7 @@ import {
   GetMyReactionUseCase,
   GetPostDetailUseCase,
   ListAdminPostsUseCase,
+  ListPostsUseCase,
   PublishPostUseCase,
   SetReactionUseCase,
   TrackShareUseCase,
@@ -278,6 +279,48 @@ describe('Social Application Use Cases', () => {
       expect(result.post.tripAttachment?.priceDisclaimer).toBe('Giá chỉ mang tính chất tham khảo');
       expect(result.viewerContext.myReaction).toBe('like');
       expect(result.viewerContext.isBookmarked).toBe(true);
+    });
+
+    it('gắn authorName từ userDirectory khi xem chi tiết bài viết', async () => {
+      const post = samplePostRecord({ status: 'published', authorId });
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockReactionRepo.findByPostAndUser.mockResolvedValue(null);
+      mockBookmarkRepo.isBookmarked.mockResolvedValue(false);
+
+      const mockUserDir = {
+        getDisplayNames: vi.fn().mockResolvedValue(new Map([[authorId, 'Thành Lê']])),
+      };
+
+      const useCase = new GetPostDetailUseCase(
+        mockPostRepo,
+        mockReactionRepo,
+        mockBookmarkRepo,
+        mockUserDir,
+      );
+
+      const result = await useCase.execute({ postId, viewerId: otherUserId });
+      expect(result.post.authorName).toBe('Thành Lê');
+      expect(mockUserDir.getDisplayNames).toHaveBeenCalledWith([authorId]);
+    });
+  });
+
+  describe('ListPostsUseCase', () => {
+    it('gắn authorName từ userDirectory cho từng bài viết trong danh sách', async () => {
+      const post1 = samplePostRecord({ id: 'p1', authorId: 'u1' });
+      const post2 = samplePostRecord({ id: 'p2', authorId: 'u2' });
+      mockPostRepo.findPublicPosts.mockResolvedValue([post1, post2]);
+
+      const mockUserDir = {
+        getDisplayNames: vi.fn().mockResolvedValue(new Map([['u1', 'Người Dùng 1'], ['u2', 'Người Dùng 2']])),
+      };
+
+      const useCase = new ListPostsUseCase(mockPostRepo, mockUserDir);
+      const result = await useCase.execute({});
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]?.authorName).toBe('Người Dùng 1');
+      expect(result.items[1]?.authorName).toBe('Người Dùng 2');
+      expect(mockUserDir.getDisplayNames).toHaveBeenCalledWith(['u1', 'u2']);
     });
   });
 

@@ -2,6 +2,7 @@ import { Post, PostNotFoundException } from '../../domain/index.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { ReactionRepository } from '../../infra/reaction.repository.js';
+import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type {
   PostRecord,
   ReactionType,
@@ -17,6 +18,7 @@ export interface GetPostDetailQuery {
 export interface PostDetailResult {
   post: Omit<PostRecord, 'tripAttachment'> & {
     tripAttachment: TripAttachmentData | null;
+    authorName: string | null;
   };
   viewerContext: {
     myReaction: ReactionType | null;
@@ -30,6 +32,7 @@ export class GetPostDetailUseCase {
     private readonly postRepository: PostRepository,
     private readonly reactionRepository: ReactionRepository,
     private readonly bookmarkRepository: BookmarkRepository,
+    private readonly userDirectory?: UserDirectoryPort,
   ) {}
 
   async execute(query: GetPostDetailQuery): Promise<PostDetailResult> {
@@ -80,10 +83,21 @@ export class GetPostDetailUseCase {
 
     const maskedTrip = domainPost.getMaskedTripAttachment();
 
+    let authorName: string | null = null;
+    if (this.userDirectory) {
+      try {
+        const names = await this.userDirectory.getDisplayNames([record.authorId]);
+        authorName = names.get(record.authorId) ?? null;
+      } catch {
+        authorName = null;
+      }
+    }
+
     return {
       post: {
         ...record,
         tripAttachment: maskedTrip,
+        authorName,
       },
       viewerContext: {
         myReaction,
