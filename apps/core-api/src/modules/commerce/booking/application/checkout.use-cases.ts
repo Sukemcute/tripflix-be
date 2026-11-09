@@ -123,6 +123,9 @@ export interface PricedItem extends NewOrderItem {
   cells: InventoryCell[];
 }
 
+/** Transaction chờ khoá vẫn giữ một kết nối: chờ quá lâu thì nhiều người tranh một phòng sẽ làm hết pool của commerce. */
+const HOLD_LOCK_WAIT_MS = 2_000;
+
 const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date: string; nights: number; qty: number }): InventoryCell[] =>
   Array.from({ length: item.nights }, (_, i) => ({ productType: item.productType, productId: item.productId, date: addDays(item.date, i), qty: item.qty }));
 
@@ -146,7 +149,10 @@ export class CheckoutUseCases {
   ) {}
 
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutView> {
-    const orderId = await this.holdAndCreateOrder(userId, input);
+    const orderId = await this.holdAndCreateOrder(userId, input).catch((error: unknown) => {
+      if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
+      throw error;
+    });
     return this.getCheckout(userId, orderId);
   }
 
@@ -162,6 +168,7 @@ export class CheckoutUseCases {
       throw new CommerceError('invalid_query', 'Trẻ em và em bé chỉ áp dụng cho vé máy bay.', mix.children > 0 ? 'children' : 'infants');
     }
 
+    await this.orders.limitLockWait(HOLD_LOCK_WAIT_MS);
     await this.orders.lockUser(userId);
     const now = this.now();
     if ((await this.orders.countOrdersCreatedSince(userId, new Date(now.getTime() - 3_600_000))) >= HOLDS_PER_HOUR) {
