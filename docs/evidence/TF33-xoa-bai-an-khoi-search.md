@@ -20,7 +20,19 @@
 | Thử lại, quá 5 lần vào dead-letter | Đạt (thư viện `libs/event-bus`, `maxDeliveries = 5`) | `libs/event-bus/src/consumer.ts` |
 
 ## Kết quả kiểm tra
-`pnpm turbo run lint typecheck test --affected` (2026-11-09): 49/49 task pass. `core-api`: 61 file, 676 test pass, 1 bỏ qua (có sẵn). Lint 0 lỗi, không có cảnh báo trong file của task.
+`pnpm turbo run lint typecheck test --affected` (2026-11-09): 49/49 task pass. `core-api`: 61 file, 676 test pass, 1 bỏ qua (có sẵn). Lint 0 lỗi, không có cảnh báo trong file của task. Lần chạy sau commit sửa log: 4 e2e của `access` quá 5 s khi stack docker đang chạy cùng; chạy lại riêng `core-api` thì 676 pass.
+
+Chạy thật trên stack local (`pnpm stack:up`, `APP_ROLE=all`), ẩn/khôi phục bài "Cáp treo vượt biển sang đảo Hòn Tre, Nha Trang" (`…000a`) từ trang admin `/moderation`:
+
+| Giờ | Thao tác | Discovery | Kết quả |
+|---|---|---|---|
+| 13:49:07 | hide | Log "Đã gỡ bài …000a" cùng giây | Gỡ dưới 1 s |
+| 13:51:02 | restore | Không xoá gì | Đúng: bài đang hiện, thêm lại ở lượt job sau |
+| 13:51:26 | hide | Gỡ lại | Đúng |
+
+Sau đó: `content.posts.status = hidden`, `discovery.search_documents` không còn `post:…000a`, `XINFO GROUPS stream:core.content`: `core-discovery` pending 0, lag 0. Lần hide thứ ba lộ lỗi log ("Đã gỡ" dù bài đã không còn trong chỉ mục), đã sửa ở commit `fix(discovery): log gỡ bài chỉ ghi khi thật sự xoá khỏi chỉ mục`.
+
+Lưu ý: chưa trang FE nào hiển thị `sections[].total` của `/api/search` (web tìm bài dùng `GET /api/v1/posts?keyword=` của social, mobile dùng `/api/search/posts` vốn đã lọc). Xem C19 trong `docs/prd-alignment.md` của workspace.
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/core-api exec vitest run src/modules/discovery/search`
