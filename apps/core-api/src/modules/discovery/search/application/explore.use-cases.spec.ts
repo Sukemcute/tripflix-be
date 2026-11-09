@@ -1,4 +1,9 @@
+import type { EventEnvelope } from '@tripflix/contracts';
+import type { Redis } from 'ioredis';
+import type { CoreEnv } from '../../../../platform/env.js';
+import { ExploreContentConsumer } from '../consumers/explore-content.consumer.js';
 import { buildIndex } from '../domain/explore/build.js';
+import { RebuildExploreIndexJob } from '../jobs/rebuild-explore-index.job.js';
 import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
 import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-cases.js';
@@ -149,6 +154,41 @@ describe('ExploreUseCases', () => {
       expect(await explore.rebuildIndex()).toBe(2);
       expect(store.saved!.docs.map((d) => d.id)).toContain('post:P2'); // replaceAll đã ghi lại P2
       expect(await planTotal(explore)).toBe(1);
+    });
+
+    it('cả luồng: ẩn → gỡ trong vài giây; restore → bài quay lại ở lượt job kế tiếp (tua 10 phút bằng fake timer)', async () => {
+      vi.useFakeTimers();
+      try {
+        const hidden: string[] = [];
+        const { explore } = setup([], plans, hidden);
+        const job = new RebuildExploreIndexJob({ APP_ROLE: 'worker' } as CoreEnv, explore);
+        const consumer = new ExploreContentConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore);
+        const moderated = (action: string) =>
+          consumer.route({ eventId: action, type: 'content.post.moderated', payload: { postId: 'P2', action } } as unknown as EventEnvelope);
+        const minute = 60_000;
+
+        job.onApplicationBootstrap(); // phút 0: worker khởi động, dựng chỉ mục lần đầu
+        await vi.advanceTimersByTimeAsync(0);
+        expect(await planTotal(explore)).toBe(2);
+
+        await vi.advanceTimersByTimeAsync(2 * minute); // phút 2: admin ẩn P2, consumer nhận event
+        hidden.push('P2');
+        await moderated('hide');
+        expect(await planTotal(explore)).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(3 * minute); // phút 5: admin khôi phục P2
+        hidden.splice(0);
+        await moderated('restore');
+        expect(await planTotal(explore)).toBe(1); // consumer không thêm lại, chờ job
+
+        await vi.advanceTimersByTimeAsync(5 * minute - 1); // ngay trước phút 10: job chưa chạy
+        expect(await planTotal(explore)).toBe(1);
+        await vi.advanceTimersByTimeAsync(1); // phút 10: job chạy lượt kế tiếp
+        expect(await planTotal(explore)).toBe(2);
+        job.onApplicationShutdown();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('dọn sau khi dựng lỗi thì vẫn giữ chỉ mục mới', async () => {
