@@ -17,6 +17,7 @@
 | Bài ẩn không lộ trong kết quả `/search` | Đạt (có từ TF11) | `explore.use-cases.spec.ts`: "tìm theo nơi, ngân sách; bài bị ẩn không lọt ra kết quả" |
 | `total` hết đếm bài ẩn ngay khi gỡ | Đạt | Test "ẩn bài rồi dropHidden: total giảm ngay, gọi lại vẫn vậy" |
 | Bài bị ẩn lúc job đang dựng không bị ghi lại | Đạt | Test "bài bị ẩn sau lúc job đọc mà bị ghi lại vẫn bị gỡ ngay sau khi dựng xong" |
+| Restore: bài quay lại ở lượt job kế tiếp, consumer không thêm lại | Đạt | Test "cả luồng: ẩn → gỡ trong vài giây; restore → bài quay lại ở lượt job kế tiếp" (job + consumer thật, fake timer tua 10 phút, chạy ~40 ms); đo trên stack bên dưới |
 | Thử lại, quá 5 lần vào dead-letter | Đạt (thư viện `libs/event-bus`, `maxDeliveries = 5`) | `libs/event-bus/src/consumer.ts` |
 
 ## Kết quả kiểm tra
@@ -31,6 +32,8 @@ Chạy thật trên stack local (`pnpm stack:up`, `APP_ROLE=all`), ẩn/khôi ph
 | 13:51:26 | hide | Gỡ lại | Đúng |
 
 Sau đó: `content.posts.status = hidden`, `discovery.search_documents` không còn `post:…000a`, `XINFO GROUPS stream:core.content`: `core-discovery` pending 0, lag 0. Lần hide thứ ba lộ lỗi log ("Đã gỡ" dù bài đã không còn trong chỉ mục), đã sửa ở commit `fix(discovery): log gỡ bài chỉ ghi khi thật sự xoá khỏi chỉ mục`.
+
+Đo chiều thêm lại (14:04): restore `…000a` trên admin → ngay sau đó bài chưa có trong `/api/search` (đúng, chờ job) → restart `core-api` để job dựng chỉ mục lúc khởi động (thay cho chờ tới 10 phút) → bài có lại sau **16 s** (log "Đã dựng chỉ mục tìm khám phá: 230 mục trong 580 ms" cùng giây). Khi chạy bình thường không restart, bài quay lại trong 0–10 phút.
 
 Lưu ý: chưa trang FE nào hiển thị `sections[].total` của `/api/search` (web tìm bài dùng `GET /api/v1/posts?keyword=` của social, mobile dùng `/api/search/posts` vốn đã lọc). Xem C19 trong `docs/prd-alignment.md` của workspace.
 
