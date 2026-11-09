@@ -93,6 +93,7 @@ export class CatalogUseCases {
       return {
         type: 'hotel',
         id: p.id,
+        slug: p.slug,
         name: p.name,
         province: { slug: p.provinceSlug, name: p.provinceName },
         city: p.city,

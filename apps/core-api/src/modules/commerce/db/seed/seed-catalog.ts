@@ -1,3 +1,4 @@
+import { buildHotelSlug } from '../../inventory/domain/hotel-slug.js';
 import { readFileSync } from 'node:fs';
 import type { Db } from '@tripflix/db';
 import { sql } from 'drizzle-orm';
@@ -105,6 +106,7 @@ export async function seedCatalog(
   await db.transaction(async (tx) => {
     const hotelRows = seed.hotels.map(({ roomTypes: _roomTypes, basePrice: _basePrice, ...hotel }) => ({
     ...hotel,
+    slug: buildHotelSlug(hotel.id, hotel.name),
     thumbnail: hotel.thumbnail ? toImageKey(hotel.thumbnail) : null,
     images: hotel.images.map(toImageKey),
     reviewCount: hotel.reviewCount ?? 0,
@@ -117,6 +119,7 @@ export async function seedCatalog(
         .onConflictDoUpdate({
           target: properties.id,
           set: {
+            slug: sql`excluded.slug`,
             name: sql`excluded.name`,
             provinceSlug: sql`excluded.province_slug`,
             provinceName: sql`excluded.province_name`,
