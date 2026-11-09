@@ -4637,6 +4637,11 @@
           "authorId": {
             "type": "string"
           },
+          "authorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên hiển thị của tác giả"
+          },
           "parentCommentId": {
             "type": "string",
             "nullable": true
