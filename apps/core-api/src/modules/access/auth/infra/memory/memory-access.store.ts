@@ -27,6 +27,8 @@ export class MemoryAccessStore implements AccessStore {
   readonly users = {
     findByEmail: async (email: string) => [...this.userRows.values()].find((u) => u.email === email) ?? null,
     findById: async (id: string) => this.userRows.get(id) ?? null,
+    findByIds: async (ids: string[]) =>
+      ids.map((id) => this.userRows.get(id)).filter((u): u is UserRecord => u !== undefined),
     lockById: async (id: string) => this.userRows.get(id) ?? null,
     insert: async ({
       emailVerifiedAt = null,

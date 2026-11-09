@@ -1,7 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, inArray, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import {
   accessOutboxEvents,
   auditLogs,
@@ -79,6 +79,12 @@ class DrizzleUserRepository implements UserRepository {
   async findById(id: string) {
     const [row] = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
     return row ? mapUserRow(row) : null;
+  }
+
+  async findByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    const rows = await this.db.select().from(users).where(inArray(users.id, ids));
+    return rows.map(mapUserRow);
   }
 
   async lockById(id: string) {

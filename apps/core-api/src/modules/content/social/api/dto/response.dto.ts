@@ -63,6 +63,8 @@ export class SocialCommentDto {
   @ApiProperty() id!: string;
   @ApiProperty() postId!: string;
   @ApiProperty() authorId!: string;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
+  authorName?: string | null;
   @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() isEdited!: boolean;

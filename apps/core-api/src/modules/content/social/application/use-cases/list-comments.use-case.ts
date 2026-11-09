@@ -3,6 +3,7 @@ import { Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { CommentReactionRepository } from '../../infra/comment-reaction.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { CommentRecord } from '../../../db/schema/index.js';
 
 export interface ListCommentsQuery {
@@ -18,6 +19,7 @@ export interface ListCommentsQuery {
 export type EnrichedCommentItem = CommentRecord & {
   isLiked: boolean;
   likeCount: number;
+  authorName: string | null;
 };
 
 export interface ListCommentsResult {
@@ -38,6 +40,7 @@ export class ListCommentsUseCase {
     private readonly postRepository: PostRepository,
     private readonly commentRepository: CommentRepository,
     private readonly commentReactionRepository?: CommentReactionRepository,
+    private readonly userDirectory?: UserDirectoryPort,
   ) {}
 
   async execute(query: ListCommentsQuery): Promise<ListCommentsResult> {
@@ -87,8 +90,19 @@ export class ListCommentsUseCase {
       );
     }
 
+    // Tên tác giả chỉ để hiển thị: lỗi tra cứu không được làm hỏng danh sách bình luận.
+    let authorNames = new Map<string, string>();
+    if (rawItems.length > 0 && this.userDirectory) {
+      try {
+        authorNames = await this.userDirectory.getDisplayNames(rawItems.map((c) => c.authorId));
+      } catch {
+        authorNames = new Map();
+      }
+    }
+
     const items: EnrichedCommentItem[] = rawItems.map((comment) => ({
       ...comment,
+      authorName: authorNames.get(comment.authorId) ?? null,
       likeCount: comment.likeCount ?? 0,
       isLiked: likedIds.has(comment.id),
     }));

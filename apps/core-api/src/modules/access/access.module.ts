@@ -46,6 +46,7 @@ import { AccessCleanupJob } from './auth/jobs/access-cleanup.job.js';
 import { ServiceTokenController } from './service/api/service-token.controller.js';
 import { ServiceTokenUseCases } from './service/application/service-token.use-cases.js';
 import { CORE_API_SERVICE_AUDIENCE } from './service/domain/service-client-rules.js';
+import { AccessFacade } from './access.facade.js';
 import { AdminController } from './staff/api/admin.controller.js';
 import { StaffUseCases } from './staff/application/staff.use-cases.js';
 
@@ -150,6 +151,8 @@ export class AccessInfraModule {}
     WebSession,
     AccessOutboxRelay,
     AccessCleanupJob,
+    AccessFacade,
   ],
+  exports: [AccessFacade],
 })
 export class AccessModule {}

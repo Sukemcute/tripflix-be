@@ -111,6 +111,8 @@ export interface UserRepository {
   lockById(id: string): Promise<UserRecord | null>;
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
+  /** Nhiều người dùng theo id; id không tồn tại thì bỏ qua. */
+  findByIds(ids: string[]): Promise<UserRecord[]>;
   /** Trả null khi email đã có người dùng. */
   insert(
     user: Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' | 'role'> & { emailVerifiedAt?: Date | null },
