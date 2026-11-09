@@ -273,6 +273,26 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect(cell.held + cell.sold).toBeLessThanOrEqual(cell.total);
   });
 
+  it('chờ khoá quá 2 giây: trả 409 thử lại, không giữ chỗ, nhả khoá xong đặt được', async () => {
+    const checkIn = addDays(TODAY_DATE, 27);
+    const before = await inventoryOf(checkIn);
+    const locker = await pool.connect();
+    try {
+      await locker.query('begin');
+      await locker.query('select 1 from commerce.room_inventory where room_type_id = $1 and date = $2 for update', [roomTypeId, checkIn]);
+      const startedAt = Date.now();
+      const blocked = await holdRoom(newUser(), checkIn);
+      expect(blocked.status, JSON.stringify(blocked.body)).toBe(409);
+      expect(blocked.body.reason).toBe('LOCK_TIMEOUT');
+      expect(Date.now() - startedAt).toBeLessThan(2_900);
+      await locker.query('rollback');
+    } finally {
+      locker.release();
+    }
+    expect((await inventoryOf(checkIn)).held).toBe(before.held);
+    expect((await holdRoom(newUser(), checkIn)).status).toBe(201);
+  });
+
   it('giữ giỏ thiếu một mục thì không giữ gì; giỏ mới thay giỏ cũ và trả chỗ cũ về kho', async () => {
     const user = newUser();
     const checkIn = addDays(TODAY_DATE, 30);

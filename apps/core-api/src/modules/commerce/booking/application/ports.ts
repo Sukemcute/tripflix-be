@@ -87,6 +87,10 @@ export interface InventoryCell {
 export interface OrderStore {
   /** Khoá theo tài khoản trong transaction: hai request giữ chỗ của cùng người chạy tuần tự. */
   lockUser(userId: string): Promise<void>;
+  /** Giới hạn thời gian chờ khoá trong transaction đang mở; quá hạn thì lệnh đang chờ báo lỗi. */
+  limitLockWait(milliseconds: number): Promise<void>;
+  /** Lỗi này có phải do chờ khoá quá giới hạn của limitLockWait không. */
+  isLockWaitTimeout(error: unknown): boolean;
   countOrdersCreatedSince(userId: string, since: Date): Promise<number>;
   findOrder(orderId: string): Promise<OrderRecord | null>;
   lockOrder(orderId: string): Promise<OrderRecord | null>;

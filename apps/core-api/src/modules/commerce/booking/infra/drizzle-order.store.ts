@@ -50,6 +50,8 @@ const mapPayment = (row: PaymentRow): PaymentRecord => ({
   createdAt: row.createdAt,
 });
 
+const POSTGRES_LOCK_NOT_AVAILABLE = '55P03';
+
 @Injectable()
 export class DrizzleOrderStore implements OrderStore {
   constructor(@InjectTransactionHost('commerce') private readonly host: OrderDbHost) {}
@@ -60,6 +62,15 @@ export class DrizzleOrderStore implements OrderStore {
 
   async lockUser(userId: string) {
     await this.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+  }
+
+  async limitLockWait(milliseconds: number) {
+    await this.db.execute(sql`select set_config('lock_timeout', ${`${milliseconds}ms`}, true)`);
+  }
+
+  isLockWaitTimeout(error: unknown) {
+    const { code, cause } = error as { code?: string; cause?: { code?: string } };
+    return code === POSTGRES_LOCK_NOT_AVAILABLE || cause?.code === POSTGRES_LOCK_NOT_AVAILABLE;
   }
 
   async countOrdersCreatedSince(userId: string, since: Date) {
