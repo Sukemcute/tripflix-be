@@ -10,6 +10,7 @@ export { MemorySidBlocklist, RedisSidBlocklist, buildRevokedSidKey, type SidBloc
 export {
   AUTH_VERIFIER,
   AccessTokenGuard,
+  AllowWhenRevocationUnavailable,
   Authenticated,
   CurrentUser,
   EMAIL_UNVERIFIED_CODE,
