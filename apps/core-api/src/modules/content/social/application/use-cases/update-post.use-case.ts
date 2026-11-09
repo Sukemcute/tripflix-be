@@ -1,5 +1,7 @@
+import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type {
   PostRecord,
   PostVisibility,
@@ -19,13 +21,19 @@ export interface UpdatePostCommand {
 }
 
 export class UpdatePostUseCase {
-  constructor(private readonly postRepository: PostRepository) {}
+  constructor(
+    private readonly postRepository: PostRepository,
+    private readonly outbox?: ContentOutbox,
+  ) {}
 
+  @Transactional('content')
   async execute(command: UpdatePostCommand): Promise<PostRecord> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
       throw new PostNotFoundException(command.postId);
     }
+
+    const previousStatus = record.status;
 
     const domainPost = new Post({
       id: record.id,
@@ -61,7 +69,7 @@ export class UpdatePostUseCase {
       tripAttachment: command.tripAttachment,
     });
 
-    return this.postRepository.update(command.postId, {
+    const updated = await this.postRepository.update(command.postId, {
       title: domainPost.title,
       body: domainPost.body,
       hashtags: domainPost.hashtags,
@@ -71,5 +79,26 @@ export class UpdatePostUseCase {
       tripAttachment: domainPost.tripAttachment,
       isVerified: domainPost.isVerified,
     });
+
+    // Nếu bài viết đã xuất bản (published), phát sự kiện outbox content.post.updated để Moderation quét lại nội dung
+    if (previousStatus === 'published' && this.outbox) {
+      await this.outbox.add({
+        type: 'content.post.updated',
+        userId: command.userId,
+        payload: {
+          postId: updated.id,
+          authorId: updated.authorId,
+          title: updated.title,
+          body: updated.body,
+          hashtags: updated.hashtags,
+          visibility: updated.visibility,
+          mediaIds: updated.mediaIds,
+          coverMediaId: updated.coverMediaId,
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      });
+    }
+
+    return updated;
   }
 }

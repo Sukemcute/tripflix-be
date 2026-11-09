@@ -235,6 +235,46 @@ describe('Social Application Use Cases', () => {
       );
     });
 
+    it('phát sự kiện outbox content.post.updated khi chỉnh sửa bài viết đã xuất bản (published)', async () => {
+      const publishedPost = samplePostRecord({ status: 'published' });
+      mockPostRepo.findById.mockResolvedValue(publishedPost);
+      mockPostRepo.update.mockResolvedValue({ ...publishedPost, title: 'Tiêu đề cập nhật mới' });
+
+      const useCase = new UpdatePostUseCase(mockPostRepo, mockOutbox);
+      await useCase.execute({
+        postId,
+        userId: authorId,
+        title: 'Tiêu đề cập nhật mới',
+      });
+
+      expect(mockOutbox.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'content.post.updated',
+          userId: authorId,
+          payload: expect.objectContaining({
+            postId,
+            authorId,
+            title: 'Tiêu đề cập nhật mới',
+          }),
+        }),
+      );
+    });
+
+    it('không phát sự kiện outbox content.post.updated khi chỉnh sửa bản nháp (draft)', async () => {
+      const draftPost = samplePostRecord({ status: 'draft' });
+      mockPostRepo.findById.mockResolvedValue(draftPost);
+      mockPostRepo.update.mockResolvedValue({ ...draftPost, title: 'Bản nháp mới' });
+
+      const useCase = new UpdatePostUseCase(mockPostRepo, mockOutbox);
+      await useCase.execute({
+        postId,
+        userId: authorId,
+        title: 'Bản nháp mới',
+      });
+
+      expect(mockOutbox.add).not.toHaveBeenCalled();
+    });
+
     it('xóa bài đăng thành công và ghi event outbox content.post.deleted', async () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
