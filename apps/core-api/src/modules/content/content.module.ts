@@ -191,22 +191,25 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: GetPostDetailUseCase,
-      inject: [PostRepository, ReactionRepository, BookmarkRepository],
+      inject: [PostRepository, ReactionRepository, BookmarkRepository, USER_DIRECTORY_PORT],
       useFactory: (
         postRepo: PostRepository,
         reactionRepo: ReactionRepository,
         bookmarkRepo: BookmarkRepository,
-      ) => new GetPostDetailUseCase(postRepo, reactionRepo, bookmarkRepo),
+        userDirectory: UserDirectoryPort,
+      ) => new GetPostDetailUseCase(postRepo, reactionRepo, bookmarkRepo, userDirectory),
     },
     {
       provide: ListPostsUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new ListPostsUseCase(postRepo),
+      inject: [PostRepository, USER_DIRECTORY_PORT],
+      useFactory: (postRepo: PostRepository, userDirectory: UserDirectoryPort) =>
+        new ListPostsUseCase(postRepo, userDirectory),
     },
     {
       provide: ListUserPostsUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new ListUserPostsUseCase(postRepo),
+      inject: [PostRepository, USER_DIRECTORY_PORT],
+      useFactory: (postRepo: PostRepository, userDirectory: UserDirectoryPort) =>
+        new ListUserPostsUseCase(postRepo, userDirectory),
     },
     {
       provide: SetReactionUseCase,
@@ -275,9 +278,12 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListBookmarksUseCase,
-      inject: [BookmarkRepository, PostRepository],
-      useFactory: (bookmarkRepo: BookmarkRepository, postRepo: PostRepository) =>
-        new ListBookmarksUseCase(bookmarkRepo, postRepo),
+      inject: [BookmarkRepository, PostRepository, USER_DIRECTORY_PORT],
+      useFactory: (
+        bookmarkRepo: BookmarkRepository,
+        postRepo: PostRepository,
+        userDirectory: UserDirectoryPort,
+      ) => new ListBookmarksUseCase(bookmarkRepo, postRepo, userDirectory),
     },
     {
       provide: TrackShareUseCase,

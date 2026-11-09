@@ -5,6 +5,8 @@ import { TripAttachmentDto } from './post.dto.js';
 export class SocialPostDto {
   @ApiProperty() id!: string;
   @ApiProperty() authorId!: string;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
+  authorName?: string | null;
   @ApiProperty({ enum: ['video', 'vlog'] }) postType!: string;
   @ApiProperty() title!: string;
   @ApiProperty() body!: string;

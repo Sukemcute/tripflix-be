@@ -1,6 +1,7 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { PostRecord, PostType } from '../../../db/schema/index.js';
+import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListPostsQuery {
   limit?: number;
@@ -11,14 +12,21 @@ export interface ListPostsQuery {
   keyword?: string;
 }
 
+export type EnrichedPostItem = PostRecord & {
+  authorName: string | null;
+};
+
 export interface ListPostsResult {
-  items: PostRecord[];
+  items: EnrichedPostItem[];
   nextCursor: string | null;
   hasMore: boolean;
 }
 
 export class ListPostsUseCase {
-  constructor(private readonly postRepository: PostRepository) {}
+  constructor(
+    private readonly postRepository: PostRepository,
+    private readonly userDirectory?: UserDirectoryPort,
+  ) {}
 
   async execute(query: ListPostsQuery): Promise<ListPostsResult> {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -41,8 +49,22 @@ export class ListPostsUseCase {
     const lastItem = items[items.length - 1];
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id) : null;
 
+    let authorNames = new Map<string, string>();
+    if (items.length > 0 && this.userDirectory) {
+      try {
+        authorNames = await this.userDirectory.getDisplayNames(items.map((p) => p.authorId));
+      } catch {
+        authorNames = new Map();
+      }
+    }
+
+    const enrichedItems: EnrichedPostItem[] = items.map((post) => ({
+      ...post,
+      authorName: authorNames.get(post.authorId) ?? null,
+    }));
+
     return {
-      items,
+      items: enrichedItems,
       nextCursor,
       hasMore,
     };
