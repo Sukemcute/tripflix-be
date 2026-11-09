@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   SetMetadata,
   UnauthorizedException,
   UseGuards,
@@ -18,6 +19,9 @@ import { InvalidAccessTokenError, type AccessTokenVerifier, type AuthUser } from
 export const AUTH_VERIFIER = Symbol('AUTH_VERIFIER');
 export const SID_BLOCKLIST = Symbol('SID_BLOCKLIST');
 const ROLES_KEY = 'tripflix:roles';
+const ALLOW_WHEN_REVOCATION_UNAVAILABLE_KEY = 'tripflix:allow-when-revocation-unavailable';
+/** Thời gian tối đa chờ Redis ở các API đã bật @AllowWhenRevocationUnavailable. */
+export const REVOCATION_CHECK_TIMEOUT_MS = 300;
 
 export const UNAUTHORIZED_MESSAGE = 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn';
 export const FORBIDDEN_MESSAGE = 'Bạn không có quyền dùng chức năng này';
@@ -40,9 +44,12 @@ function extractBearerToken(req: AuthRequest): string | undefined {
 /** Kiểm access token (chữ ký, iss, aud, exp) và sid chưa bị chặn; gắn req.user. */
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
+  private readonly logger = new Logger(AccessTokenGuard.name);
+
   constructor(
     @Inject(AUTH_VERIFIER) private readonly verify: AccessTokenVerifier,
     @Inject(SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
+    @Inject(Reflector) private readonly reflector: Reflector = new Reflector(),
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -56,9 +63,33 @@ export class AccessTokenGuard implements CanActivate {
       if (err instanceof InvalidAccessTokenError) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
       throw err;
     }
-    if (await this.blocklist.isBlocked(user.sid)) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
+    if (await this.isRevoked(context, user.sid)) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
     req.user = user;
     return true;
+  }
+
+  private isRevoked(context: ExecutionContext, sid: string): Promise<boolean> {
+    const canSkipCheck = this.reflector.getAllAndOverride<boolean | undefined>(ALLOW_WHEN_REVOCATION_UNAVAILABLE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    return canSkipCheck ? this.isRevokedWithinTimeout(sid) : this.blocklist.isBlocked(sid);
+  }
+
+  /** Redis lỗi hoặc chậm thì coi như chưa thu hồi: token vẫn được kiểm chữ ký và hạn dùng. */
+  private async isRevokedWithinTimeout(sid: string): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(`quá ${REVOCATION_CHECK_TIMEOUT_MS} ms`)), REVOCATION_CHECK_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([this.blocklist.isBlocked(sid), timeout]);
+    } catch (err) {
+      this.logger.warn(`Không kiểm được phiên thu hồi, cho đi tiếp: ${(err as Error).message}`);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -109,6 +140,12 @@ export const Roles = (...roles: Role[]) =>
  * spam bằng email không có thật. Dùng được cùng @Authenticated hoặc @Roles ở controller.
  */
 export const RequireVerifiedEmail = () => UseGuards(AccessTokenGuard, VerifiedEmailGuard);
+
+/**
+ * Luồng phải chạy được khi Redis sập (đặt chỗ, thanh toán): Redis lỗi hoặc chậm thì bỏ qua bước kiểm phiên thu hồi.
+ * Đánh đổi: trong lúc đó token đã thu hồi vẫn dùng được tới khi hết hạn. Không dùng cho API quản trị.
+ */
+export const AllowWhenRevocationUnavailable = () => SetMetadata(ALLOW_WHEN_REVOCATION_UNAVAILABLE_KEY, true);
 
 /** Lấy người dùng đã kiểm từ request (chỉ dùng sau @Authenticated hoặc @Roles). */
 export const CurrentUser = createParamDecorator((_data: unknown, context: ExecutionContext): AuthUser => {

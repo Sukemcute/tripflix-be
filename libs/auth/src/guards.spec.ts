@@ -4,8 +4,10 @@ import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { Reflector } from '@nestjs/core';
 import {
   AccessTokenGuard,
+  AllowWhenRevocationUnavailable,
   EMAIL_UNVERIFIED_CODE,
   EMAIL_UNVERIFIED_MESSAGE,
+  REVOCATION_CHECK_TIMEOUT_MS,
   RequireVerifiedEmail,
   Roles,
   RolesGuard,
@@ -53,6 +55,46 @@ describe('AccessTokenGuard', () => {
     await expect(
       guard.canActivate(context({ headers: { authorization: 'Bearer good' } })),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('AccessTokenGuard khi không kiểm được phiên thu hồi', () => {
+  const verify = async () => member;
+  const brokenBlocklist = { block: async () => undefined, isBlocked: async () => Promise.reject(new Error('redis down')) };
+  const slowBlocklist = { block: async () => undefined, isBlocked: () => new Promise<boolean>(() => undefined) };
+  const req = () => ({ headers: { authorization: 'Bearer good' } }) as Record<string, unknown>;
+  class Ctrl {
+    @AllowWhenRevocationUnavailable()
+    book() {}
+    admin() {}
+  }
+
+  it('API đã bật: Redis lỗi thì vẫn cho đi tiếp', async () => {
+    const guard = new AccessTokenGuard(verify, brokenBlocklist);
+    await expect(guard.canActivate(context(req(), Ctrl.prototype.book))).resolves.toBe(true);
+  });
+
+  it('API đã bật: Redis treo thì cho đi tiếp đúng sau thời gian chờ', async () => {
+    vi.useFakeTimers();
+    try {
+      const passed = new AccessTokenGuard(verify, slowBlocklist).canActivate(context(req(), Ctrl.prototype.book));
+      await vi.advanceTimersByTimeAsync(REVOCATION_CHECK_TIMEOUT_MS);
+      await expect(passed).resolves.toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('API đã bật: Redis bình thường thì phiên bị chặn vẫn 401', async () => {
+    const blocklist = new MemorySidBlocklist();
+    await blocklist.block('s-1', 900);
+    const guard = new AccessTokenGuard(verify, blocklist);
+    await expect(guard.canActivate(context(req(), Ctrl.prototype.book))).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('API chưa bật: giữ hành vi cũ, lỗi Redis được ném ra', async () => {
+    const guard = new AccessTokenGuard(verify, brokenBlocklist);
+    await expect(guard.canActivate(context(req(), Ctrl.prototype.admin))).rejects.toThrow('redis down');
   });
 });
 

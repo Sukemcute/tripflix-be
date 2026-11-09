@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Put, Query, UseFilters } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { AllowWhenRevocationUnavailable, Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import type { z } from 'zod';
 import { CommerceErrorFilter, IDEMPOTENCY_KEY_HEADER, ZodQuery } from '../../inventory/api/http.js';
@@ -33,6 +33,7 @@ import {
 @Controller('checkout')
 @UseFilters(CommerceErrorFilter)
 @Authenticated()
+@AllowWhenRevocationUnavailable()
 export class CheckoutController {
   constructor(
     @Inject(CheckoutUseCases) private readonly checkout: CheckoutUseCases,
