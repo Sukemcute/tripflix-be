@@ -61,6 +61,7 @@ export interface HotelRoomOffer {
 
 export interface HotelDetail {
   id: string;
+  slug: string;
   name: string;
   province: { slug: string; name: string };
   city: string | null;
@@ -118,7 +119,7 @@ export class HotelDetailUseCases {
       throw new CommerceError('invalid_query', `calendarDays từ 1 đến ${MAX_CALENDAR_DAYS}.`, 'calendarDays');
     }
 
-    const hotel = await this.store.catalog.findPropertyById(hotelId);
+    const hotel = await this.store.catalog.findPropertyBySlugOrId(hotelId);
     if (!hotel) throw new CommerceError('not_found', 'Không có khách sạn này.');
     const roomTypes = await this.store.catalog.findRoomTypesByPropertyIds([hotel.id]);
     const calendarEnd = addDays(today, calendarDays - 1);
@@ -171,6 +172,7 @@ export class HotelDetailUseCases {
     const d = hotel.details ?? {};
     return {
       id: hotel.id,
+      slug: hotel.slug,
       name: hotel.name,
       province: { slug: hotel.provinceSlug, name: hotel.provinceName },
       city: hotel.city,

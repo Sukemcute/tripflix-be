@@ -38,6 +38,8 @@ export interface CatalogOption {
 export interface CatalogHotel {
   type: 'hotel';
   id: string;
+  /** Luôn có khi đọc từ commerce; optional để các test dựng sẵn CatalogHotel của module khác không phải đổi. */
+  slug?: string;
   name: string;
   province: { slug: string; name: string };
   city: string | null;

@@ -16,19 +16,19 @@ export class HotelsController {
     @Inject(ReviewUseCases) private readonly reviews: ReviewUseCases,
   ) {}
 
-  @Get(':id')
+  @Get(':slug')
   // Kiểu tham số là giao của DTO và schema zod nên Swagger không tự đọc được: khai báo tường minh.
   @ApiQuery({ type: HotelDetailQueryDto })
   @ApiOkResponse({ type: HotelDetailDto })
   @ApiNotFoundResponse({ description: 'Không có khách sạn này' })
-  getHotel(@Param('id') id: string, @Query(new ZodQuery(HotelDetailQuerySchema)) query: HotelDetailQueryDto & z.infer<typeof HotelDetailQuerySchema>) {
-    return this.hotels.getHotelDetail(id, query);
+  getHotel(@Param('slug') slug: string, @Query(new ZodQuery(HotelDetailQuerySchema)) query: HotelDetailQueryDto & z.infer<typeof HotelDetailQuerySchema>) {
+    return this.hotels.getHotelDetail(slug, query);
   }
 
-  @Get(':id/reviews')
+  @Get(':slug/reviews')
   @ApiOkResponse({ type: HotelReviewPageDto })
   @ApiNotFoundResponse({ description: 'Không có khách sạn này' })
-  listReviews(@Param('id') id: string, @Query(new ZodQuery(HotelReviewQuerySchema)) query: HotelReviewQueryDto & z.infer<typeof HotelReviewQuerySchema>) {
-    return this.reviews.listHotelReviews(id, query);
+  listReviews(@Param('slug') slug: string, @Query(new ZodQuery(HotelReviewQuerySchema)) query: HotelReviewQueryDto & z.infer<typeof HotelReviewQuerySchema>) {
+    return this.reviews.listHotelReviews(slug, query);
   }
 }

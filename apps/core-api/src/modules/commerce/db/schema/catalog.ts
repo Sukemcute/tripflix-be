@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, check, date, doublePrecision, foreignKey, index, integer, jsonb, primaryKey, smallint, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, check, date, doublePrecision, foreignKey, index, integer, jsonb, primaryKey, smallint, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { commerceSchema } from './commerce-schema.js';
 
 /** Một gói giá của loại phòng hoặc hạng ghế: ăn sáng, hoàn huỷ, hệ số giá so với giá gốc của ngày. */
@@ -68,6 +68,8 @@ export const properties = commerceSchema.table(
   'properties',
   {
     id: text('id').primaryKey(),
+    // Tên công khai trên URL; id có quy luật nên không đưa ra ngoài (TF66).
+    slug: text('slug').notNull(),
     name: text('name').notNull(),
     provinceSlug: text('province_slug').notNull(),
     provinceName: text('province_name').notNull(),
@@ -92,6 +94,7 @@ export const properties = commerceSchema.table(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex('uq_properties_slug').on(t.slug),
     index('idx_properties_province_slug').on(t.provinceSlug),
     check('ck_properties_stars', sql`${t.stars} is null or ${t.stars} between 1 and 5`),
     check('ck_properties_rating_avg', sql`${t.ratingAvg} is null or ${t.ratingAvg} between 0 and 5`),

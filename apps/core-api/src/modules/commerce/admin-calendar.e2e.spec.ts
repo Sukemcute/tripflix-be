@@ -43,7 +43,7 @@ describe('commerce E2E: màn Lịch trống & giá', () => {
 
   beforeEach(async () => {
     store = new MemoryCommerceStore();
-    store.properties.push({ id: 'H1', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: null, stars: 4, brand: null, style: null, thumbnail: null, images: [] });
+    store.properties.push({ id: 'H1', slug: 'bien-xanh-ab12', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: null, stars: 4, brand: null, style: null, thumbnail: null, images: [] });
     store.roomTypes.push({ id: 'H1--STD', propertyId: 'H1', name: 'Tiêu chuẩn', maxGuests: 2, defaultTotal: 5, defaultPrice: 1_000_000, ratePlans: plans });
     store.flights.push({ id: 'F1--Y', flightKey: 'F1', name: 'Bay HAN – DAD', airline: 'VN', fromAirport: 'HAN', toAirport: 'DAD', departTime: null, arriveTime: null, destinationSlug: 'da-nang', destinationName: 'Đà Nẵng', cabinName: 'Phổ thông', defaultSeats: 10, defaultPrice: 1_500_000, farePlans: plans });
     await new CalendarUseCases(store, () => TODAY_DATE).openCalendarWindow(30);
