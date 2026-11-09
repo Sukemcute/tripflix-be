@@ -4,6 +4,7 @@ import {
   AccessRegistrationCodeRequestedV1Schema,
   AccessPasswordResetRequestedV1Schema,
   AccessUserWelcomeEmailRequestedV1Schema,
+  CommerceOrderPaidV1Schema,
   type EventEnvelope,
 } from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
@@ -11,6 +12,7 @@ import type { Mailer } from '../outapp/mailer.js';
 import { buildEmailVerificationEmail } from '../outapp/email-verification.email.js';
 import { buildExistingAccountEmail } from '../outapp/existing-account.email.js';
 import { buildRegistrationCodeEmail } from '../outapp/registration-code.email.js';
+import { buildOrderConfirmationEmail } from '../outapp/order-confirmation.email.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
 import { buildWelcomeEmail } from '../outapp/welcome.email.js';
 
@@ -86,6 +88,13 @@ export class EventRouter {
       const payload = AccessUserWelcomeEmailRequestedV1Schema.parse(event.payload);
       await this.mailer.send(buildWelcomeEmail(payload, this.links.webAppUrl));
       result = 'handled';
+    } else if (event.type === 'commerce.order.paid') {
+      const payload = CommerceOrderPaidV1Schema.parse(event.payload);
+      // Notification chưa tra được email tài khoản theo userId nên đơn không có email liên hệ thì chưa gửi.
+      if (payload.contactEmail) {
+        await this.mailer.send(buildOrderConfirmationEmail(payload, payload.contactEmail));
+        result = 'handled';
+      }
     }
     this.log(result === 'handled' ? 'Đã xử lý sự kiện' : 'Đã nhận sự kiện', event);
     await this.processed.mark(event.eventId);

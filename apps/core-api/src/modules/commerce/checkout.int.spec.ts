@@ -578,6 +578,7 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
       expect(paid.status, JSON.stringify(paid.body)).toBe(200);
       const events = await pool.query(`select payload from commerce.outbox_events where type = 'commerce.order.paid' and payload->>'orderId' = $1`, [held.body.orderId]);
       expect(events.rows[0].payload).toMatchObject({ confirmationCode: paid.body.confirmationCode, contactName: 'Người Đặt', contactEmail: 'nguoidat@example.com' });
+      expect(events.rows[0].payload.items[0]).toMatchObject({ productName: expect.any(String), propertyName: roomPropertyName, ratePlanName: expect.any(String), flight: null });
     });
 
     it('tham số sai trả 400', async () => {

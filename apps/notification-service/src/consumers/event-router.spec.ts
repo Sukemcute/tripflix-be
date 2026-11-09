@@ -92,6 +92,71 @@ describe('EventRouter', () => {
     expect(mailer.sent).toHaveLength(1);
   });
 
+  const paidPayload = (contactEmail: string | null) => ({
+    orderId: randomUUID(),
+    userId: randomUUID(),
+    total: 2_850_000,
+    sourcePostId: null,
+    items: [
+      { productType: 'room', productId: 'P-1', date: '2026-12-01', nights: 2, qty: 1 },
+      { productType: 'flight', productId: 'F-1', date: '2026-12-03', nights: 1, qty: 3 },
+    ],
+    confirmationCode: 'TF-ABC123',
+    contactName: 'An <b>',
+    contactEmail,
+  });
+
+  it('commerce.order.paid thì gửi email xác nhận đúng nội dung, giao lại không gửi lần hai', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const event = createEvent('commerce.order.paid', paidPayload('an@example.com'));
+    await expect(router.route(event)).resolves.toBe('handled');
+    await expect(router.route(event)).resolves.toBe('duplicate');
+    expect(mailer.sent).toHaveLength(1);
+    const mail = mailer.sent[0]!;
+    expect(mail.to).toBe('an@example.com');
+    expect(mail.subject).toContain('TF-ABC123');
+    expect(mail.text).toContain('2.850.000đ');
+    expect(mail.text).toContain('nhận phòng 01/12/2026 · 2 đêm · 1 phòng');
+    expect(mail.text).toContain('ngày bay 03/12/2026 · 3 ghế');
+    expect(mail.html).toContain('An &lt;b&gt;');
+    expect(mail.html).not.toContain('An <b>');
+  });
+
+  it('email xác nhận hiện tên khách sạn, chuyến bay, giờ bay và hành khách khi sự kiện có đủ', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const payload = paidPayload('an@example.com');
+    await router.route(
+      createEvent('commerce.order.paid', {
+        ...payload,
+        items: [
+          { ...payload.items[0], productName: 'Deluxe', propertyName: 'Khách sạn <Biển>', ratePlanName: 'Gồm ăn sáng', flight: null },
+          { ...payload.items[1], productName: 'VN123 · Phổ thông', propertyName: null, ratePlanName: 'Tiết kiệm', flight: { fromAirport: 'SGN', toAirport: 'CXR', departTime: '07:05:00', arriveTime: '08:15:00' } },
+        ],
+        guests: [
+          { fullName: 'Người Lớn', passengerType: 'adult' },
+          { fullName: 'Bé Na', passengerType: 'infant' },
+        ],
+      }),
+    );
+    const mail = mailer.sent[0]!;
+    expect(mail.text).toContain('Khách sạn <Biển> · Deluxe · Gồm ăn sáng · nhận phòng 01/12/2026 · trả phòng 03/12/2026 · 2 đêm · 1 phòng');
+    expect(mail.text).toContain('VN123 · Phổ thông · Tiết kiệm · SGN → CXR · 03/12/2026 · 07:05–08:15 · 3 ghế');
+    expect(mail.text).toContain('- Người Lớn (Người lớn)');
+    expect(mail.text).toContain('- Bé Na (Em bé)');
+    expect(mail.html).toContain('Khách sạn &lt;Biển&gt;');
+  });
+
+  it('commerce.order.paid không có email liên hệ thì không gửi, vẫn đánh dấu đã xử lý', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const event = createEvent('commerce.order.paid', paidPayload(null));
+    await expect(router.route(event)).resolves.toBe('ignored');
+    await expect(router.route(event)).resolves.toBe('duplicate');
+    expect(mailer.sent).toHaveLength(0);
+  });
+
   it('sự kiện chưa có việc thì chỉ ghi log đã nhận', async () => {
     const mailer = new MemoryMailer();
     const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);

@@ -113,6 +113,8 @@ export interface OrderStore {
   updateOrder(orderId: string, patch: Partial<Pick<OrderRecord, 'status' | 'total' | 'contactName' | 'contactPhone' | 'contactEmail' | 'confirmationCode' | 'cancelReason' | 'paidAt'>> & { policyVersion?: string; policyAcceptedAt?: Date; cancelledAt?: Date }): Promise<void>;
   replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null; passengerType: PassengerType | null }[]): Promise<void>;
   findGuestBirthdates(orderId: string): Promise<(string | null)[]>;
+  /** Khách của đơn, người lớn trước rồi trẻ em, em bé. */
+  findGuests(orderId: string): Promise<{ fullName: string; passengerType: PassengerType | null }[]>;
 
   /**
    * Tồn kho, cập nhật có điều kiện từng ô (UPDATE ... WHERE), không đọc rồi ghi. Trả false khi ô không đủ chỗ;
