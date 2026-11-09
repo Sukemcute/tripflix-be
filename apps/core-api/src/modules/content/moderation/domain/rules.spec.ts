@@ -75,6 +75,68 @@ describe('Luật kiểm duyệt tiếng Việt', () => {
     });
   });
 });
+describe('Luật xúc phạm và đe doạ', () => {
+  const config = { aiThreshold: 0.8, reportThreshold: 3 };
+  const codesOf = (text: string) => evaluateRules(text).map((hit) => hit.code);
+
+  it.each([
+    'Mày ngu như bò, quay video kiểu này mà cũng đăng',
+    'may ngu nhu bo, dang lam gi vay',
+    'đm con này xấu mà cũng bày đặt review',
+    'vcl ad óc chó, nội dung rác rưởi',
+    'VKL, dịch vụ gì mà thế',
+    'dcm chủ homestay',
+    'bọn nhà quê ngu dốt mới đi chỗ này',
+    'thằng chó chủ resort',
+    'mặt như lồn',
+    'địt mẹ lừa khách',
+    'clgt vậy trời',
+  ])('nhận xúc phạm: %s', (text) => {
+    expect(codesOf(text)).toContain('PROFANITY');
+  });
+
+  it.each([
+    'Tao biết nhà mày ở đâu rồi đấy, liệu hồn',
+    'biết nhà em ở đâu rồi nhé',
+    'tao se tim ra may va cho may biet tay',
+    'cho mày biết tay',
+    'con kia mà còn chê nữa tao đánh cho nhập viện',
+    'đập cho gãy tay',
+    'tao giết mày',
+    'chém chết mày luôn',
+  ])('nhận đe doạ: %s', (text) => {
+    expect(codesOf(text)).toContain('THREAT');
+  });
+
+  it.each([
+    'view đẹp chết mất, nhất định phải đi một lần',
+    'buffet ngon xỉu, ăn no muốn té xỉu luôn =))',
+    'phục vụ tệ, đồ ăn dở, giá thì chát, không quay lại',
+    'lừa đảo khách hàng, quảng cáo một đằng làm một nẻo',
+    'mình bị ngộ độc sau khi ăn hải sản ở đây',
+    'bãi biển có sứa, bé nhà mình bị đốt sưng chân',
+    'nóng muốn chết mà nhảy xuống hồ bơi là sướng',
+    'đỉnh của chóp, đẹp vãi chưởng',
+    'cho mình hỏi phòng có cho mang thú cưng không ạ',
+    'giá vé cắt cổ thật sự, chém khách quá tay',
+    'chết cười với ông hướng dẫn viên, vui tính xỉu',
+    'đi ngủ sớm để mai dậy ngắm bình minh',
+    'mang theo lon bia và máy ảnh',
+    'cho mình biết tay nghề đầu bếp ở đây ra sao',
+    'đeo kính bơi khi lặn',
+    'ngủ ngon, nệm êm lắm',
+  ])('không bắt nhầm câu sạch: %s', (text) => {
+    expect(codesOf(text).filter((code) => code === 'PROFANITY' || code === 'THREAT')).toEqual([]);
+  });
+
+  it('đe doạ vào hàng chờ với mức cao hơn xúc phạm nhưng không tự ẩn một mình', () => {
+    const threat = evaluateSeverity(evaluateRules('tao giết mày'), null, 0, config);
+    const profanity = evaluateSeverity(evaluateRules('vcl ad óc chó'), null, 0, config);
+    expect(threat).toMatchObject({ suspicious: true, shouldAutoHide: false });
+    expect(profanity).toMatchObject({ suspicious: true, shouldAutoHide: false });
+    expect(threat.severity).toBeGreaterThan(profanity.severity);
+  });
+});
 describe('Ngưỡng severity', () => {
   const config = { aiThreshold: 0.8, reportThreshold: 3 };
   it('giữ nguyên nhãn slash, chỉ tự ẩn nhóm nguy hiểm đủ điểm và flagged', () => {
