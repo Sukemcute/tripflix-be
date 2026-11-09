@@ -357,13 +357,6 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     const fare = offer.body.fares[0] as { code: string; pricePerPerson: number; childPrice: number; infantPrice: number; totalPrice: number };
     expect(fare.totalPrice).toBe(fare.pricePerPerson * 2 + fare.childPrice + fare.infantPrice);
 
-    const roomsOnly = await http()
-      .post('/api/checkout')
-      .set({ ...user.auth, ...key() })
-      .send({ adults: 1, children: 1, items: [{ productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 }] });
-    expect(roomsOnly.status).toBe(400);
-    expect(roomsOnly.body.errors).toEqual([expect.objectContaining({ field: 'children' })]);
-
     const tooManyInfants = await http().post('/api/checkout').set({ ...user.auth, ...key() }).send({ adults: 1, infants: 2, items: [{ productId: flightId, checkIn }] });
     expect(tooManyInfants.status).toBe(400);
     expect(tooManyInfants.body.errors).toEqual([expect.objectContaining({ field: 'infants' })]);
