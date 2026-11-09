@@ -195,6 +195,13 @@ export class CheckoutUseCases {
     return orderId;
   }
 
+  /** Hành trình của các chuyến bay trong đơn, theo mã sản phẩm. */
+  async findFlightRoutes(productIds: string[]) {
+    if (!productIds.length) return new Map<string, { fromAirport: string; toAirport: string; departTime: string | null; arriveTime: string | null }>();
+    const flights = await this.catalog.catalog.findFlightsByIds(productIds);
+    return new Map(flights.map((f) => [f.id, { fromAirport: f.fromAirport, toAirport: f.toAirport, departTime: f.departTime, arriveTime: f.arriveTime }]));
+  }
+
   /**
    * Tính giá và kiểm luật bán từng mục từ lịch trống; một mục không đặt được thì báo lý do, chưa giữ gì.
    * Phòng tính theo người lớn như trước; vé bay giữ ghế cho người lớn + trẻ em và tính giá cả em bé.

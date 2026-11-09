@@ -23,3 +23,7 @@
 
 ## Ảnh hưởng tới phần của người khác
 - Có: `notification-service` (Dũng), chỉ thêm một nhánh xử lý.
+
+## Bổ sung: email hiện đủ thông tin
+- `commerce.order.paid` thêm các trường optional: tên phòng hoặc chuyến, tên khách sạn, gói giá, hành trình và giờ bay, danh sách hành khách. Chỉ thêm trường, sự kiện cũ vẫn đọc được.
+- Kiểm tra: notification và `checkout.int.spec.ts` pass, lint và typecheck pass. Phần hiển thị kiểm bằng unit test, chưa chạy lại trên stack thật.

@@ -71,8 +71,22 @@ export const CommerceOrderPaidV1Schema = z.object({
       date: z.string(),
       nights: z.number().int().positive(),
       qty: z.number().int().positive(),
+      // Thêm sau để email xác nhận hiện đủ thông tin nên optional: sự kiện cũ trong stream không có.
+      productName: z.string().optional(),
+      propertyName: z.string().nullable().optional(),
+      ratePlanName: z.string().optional(),
+      flight: z
+        .object({
+          fromAirport: z.string(),
+          toAirport: z.string(),
+          departTime: z.string().nullable(),
+          arriveTime: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
     }),
   ),
+  guests: z.array(z.object({ fullName: z.string(), passengerType: z.enum(['adult', 'child', 'infant']).nullable() })).optional(),
   confirmationCode: z.string().nullable().optional(),
   contactName: z.string().nullable().optional(),
   contactEmail: z.string().nullable().optional(),

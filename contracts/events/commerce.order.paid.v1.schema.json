@@ -51,6 +51,55 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          },
+          "productName": {
+            "type": "string"
+          },
+          "propertyName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ratePlanName": {
+            "type": "string"
+          },
+          "flight": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "fromAirport": {
+                    "type": "string"
+                  },
+                  "toAirport": {
+                    "type": "string"
+                  },
+                  "departTime": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "arriveTime": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "fromAirport",
+                  "toAirport",
+                  "departTime",
+                  "arriveTime"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -59,6 +108,37 @@
           "date",
           "nights",
           "qty"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "guests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "passengerType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "adult",
+                  "child",
+                  "infant"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "fullName",
+          "passengerType"
         ],
         "additionalProperties": false
       }

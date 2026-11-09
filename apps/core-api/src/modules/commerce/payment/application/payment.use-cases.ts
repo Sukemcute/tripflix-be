@@ -221,6 +221,8 @@ export class PaymentUseCases {
       const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(6)) }));
       await this.orders.setItemConfirmationCodes(codes);
       await this.orders.updateOrder(order.id, { status: 'paid', confirmationCode: codes[0]!.code, paidAt: this.now() });
+      const flightRoutes = await this.checkout.findFlightRoutes(items.filter((i) => i.productType === 'flight').map((i) => i.productId));
+      const guests = await this.orders.findGuests(order.id);
       await this.outbox.add({
         type: 'commerce.order.paid',
         userId: order.userId,
@@ -229,7 +231,18 @@ export class PaymentUseCases {
           userId: order.userId,
           total: payment.amount,
           sourcePostId: order.sourcePostId,
-          items: items.map((i) => ({ productType: i.productType, productId: i.productId, date: i.date, nights: i.nights, qty: i.qty })),
+          items: items.map((i) => ({
+            productType: i.productType,
+            productId: i.productId,
+            date: i.date,
+            nights: i.nights,
+            qty: i.qty,
+            productName: i.productName,
+            propertyName: i.propertyName ?? null,
+            ratePlanName: i.ratePlanName,
+            flight: flightRoutes.get(i.productId) ?? null,
+          })),
+          guests,
           confirmationCode: codes[0]!.code,
           contactName: order.contactName,
           contactEmail: order.contactEmail,
