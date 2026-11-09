@@ -141,3 +141,13 @@ export function quoteFlight(input: { day: FlightDay | undefined; passengers: num
 
 /** Số phòng tối thiểu để đủ chỗ cho cả nhóm. */
 export const countRoomsNeeded = (adults: number, maxGuestsPerRoom: number) => Math.ceil(adults / maxGuestsPerRoom);
+
+/** Giảm giá trẻ em của một kỳ ở: trẻ em trả 1/3 suất người lớn (suất = tổng tiền phòng ÷ tổng sức chứa), nên giảm 2/3 suất, làm tròn 10.000đ. */
+export function calculateChildStayDiscount(input: { stayTotal: number; capacity: number; children: number }): number {
+  return Math.round((input.children * 2 * input.stayTotal) / (3 * input.capacity) / 10_000) * 10_000;
+}
+
+/** Số phòng tối thiểu: người lớn, trẻ em, em bé đều chiếm một chỗ trong sức chứa của phòng. */
+export function countRoomsForGuests(input: { guests: number; maxGuests: number }): number {
+  return Math.ceil(input.guests / input.maxGuests);
+}

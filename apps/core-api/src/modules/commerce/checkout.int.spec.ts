@@ -312,6 +312,41 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect((await inventoryOf(checkIn)).held).toBe(before.held);
   });
 
+  it('đoàn chia nhiều mục phòng: sức chứa tính gộp trong một khách sạn, một mục không đủ thì 409', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 35);
+    const line = { productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 };
+    const { rows } = await pool.query<{ max_guests: number }>('select max_guests from commerce.room_types where id = $1', [roomTypeId]);
+    const adults = rows[0]!.max_guests + 1;
+
+    const single = await http().post('/api/checkout').set({ ...user.auth, ...key() }).send({ adults, items: [line] });
+    expect(single.status).toBe(409);
+    expect(single.body.reason).toBe('NOT_ENOUGH_ROOMS');
+
+    const split = await http().post('/api/checkout').set({ ...user.auth, ...key() }).send({ adults, items: [line, line] });
+    expect(split.status).toBe(201);
+    expect(split.body.items).toHaveLength(2);
+  });
+
+  it('khách sạn: người lớn, trẻ em, em bé đều chiếm chỗ; trẻ em trả 1/3 suất, em bé miễn phí; mỗi phòng cần một người lớn', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 33);
+    const line = { productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 };
+    const { rows } = await pool.query<{ max_guests: number }>('select max_guests from commerce.room_types where id = $1', [roomTypeId]);
+    const maxGuests = rows[0]!.max_guests;
+    const send = (body: object) => http().post('/api/checkout').set({ ...user.auth, ...key() }).send(body);
+
+    expect((await send({ adults: maxGuests, children: 1, items: [line] })).body.reason).toBe('NOT_ENOUGH_ROOMS');
+    expect((await send({ adults: maxGuests, infants: 1, items: [line] })).body.reason).toBe('NOT_ENOUGH_ROOMS');
+    expect((await send({ adults: 1, items: [line, line] })).body.reason).toBe('NOT_ENOUGH_ADULTS');
+    const base = (await send({ adults: 1, items: [line] })).body.total as number;
+    expect((await send({ adults: 1, infants: 1, items: [line] })).body.total).toBe(base);
+    const withChild = await send({ adults: 1, children: 1, items: [line] });
+    expect(withChild.status).toBe(201);
+    expect(withChild.body.total).toBe(base - Math.round((2 * base) / (3 * maxGuests) / 10_000) * 10_000);
+    expect(withChild.body.passengerTypes).toEqual(['child']);
+  });
+
   it('vé bay có trẻ em, em bé: giữ ghế cho người lớn + trẻ em, giá theo loại khách, kiểm tuổi tại ngày bay', async () => {
     const user = newUser();
     const checkIn = addDays(TODAY_DATE, 36);
@@ -321,13 +356,6 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     const offer = await http().get(`/api/flights/${flightId}`).query({ date: checkIn, passengers: 2, children: 1, infants: 1 }).expect(200);
     const fare = offer.body.fares[0] as { code: string; pricePerPerson: number; childPrice: number; infantPrice: number; totalPrice: number };
     expect(fare.totalPrice).toBe(fare.pricePerPerson * 2 + fare.childPrice + fare.infantPrice);
-
-    const roomsOnly = await http()
-      .post('/api/checkout')
-      .set({ ...user.auth, ...key() })
-      .send({ adults: 1, children: 1, items: [{ productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1), qty: 1 }] });
-    expect(roomsOnly.status).toBe(400);
-    expect(roomsOnly.body.errors).toEqual([expect.objectContaining({ field: 'children' })]);
 
     const tooManyInfants = await http().post('/api/checkout').set({ ...user.auth, ...key() }).send({ adults: 1, infants: 2, items: [{ productId: flightId, checkIn }] });
     expect(tooManyInfants.status).toBe(400);

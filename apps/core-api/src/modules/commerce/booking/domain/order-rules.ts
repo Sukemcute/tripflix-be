@@ -39,6 +39,13 @@ export function isAgeOfPassengerType(type: PassengerType, ageAtFirst: number, ag
   return ageAtFirst >= 0 && ageAtLast < 2;
 }
 
+/** Tuổi đúng loại khách ở phòng khách sạn tại ngày nhận phòng: em bé dưới 4 tuổi, trẻ em từ 4 đến dưới 12 tuổi. */
+export function isAgeOfRoomGuest(type: PassengerType, age: number): boolean {
+  if (type === 'adult') return age >= 12;
+  if (type === 'child') return age >= 4 && age <= 11;
+  return age >= 0 && age < 4;
+}
+
 export interface ContactInput {
   fullName: string;
   phone: string;
@@ -50,6 +57,12 @@ export interface GuestFieldError {
   field: string;
   message: string;
 }
+
+const ROOM_AGE_MESSAGES: Record<PassengerType, string> = {
+  adult: 'là người lớn, phải đủ 12 tuổi vào ngày nhận phòng',
+  child: 'là trẻ em, phải từ 4 đến dưới 12 tuổi vào ngày nhận phòng',
+  infant: 'là em bé, phải dưới 4 tuổi vào ngày nhận phòng',
+};
 
 const AGE_MESSAGES: Record<PassengerType, string> = {
   adult: 'là người lớn, phải đủ 12 tuổi vào ngày bay',
@@ -69,6 +82,8 @@ export function listGuestFieldErrors(input: {
   passengerTypes?: PassengerType[];
   /** Ngày bay đầu và cuối của đơn (một chặng thì hai ngày như nhau). */
   travelDates?: { first: string; last: string };
+  /** Ngày nhận phòng đầu tiên; chỉ dùng khi đơn không có vé bay. */
+  stayDate?: string;
 }): GuestFieldError[] {
   const errors: GuestFieldError[] = [];
   if (!input.contact.fullName.trim()) errors.push({ field: 'contact.fullName', message: 'Nhập họ tên người liên hệ.' });
@@ -86,6 +101,8 @@ export function listGuestFieldErrors(input: {
       else if (g.birthdate > input.today) errors.push({ field, message: `Ngày sinh ${guest} không được sau hôm nay.` });
       else if (type && dates && !isAgeOfPassengerType(type, countAgeOn(g.birthdate, dates.first), countAgeOn(g.birthdate, dates.last)))
         errors.push({ field, message: `Hành khách ${i + 1} ${AGE_MESSAGES[type]}.` });
+      else if (type && !dates && input.stayDate && !isAgeOfRoomGuest(type, countAgeOn(g.birthdate, input.stayDate)))
+        errors.push({ field, message: `Hành khách ${i + 1} ${ROOM_AGE_MESSAGES[type]}.` });
     });
   }
   return errors;
