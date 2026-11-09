@@ -159,9 +159,12 @@ services:
       # Dev mặc định fake (không gọi LLM thật); đặt LLM_PROVIDER trong deploy/.env để đổi.
       LLM_PROVIDER: ${LLM_PROVIDER:-fake}
       LLM_MODEL: ${LLM_MODEL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       SERVICE_CLIENT_SECRET: ${SERVICE_CLIENT_SECRET:-}
       SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
+      # Bộ phân loại bình luận: khoảng 2 nhân CPU, ~820 MB RAM lúc cao nhất. Nếu giới hạn CPU container thì đặt số luồng bằng số nhân đó.
+      CLASSIFIER_THREADS: ${CLASSIFIER_THREADS:-2}
       # logging của Python chỉ nhận chữ hoa (DEBUG, INFO), không dùng chung LOG_LEVEL=debug của BE.
       LOG_LEVEL: ${AI_WORKER_LOG_LEVEL:-INFO}
     depends_on:
