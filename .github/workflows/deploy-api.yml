@@ -1,0 +1,76 @@
+name: deploy-api
+
+# Deploy core-api, notification-service lên server staging bằng image sha-xxxxxxx đã có trên GHCR.
+# publish.yml gọi sau mỗi lần merge vào develop (khi biến repo API_AUTO_DEPLOY=true). Chạy tay để quay về bản cũ.
+# Phần việc trên server (backup, migrate, kiểm tra, quay về bản trước) nằm trong deploy/deploy-api.sh.
+on:
+  workflow_call:
+    inputs:
+      apps:
+        description: App có image mới, cách nhau bởi dấu cách
+        required: true
+        type: string
+      commit:
+        description: Commit đã có image trên GHCR
+        required: true
+        type: string
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App cần deploy
+        required: true
+        type: choice
+        options: [core-api, notification-service]
+      commit:
+        description: Commit đã có image của app trên GHCR, ít nhất 7 ký tự đầu
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_HOST: 34.126.176.227
+  # Host key công khai của server, để CI không kết nối nhầm máy khác.
+  DEPLOY_KNOWN_HOST: 34.126.176.227 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICrqTafEyy1D1a7Q5VhvXSOwOiwbFsyY0WEyNpv+lzOZ
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Không chạy chồng hai lần deploy. Script trên server cũng tự khoá, vì lần chạy bị huỷ vẫn chạy tiếp trên server.
+    concurrency:
+      group: deploy-api-staging
+      cancel-in-progress: false
+    steps:
+      - name: Chạy script deploy trên server
+        env:
+          # Gọi từ publish: inputs.apps. Chạy tay: inputs.app.
+          APPS: ${{ inputs.apps || inputs.app }}
+          COMMIT: ${{ inputs.commit }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          [[ "$COMMIT" =~ ^[0-9a-f]{7,40}$ ]] || { echo "Commit không hợp lệ" >&2; exit 2; }
+          umask 077
+          key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_file"
+          printf '%s\n' "$DEPLOY_KNOWN_HOST" > "$known_hosts_file"
+          # core-api trước: notification-service lấy khoá JWT từ core-api.
+          for app in core-api notification-service; do
+            [[ " $APPS " == *" $app "* ]] || continue
+            echo "::group::Deploy $app sha-${COMMIT:0:7}"
+            ssh -i "$key_file" \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$known_hosts_file" \
+              -o ConnectTimeout=20 \
+              -o ServerAliveInterval=30 \
+              "deploy@$DEPLOY_HOST" "$app sha-${COMMIT:0:7}"
+            echo "::endgroup::"
+          done
