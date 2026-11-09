@@ -17,7 +17,7 @@ Backend Tripflix: `core-api` (modular monolith 5 module), `notification-service`
    └─ tripflix-ai/
    ```
 
-4. Trong `tripflix-be`: `pnpm install`, rồi chép `deploy/.env.example` thành `deploy/.env` và điền `DEV_NAME`, key AWS dev (nếu làm phần media), `LLM_PROVIDER` và `OPENAI_API_KEY` (nếu chạy AI; code ở máy thì để `LLM_PROVIDER=fake`, không cần key).
+4. Trong `tripflix-be`: `pnpm install`, rồi chép `deploy/.env.example` thành `deploy/.env` và điền `DEV_NAME`, key AWS dev (nếu làm phần media), `LLM_PROVIDER` và `DEEPSEEK_API_KEY` (nếu chạy AI với `LLM_PROVIDER=deepseek`; code ở máy thì để `LLM_PROVIDER=fake`, không cần key).
 
 ## Chạy
 
