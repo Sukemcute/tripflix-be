@@ -41,7 +41,7 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
 
   beforeEach(async () => {
     store = new MemoryCommerceStore();
-    store.properties.push({ id: 'H1', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: 'Đà Nẵng', stars: 4, brand: null, style: null, thumbnail: 'dev/thang/images/hotels/a.jpg', images: ['dev/thang/images/hotels/a.jpg', 'https://other.example/b.jpg'] });
+    store.properties.push({ id: 'H1', slug: 'bien-xanh-ab12', name: 'Biển Xanh', provinceSlug: 'da-nang', provinceName: 'Đà Nẵng', city: 'Đà Nẵng', stars: 4, brand: null, style: null, thumbnail: 'dev/thang/images/hotels/a.jpg', images: ['dev/thang/images/hotels/a.jpg', 'https://other.example/b.jpg'] });
     store.roomTypes.push(
       { id: 'H1--STD', propertyId: 'H1', name: 'Tiêu chuẩn', maxGuests: 2, defaultTotal: 3, defaultPrice: 1_000_000, ratePlans: plans },
       { id: 'H1--FAM', propertyId: 'H1', name: 'Gia đình', maxGuests: 4, defaultTotal: 1, defaultPrice: 2_000_000, ratePlans: plans },
@@ -78,6 +78,16 @@ describe('commerce E2E: GET /api/hotels/:id', () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  it('TF66: mở được bằng slug, id cũ vẫn chạy, response có slug; slug lạ thì 404', async () => {
+    const bySlug = await request(app.getHttpServer()).get('/api/hotels/bien-xanh-ab12').expect(200);
+    expect(bySlug.body).toMatchObject({ id: 'H1', slug: 'bien-xanh-ab12' });
+    const byId = await request(app.getHttpServer()).get('/api/hotels/H1').expect(200);
+    expect(byId.body.slug).toBe('bien-xanh-ab12');
+    await request(app.getHttpServer()).get('/api/hotels/bien-xanh-ab12/reviews').expect(200);
+    await request(app.getHttpServer()).get('/api/hotels/H1/reviews').expect(200);
+    await request(app.getHttpServer()).get('/api/hotels/khong-co-ab12').expect(404);
   });
 
   it('mặc định ở 1 đêm từ hôm nay, 2 khách: ảnh, tỉnh, giá theo gói, còn phòng thật, lịch 14 ngày', async () => {

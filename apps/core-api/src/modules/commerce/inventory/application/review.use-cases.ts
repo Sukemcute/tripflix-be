@@ -69,7 +69,7 @@ export class ReviewUseCases {
       throw new CommerceError('invalid_query', 'rating từ 1 đến 5.', 'rating');
     }
 
-    const hotel = await this.store.catalog.findPropertyById(hotelId);
+    const hotel = await this.store.catalog.findPropertyBySlugOrId(hotelId);
     if (!hotel) throw new CommerceError('not_found', 'Không có khách sạn này.');
     const [stats, found, roomTypes] = await Promise.all([
       this.store.reviews.getReviewStats(hotel.id, TAG_LIMIT),

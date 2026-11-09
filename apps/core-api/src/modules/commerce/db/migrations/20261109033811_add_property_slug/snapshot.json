@@ -1,0 +1,91 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d5fdfadf-4519-4a38-a934-564c30f91021",
+  "prevIds": [
+    "90667ccb-998c-450a-bcb9-a5491386fcb6"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "properties",
+        "slug"
+      ],
+      "writes": [
+        "s|col|commerce.properties.slug",
+        "n|col|commerce.properties.slug",
+        "e|col|commerce.properties.slug"
+      ],
+      "reads": [
+        "n|tbl|commerce.properties",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "properties",
+        "uq_properties_slug"
+      ],
+      "writes": [
+        "s|idx|commerce.uq_properties_slug",
+        "n|idx|commerce.uq_properties_slug",
+        "e|idx|commerce.uq_properties_slug",
+        "n|rel|commerce.uq_properties_slug"
+      ],
+      "reads": [
+        "n|tbl|commerce.properties",
+        "n|sch|commerce",
+        "n|col|commerce.properties.slug"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "properties",
+        "name": "slug",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "properties",
+        "name": "uq_properties_slug",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "slug",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

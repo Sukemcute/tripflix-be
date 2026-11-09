@@ -108,6 +108,7 @@ class CalendarDayDto {
 
 export class HotelDetailDto {
   @ApiProperty({ example: 'P-h-dn-01' }) id!: string;
+  @ApiProperty({ example: 'vinpearl-beach-da-nang-x7k2', description: 'Tên công khai trên URL' }) slug!: string;
   @ApiProperty({ example: 'Vinpearl Beach Đà Nẵng' }) name!: string;
   @ApiProperty({ type: ProvinceDto }) province!: ProvinceDto;
   @ApiProperty({ type: String, nullable: true }) city!: string | null;

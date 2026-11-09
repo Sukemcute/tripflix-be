@@ -3,6 +3,7 @@ import type { FlightDay, PricePlan, RoomDay } from '../domain/sales-rules.js';
 
 export interface PropertyRecord {
   id: string;
+  slug: string;
   name: string;
   provinceSlug: string;
   provinceName: string;
@@ -68,6 +69,8 @@ export interface CatalogRepository {
   /** Khách sạn theo id tăng dần, sau afterId (phân trang theo con trỏ). */
   listProperties(filter: { provinceSlug?: string; afterId?: string; limit: number }): Promise<PropertyRecord[]>;
   findPropertyById(id: string): Promise<PropertyRecord | null>;
+  /** Tìm theo slug; tạm nhận cả id cũ để app bản cũ không gãy (TF66). */
+  findPropertyBySlugOrId(slugOrId: string): Promise<PropertyRecord | null>;
   findRoomTypesByPropertyIds(propertyIds: string[]): Promise<RoomTypeRecord[]>;
   findRoomTypesByIds(ids: string[]): Promise<RoomTypeRecord[]>;
   /** Các chuyến (theo flight_key tăng dần, sau afterKey) cùng mọi hạng ghế của chuyến đó. */

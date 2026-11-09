@@ -2,7 +2,7 @@
 
 `compose.server.yaml` chạy image production trên một máy. Postgres và Redis không mở cổng, API chỉ nghe trên `127.0.0.1`. `compose.yaml` vẫn chỉ dùng cho máy dev.
 
-Đã làm: giai đoạn 1, 2 và 3 (gồm website). Chưa làm: `video-worker`, `notification-service`, backup, deploy `core-api` từ CI.
+Đã làm: giai đoạn 1 đến 5, deploy web và backend từ CI (backup database trước mỗi lần deploy backend). Chưa làm: `video-worker`, backup định kỳ.
 
 ## Chuẩn bị máy
 
@@ -139,9 +139,13 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
-## Giai đoạn 5: tóm tắt AI (TF14)
+## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt)
 
-Chỉ chạy `ai-summary-worker`, image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public). `ai-service` hiện chỉ có `/health` nên chưa cần. Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
+Hai service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-service` nhận `POST /moderate` từ core-api.
+
+### Tóm tắt bình luận
+
+Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
 
 1. Tạo service client, ghi secret thẳng vào `.env.server`, không in ra màn hình. Secret chỉ tạo được một lần; client `ai-service` đã có thì lệnh báo lỗi, khi đó hỏi người đang giữ secret.
 
@@ -161,6 +165,27 @@ dc --profile ai logs -f ai-summary-worker
 ```
 
 Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` rồi chạy lại lệnh `up`. Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
+
+### Kiểm duyệt (`ai-service`)
+
+core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway không có đường tới ai-service, nên chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 384 MB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
+
+1. Nhập key OpenAI thẳng vào `.env.server`, không gửi qua chat, không in ra màn hình:
+
+```bash
+cd ~/tripflix-be
+read -rs k && printf 'OPENAI_API_KEY=%s\n' "$k" >> deploy/.env.server && unset k
+grep -c '^OPENAI_API_KEY=.' deploy/.env.server   # 1 là đạt
+```
+
+2. Chạy, rồi gọi thử từ core-api không kèm token: `401` là ai-service chạy, core-api tới được và đã chặn người gọi lạ.
+
+```bash
+dc --profile ai up -d --wait ai-service
+dc --profile api exec -T core-api node -e "fetch('http://ai-service:8000/moderate',{method:'POST'}).then(r=>console.log(r.status))"
+```
+
+Thiếu key thì `/moderate` trả `503` và core giữ bước lọc regex. Thu hồi key: xoá dòng `OPENAI_API_KEY` rồi chạy lại lệnh `up`.
 
 ## Đăng nhập Google
 
@@ -193,6 +218,8 @@ dc --profile api --profile gateway --profile mail pull && dc --profile api --pro
 
 `CORE_API_TAG` (core-api và migrate) và `NOTIFICATION_TAG` (notification-service) trong `.env.server` chọn bản chạy. Mỗi app một biến vì CI chỉ build image của app có thay đổi, nên sha mới nhất của app này có thể không có ở app kia. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy. Biến nào chưa đặt thì dùng `IMAGE_TAG` cũ, không có cả hai thì dùng `develop`.
 
+Khi bật deploy backend tự động, mỗi lần merge vào `develop` có image mới thì CI ghi đè `CORE_API_TAG`, `NOTIFICATION_TAG`. Muốn giữ một bản cũ thì tắt `API_AUTO_DEPLOY` trước (mục Deploy backend tự động).
+
 Đổi bản ghim thì cập nhật luôn biến repo `GHCR_KEEP_TAGS` (Settings → Secrets and variables → Actions → Variables), để workflow dọn GHCR hằng tuần không xoá bản đang chạy. Nhiều tag cách nhau bằng dấu cách.
 
 `docker compose down -v` xoá luôn database. Chưa có backup thì không chạy lệnh này trên server.
@@ -217,4 +244,71 @@ Image trên GHCR là private, nên `<user>` phải `docker login ghcr.io` bằng
 Quay về bản cũ: chạy workflow `deploy-web` trên GitHub với commit muốn dùng, hoặc trên server chạy `/opt/tripflix/deploy.sh sha-xxxxxxx`.
 
 - Kiểm tra tự động chỉ phát hiện web không trả 200, không phát hiện lỗi giao diện hay nghiệp vụ.
-- Phần này chỉ áp dụng cho web. `core-api` có migration, quay về image cũ không hoàn tác được database, nên cần backup trước khi tự động hoá.
+- Phần này chỉ áp dụng cho web. Backend xem mục dưới.
+
+## Deploy backend tự động
+
+Merge vào `develop` của `tripflix-be`: CI đạt, GitHub build image của app có thay đổi. Sau đó, với từng app trong `core-api` rồi `notification-service`, workflow SSH vào server chạy `deploy-api.sh <app> sha-xxxxxxx`. Script:
+
+1. Ghi tag mới vào `CORE_API_TAG` hoặc `NOTIFICATION_TAG` trong `.env.server`, rồi pull image. Pull lỗi thì trả lại file, app không bị đụng tới.
+2. Backup database của app (`core` hoặc `notification`) vào `~/backups/auto-<db>-<giờ>-before-<tag>.dump`, giữ 20 bản mới nhất mỗi database. Backup lỗi thì không deploy.
+3. Chạy app. core-api chạy `migrate` trước; migrate lỗi thì core-api cũ vẫn chạy.
+4. Kiểm tra healthcheck của container. Với core-api, kiểm thêm `https://<API_HOST>/api/v1/feed` phải trả 200.
+5. Không đạt thì trả lại `.env.server` và chạy lại image cũ, không chạy lại migrate. Workflow báo lỗi kèm log của app.
+
+Chỉ chạy khi biến repo `API_AUTO_DEPLOY=true` (Settings → Secrets and variables → Actions → Variables). Đặt `false` để tắt ngay, ví dụ trong lúc demo; image vẫn được build. App chưa chạy trên server thì script chỉ ghi tag, không tự bật.
+
+Log từng lần deploy nằm trong `~/deploy-logs/`. Script chạy tiếp đến cuối kể cả khi GitHub huỷ lần chạy (có merge mới) hay SSH bị đứt. Lần deploy sau đợi lần trước xong rồi mới chạy.
+
+### Cài một lần
+
+Trên máy của bạn, tạo key riêng cho repo này (không dùng lại key của `tripflix-fe`, để thu hồi riêng được), đưa private key vào secret rồi xoá file:
+
+```bash
+ssh-keygen -t ed25519 -N '' -C ci-tripflix-be -f ./tripflix-be-deploy
+gh secret set DEPLOY_SSH_KEY --repo Sukemcute/tripflix-be < ./tripflix-be-deploy
+rm ./tripflix-be-deploy
+cat ./tripflix-be-deploy.pub   # dòng này dán vào server ở bước dưới
+```
+
+Trên server, sau khi chép `deploy/` mới lên máy (`<user>` là user đang chạy compose):
+
+```bash
+sudo install -m 755 -o root -g root ~/tripflix-be/deploy/deploy-api.sh /opt/tripflix/deploy-api.sh
+printf '%s\n' 'deploy ALL=(<user>) NOPASSWD: /opt/tripflix/deploy.sh, /opt/tripflix/deploy-api.sh' | sudo tee /etc/sudoers.d/tripflix-deploy >/dev/null
+sudo chmod 440 /etc/sudoers.d/tripflix-deploy
+sudo visudo -cf /etc/sudoers.d/tripflix-deploy
+# Key chỉ chạy được script này: không shell, không chuyển cổng.
+echo 'restrict,command="/opt/tripflix/deploy-api.sh" <dòng trong tripflix-be-deploy.pub>' | sudo tee -a /home/deploy/.ssh/authorized_keys >/dev/null
+# Phải in "forcecommand none". Nếu in tên script của web thì sshd đang ép mọi key của deploy chạy script web: báo người cài.
+sudo sshd -T -C user=deploy,host=x,addr=127.0.0.1 | grep -i forcecommand
+```
+
+Thử trên server với bản đang chạy (deploy lại đúng bản cũ, có backup): `/opt/tripflix/deploy-api.sh core-api sha-<bản đang chạy>`. Sau đó chạy workflow `deploy-api` trên GitHub với cùng commit. Cả hai đạt thì mới đặt `API_AUTO_DEPLOY=true`.
+
+Quay về bản cũ: chạy workflow `deploy-api` trên GitHub, chọn app và commit muốn dùng, hoặc trên server chạy `/opt/tripflix/deploy-api.sh core-api sha-xxxxxxx`. Bản cũ không hiểu database sau migration mới thì phải khôi phục database (mục dưới).
+
+- Kiểm tra tự động chỉ phát hiện app không trả lời, không phát hiện lỗi nghiệp vụ.
+- Deploy chỉ kéo image mới. Sửa `compose.server.yaml` hay file khác trong `deploy/` vẫn phải chép lên server bằng tay.
+- Bản server đang chạy thường là bản build mới nhất của app, nằm trong 5 bản workflow dọn GHCR giữ lại. Deploy lỗi rồi quay về, hay ghim tay một bản cũ, thì thêm tag đó vào `GHCR_KEEP_TAGS`.
+
+### Khôi phục database
+
+Thử khôi phục vào một database tạm, không đụng dữ liệu thật. Nên làm sau khi cài, và thỉnh thoảng làm lại:
+
+```bash
+f=$(ls -1t ~/backups/auto-core-*.dump | head -n 1)
+dc exec -T postgres createdb -U postgres restore_test
+dc exec -T postgres pg_restore -U postgres -d restore_test < "$f"
+dc exec -T postgres psql -U postgres -d restore_test -tAc "select count(*) from information_schema.tables where table_schema not in ('pg_catalog','information_schema')"   # số bảng, phải lớn hơn 0
+dc exec -T postgres dropdb -U postgres restore_test
+```
+
+Khôi phục thật ghi đè database `core`: mọi dữ liệu ghi sau lúc backup bị mất. Chỉ làm khi bản cũ không chạy được với database đã migrate, và báo team trước:
+
+```bash
+dc --profile api --profile ai stop core-api ai-summary-worker
+dc exec -T postgres pg_restore -U postgres -d core --clean --if-exists --single-transaction < ~/backups/auto-core-<giờ>-before-<tag mới>.dump
+/opt/tripflix/deploy-api.sh core-api sha-<bản cũ>   # core-api đang dừng nên chỉ ghi tag
+dc --profile api --profile ai up -d --wait core-api ai-summary-worker
+```

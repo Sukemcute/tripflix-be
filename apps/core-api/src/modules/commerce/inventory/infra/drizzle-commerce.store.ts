@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
-import { and, asc, desc, eq, gt, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lte, max, or, sql } from 'drizzle-orm';
 import { auditLogs, flightInventory, flights, properties, reviews, roomInventory, roomRates, roomTypes, type FlightRow, type PropertyRow, type ReviewRow, type RoomTypeRow } from '../../db/schema/index.js';
 import type {
   CalendarAdminRepository,
@@ -28,6 +28,7 @@ import type { FlightDay, RoomDay } from '../domain/sales-rules.js';
 
 const mapProperty = (row: PropertyRow): PropertyRecord => ({
   id: row.id,
+  slug: row.slug,
   name: row.name,
   provinceSlug: row.provinceSlug,
   provinceName: row.provinceName,
@@ -110,6 +111,11 @@ class DrizzleCatalogRepository implements CatalogRepository {
 
   async findPropertyById(id: string) {
     const [row] = await this.db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    return row ? mapProperty(row) : null;
+  }
+
+  async findPropertyBySlugOrId(slugOrId: string) {
+    const [row] = await this.db.select().from(properties).where(or(eq(properties.slug, slugOrId), eq(properties.id, slugOrId))).limit(1);
     return row ? mapProperty(row) : null;
   }
 

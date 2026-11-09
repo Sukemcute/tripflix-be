@@ -2408,12 +2408,12 @@
         ]
       }
     },
-    "/api/hotels/{id}": {
+    "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
         "parameters": [
           {
-            "name": "id",
+            "name": "slug",
             "required": true,
             "in": "path",
             "schema": {
@@ -2484,12 +2484,12 @@
         ]
       }
     },
-    "/api/hotels/{id}/reviews": {
+    "/api/hotels/{slug}/reviews": {
       "get": {
         "operationId": "HotelsController_listReviews",
         "parameters": [
           {
-            "name": "id",
+            "name": "slug",
             "required": true,
             "in": "path",
             "schema": {
@@ -6801,6 +6801,11 @@
             "type": "string",
             "example": "P-h-dn-01"
           },
+          "slug": {
+            "type": "string",
+            "example": "vinpearl-beach-da-nang-x7k2",
+            "description": "Tên công khai trên URL"
+          },
           "name": {
             "type": "string",
             "example": "Vinpearl Beach Đà Nẵng"
@@ -6933,6 +6938,7 @@
         },
         "required": [
           "id",
+          "slug",
           "name",
           "province",
           "city",

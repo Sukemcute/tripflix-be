@@ -12,7 +12,7 @@ const plans = [
 async function setup() {
   const store = new MemoryCommerceStore();
   for (const [id, province] of [['H1', 'da-nang'], ['H2', 'da-nang'], ['H3', 'phu-quoc']] as const) {
-    store.properties.push({ id, name: `Khách sạn ${id}`, provinceSlug: province, provinceName: province, city: null, stars: 4, brand: null, style: null, thumbnail: `/img/${id}.jpg`, images: [`/img/${id}.jpg`], ...(id === 'H1' ? { address: '1 Bạch Đằng, Đà Nẵng', lat: 16.07, lng: 108.22 } : {}) });
+    store.properties.push({ id, slug: `khach-san-${id.toLowerCase()}`, name: `Khách sạn ${id}`, provinceSlug: province, provinceName: province, city: null, stars: 4, brand: null, style: null, thumbnail: `/img/${id}.jpg`, images: [`/img/${id}.jpg`], ...(id === 'H1' ? { address: '1 Bạch Đằng, Đà Nẵng', lat: 16.07, lng: 108.22 } : {}) });
   }
   store.roomTypes.push(
     { id: 'H1--STD', propertyId: 'H1', name: 'Tiêu chuẩn', maxGuests: 2, defaultTotal: 3, defaultPrice: 1_000_000, ratePlans: plans },

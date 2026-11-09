@@ -136,9 +136,31 @@ services:
       retries: 12
       start_period: 30s
 
-  # ---------- Giai đoạn 5: tóm tắt AI (TF14, repo tripflix-ai) ----------
-  # Chỉ chạy worker: ai-service hiện chỉ có /health, app đọc tóm tắt qua core-api.
-  # Worker nghe bình luận trên stream:core.content, gom 60 giây mỗi bài rồi gọi DeepSeek, ghi kết quả về core-api
+  # ---------- Giai đoạn 5: AI (repo tripflix-ai) ----------
+  # ai-service và worker dùng chung image và AI_TAG. App đọc tóm tắt, kết quả kiểm duyệt qua core-api.
+  # ai-service (TF32): POST /moderate cho core-api gọi kiểm duyệt chữ và ảnh qua OpenAI moderation.
+  # Chỉ nghe trong mạng nội bộ (gateway không có đường /ai), chỉ nhận service token của core-api,
+  # kiểm bằng JWKS của core-api. Thiếu OPENAI_API_KEY thì /moderate trả 503 và core giữ bước lọc regex.
+  # Không tải bộ phân loại, không gọi LLM nên nhẹ, giới hạn nửa nhân.
+  ai-service:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CORE_API_URL: http://core-api:3000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: INFO
+    cpus: 0.5
+    mem_limit: 384m
+    healthcheck:
+      test: ['CMD', '/app/.venv/bin/python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # Worker tóm tắt (TF14): nghe bình luận trên stream:core.content, gom 60 giây mỗi bài rồi gọi DeepSeek, ghi kết quả về core-api
   # bằng service token (client ai-service, deploy/SERVER.md mục Tóm tắt AI). Lần đầu chạy đọc lại cả sự kiện cũ trong stream.
   # Bộ phân loại bình luận cần ~2 nhân và ~820 MB RAM với 2 luồng. Máy chỉ 2 vCPU dùng chung với core-api,
   # nên mặc định giới hạn 1 nhân, 1 luồng; số luồng phải bằng số nhân được cấp.
