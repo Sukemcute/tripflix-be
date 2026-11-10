@@ -93,6 +93,19 @@ export const CommerceOrderPaidV1Schema = z.object({
 });
 export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
 
+/** commerce.order.cancelled v1: khách huỷ đơn đã thanh toán, chỗ đã trả về kho. Mang sẵn dữ liệu để notification báo huỷ. */
+export const CommerceOrderCancelledV1Schema = z.object({
+  orderId: z.uuid(),
+  userId: z.uuid(),
+  total: z.number().int().positive(),
+  refundAmount: z.number().int().nonnegative(),
+  feeAmount: z.number().int().nonnegative(),
+  confirmationCode: z.string().nullable(),
+  contactName: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+});
+export type CommerceOrderCancelledV1 = z.infer<typeof CommerceOrderCancelledV1Schema>;
+
 /** content.media.transcode_requested v1: file gốc đã ghép xong, video-worker chuyển mã và ghi vào videos/{assetId}/r{revision}/. */
 export const ContentMediaTranscodeRequestedV1Schema = z.object({
   assetId: z.uuid(),
@@ -259,6 +272,7 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.unlocked.v1': AccessUserUnlockedV1Schema,
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
   'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
+  'commerce.order.cancelled.v1': CommerceOrderCancelledV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
   'content.media.ready.v1': ContentMediaReadyV1Schema,
   'content.media.failed.v1': ContentMediaFailedV1Schema,

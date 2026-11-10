@@ -347,6 +347,87 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect(withChild.body.passengerTypes).toEqual(['child']);
   });
 
+  describe('TF70 huỷ đơn đã thanh toán', () => {
+    const paidOrder = async (days: number) => {
+      const user = newUser();
+      const checkIn = addDays(TODAY_DATE, days);
+      const order = await ready(user, checkIn);
+      expect((await pay(user, order)).status).toBe(200);
+      return { user, order, checkIn };
+    };
+    const cancel = (user: { auth: Record<string, string> }, id: string, headers = key()) => http().post(`/api/checkout/${id}/cancel-paid`).set({ ...user.auth, ...headers });
+    const quote = (user: { auth: Record<string, string> }, id: string) => http().get(`/api/checkout/${id}/cancel-quote`).set(user.auth);
+    const refundsOf = async (id: string) => (await pool.query<{ amount: string; status: string }>('select amount, status from commerce.refunds where order_id = $1', [id])).rows;
+    const roomSold = async (date: string) => (await pool.query<{ sold: number }>('select sold from commerce.room_inventory where room_type_id = $1 and date = $2', [roomTypeId, date])).rows[0]!.sold;
+
+    it('còn hạn: hoàn 100%, chỗ về kho, có sự kiện; gửi lại cùng key không hoàn thêm, key mới bị 409', async () => {
+      const { user, order, checkIn } = await paidOrder(21);
+      expect((await http().get(`/api/checkout/${order.orderId}`).set(user.auth).expect(200)).body).toMatchObject({ status: 'paid', cancelledAt: null, refund: null });
+      const sold = await roomSold(checkIn);
+      expect((await quote(user, order.orderId)).body.quote).toMatchObject({ isCancellable: true, refundAmount: order.total, feeAmount: 0 });
+      const headers = key();
+      const first = await cancel(user, order.orderId, headers).expect(200);
+      expect(first.body).toMatchObject({ status: 'cancelled', refundAmount: order.total, feeAmount: 0, refundStatus: 'refunded' });
+      expect(await roomSold(checkIn)).toBe(sold - 1);
+      expect(await orderStatus(order.orderId)).toBe('cancelled');
+      expect((await cancel(user, order.orderId, headers).expect(200)).body).toEqual(first.body);
+      expect((await cancel(user, order.orderId)).status).toBe(409);
+      expect(await refundsOf(order.orderId)).toEqual([{ amount: String(order.total), status: 'succeeded' }]);
+      const timestamps = (await pool.query<{ cancelled_at: Date; refunded_at: Date }>('select o.cancelled_at, r.updated_at as refunded_at from commerce.orders o join commerce.refunds r on r.order_id = o.id where o.id = $1', [order.orderId])).rows[0]!;
+      const checkout = (await http().get(`/api/checkout/${order.orderId}`).set(user.auth).expect(200)).body;
+      expect(checkout).toMatchObject({ status: 'cancelled', cancelledAt: timestamps.cancelled_at.toISOString() });
+      expect(checkout.refund).toEqual({ amount: order.total, feeAmount: 0, status: 'refunded', method: 'card', bankCode: null, refundedAt: timestamps.refunded_at.toISOString() });
+      const events = await pool.query("select payload from commerce.outbox_events where type = 'commerce.order.cancelled' and payload->>'orderId' = $1", [order.orderId]);
+      expect(events.rowCount).toBe(1);
+    });
+
+    it('quá hạn: mất đêm đầu; 2 yêu cầu cùng lúc chỉ hoàn một lần', async () => {
+      const { user, order } = await paidOrder(23);
+      await pool.query("update commerce.order_items set free_cancel_until = '2020-01-01' where order_id = $1", [order.orderId]);
+      const results = await Promise.all([cancel(user, order.orderId), cancel(user, order.orderId)]);
+      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+      const done = results.find((r) => r.status === 200)!.body;
+      expect(done.feeAmount).toBeGreaterThan(0);
+      expect(done.refundAmount + done.feeAmount).toBe(order.total);
+      expect(await refundsOf(order.orderId)).toHaveLength(1);
+      const checkout = (await http().get(`/api/checkout/${order.orderId}`).set(user.auth).expect(200)).body;
+      expect(checkout).toMatchObject({ status: 'cancelled', cancelledAt: expect.any(String), refund: { amount: done.refundAmount, feeAmount: done.feeAmount, status: 'refunded', method: 'card', bankCode: null, refundedAt: expect.any(String) } });
+    });
+
+    it('gói không hoàn thì không có khoản hoàn; đã tới ngày thì không huỷ được; đơn người khác 404', async () => {
+      const noRefund = await paidOrder(14);
+      await pool.query('update commerce.order_items set is_refundable = false, free_cancel_until = null where order_id = $1', [noRefund.order.orderId]);
+      expect((await cancel(noRefund.user, noRefund.order.orderId).expect(200)).body).toMatchObject({ refundAmount: 0, refundStatus: 'none' });
+      expect(await refundsOf(noRefund.order.orderId)).toEqual([]);
+      const cancelledAt = (await pool.query<{ cancelled_at: Date }>('select cancelled_at from commerce.orders where id = $1', [noRefund.order.orderId])).rows[0]!.cancelled_at;
+      expect((await http().get(`/api/checkout/${noRefund.order.orderId}`).set(noRefund.user.auth).expect(200)).body).toMatchObject({ status: 'cancelled', cancelledAt: cancelledAt.toISOString(), refund: null });
+
+      const started = await paidOrder(16);
+      expect((await cancel(newUser(), started.order.orderId)).status).toBe(404);
+      await pool.query('update commerce.order_items set date = $2 where order_id = $1', [started.order.orderId, TODAY_DATE]);
+      expect((await quote(started.user, started.order.orderId)).body.quote).toMatchObject({ isCancellable: false, reason: 'ALREADY_STARTED' });
+      expect((await cancel(started.user, started.order.orderId)).status).toBe(409);
+      expect(await orderStatus(started.order.orderId)).toBe('paid');
+    });
+
+    it('GET phản ánh hoàn VNPay cần kiểm tra, đang xử lý và thành công', async () => {
+      const { user, order } = await paidOrder(18);
+      await cancel(user, order.orderId).expect(200);
+      // Đổi dữ liệu sau khi hoàn giả lập để chỉ kiểm phép chiếu, không gọi cổng thật.
+      await pool.query("update commerce.payments set gateway = 'vnpay' where order_id = $1", [order.orderId]);
+      await pool.query("update commerce.refunds set status = 'initiated', needs_review = true, gateway_bank_code = null, gateway_refunded_at = null where order_id = $1", [order.orderId]);
+      const readCheckout = async () => (await http().get(`/api/checkout/${order.orderId}`).set(user.auth).expect(200)).body;
+      expect((await readCheckout()).refund).toEqual({ amount: order.total, feeAmount: 0, status: 'needs_review', method: 'vnpay', bankCode: null, refundedAt: null });
+
+      await pool.query('update commerce.refunds set needs_review = false where order_id = $1', [order.orderId]);
+      expect((await readCheckout()).refund).toEqual({ amount: order.total, feeAmount: 0, status: 'processing', method: 'vnpay', bankCode: null, refundedAt: null });
+
+      const refundedAt = '2026-11-10T04:22:33.000Z';
+      await pool.query("update commerce.refunds set status = 'succeeded', gateway_bank_code = 'NCB', gateway_refunded_at = $2 where order_id = $1", [order.orderId, refundedAt]);
+      expect((await readCheckout()).refund).toEqual({ amount: order.total, feeAmount: 0, status: 'refunded', method: 'vnpay', bankCode: 'NCB', refundedAt });
+    });
+  });
+
   it('vé bay có trẻ em, em bé: giữ ghế cho người lớn + trẻ em, giá theo loại khách, kiểm tuổi tại ngày bay', async () => {
     const user = newUser();
     const checkIn = addDays(TODAY_DATE, 36);
@@ -542,12 +623,17 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
       expect(res.body).toEqual({ trips: [], nextCursor: null });
     });
 
-    it('lọc theo ?status=, gồm cả đơn hết hạn và đã huỷ; mới đặt trước', async () => {
+    it('lọc theo ?status=; đơn chưa trả đã hết hạn hoặc huỷ thì ẩn, đơn đã trả rồi huỷ vẫn hiện; mới đặt trước', async () => {
       const user = newUser();
       const expired = (await holdRoom(user, addDays(TODAY_DATE, 31))).body.orderId as string;
       await pool.query(`update commerce.orders set status = 'expired' where id = $1`, [expired]);
       const cancelled = (await holdRoom(user, addDays(TODAY_DATE, 32))).body.orderId as string;
       expect((await http().post(`/api/checkout/${cancelled}/cancel`).set({ ...user.auth, ...key() })).status).toBeLessThan(300);
+
+      // Hai đơn này coi như đã trả tiền trước đó, để kiểm cả hai trạng thái vẫn hiện.
+      await pool.query(`update commerce.orders set paid_at = now() where id = any($1)`, [[expired, cancelled]]);
+      const hidden = (await holdRoom(user, addDays(TODAY_DATE, 40))).body.orderId as string;
+      await pool.query(`update commerce.orders set status = 'expired' where id = $1`, [hidden]);
       const pending = (await holdRoom(user, addDays(TODAY_DATE, 33))).body.orderId as string;
 
       const all = await listTrips(user.auth);
@@ -570,6 +656,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
         expect(held.status, JSON.stringify(held.body)).toBe(201);
         ids.push(held.body.orderId as string);
       }
+      // Giữ giỏ mới huỷ giỏ cũ; đánh dấu đã trả để các đơn vẫn hiện trong danh sách khi kiểm phân trang.
+      await pool.query(`update commerce.orders set status = 'paid', paid_at = now() where id = any($1)`, [ids]);
       // Ba đơn cùng mili giây (khác micro giây), nằm vắt qua ranh giới trang.
       const base = '2026-11-01T03:00:00.123';
       await pool.query(`update commerce.orders set created_at = $2::timestamptz where id = $1`, [ids[0], '2026-11-01T02:00:00Z']);

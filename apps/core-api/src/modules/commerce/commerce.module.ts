@@ -32,6 +32,9 @@ import { MockGateway } from './payment/infra/mock-gateway.js';
 import { PaymentJobs } from './payment/jobs/payment-jobs.js';
 import { VnpayCallbackController, VnpayCheckoutController } from './payment/api/vnpay.controller.js';
 import { VNPAY_CONFIG, VnpayUseCases, type VnpayConfig } from './payment/application/vnpay.use-cases.js';
+import { REFUND_GATEWAYS, type RefundGateways } from './payment/application/refund-gateways.port.js';
+import { VNPAY_GATEWAY } from './payment/domain/vnpay-signature.js';
+import { VNPAY_DEFAULT_API_URL, VnpayRefundClient } from './payment/infra/vnpay-refund-gateway.js';
 
 /** Ngày theo giờ Việt Nam: lịch trống và luật bán tính theo ngày địa phương, không theo UTC. */
 const todayInVietnam: Today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
@@ -42,12 +45,13 @@ const VnpayEnvSchema = z.object({
   VNPAY_HASH_SECRET: z.string().optional(),
   VNPAY_PAYMENT_URL: z.url().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
   VNPAY_RETURN_URL: z.url().default('http://localhost:3000/api/payments/vnpay/return'),
+  VNPAY_API_URL: z.url().default(VNPAY_DEFAULT_API_URL),
 });
 
 function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
   const env = VnpayEnvSchema.parse(source);
   if (!env.VNPAY_TMN_CODE || !env.VNPAY_HASH_SECRET) return null;
-  return { tmnCode: env.VNPAY_TMN_CODE, hashSecret: env.VNPAY_HASH_SECRET, paymentUrl: env.VNPAY_PAYMENT_URL, returnUrl: env.VNPAY_RETURN_URL };
+  return { tmnCode: env.VNPAY_TMN_CODE, hashSecret: env.VNPAY_HASH_SECRET, paymentUrl: env.VNPAY_PAYMENT_URL, returnUrl: env.VNPAY_RETURN_URL, apiUrl: env.VNPAY_API_URL };
 }
 
 /** Ảnh lưu khoá đầy đủ trên S3 (có tiền tố môi trường); web và app nhận URL CloudFront. */
@@ -89,6 +93,11 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       useFactory: (pools: DbPools): PaymentGateway => new MockGateway(createDb(pools.commerce)),
     },
     { provide: VNPAY_CONFIG, useFactory: () => loadVnpayConfig(process.env) },
+    {
+      provide: REFUND_GATEWAYS,
+      inject: [VNPAY_CONFIG],
+      useFactory: (config: VnpayConfig | null): RefundGateways => new Map(config ? [[VNPAY_GATEWAY, new VnpayRefundClient(config)]] : []),
+    },
     { provide: MEDIA_URL, inject: [CORE_ENV], useFactory: (env: CoreEnv) => buildMediaUrl(env.MEDIA_CDN_URL) },
     CatalogUseCases,
     HotelDetailUseCases,

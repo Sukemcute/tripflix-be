@@ -4,6 +4,8 @@ import { ORDER_STORE, type OrderStore, type PaymentRecord } from '../../booking/
 import { CommerceError } from '../../inventory/domain/errors.js';
 import { VNPAY_GATEWAY, VNPAY_PAYMENT_WINDOW_MINUTES, buildSignedUrl, buildVnpayTxnRef, formatVnpayDate, isValidSignature, isVnpaySuccess } from '../domain/vnpay-signature.js';
 import { PaymentUseCases } from './payment.use-cases.js';
+import { parseVnpayDate } from '../domain/vnpay-date.js';
+import { describeVnpayPayError } from '../domain/vnpay-pay-error.js';
 
 export const VNPAY_CONFIG = Symbol('COMMERCE_VNPAY_CONFIG');
 
@@ -13,6 +15,7 @@ export interface VnpayConfig {
   hashSecret: string;
   paymentUrl: string;
   returnUrl: string;
+  apiUrl?: string;
 }
 
 const hmacSha512 = (secret: string, data: string) => createHmac('sha512', secret).update(Buffer.from(data, 'utf8')).digest('hex');
@@ -53,6 +56,8 @@ export class VnpayUseCases {
       throw new CommerceError('conflict', 'Giá đã thay đổi, vui lòng xác nhận giá mới.', 'expectedTotal', { reason: 'PRICE_CHANGED', oldTotal: prepared.oldTotal, newTotal: prepared.newTotal });
     }
     if (prepared.kind === 'replay') throw new CommerceError('conflict', 'Đơn này đang có một lần thanh toán chưa xong.');
+    const payment = (await this.orders.findPaymentsByKey(prepared.gatewayKey))[0];
+    if (!payment) throw new Error('Không tìm thấy khoản thanh toán vừa tạo.');
     const now = new Date();
     const expiresAt = new Date(now.getTime() + VNPAY_PAYMENT_WINDOW_MINUTES * 60_000);
     const params: Record<string, string> = {
@@ -68,7 +73,8 @@ export class VnpayUseCases {
       vnp_Locale: 'vn',
       vnp_ReturnUrl: config.returnUrl,
       vnp_IpAddr: input.clientIp,
-      vnp_CreateDate: formatVnpayDate(now),
+      // Dùng đúng mốc đã lưu để Merchant API hoàn tiền có thể dựng lại ngày giao dịch chính xác.
+      vnp_CreateDate: formatVnpayDate(payment.createdAt),
       vnp_ExpireDate: formatVnpayDate(expiresAt),
       ...(input.bankCode && { vnp_BankCode: input.bankCode }),
     };
@@ -106,7 +112,9 @@ export class VnpayUseCases {
       status: isSuccess ? 'succeeded' : 'failed',
       ref: params.vnp_TransactionNo,
       code: isSuccess ? undefined : `vnpay_${params.vnp_ResponseCode}`,
+      message: isSuccess ? undefined : describeVnpayPayError(params.vnp_ResponseCode),
       last4: params.vnp_CardType,
+      ...(isSuccess && { gatewayBankCode: params.vnp_BankCode || null, gatewayPaidAt: parseVnpayDate(params.vnp_PayDate) }),
     });
     if (applied.kind === 'compensated') await this.payment.processRefunds((await this.orders.findPaymentsByKey(params.vnp_TxnRef!))[0]!.orderId);
   }

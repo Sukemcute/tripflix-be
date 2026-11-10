@@ -8,6 +8,8 @@ import { PaymentUseCases } from '../../payment/application/payment.use-cases.js'
 import { CheckoutUseCases } from '../application/checkout.use-cases.js';
 import {
   CancelHoldResultDto,
+  CancelPaidResultDto,
+  CancelQuoteResultDto,
   CheckoutDto,
   CheckoutRequestDto,
   CheckoutRequestSchema,
@@ -101,6 +103,24 @@ export class CheckoutController {
   @ApiOkResponse({ type: PayResultDto })
   confirm3ds(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodQuery(ConfirmThreeDsRequestSchema)) body: z.infer<typeof ConfirmThreeDsRequestSchema>) {
     return this.payment.confirm3ds(user.userId, id, body);
+  }
+
+  /** Báo phí huỷ và số tiền được hoàn của đơn đã trả, chưa huỷ gì. */
+  @Get(':id/cancel-quote')
+  @Header('Cache-Control', 'no-store')
+  @ApiOkResponse({ type: CancelQuoteResultDto })
+  cancelQuote(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payment.getCancelQuote(user.userId, id);
+  }
+
+  /** Huỷ đơn đã trả, trả chỗ về kho và hoàn tiền theo chính sách. Huỷ cả đơn. */
+  @Post(':id/cancel-paid')
+  @Idempotent()
+  @ApiHeader(IDEMPOTENCY_KEY_HEADER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: CancelPaidResultDto })
+  cancelPaid(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payment.cancelPaid(user.userId, id);
   }
 
   /** Huỷ giỏ đang giữ, trả chỗ về kho. Gọi lại nhiều lần vẫn ra cùng kết quả. */
