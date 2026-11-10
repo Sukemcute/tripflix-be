@@ -50,8 +50,31 @@ PR này thêm bản Go ở `apps/video-worker-go`, chạy song song với bản 
 - Image TypeScript đem đo build ngày 05/11. Code worker từ đó tới nay không đổi.
 - Phần lớn dung lượng image là FFmpeg của Debian, nên bỏ Node chỉ giảm khoảng 260 MB.
 
+### Chạy thật với S3 dev, ngày 10/11
+Cách chạy:
+- Mỗi bản chạy một lần, lần lượt, trên laptop qua Docker.
+- Cùng một video thử 60 giây, dọc 1080x1920, có tiếng, 58 MB.
+- S3 `tripflix-media-dev/dev/phong/`.
+- Thời gian tính từ lúc gửi việc lên Redis.
+- Dữ liệu thử đã xoá sau khi đo.
+
+| | TypeScript | Go |
+|---|---|---|
+| RAM đỉnh riêng tiến trình worker | 198 MB | 23 MB |
+| RAM đỉnh cả container, gồm FFmpeg và bộ đệm file | 635 MB | 400 MB |
+| Tới khi xong 360p (video đăng được) | 189 giây | 205 giây |
+| Tới khi xong cả 3 mức | 370 giây | 310 giây |
+| Số file trên S3 | 97 | 97, cùng tên |
+| Tổng dung lượng HLS | 29,35 MB | 29,33 MB |
+| Phát qua CloudFront: `ffprobe` đọc master, giải mã hết 360p | đạt | đạt |
+
+Nhận xét:
+- **RAM:** RAM của riêng worker giảm khoảng 8 lần, vì bản Go không có Node và đọc file thẳng từ đĩa khi tải lên S3.
+- **Thời gian:** mới đo một lần mỗi bản, và phần lớn là tải file gốc từ Sydney cùng thời gian FFmpeg. Chưa đủ để nói bản nào nhanh hơn.
+- **Dung lượng file:** 89 file khác nhau vài phần trăm dung lượng, nhưng tổng chỉ lệch 0,06%. x264 chạy nhiều luồng nên mỗi lần chuyển mã ra kết quả hơi khác, kể cả cùng một bản.
+
 ## Chưa làm, giới hạn
-- Chưa chạy cả quy trình với S3 thật, nên chưa so RAM và thời gian lúc đang chuyển mã. Thời gian chủ yếu do FFmpeg nên dự kiến gần như nhau.
+- Mới đo một lần mỗi bản, trên laptop chứ chưa trên server. Muốn so thời gian thì cần đo nhiều lần trên máy server.
 - CI chưa chạy test Go. `publish.yml` chưa build image Go. `compose.yaml` và `compose.server.yaml` chưa có service. Cả ba là phần của Tech Lead.
 - Chưa gộp lần chạy FFmpeg của các mức. Mỗi mức vẫn đọc lại file gốc, giống bản TypeScript.
 - Không chạy cùng lúc hai bản trên cùng Redis, vì chung group `video-worker`.
