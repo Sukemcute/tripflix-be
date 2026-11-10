@@ -71,9 +71,10 @@ export class PostsController {
   }
 
   @Get('posts')
+  @OptionalAuthenticated()
   @ApiOperation({ summary: 'Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng kèm nextCursor', type: SocialPostPageDto })
-  async listPublicPosts(@Query() query: ListPostsQueryDto) {
+  async listPublicPosts(@Query() query: ListPostsQueryDto, @OptionalCurrentUser() user?: AuthUser) {
     return this.listPostsUseCase.execute({
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
@@ -81,6 +82,7 @@ export class PostsController {
       postType: query.post_type,
       hashtag: query.hashtag,
       keyword: query.keyword,
+      viewerId: user?.userId ?? null,
     });
   }
 

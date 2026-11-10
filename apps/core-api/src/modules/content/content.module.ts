@@ -200,9 +200,13 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListPostsUseCase,
-      inject: [PostRepository, USER_DIRECTORY_PORT],
-      useFactory: (postRepo: PostRepository, userDirectory: UserDirectoryPort) =>
-        new ListPostsUseCase(postRepo, userDirectory),
+      inject: [PostRepository, USER_DIRECTORY_PORT, ReactionRepository, BookmarkRepository],
+      useFactory: (
+        postRepo: PostRepository,
+        userDirectory: UserDirectoryPort,
+        reactionRepo: ReactionRepository,
+        bookmarkRepo: BookmarkRepository,
+      ) => new ListPostsUseCase(postRepo, userDirectory, reactionRepo, bookmarkRepo),
     },
     {
       provide: ListUserPostsUseCase,

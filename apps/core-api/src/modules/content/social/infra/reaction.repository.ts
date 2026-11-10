@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   reactions,
@@ -57,6 +57,23 @@ export class ReactionRepository {
       .limit(1);
 
     return record ?? null;
+  }
+
+  async findByPostsAndUser(postIds: string[], userId: string): Promise<Map<string, ReactionType>> {
+    if (postIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        postId: reactions.postId,
+        type: reactions.type,
+      })
+      .from(reactions)
+      .where(and(inArray(reactions.postId, postIds), eq(reactions.userId, userId)));
+
+    const map = new Map<string, ReactionType>();
+    for (const row of rows) {
+      map.set(row.postId, row.type);
+    }
+    return map;
   }
 
   /**

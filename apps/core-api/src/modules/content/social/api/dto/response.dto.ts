@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TripAttachmentDto } from './post.dto.js';
 
+export class PostViewerContextDto {
+  @ApiProperty({ type: String, enum: ['like', 'love', 'helpful'], nullable: true }) myReaction!:
+    string | null;
+  @ApiProperty() isBookmarked!: boolean;
+}
+
 // Document the existing wire format so generated clients do not treat JSON responses as void.
 export class SocialPostDto {
   @ApiProperty() id!: string;
@@ -25,6 +31,8 @@ export class SocialPostDto {
   @ApiProperty() commentCount!: number;
   @ApiProperty() shareCount!: number;
   @ApiProperty() bookmarkCount!: number;
+  @ApiProperty({ type: PostViewerContextDto, required: false, nullable: true })
+  viewerContext?: PostViewerContextDto | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) publishedAt!: string | null;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ format: 'date-time' }) updatedAt!: string;
@@ -34,11 +42,6 @@ export class SocialPostPageDto {
   @ApiProperty({ type: [SocialPostDto] }) items!: SocialPostDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
   @ApiProperty() hasMore!: boolean;
-}
-export class PostViewerContextDto {
-  @ApiProperty({ type: String, enum: ['like', 'love', 'helpful'], nullable: true }) myReaction!:
-    string | null;
-  @ApiProperty() isBookmarked!: boolean;
 }
 export class SocialPostDetailDto {
   @ApiProperty({ type: SocialPostDto }) post!: SocialPostDto;

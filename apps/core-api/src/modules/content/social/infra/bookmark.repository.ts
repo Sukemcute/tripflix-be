@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   bookmarks,
@@ -47,6 +47,16 @@ export class BookmarkRepository {
       .limit(1);
 
     return Boolean(record);
+  }
+
+  async findBookmarkedPostIds(postIds: string[], userId: string): Promise<Set<string>> {
+    if (postIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ postId: bookmarks.postId })
+      .from(bookmarks)
+      .where(and(inArray(bookmarks.postId, postIds), eq(bookmarks.userId, userId)));
+
+    return new Set(rows.map((r) => r.postId));
   }
 
   /**
