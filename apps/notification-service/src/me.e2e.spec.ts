@@ -56,6 +56,7 @@ describe('notification-service kiểm access token qua JWKS', () => {
       // Test này chỉ kiểm JWKS, không có Redis nên tắt consumer.
       NOTIFICATION_CONSUMER_ENABLED: false,
       NOTIFICATION_CONSUMER_NAME: undefined,
+      NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: 60_000,
     };
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ENV)

@@ -245,6 +245,7 @@ export class PaymentUseCases {
           guests,
           confirmationCode: codes[0]!.code,
           contactName: order.contactName,
+          contactPhone: order.contactPhone,
           contactEmail: order.contactEmail,
         },
       });

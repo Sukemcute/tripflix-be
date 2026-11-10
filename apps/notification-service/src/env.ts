@@ -24,6 +24,8 @@ export const envSchema = baseEnvSchema
       .default('true')
       .transform((v) => v === 'true'),
     NOTIFICATION_CONSUMER_NAME: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+    // Giãn nhịp quét để Redis không bị truy vấn liên tục khi SMTP lỗi.
+    NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
   })
   .superRefine((env, ctx) => {
     // Production mà vẫn gửi tới Mailpit thì email xác thực, đặt lại mật khẩu không tới người dùng: dừng ngay lúc khởi động.

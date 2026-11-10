@@ -60,7 +60,7 @@ export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdated
 /**
  * commerce.order.paid v1: đơn đã thanh toán, chỗ đã bán. Mang thông tin liên hệ khách nhập khi đặt để notification gửi
  * email xác nhận; contactEmail có thể null (form không bắt buộc), khi đó notification tra email tài khoản theo userId.
- * Ba trường liên hệ thêm sau (TF37) nên optional: sự kiện cũ trong stream không có.
+ * Các trường bổ sung mã xác nhận và liên hệ đều optional để đọc sự kiện cũ.
  */
 export const CommerceOrderPaidV1Schema = z.object({
   orderId: z.uuid(),
@@ -94,6 +94,7 @@ export const CommerceOrderPaidV1Schema = z.object({
     .optional(),
   confirmationCode: z.string().nullable().optional(),
   contactName: z.string().nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
   contactEmail: z.string().nullable().optional(),
 });
 export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
