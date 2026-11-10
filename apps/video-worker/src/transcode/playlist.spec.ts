@@ -17,9 +17,9 @@ describe('buildMasterPlaylist', () => {
     );
   });
 
-  it('liệt kê đủ các mức theo thứ tự', () => {
+  it('liệt kê đủ các mức, mức cao nhất đầu tiên để trình phát bắt đầu ở chất lượng cao', () => {
     const playlist = buildMasterPlaylist([...QUALITY_RUNGS], PORTRAIT_VIDEO);
-    expect(playlist.match(/^\d+p\/index\.m3u8$/gm)).toEqual(['360p/index.m3u8', '540p/index.m3u8', '720p/index.m3u8']);
+    expect(playlist.match(/^\d+p\/index\.m3u8$/gm)).toEqual(['720p/index.m3u8', '540p/index.m3u8', '360p/index.m3u8']);
   });
 
   it('video không có tiếng thì không khai báo codec âm thanh, vì trình phát có thể từ chối', () => {
