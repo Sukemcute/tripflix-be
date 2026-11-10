@@ -27,7 +27,7 @@ func TestBuildMasterPlaylistChiCoMucDaXong(t *testing.T) {
 func TestBuildMasterPlaylistDuCacMucTheoThuTu(t *testing.T) {
 	playlist := BuildMasterPlaylist(QualityRungs, portraitVideo)
 	got := regexp.MustCompile(`(?m)^\d+p/index\.m3u8$`).FindAllString(playlist, -1)
-	if want := []string{"360p/index.m3u8", "540p/index.m3u8", "720p/index.m3u8"}; !slices.Equal(got, want) {
+	if want := []string{"720p/index.m3u8", "540p/index.m3u8", "360p/index.m3u8"}; !slices.Equal(got, want) {
 		t.Errorf("được %v", got)
 	}
 	if !strings.Contains(playlist, "BANDWIDTH=1306000,RESOLUTION=540x960") {
