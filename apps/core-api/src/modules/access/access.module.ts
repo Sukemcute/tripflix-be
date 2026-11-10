@@ -30,11 +30,16 @@ import {
   GOOGLE_VERIFIER,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
+  PASSWORD_KEYRING,
   TOKEN_ISSUER,
   type Clock,
   type GoogleIdTokenVerifier,
+  type PasswordKeyring,
   type TokenIssuer,
 } from './auth/application/ports.js';
+import { PasswordEncryption } from './auth/application/password-encryption.js';
+import { PasswordDecryptionInterceptor } from './auth/api/encrypted-passwords.js';
+import { X25519PasswordKeyring } from './auth/infra/x25519-password-keyring.js';
 import { AccessOutboxRelay } from './auth/infra/access-outbox-relay.js';
 import { Argon2PasswordHasher } from './auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from './auth/infra/drizzle-access.store.js';
@@ -76,6 +81,22 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
     { provide: ACTION_RATE_LIMITER, inject: [REDIS], useFactory: (redis: Redis) => new RedisActionRateLimiter(redis) },
     { provide: ACCESS_SID_BLOCKLIST, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
     {
+      provide: PASSWORD_KEYRING,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv): PasswordKeyring | null => {
+        const logger = new Logger('AccessModule');
+        const keys = env.AUTH_PASSWORD_KEYS as string | undefined;
+        if (keys) return X25519PasswordKeyring.fromConfig(keys);
+        if (env.NODE_ENV === 'production') {
+          logger.error('Chưa đặt AUTH_PASSWORD_KEYS: tắt mã hoá mật khẩu, client gửi mật khẩu như cũ (TF056)');
+          return null;
+        }
+        // Dev, test: khoá tạm. Nhiều replica cần chung một khoá, nên production không dùng cách này.
+        logger.warn('Chưa đặt AUTH_PASSWORD_KEYS: dùng khoá tạm để mã hoá mật khẩu, đổi mỗi lần core-api khởi động lại');
+        return X25519PasswordKeyring.ephemeral();
+      },
+    },
+    {
       provide: TOKEN_ISSUER,
       inject: [CORE_ENV, CLOCK],
       useFactory: async (env: CoreEnv, clock: Clock): Promise<TokenIssuer> => {
@@ -106,6 +127,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
     ACCESS_SID_BLOCKLIST,
     TOKEN_ISSUER,
     GOOGLE_VERIFIER,
+    PASSWORD_KEYRING,
   ],
 })
 export class AccessInfraModule {}
@@ -148,6 +170,8 @@ export class AccessInfraModule {}
     EmailVerificationUseCases,
     StaffUseCases,
     ServiceTokenUseCases,
+    PasswordEncryption,
+    PasswordDecryptionInterceptor,
     WebSession,
     AccessOutboxRelay,
     AccessCleanupJob,

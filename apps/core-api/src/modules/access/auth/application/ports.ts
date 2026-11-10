@@ -2,6 +2,7 @@ import type { Role } from '@tripflix/contracts';
 import type { NewOutboxEvent } from '@tripflix/outbox';
 import type { JWK } from 'jose';
 import type { PersonalInfo } from '../../account/domain/personal-info.js';
+import type { ParsedPasswordEnvelope } from '../domain/password-envelope.js';
 import type { RefreshState } from '../domain/refresh-rotation.js';
 
 export interface UserRecord {
@@ -225,6 +226,21 @@ export interface PasswordHasher {
   verify(hash: string, password: string): Promise<boolean>;
 }
 
+/** Khoá công khai client dùng để mã hoá mật khẩu trước khi gửi (GET /auth/password-key). */
+export interface PublicPasswordKey {
+  keyId: string;
+  /** 32 byte X25519, base64url. */
+  publicKey: string;
+  algorithm: string;
+}
+
+/** Giữ khoá riêng X25519 (AUTH_PASSWORD_KEYS) và giải mã chuỗi mật khẩu của client (TF056). */
+export interface PasswordKeyring {
+  publicKey(): PublicPasswordKey;
+  /** Ném PasswordEnvelopeError khi sai khoá, bị sửa, sai AAD. */
+  decrypt(envelope: ParsedPasswordEnvelope, aad: Buffer): string;
+}
+
 export interface IssuedAccessToken {
   token: string;
   expiresIn: number;
@@ -274,3 +290,5 @@ export const ACCESS_SID_BLOCKLIST = Symbol('ACCESS_SID_BLOCKLIST');
 export const ACTION_RATE_LIMITER = Symbol('ACTION_RATE_LIMITER');
 export const GOOGLE_VERIFIER = Symbol('GOOGLE_VERIFIER');
 export const CLOCK = Symbol('CLOCK');
+/** Null khi production chưa đặt AUTH_PASSWORD_KEYS: tắt mã hoá, client gửi mật khẩu như cũ. */
+export const PASSWORD_KEYRING = Symbol('PASSWORD_KEYRING');

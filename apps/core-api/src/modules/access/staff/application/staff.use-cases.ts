@@ -20,6 +20,7 @@ import { mapPublicUser, type PublicUser } from '../../auth/application/public-us
 import { buildDisplayName, normalizeEmail } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
+import { PasswordResetUseCases } from '../../account/application/password-reset.use-cases.js';
 import { STAFF_DENIAL_MESSAGES, checkStaffAction, maskEmail, type StaffAction } from '../domain/staff-policy.js';
 
 export const USER_NOT_FOUND_MESSAGE = 'Không tìm thấy người dùng';
@@ -47,6 +48,7 @@ export class StaffUseCases {
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    @Inject(PasswordResetUseCases) private readonly resets: PasswordResetUseCases,
   ) {}
 
   @Transactional('access')
@@ -63,8 +65,8 @@ export class StaffUseCases {
     if (existing) {
       throw new BadRequestException('Email đã tồn tại trong hệ thống');
     }
-    const rawPassword = input.password?.trim() || 'Tripflix@2025';
-    const passwordHash = await this.hasher.hash(rawPassword);
+    // Không có mật khẩu mặc định: bỏ trống thì tạo tài khoản chưa có mật khẩu và gửi link để nhân sự tự đặt.
+    const passwordHash = input.password ? await this.hasher.hash(input.password) : null;
     const user = await this.store.users.insert({
       email: cleanEmail,
       displayName: buildDisplayName(input.displayName, cleanEmail),
@@ -77,8 +79,9 @@ export class StaffUseCases {
       action: 'staff.role_granted',
       actorUserId: actor.userId,
       ...meta,
-      meta: { createdUserId: user.id, email: user.email, role: user.role },
+      meta: { createdUserId: user.id, email: user.email, role: user.role, passwordSetBy: passwordHash ? 'admin' : 'email' },
     });
+    if (!passwordHash) await this.resets.sendPasswordSetupLink(user, meta);
     return { ...mapPublicUser(user), status: user.status };
   }
 

@@ -20,6 +20,7 @@ import type { Request } from 'express';
 import type { z } from 'zod';
 import { AuthUseCases } from '../../auth/application/auth.use-cases.js';
 import { UserDto } from '../../auth/api/dto.js';
+import { EncryptedPasswords } from '../../auth/api/encrypted-passwords.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { StaffUseCases } from '../application/staff.use-cases.js';
 import {
@@ -76,6 +77,10 @@ export class AdminController {
   @Post('users')
   @HttpCode(HttpStatus.CREATED)
   @Roles('superadmin')
+  @EncryptedPasswords({
+    subjectField: 'email',
+    fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'staff_create' }],
+  })
   @ApiBody({ type: CreateUserDto })
   @ApiOkResponse({ type: AdminUserDto })
   createStaff(
