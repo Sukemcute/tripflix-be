@@ -11,6 +11,8 @@ umask 077
 secret() { openssl rand -hex 24; }
 # PEM PKCS8 của ES256, đổi xuống dòng thành \n như lệnh auth:keygen.
 jwt_key=$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 2>/dev/null | awk 'NF{printf "%s\\n", $0}')
+# X25519 thô 32 byte, base64url, như lệnh auth:password-keygen: client mã hoá mật khẩu trước khi gửi (TF056).
+password_key=$(openssl genpkey -algorithm X25519 -outform DER 2>/dev/null | tail -c 32 | base64 | tr '+/' '-_' | tr -d '=\n')
 cat > "$target" <<ENV
 POSTGRES_PASSWORD=$(secret)
 DB_PASS_ACCESS=$(secret)
@@ -20,6 +22,7 @@ DB_PASS_ANALYTICS=$(secret)
 DB_PASS_COMMERCE=$(secret)
 DB_PASS_NOTIFICATION=$(secret)
 AUTH_JWT_PRIVATE_KEY="$jwt_key"
+AUTH_PASSWORD_KEYS="k1:$password_key"
 # Mật khẩu chung của 3 tài khoản mẫu, gồm cả superadmin.
 SEED_PASSWORD=$(secret)
 

@@ -46,6 +46,30 @@
         ]
       }
     },
+    "/api/auth/password-key": {
+      "get": {
+        "operationId": "AuthController_passwordKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordKeyDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Máy chủ chưa bật mã hoá mật khẩu"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -4015,16 +4039,10 @@
           "email": {
             "type": "string",
             "example": "khang@example.com"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 12,
-            "maxLength": 64
           }
         },
         "required": [
-          "email",
-          "password"
+          "email"
         ]
       },
       "RegistrationCodeResultDto": {
@@ -4045,6 +4063,39 @@
           "resendAfterSeconds"
         ]
       },
+      "PasswordKeyDto": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "example": "k1"
+          },
+          "publicKey": {
+            "type": "string",
+            "description": "Khoá công khai X25519, 32 byte, base64url"
+          },
+          "algorithm": {
+            "type": "string",
+            "example": "X25519-HKDF-SHA256-A256GCM"
+          },
+          "version": {
+            "type": "number",
+            "example": 1
+          },
+          "serverTime": {
+            "type": "number",
+            "example": 1794300000,
+            "description": "Giờ server (giây), để client tính lệch đồng hồ"
+          }
+        },
+        "required": [
+          "keyId",
+          "publicKey",
+          "algorithm",
+          "version",
+          "serverTime"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -4052,10 +4103,15 @@
             "type": "string",
             "example": "khang@example.com"
           },
+          "encPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
           "password": {
             "type": "string",
             "minLength": 12,
-            "maxLength": 64
+            "maxLength": 64,
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
           },
           "displayName": {
             "type": "string",
@@ -4100,7 +4156,6 @@
         },
         "required": [
           "email",
-          "password",
           "displayName",
           "registrationId",
           "code",
@@ -4151,8 +4206,13 @@
             "type": "string",
             "example": "khang@example.com"
           },
+          "encPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
           "password": {
-            "type": "string"
+            "type": "string",
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
           },
           "deviceName": {
             "type": "string",
@@ -4160,8 +4220,7 @@
           }
         },
         "required": [
-          "email",
-          "password"
+          "email"
         ]
       },
       "TokenPairDto": {
@@ -4326,19 +4385,25 @@
       "ChangePasswordDto": {
         "type": "object",
         "properties": {
+          "encCurrentPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
           "currentPassword": {
-            "type": "string"
+            "type": "string",
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
+          },
+          "encNewPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
           },
           "newPassword": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 64
+            "maxLength": 64,
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
           }
-        },
-        "required": [
-          "currentPassword",
-          "newPassword"
-        ]
+        }
       },
       "SessionDto": {
         "type": "object",
@@ -4409,15 +4474,19 @@
             "type": "string",
             "description": "Giá trị ?token= trên link trong email"
           },
+          "encNewPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
           "newPassword": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 64
+            "maxLength": 64,
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
           }
         },
         "required": [
-          "token",
-          "newPassword"
+          "token"
         ]
       },
       "VerifyEmailDto": {
@@ -4593,16 +4662,10 @@
             "type": "string",
             "example": "Nguyễn Văn A"
           },
-          "password": {
-            "type": "string",
-            "example": "Tripflix@2025"
-          },
           "role": {
             "type": "string",
             "enum": [
-              "member",
-              "moderator",
-              "superadmin"
+              "moderator"
             ],
             "default": "moderator"
           }

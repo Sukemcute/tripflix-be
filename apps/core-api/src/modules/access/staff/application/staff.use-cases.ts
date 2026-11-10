@@ -10,9 +10,7 @@ import { Transactional } from '@tripflix/db';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
-  PASSWORD_HASHER,
   type AccessStore,
-  type PasswordHasher,
   type RequestMeta,
   type UserRecord,
 } from '../../auth/application/ports.js';
@@ -20,6 +18,7 @@ import { mapPublicUser, type PublicUser } from '../../auth/application/public-us
 import { buildDisplayName, normalizeEmail } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
+import { PasswordResetUseCases } from '../../account/application/password-reset.use-cases.js';
 import { STAFF_DENIAL_MESSAGES, checkStaffAction, maskEmail, type StaffAction } from '../domain/staff-policy.js';
 
 export const USER_NOT_FOUND_MESSAGE = 'Không tìm thấy người dùng';
@@ -46,13 +45,13 @@ export class StaffUseCases {
   constructor(
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
-    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    @Inject(PasswordResetUseCases) private readonly resets: PasswordResetUseCases,
   ) {}
 
   @Transactional('access')
   async createStaff(
     actor: AuthUser,
-    input: { email: string; displayName: string; password?: string; role?: Role },
+    input: { email: string; displayName: string; role?: 'moderator' },
     meta: RequestMeta,
   ): Promise<AdminUserView> {
     if (actor.role !== 'superadmin') {
@@ -63,13 +62,13 @@ export class StaffUseCases {
     if (existing) {
       throw new BadRequestException('Email đã tồn tại trong hệ thống');
     }
-    const rawPassword = input.password?.trim() || 'Tripflix@2025';
-    const passwordHash = await this.hasher.hash(rawPassword);
+    // TF056: superadmin không biết mật khẩu của nhân sự. Tài khoản chưa có mật khẩu, nhân sự nhận email để tự đặt.
+    // TODO(TF056C): thư mời riêng 24 giờ; chỉ đánh dấu email đã xác thực khi nhân sự mở link.
     const user = await this.store.users.insert({
       email: cleanEmail,
       displayName: buildDisplayName(input.displayName, cleanEmail),
-      passwordHash,
-      role: input.role || 'moderator',
+      passwordHash: null,
+      role: 'moderator',
       emailVerifiedAt: new Date(),
     });
     if (!user) throw new BadRequestException('Không thể tạo tài khoản');
@@ -77,8 +76,9 @@ export class StaffUseCases {
       action: 'staff.role_granted',
       actorUserId: actor.userId,
       ...meta,
-      meta: { createdUserId: user.id, email: user.email, role: user.role },
+      meta: { createdUserId: user.id, email: user.email, role: user.role, passwordSetBy: 'email' },
     });
+    await this.resets.sendPasswordSetupLink(user, meta);
     return { ...mapPublicUser(user), status: user.status };
   }
 

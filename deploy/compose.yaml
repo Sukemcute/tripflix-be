@@ -14,6 +14,8 @@ x-be-env: &be-env
   DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
   # Access token: core-api ký (bỏ trống khoá ở dev thì tự sinh khoá tạm), service khác kiểm qua JWKS.
   AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
+  # Khoá để client mã hoá mật khẩu trước khi gửi (TF056). Bỏ trống ở dev thì tự sinh khoá tạm.
+  AUTH_PASSWORD_KEYS: ${AUTH_PASSWORD_KEYS:-}
   AUTH_JWT_ISSUER: tripflix-core
   AUTH_JWT_AUDIENCE: tripflix
   # Web (3100), admin (3200) gọi API qua gateway :8080 từ trình duyệt: CORS và cookie refresh token.

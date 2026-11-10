@@ -20,6 +20,7 @@ import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { MyProfileDto } from '../../auth/api/dto.js';
+import { EncryptedPasswords } from '../../auth/api/encrypted-passwords.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { WebSession, isWebClient } from '../../auth/api/web-session.js';
 import { AccountUseCases } from '../application/account.use-cases.js';
@@ -59,6 +60,12 @@ export class AccountController {
   /** Sai mật khẩu hiện tại: 400. Đổi xong thì các thiết bị khác bị đăng xuất, thiết bị này vẫn dùng tiếp. */
   @Post('password/change')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @EncryptedPasswords({
+    fields: [
+      { encrypted: 'encCurrentPassword', plain: 'currentPassword', purpose: 'change_current' },
+      { encrypted: 'encNewPassword', plain: 'newPassword', purpose: 'change_new' },
+    ],
+  })
   @ApiBody({ type: ChangePasswordDto })
   @ApiNoContentResponse()
   async changePassword(

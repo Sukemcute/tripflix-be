@@ -24,12 +24,14 @@ import {
 
 // Schema zod để kiểm dữ liệu vào; class bên dưới chỉ để Swagger sinh contracts/openapi.
 // Trường lạ (như role) bị bỏ đi, nên không ai tự cấp quyền khi đăng ký.
+// Bước xin mã chỉ cần email (TF056): app bản cũ còn gửi password thì trường đó bị bỏ đi, không lỗi.
 export const RegistrationCodeRequestSchema = z.object({
   email: signupEmailField(),
-  password: registrationPasswordField(),
 });
 
+// password có thể đến từ encPassword: PasswordDecryptionInterceptor giải mã trước khi schema này kiểm.
 export const RegisterRequestSchema = RegistrationCodeRequestSchema.extend({
+  password: registrationPasswordField(),
   displayName: displayNameField(),
   registrationId: z.uuid('Yêu cầu gửi mã xác thực email trước khi đăng ký'),
   code: z.string().regex(REGISTRATION_CODE_PATTERN, INVALID_REGISTRATION_CODE),
@@ -65,9 +67,24 @@ export class GoogleLoginDto {
   @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
 }
 
+/** Mô tả chung cho các trường enc*: chuỗi mã hoá thay cho mật khẩu gốc (TF056). */
+export const ENC_PASSWORD_DESCRIPTION =
+  'Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng "#TFPWD:1:<keyId>:<ts>:<dữ liệu>". ' +
+  'Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai.';
+export const PLAIN_PASSWORD_DESCRIPTION =
+  'Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED.';
+
 export class RegistrationCodeDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
-  @ApiProperty({ minLength: REGISTRATION_PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) password!: string;
+}
+
+export class PasswordKeyDto {
+  @ApiProperty({ example: 'k1' }) keyId!: string;
+  @ApiProperty({ description: 'Khoá công khai X25519, 32 byte, base64url' }) publicKey!: string;
+  @ApiProperty({ example: 'X25519-HKDF-SHA256-A256GCM' }) algorithm!: string;
+  @ApiProperty({ example: 1 }) version!: number;
+  @ApiProperty({ example: 1794300000, description: 'Giờ server (giây), để client tính lệch đồng hồ' })
+  serverTime!: number;
 }
 
 export class RegistrationCodeResultDto {
@@ -77,6 +94,13 @@ export class RegistrationCodeResultDto {
 }
 
 export class RegisterDto extends RegistrationCodeDto {
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encPassword?: string;
+  @ApiPropertyOptional({
+    minLength: REGISTRATION_PASSWORD_MIN,
+    maxLength: NEW_PASSWORD_MAX,
+    description: PLAIN_PASSWORD_DESCRIPTION,
+  })
+  password?: string;
   @ApiProperty({ maxLength: DISPLAY_NAME_MAX, example: 'Khang' }) displayName!: string;
   @ApiProperty({ format: 'uuid' }) registrationId!: string;
   @ApiProperty({ pattern: REGISTRATION_CODE_PATTERN.source }) code!: string;
@@ -90,7 +114,8 @@ export class RegisterDto extends RegistrationCodeDto {
 
 export class LoginDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
-  @ApiProperty() password!: string;
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encPassword?: string;
+  @ApiPropertyOptional({ description: PLAIN_PASSWORD_DESCRIPTION }) password?: string;
   @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
 }
 

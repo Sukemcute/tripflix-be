@@ -164,11 +164,8 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     const email = 'otp-new@example.com';
     const credentials = { email, password: PASSWORD, displayName: 'Lan' };
     await http().post('/api/auth/register').send(credentials).expect(400);
-    for (const password of ['huhuhuhu', 'Password123456', 'aaaaaaaaaaaa']) {
-      const response = await http().post('/api/auth/registration-code').send({ email, password }).expect(400);
-      expect(response.body.errors).toEqual([expect.objectContaining({ field: 'password' })]);
-    }
-    const first = await http().post('/api/auth/registration-code').send(credentials).expect(202);
+    // TF056: bước xin mã chỉ cần email; mật khẩu yếu bị chặn ở bước đăng ký (bên dưới).
+    const first = await http().post('/api/auth/registration-code').send({ email }).expect(202);
     advanceLimiter(REGISTRATION_CODE_COOLDOWN_SECONDS);
     const second = await http().post('/api/auth/registration-code').send(credentials).expect(202);
     const messages = store.outboxRows.filter((event) => event.type === 'access.registration_code_requested' && event.payload.email === email);
@@ -176,6 +173,10 @@ describe('TF05D: xác thực email và chặn spam đăng ký', () => {
     const code = messages[1]!.payload.code as string;
     const payload = { ...credentials, ...SIGNUP_PROFILE, registrationId: second.body.registrationId, code };
     const wrongCode = code === '00000000' ? '00000001' : '00000000';
+    for (const password of ['huhuhuhu', 'Password123456', 'aaaaaaaaaaaa']) {
+      const response = await http().post('/api/auth/register').send({ ...payload, password }).expect(400);
+      expect(response.body.errors).toEqual([expect.objectContaining({ field: 'password' })]);
+    }
     expect(store.registrationChallengeRows.get(email)?.codeHash).not.toContain(code);
     expect(await store.users.findByEmail(email)).toBeNull();
     await http().post('/api/auth/login').send(credentials).expect(401);
