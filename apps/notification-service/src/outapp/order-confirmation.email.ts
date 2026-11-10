@@ -38,18 +38,19 @@ function describeFlight(item: OrderItem): string {
 
 const describeItem = (item: OrderItem) => (item.productType === 'room' ? describeRoom(item) : describeFlight(item));
 
-/** Email xác nhận đặt chỗ gửi tới email khách nhập khi đặt. */
-export function buildOrderConfirmationEmail(payload: CommerceOrderPaidV1, email: string): EmailMessage {
+/** Email xác nhận đặt chỗ gửi tới email khách nhập khi đặt, kèm link mở lại đơn trên web. */
+export function buildOrderConfirmationEmail(payload: CommerceOrderPaidV1, email: string, webAppUrl: string): EmailMessage {
   const greeting = payload.contactName ? `Chào ${payload.contactName},` : 'Chào bạn,';
   const codeLine = payload.confirmationCode ? `Mã xác nhận: ${payload.confirmationCode}` : `Mã đơn: ${payload.orderId}`;
   const items = payload.items.map(describeItem);
   const guests = (payload.guests ?? []).map((guest) => (guest.passengerType ? `${guest.fullName} (${PASSENGER_LABELS[guest.passengerType]})` : guest.fullName));
   const guestLines = guests.length ? ['', 'Hành khách:', ...guests.map((guest) => `- ${guest}`)] : [];
   const totalLine = `Tổng thanh toán: ${formatMoney(payload.total)}`;
+  const orderUrl = `${webAppUrl.replace(/\/+$/, '')}/checkout/${encodeURIComponent(payload.orderId)}`;
   return {
     to: email,
     subject: payload.confirmationCode ? `Xác nhận đặt chỗ Tripflix ${payload.confirmationCode}` : 'Xác nhận đặt chỗ Tripflix',
-    text: [greeting, '', 'Đơn đặt chỗ của bạn đã được thanh toán thành công.', codeLine, '', ...items.map((item) => `- ${item}`), ...guestLines, '', totalLine, '', 'Tripflix · Chạm cảm hứng, trọn hành trình.'].join('\n'),
+    text: [greeting, '', 'Đơn đặt chỗ của bạn đã được thanh toán thành công.', codeLine, '', ...items.map((item) => `- ${item}`), ...guestLines, '', totalLine, '', `Xem đơn: ${orderUrl}`, '', 'Tripflix · Chạm cảm hứng, trọn hành trình.'].join('\n'),
     html: [
       EMAIL_WRAPPER_OPEN,
       '<p style="font-size:22px;font-weight:700;margin:0 0 16px">Đặt chỗ thành công</p>',
@@ -59,6 +60,7 @@ export function buildOrderConfirmationEmail(payload: CommerceOrderPaidV1, email:
       `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`,
       ...(guests.length ? ['<p style="font-weight:700;margin-bottom:0">Hành khách</p>', `<ul>${guests.map((guest) => `<li>${escapeHtml(guest)}</li>`).join('')}</ul>`] : []),
       `<p style="font-weight:700">${escapeHtml(totalLine)}</p>`,
+      `<p style="margin:24px 0"><a href="${escapeHtml(orderUrl)}" style="display:inline-block;background:#BC331E;color:#FFFFFF;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:12px">Xem đơn đặt chỗ</a></p>`,
       EMAIL_FOOTER,
       '</div>',
     ].join('\n'),

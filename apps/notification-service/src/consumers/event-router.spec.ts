@@ -123,6 +123,16 @@ describe('EventRouter', () => {
     expect(mail.html).not.toContain('An <b>');
   });
 
+  it('email xác nhận có link mở lại đơn trên web', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log, { webAppUrl: 'https://tripflix.io.vn/' });
+    const payload = paidPayload('an@example.com');
+    await router.route(createEvent('commerce.order.paid', payload));
+    const orderUrl = `https://tripflix.io.vn/checkout/${payload.orderId}`;
+    expect(mailer.sent[0]!.text).toContain(`Xem đơn: ${orderUrl}`);
+    expect(mailer.sent[0]!.html).toContain(`href="${orderUrl}"`);
+  });
+
   it('email xác nhận hiện tên khách sạn, chuyến bay, giờ bay và hành khách khi sự kiện có đủ', async () => {
     const mailer = new MemoryMailer();
     const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
