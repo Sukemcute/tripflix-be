@@ -27,14 +27,7 @@ export const AES_GCM_TAG_BYTES = 16;
 /** Chuỗi dài hơn mức này chắc chắn không phải mật khẩu thật (mật khẩu tối đa 1024 ký tự). */
 export const PASSWORD_ENVELOPE_MAX_LENGTH = 6000;
 
-export const PASSWORD_PURPOSES = [
-  'login',
-  'register',
-  'change_current',
-  'change_new',
-  'reset',
-  'staff_create',
-] as const;
+export const PASSWORD_PURPOSES = ['login', 'register', 'change_current', 'change_new', 'reset'] as const;
 export type PasswordPurpose = (typeof PASSWORD_PURPOSES)[number];
 
 export interface ParsedPasswordEnvelope {

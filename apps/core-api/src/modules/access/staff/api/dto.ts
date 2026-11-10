@@ -1,7 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
-import { ENC_PASSWORD_DESCRIPTION, PLAIN_PASSWORD_DESCRIPTION, UserDto } from '../../auth/api/dto.js';
-import { newPasswordField } from '../../auth/api/validation.js';
+import { UserDto } from '../../auth/api/dto.js';
 
 export const SearchUsersQuerySchema = z.object({
   query: z.string().trim().max(100, 'Từ khoá tối đa 100 ký tự').optional(),
@@ -21,22 +20,18 @@ export class GrantStaffDto {
   @ApiProperty({ format: 'uuid' }) userId!: string;
 }
 
-// Không có mật khẩu mặc định (TF056): bỏ trống thì nhân sự nhận email để tự đặt mật khẩu.
-// Có mật khẩu thì theo cùng luật với mật khẩu mới (8–64 ký tự, không chỉ có khoảng trắng), không cắt khoảng trắng.
+// TF056: superadmin không đặt mật khẩu hộ. Tài khoản tạo ra chưa có mật khẩu, nhân sự nhận email để tự đặt;
+// trường password/encPassword gửi kèm bị bỏ qua. Chỉ tạo được kiểm duyệt viên: superadmin tạo nhầm không gỡ được qua giao diện.
 export const CreateUserRequestSchema = z.object({
   email: z.string().trim().email('Email không hợp lệ').max(255),
   displayName: z.string().trim().min(2, 'Tên hiển thị tối thiểu 2 ký tự').max(100),
-  password: newPasswordField().optional(),
-  role: z.enum(['member', 'moderator', 'superadmin']).default('moderator'),
+  role: z.enum(['moderator'], 'Chỉ tạo được tài khoản kiểm duyệt viên').default('moderator'),
 });
 
 export class CreateUserDto {
   @ApiProperty({ example: 'mod_015@tripflix.vn' }) email!: string;
   @ApiProperty({ example: 'Nguyễn Văn A' }) displayName!: string;
-  @ApiPropertyOptional({ description: `${ENC_PASSWORD_DESCRIPTION} Bỏ trống cả hai: gửi email để nhân sự tự đặt mật khẩu.` })
-  encPassword?: string;
-  @ApiPropertyOptional({ description: PLAIN_PASSWORD_DESCRIPTION }) password?: string;
-  @ApiProperty({ enum: ['member', 'moderator', 'superadmin'], default: 'moderator', required: false }) role?: 'member' | 'moderator' | 'superadmin';
+  @ApiProperty({ enum: ['moderator'], default: 'moderator', required: false }) role?: 'moderator';
 }
 
 export class AdminUserDto extends UserDto {

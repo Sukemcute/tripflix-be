@@ -39,7 +39,7 @@
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
 | `GET /api/admin/users?query=&page=` | `moderator`, `superadmin` | Tìm theo email, tên; 20 người mỗi trang. Moderator thấy email đã che (`kh***@example.com`) |
-| `POST /api/admin/users` `{ email, displayName, role?, encPassword? }` | `superadmin` | `201` tạo tài khoản nhân sự. Không có mật khẩu mặc định: bỏ trống `encPassword` thì tài khoản chưa có mật khẩu và nhân sự nhận email để tự đặt (link 30 phút, hết hạn thì dùng "Quên mật khẩu") |
+| `POST /api/admin/users` `{ email, displayName, role? }` | `superadmin` | `201` tạo tài khoản kiểm duyệt viên (`role` chỉ nhận `moderator`, khác thì `400`). Superadmin không đặt mật khẩu hộ: tài khoản chưa có mật khẩu, nhân sự nhận email để tự đặt (link 30 phút, hết hạn thì dùng "Quên mật khẩu"); `password`, `encPassword` gửi kèm bị bỏ qua |
 | `POST /api/admin/staff` `{ userId }` | `superadmin` | Cấp `moderator` |
 | `DELETE /api/admin/staff/{userId}` | `superadmin` | Thu hồi về `member` |
 | `POST /api/admin/users/{userId}/lock`, `/unlock` | `superadmin` | Khoá: không đăng nhập được. Mở khoá: đăng nhập lại được |
@@ -60,7 +60,7 @@ Giống Facebook (`#PWD_BROWSER`): client mã hoá mật khẩu bằng khoá cô
 3. gửi "#TFPWD:1:<keyId>:<ts>:<base64url(khoáTạm 32B ‖ iv 12B ‖ bản mã ‖ tag 16B)>"
 ```
 
-- **Mục đích** (`auth/domain/password-envelope.ts`): `login`, `register`, `change_current`, `change_new`, `reset`, `staff_create`. Email (trim, chữ thường) gắn vào AAD với `login`, `register`, `staff_create`; đổi và đặt lại mật khẩu dùng chuỗi rỗng.
+- **Mục đích** (`auth/domain/password-envelope.ts`): `login`, `register`, `change_current`, `change_new`, `reset`. Email (trim, chữ thường) gắn vào AAD với `login`, `register`; đổi và đặt lại mật khẩu dùng chuỗi rỗng.
 - **Server kiểm** (`PasswordDecryptionInterceptor`, chạy trước ZodBody nên luật mật khẩu giữ nguyên): đúng `keyId`, ts trong 5 phút gần đây (nhanh hơn tối đa 60 giây), giải mã được với đúng AAD, `t` trong bản rõ khớp ts, nonce chưa dùng (Redis `auth:action:pwd-nonce:<n>`, 10 phút).
 - **Lỗi**: chuỗi sai, hết hạn, sai mục đích hay gửi lại: `400 { code: "password_envelope_invalid", errors: [{ field: "encPassword", ... }] }`; client lấy lại khoá rồi thử lại một lần. Gửi mật khẩu thường khi đã bắt buộc: `400 { code: "password_encryption_required" }`. Lý do cụ thể chỉ ghi log, không có mật khẩu hay chuỗi mã hoá.
 - **Đổi khoá**: `auth:password-keygen k2`, đặt `AUTH_PASSWORD_KEYS="k2:<mới>,k1:<cũ>"`, giữ khoá cũ ít nhất 10 phút rồi bỏ. Mất khoá thì sinh khoá mới: client lấy lại khoá, không ai bị khoá ngoài.

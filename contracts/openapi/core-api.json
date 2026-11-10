@@ -4662,20 +4662,10 @@
             "type": "string",
             "example": "Nguyễn Văn A"
           },
-          "encPassword": {
-            "type": "string",
-            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai. Bỏ trống cả hai: gửi email để nhân sự tự đặt mật khẩu."
-          },
-          "password": {
-            "type": "string",
-            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
-          },
           "role": {
             "type": "string",
             "enum": [
-              "member",
-              "moderator",
-              "superadmin"
+              "moderator"
             ],
             "default": "moderator"
           }

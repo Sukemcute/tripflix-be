@@ -300,30 +300,40 @@ describe('TF056: mật khẩu mã hoá trước khi gửi', () => {
         .expect(401);
     });
 
-    it('đặt mật khẩu bằng encPassword: nhân sự đăng nhập được bằng đúng mật khẩu đó', async () => {
-      const encPassword = await t.enc('mat-khau-nhan-su', 'staff_create', 'mod2@tripflix.vn');
+    it('gửi kèm password hoặc encPassword: bị bỏ qua, tài khoản vẫn chưa có mật khẩu và vẫn nhận email đặt mật khẩu', async () => {
+      const encPassword = await t.enc('mat-khau-nhan-su', 'login', 'mod2@tripflix.vn');
       const res = await create({
         email: 'mod2@tripflix.vn',
         displayName: 'Kiểm duyệt 2',
+        password: 'mat-khau-nhan-su',
         encPassword,
       }).expect(201);
+      expect(t.store.userRows.get(res.body.id)!.passwordHash).toBeNull();
       expect(
         t.store.outboxRows.some(
           (e) => e.type === 'access.password_reset_requested' && e.userId === res.body.id,
         ),
-      ).toBe(false);
+      ).toBe(true);
       await t
         .http()
         .post('/api/auth/login')
         .send({ email: 'mod2@tripflix.vn', password: 'mat-khau-nhan-su' })
-        .expect(200);
+        .expect(401);
     });
 
-    it('mật khẩu chỉ có khoảng trắng hoặc quá ngắn: 400 (trước đây bị cắt khoảng trắng rồi thay bằng mật khẩu mặc định)', async () => {
-      await create({ email: 'mod3@tripflix.vn', displayName: 'Kiểm duyệt 3', password: '          ' }).expect(
-        400,
-      );
-      await create({ email: 'mod3@tripflix.vn', displayName: 'Kiểm duyệt 3', password: 'ngan' }).expect(400);
+    it.each(['superadmin', 'member'])('role %s: 400, chỉ tạo được kiểm duyệt viên', async (role) => {
+      const res = await create({
+        email: `role-${role}@tripflix.vn`,
+        displayName: 'Thử vai trò',
+        role,
+      }).expect(400);
+      expect(res.body.errors).toEqual([expect.objectContaining({ field: 'role' })]);
+      expect([...t.store.userRows.values()].some((u) => u.email === `role-${role}@tripflix.vn`)).toBe(false);
+    });
+
+    it('không ghi role: tạo kiểm duyệt viên', async () => {
+      const res = await create({ email: 'mod4@tripflix.vn', displayName: 'Kiểm duyệt 4' }).expect(201);
+      expect(res.body.role).toBe('moderator');
     });
   });
 });

@@ -10,9 +10,7 @@ import { Transactional } from '@tripflix/db';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
-  PASSWORD_HASHER,
   type AccessStore,
-  type PasswordHasher,
   type RequestMeta,
   type UserRecord,
 } from '../../auth/application/ports.js';
@@ -47,14 +45,13 @@ export class StaffUseCases {
   constructor(
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
-    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     @Inject(PasswordResetUseCases) private readonly resets: PasswordResetUseCases,
   ) {}
 
   @Transactional('access')
   async createStaff(
     actor: AuthUser,
-    input: { email: string; displayName: string; password?: string; role?: Role },
+    input: { email: string; displayName: string; role?: 'moderator' },
     meta: RequestMeta,
   ): Promise<AdminUserView> {
     if (actor.role !== 'superadmin') {
@@ -65,13 +62,13 @@ export class StaffUseCases {
     if (existing) {
       throw new BadRequestException('Email đã tồn tại trong hệ thống');
     }
-    // Không có mật khẩu mặc định: bỏ trống thì tạo tài khoản chưa có mật khẩu và gửi link để nhân sự tự đặt.
-    const passwordHash = input.password ? await this.hasher.hash(input.password) : null;
+    // TF056: superadmin không biết mật khẩu của nhân sự. Tài khoản chưa có mật khẩu, nhân sự nhận email để tự đặt.
+    // TODO(TF056C): thư mời riêng 24 giờ; chỉ đánh dấu email đã xác thực khi nhân sự mở link.
     const user = await this.store.users.insert({
       email: cleanEmail,
       displayName: buildDisplayName(input.displayName, cleanEmail),
-      passwordHash,
-      role: input.role || 'moderator',
+      passwordHash: null,
+      role: 'moderator',
       emailVerifiedAt: new Date(),
     });
     if (!user) throw new BadRequestException('Không thể tạo tài khoản');
@@ -79,9 +76,9 @@ export class StaffUseCases {
       action: 'staff.role_granted',
       actorUserId: actor.userId,
       ...meta,
-      meta: { createdUserId: user.id, email: user.email, role: user.role, passwordSetBy: passwordHash ? 'admin' : 'email' },
+      meta: { createdUserId: user.id, email: user.email, role: user.role, passwordSetBy: 'email' },
     });
-    if (!passwordHash) await this.resets.sendPasswordSetupLink(user, meta);
+    await this.resets.sendPasswordSetupLink(user, meta);
     return { ...mapPublicUser(user), status: user.status };
   }
 
