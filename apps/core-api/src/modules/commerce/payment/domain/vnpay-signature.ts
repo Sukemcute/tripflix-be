@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 // Ký và kiểm chữ ký của VNPay (tài liệu "Thanh toán PAY", phiên bản 2.1.0). Hàm thuần: nhận sẵn hàm HMAC.
 // Chuỗi ký: các tham số vnp_* (trừ vnp_SecureHash, vnp_SecureHashType) sắp theo tên, giá trị mã hoá kiểu form
 // (dấu cách thành "+"), nối "key=value" bằng "&"; chữ ký là HMAC-SHA512 hex của chuỗi đó với vnp_HashSecret.
@@ -28,7 +30,11 @@ export function buildSignedUrl(baseUrl: string, params: Record<string, string>, 
 export function isValidSignature(params: Record<string, string>, secret: string, hmac: HmacSha512Hex): boolean {
   const received = params.vnp_SecureHash;
   if (!received) return false;
-  return hmac(secret, buildSignData(params)).toLowerCase() === received.toLowerCase();
+  const expectedBuffer = Buffer.from(hmac(secret, buildSignData(params)).toLowerCase(), 'utf8');
+  const receivedBuffer = Buffer.from(received.toLowerCase(), 'utf8');
+  // So sánh chuỗi hex dạng UTF-8 để không âm thầm bỏ phần hex lỗi khi giải mã.
+  if (expectedBuffer.length !== receivedBuffer.length) return false;
+  return timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
 /** Ngày giờ theo múi giờ Việt Nam dạng yyyyMMddHHmmss, VNPay yêu cầu cho vnp_CreateDate / vnp_ExpireDate. */
