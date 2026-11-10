@@ -3,6 +3,7 @@ import { Comment, CommentNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord } from '../../../db/schema/index.js';
+import { PostRepository } from '../../infra/post.repository.js';
 
 export interface EditCommentCommand {
   commentId: string;
@@ -14,13 +15,19 @@ export class EditCommentUseCase {
   constructor(
     private readonly commentRepository: CommentRepository,
     private readonly outbox: ContentOutbox,
+    private readonly postRepository?: PostRepository,
   ) {}
 
   @Transactional('content')
   async execute(command: EditCommentCommand): Promise<CommentRecord> {
     const record = await this.commentRepository.findById(command.commentId);
-    if (!record) {
+    if (!record || record.status !== 'visible') {
       throw new CommentNotFoundException(command.commentId);
+    }
+    if (this.postRepository) {
+      const post = await this.postRepository.findById(record.postId);
+      if (!post || post.status !== 'published' || post.deletedAt)
+        throw new CommentNotFoundException(command.commentId);
     }
 
     const domainComment = new Comment({

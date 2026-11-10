@@ -36,6 +36,8 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     this.consumer = new RedisStreamsConsumer({
       redis: this.connection,
       group: 'notification',
+      // Chờ SMTP phục hồi khoảng 10 phút trước khi chuyển sang hàng đợi lỗi.
+      maxDeliveries: 10,
       consumer: this.env.NOTIFICATION_CONSUMER_NAME ?? hostname(),
       streams: [STREAMS.access, STREAMS.content, STREAMS.commerce],
       handler: async (event) => {

@@ -19,6 +19,7 @@ import {
 } from './search/application/ports.js';
 import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
+import { ExploreContentConsumer } from './search/consumers/explore-content.consumer.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
@@ -63,6 +64,7 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
     ExploreUseCases,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
+    ExploreContentConsumer,
   ],
 })
 export class DiscoveryModule {}

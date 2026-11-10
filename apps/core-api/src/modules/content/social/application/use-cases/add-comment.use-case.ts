@@ -21,7 +21,7 @@ export class AddCommentUseCase {
 
   @Transactional('content')
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
-    const post = await this.postRepository.findById(command.postId);
+    const post = await this.postRepository.findByIdForUpdate(command.postId);
     if (!post) {
       throw new PostNotFoundException(command.postId);
     }
@@ -37,7 +37,7 @@ export class AddCommentUseCase {
     // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
     if (command.parentCommentId) {
       const parent = await this.commentRepository.findById(command.parentCommentId);
-      if (!parent || parent.postId !== command.postId || parent.deletedAt) {
+      if (!parent || parent.postId !== command.postId || parent.deletedAt || parent.status !== 'visible') {
         throw new CommentNotFoundException(command.parentCommentId);
       }
       Comment.validateParentForReply(parent);

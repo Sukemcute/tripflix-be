@@ -16,6 +16,7 @@ import { createRemoteJWKSet } from 'jose';
 import type pg from 'pg';
 
 import { NotificationConsumer } from './consumers/notification-consumer.js';
+import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
@@ -99,7 +100,7 @@ export class InfraModule {}
     }),
   ],
   controllers: [HealthController, MeController],
-  providers: [NotificationConsumer],
+  providers: [NotificationConsumer, DeadLetterReplayJob],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(

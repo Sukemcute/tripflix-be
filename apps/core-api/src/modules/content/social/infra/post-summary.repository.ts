@@ -1,10 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
-import {
-  postSummaries,
-  type NewPostSummaryRecord,
-  type PostSummaryRecord,
-} from '../../db/schema/index.js';
+import { postSummaries, type NewPostSummaryRecord, type PostSummaryRecord } from '../../db/schema/index.js';
 
 export class PostSummaryRepository {
   constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
@@ -39,6 +35,7 @@ export class PostSummaryRepository {
           content: data.content,
           safety: data.safety,
           inputHash: data.inputHash,
+          sourceCommentIds: data.sourceCommentIds ?? null,
           commentCountAtSummary: data.commentCountAtSummary,
           promptVersion: data.promptVersion,
           modelName: data.modelName,
@@ -47,7 +44,7 @@ export class PostSummaryRepository {
         },
         where: sql`(
           ${postSummaries.generatedAt} IS NULL
-          OR excluded.generated_at >= ${postSummaries.generatedAt}
+          OR excluded.generated_at > ${postSummaries.generatedAt}
         ) AND NOT (
           ${postSummaries.status} = 'ready' AND excluded.status = 'failed'
         )`,

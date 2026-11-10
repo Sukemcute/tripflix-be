@@ -3,6 +3,7 @@ import { PostRepository } from '../../infra/post.repository.js';
 import { PostSummaryRepository } from '../../infra/post-summary.repository.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import type { PostSummaryRecord } from '../../../db/schema/index.js';
+import { collectCitationIds, filterCitations } from '../../domain/summary-sources.js';
 
 export interface GetPostSummaryQuery {
   postId: string;
@@ -50,10 +51,36 @@ export class GetPostSummaryUseCase {
     const countMismatch = (post.commentCount ?? 0) !== (summary.commentCountAtSummary ?? 0);
     const isStale = countMismatch || discussionChanged;
 
+    const sourceCommentIds = summary.sourceCommentIds ?? null;
+    let blocked = false;
+    if (this.commentRepository) {
+      blocked =
+        sourceCommentIds === null
+          ? await this.commentRepository.hasUnavailableSince(query.postId, summary.generatedAt ?? new Date(0))
+          : (await this.commentRepository.findVisibleIds(query.postId, sourceCommentIds)).length !==
+            new Set(sourceCommentIds).size;
+    }
+    const citedIds = [
+      ...new Set([...collectCitationIds(summary.content), ...collectCitationIds(summary.safety)]),
+    ];
+    const visibleCitations = new Set(
+      this.commentRepository && citedIds.length
+        ? await this.commentRepository.findVisibleIds(query.postId, citedIds)
+        : [],
+    );
+    const safeContent = citedIds.length
+      ? filterCitations(summary.content, visibleCitations)
+      : summary.content;
+    const safeSafety = citedIds.length ? filterCitations(summary.safety, visibleCitations) : summary.safety;
+
     return {
       ...summary,
-      safety: query.isStaff ? summary.safety : withoutPendingWarnings(summary.safety),
-      isStale,
+      sourceCommentIds,
+      summary: blocked ? null : summary.summary,
+      keyTakeaways: blocked ? [] : summary.keyTakeaways,
+      content: blocked ? null : safeContent,
+      safety: blocked ? null : query.isStaff ? safeSafety : withoutPendingWarnings(safeSafety),
+      isStale: blocked || isStale,
     };
   }
 }

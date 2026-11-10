@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserLockedV1,
@@ -10,11 +10,14 @@ import { Transactional } from '@tripflix/db';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  PASSWORD_HASHER,
   type AccessStore,
+  type PasswordHasher,
   type RequestMeta,
   type UserRecord,
 } from '../../auth/application/ports.js';
 import { mapPublicUser, type PublicUser } from '../../auth/application/public-user.js';
+import { buildDisplayName, normalizeEmail } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
 import { STAFF_DENIAL_MESSAGES, checkStaffAction, maskEmail, type StaffAction } from '../domain/staff-policy.js';
@@ -43,7 +46,41 @@ export class StaffUseCases {
   constructor(
     @Inject(ACCESS_STORE) private readonly store: AccessStore,
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
+    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
+
+  @Transactional('access')
+  async createStaff(
+    actor: AuthUser,
+    input: { email: string; displayName: string; password?: string; role?: Role },
+    meta: RequestMeta,
+  ): Promise<AdminUserView> {
+    if (actor.role !== 'superadmin') {
+      throw new AccessError('staff_rule', 'Chỉ superadmin mới có quyền tạo tài khoản nhân sự');
+    }
+    const cleanEmail = normalizeEmail(input.email);
+    const existing = await this.store.users.findByEmail(cleanEmail);
+    if (existing) {
+      throw new BadRequestException('Email đã tồn tại trong hệ thống');
+    }
+    const rawPassword = input.password?.trim() || 'Tripflix@2025';
+    const passwordHash = await this.hasher.hash(rawPassword);
+    const user = await this.store.users.insert({
+      email: cleanEmail,
+      displayName: buildDisplayName(input.displayName, cleanEmail),
+      passwordHash,
+      role: input.role || 'moderator',
+      emailVerifiedAt: new Date(),
+    });
+    if (!user) throw new BadRequestException('Không thể tạo tài khoản');
+    await this.store.audit.record({
+      action: 'staff.role_granted',
+      actorUserId: actor.userId,
+      ...meta,
+      meta: { createdUserId: user.id, email: user.email, role: user.role },
+    });
+    return { ...mapPublicUser(user), status: user.status };
+  }
 
   async listStaff(): Promise<PublicUser[]> {
     return (await this.store.users.listStaff()).map(mapPublicUser);

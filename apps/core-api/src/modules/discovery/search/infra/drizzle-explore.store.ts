@@ -93,4 +93,10 @@ export class DrizzleExploreStore implements ExploreStore {
       return true;
     });
   }
+
+  async deleteDocuments(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const deleted = await this.db.delete(searchDocuments).where(inArray(searchDocuments.id, ids)).returning({ id: searchDocuments.id });
+    return deleted.length;
+  }
 }

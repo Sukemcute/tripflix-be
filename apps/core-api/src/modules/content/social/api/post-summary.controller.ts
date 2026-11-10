@@ -19,10 +19,7 @@ import {
   SavePostSummaryRequestSchema,
   type SavePostSummaryRequest,
 } from './dto/post-summary.dto.js';
-import {
-  GetPostSummaryUseCase,
-  SavePostSummaryUseCase,
-} from '../application/index.js';
+import { GetPostSummaryUseCase, SavePostSummaryUseCase } from '../application/index.js';
 
 @ApiTags('Social - AI Summary')
 @Controller('v1/posts/:postId/ai-summary')
@@ -38,7 +35,8 @@ export class PostSummaryController {
   @ServiceOnly('ai-service')
   @ApiOperation({
     summary: 'Lưu hoặc cập nhật kết quả tóm tắt bài viết từ AI Service (Nội bộ)',
-    description: 'Chỉ cho phép ai-service với Service Token hợp lệ gọi để callback lưu kết quả tóm tắt sau khi phân tích.',
+    description:
+      'Chỉ cho phép ai-service với Service Token hợp lệ gọi để callback lưu kết quả tóm tắt sau khi phân tích.',
   })
   @ApiBody({ type: SavePostSummaryDto })
   @ApiResponse({ status: 200, description: 'Đã lưu tóm tắt thành công' })
@@ -58,6 +56,7 @@ export class PostSummaryController {
       content: body.content,
       safety: body.safety,
       inputHash: body.inputHash,
+      sourceCommentIds: body.sourceCommentIds,
       commentCount: body.commentCount,
       promptVersion: body.promptVersion,
       modelName: body.modelName,
@@ -69,7 +68,8 @@ export class PostSummaryController {
   @OptionalAuthenticated()
   @ApiOperation({
     summary: 'Lấy kết quả tóm tắt cộng đồng của bài viết',
-    description: 'Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).',
+    description:
+      'Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).',
   })
   @ApiResponse({ status: 200, description: 'Thông tin tóm tắt bài viết', type: PostSummaryResponseDto })
   @ApiResponse({ status: 400, description: 'postId sai định dạng UUID' })

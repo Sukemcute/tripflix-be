@@ -35,11 +35,13 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | `GET /api/recommendations/home` | `recommend/api/home-recommendations.controller.ts` | Khối "Gợi ý dành cho bạn" trang chủ web, mỗi thẻ kèm lý do (TF12) |
 | `POST /api/search` | `search/api/explore.controller.ts` | Tìm khám phá của app: một ô tìm, kết quả chia vùng (Ở đâu, Lộ trình, Bài viết, Video). Xem mục 6 (TF11) |
 | Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút |
+| Gỡ bài ẩn khỏi chỉ mục | `search/consumers/explore-content.consumer.ts` | Consumer group `core-discovery` trên `stream:core.content`: bài bị ẩn/xoá rời `search_documents` trong vài giây (TF33) |
 
 ## Giao tiếp
 
 - Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`; danh mục cho gợi ý trang chủ) và `CommerceFacade.checkAvailability` (`/stays`); `ContentFacade.listPosts` (dựng chỉ mục tìm khám phá) và `ContentFacade.getVisiblePosts` (`/search`, bỏ bài đã ẩn). `DiscoveryModule` import `CommerceModule`, `ContentModule`.
-- Nghe sự kiện: **không, ở v1** (05/11). Search không bao giờ chờ sự kiện: request chỉ đọc bảng của discovery hoặc gọi hàm module khác trong tiến trình. Bản chép được làm mới bằng job nền (xem bảng 1, 3, 4). **Không nghe `commerce.ari.updated`**: discovery không giữ giá hay còn phòng thật (`/stays` gọi thẳng commerce), nên không có gì để cập nhật. Danh mục khách sạn v1 là seed, nạp lại lúc worker khởi động hoặc qua lệnh reindex. Cần cập nhật ngay thì thêm `commerce.catalog.updated { productIds }` (chỉ mang id, discovery tự gọi `listCatalog`).
+- Nghe sự kiện (TF33, 09/11): consumer group `core-discovery` nghe `content.post.moderated`, `content.post.deleted`, `content.post.updated` trên `stream:core.content`. Không đọc action trong payload mà gọi `ExploreUseCases.dropHidden([postId])`: hỏi lại `getVisiblePosts`, bài không còn hiện thì xoá `post:<id>` khỏi `search_documents`. Không sửa `search_counts`, không thêm lại bài khi restore (job 10 phút lo). Job dựng lại chỉ mục cũng gọi `dropHidden` cho mọi bài ngay sau khi commit, để bài bị ẩn trong lúc dựng không bị ghi lại.
+- Ngoài việc gỡ bài ẩn, search không bao giờ chờ sự kiện: request chỉ đọc bảng của discovery hoặc gọi hàm module khác trong tiến trình. Bản chép được làm mới bằng job nền (xem bảng 1, 3, 4). **Không nghe `commerce.ari.updated`**: discovery không giữ giá hay còn phòng thật (`/stays` gọi thẳng commerce), nên không có gì để cập nhật. Danh mục khách sạn v1 là seed, nạp lại lúc worker khởi động hoặc qua lệnh reindex. Cần cập nhật ngay thì thêm `commerce.catalog.updated { productIds }` (chỉ mang id, discovery tự gọi `listCatalog`).
 - Cho module khác: không export hàm nào (content, commerce bị discovery gọi nên không được gọi ngược).
 
 ## Luồng đã chốt (Duy, 05/11)
@@ -106,7 +108,7 @@ Chọn địa điểm thì web gọi `/stays?placeId=<refId>`. Chọn khách s�
 | Vào | `{ q, loc?: { lat, lng } }`. `loc` chỉ dùng khi câu không nói nơi |
 | Ra | `{ understood, nearUser, sections: [{ kind, label, total, items }], suggest, dropped }`. `kind`: stay, plan, post, video (food, cafe, see rỗng tới khi có nguồn POI). Item: `id`, `kind`, `refId`, `title`, `subtitle`, `thumbnail`, `reason`, `priceFrom`, `days`, `location` |
 | Luồng | 1. Hiểu câu (`search/domain/explore/query.ts`): nơi, ý muốn, ngân sách, số ngày, tên riêng, cụm dính, sửa lỗi gõ — đọc bộ đếm cần cho câu từ `search_counts`.<br>2. Mỗi nhánh (song song) lấy ứng viên bằng SQL (`terms && …`, tên đường, tầm, số ngày, khung toạ độ quanh nơi) rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần bằng TS (`rank.ts`).<br>3. `content.getVisiblePosts` bỏ bài vừa ẩn |
-| Nạp dữ liệu | Job mỗi 10 phút (worker): đọc hết `listCatalog` + `listPosts`, dựng chỉ mục bằng TS, một transaction xoá rồi ghi lại (advisory lock). Dựng lại toàn bộ vì `listPosts` không báo bài bị ẩn; ~230 mục mất ~2 s |
+| Nạp dữ liệu | Job mỗi 10 phút (worker): đọc hết `listCatalog` + `listPosts`, dựng chỉ mục bằng TS, một transaction xoá rồi ghi lại (advisory lock), sau commit gỡ bài vừa bị ẩn (`dropHidden`). Dựng lại toàn bộ vì `listPosts` không báo bài bị ẩn; ~230 mục mất ~2 s. Bài bị ẩn/xoá rời chỉ mục trong vài giây nhờ consumer (TF33), nên `total` chỉ dư bài ẩn trong khoảng đó |
 | Đối chiếu | Port từ prototype Python `experiments/natural-search` (ngoài repo). `explore.parity.spec.ts` chạy 134 câu của prototype, kết quả trùng hoàn toàn (đặt `EXPLORE_PARITY_DIR`) |
 | Từ điển | `search/domain/explore/lexicon-rows.ts`. Thêm cách viết mới = thêm dòng; chỉ mục dựng lại ở chu kỳ job kế tiếp |
 

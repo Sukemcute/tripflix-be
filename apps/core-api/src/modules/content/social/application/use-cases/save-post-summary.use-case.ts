@@ -11,6 +11,7 @@ export interface SavePostSummaryCommand {
   content?: Record<string, unknown> | null;
   safety?: Record<string, unknown> | null;
   inputHash?: string | null;
+  sourceCommentIds?: string[] | null;
   commentCount?: number;
   promptVersion?: string | null;
   modelName?: string | null;
@@ -47,6 +48,10 @@ export class SavePostSummaryUseCase {
       content: command.content ?? null,
       safety: command.safety ?? null,
       inputHash: command.inputHash ?? null,
+      sourceCommentIds:
+        command.sourceCommentIds === undefined || command.sourceCommentIds === null
+          ? null
+          : [...new Set(command.sourceCommentIds)],
       commentCountAtSummary: command.commentCount ?? 0,
       promptVersion: command.promptVersion ?? null,
       modelName: command.modelName ?? null,

@@ -1,10 +1,6 @@
-import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
-import {
-  comments,
-  type CommentRecord,
-  type NewCommentRecord,
-} from '../../db/schema/index.js';
+import { comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
 
 export interface FindCommentsOptions {
   postId: string;
@@ -40,6 +36,42 @@ export class CommentRepository {
       .where(and(eq(comments.id, id), isNull(comments.deletedAt)))
       .limit(1);
     return record ?? null;
+  }
+
+  async findByIdForUpdate(id: string): Promise<CommentRecord | null> {
+    const [record] = await this.db.select().from(comments).where(eq(comments.id, id)).for('update');
+    return record ?? null;
+  }
+
+  async findVisibleIds(postId: string, ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    const records = await this.db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postId, postId),
+          inArray(comments.id, ids),
+          eq(comments.status, 'visible'),
+          isNull(comments.deletedAt),
+        ),
+      );
+    return records.map((row) => row.id);
+  }
+
+  async hasUnavailableSince(postId: string, since: Date): Promise<boolean> {
+    const [record] = await this.db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postId, postId),
+          gt(comments.updatedAt, since),
+          or(ne(comments.status, 'visible'), sql`${comments.deletedAt} IS NOT NULL`),
+        ),
+      )
+      .limit(1);
+    return Boolean(record);
   }
 
   async update(id: string, data: Partial<NewCommentRecord>): Promise<CommentRecord> {
@@ -78,12 +110,7 @@ export class CommentRepository {
         deletedAt: now,
         updatedAt: now,
       })
-      .where(
-        and(
-          or(eq(comments.id, id), eq(comments.parentCommentId, id)),
-          isNull(comments.deletedAt),
-        ),
-      )
+      .where(and(or(eq(comments.id, id), eq(comments.parentCommentId, id)), isNull(comments.deletedAt)))
       .returning();
 
     return deletedRecords;
@@ -117,10 +144,7 @@ export class CommentRepository {
         and(
           eq(comments.postId, postId),
           isNull(comments.deletedAt),
-          or(
-            gt(comments.createdAt, since),
-            and(eq(comments.isEdited, true), gt(comments.updatedAt, since)),
-          ),
+          or(gt(comments.createdAt, since), and(eq(comments.isEdited, true), gt(comments.updatedAt, since))),
         ),
       )
       .limit(1);
@@ -137,6 +161,7 @@ export class CommentRepository {
     const conditions = [
       eq(comments.postId, options.postId),
       isNull(comments.deletedAt),
+      eq(comments.status, 'visible'),
     ];
 
     if (!options.flat) {
@@ -174,6 +199,7 @@ export class CommentRepository {
     const conditions = [
       eq(comments.postId, postId),
       isNull(comments.deletedAt),
+      eq(comments.status, 'visible'),
     ];
 
     if (!options?.flat) {
