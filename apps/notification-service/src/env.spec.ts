@@ -4,6 +4,14 @@ import { envSchema } from './env.js';
 const base = { DATABASE_URL_NOTIFICATION: 'postgres://x' };
 
 describe('TF05D: env notification-service', () => {
+  it('chu kỳ replay mặc định một phút và chỉ nhận số nguyên dương', () => {
+    expect(loadEnv(envSchema, base).NOTIFICATION_DLQ_REPLAY_INTERVAL_MS).toBe(60_000);
+    expect(loadEnv(envSchema, { ...base, NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: '120000' }).NOTIFICATION_DLQ_REPLAY_INTERVAL_MS).toBe(120_000);
+    for (const interval of ['0', '-1', '1.5', 'invalid']) {
+      expect(() => loadEnv(envSchema, { ...base, NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: interval })).toThrow();
+    }
+  });
+
   it('dev: không đặt hoặc để trống SMTP_URL thì gửi qua Mailpit', () => {
     expect(loadEnv(envSchema, base).SMTP_URL).toBe('smtp://localhost:1025');
     expect(loadEnv(envSchema, { ...base, SMTP_URL: '' }).SMTP_URL).toBe('smtp://localhost:1025');

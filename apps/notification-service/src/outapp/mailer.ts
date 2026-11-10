@@ -1,5 +1,9 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 
+const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
+const SMTP_GREETING_TIMEOUT_MS = 10_000;
+const SMTP_SOCKET_TIMEOUT_MS = 20_000;
+
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -19,7 +23,12 @@ export class SmtpMailer implements Mailer {
     smtpUrl: string,
     private readonly from: string,
   ) {
-    this.transporter = nodemailer.createTransport(smtpUrl);
+    this.transporter = nodemailer.createTransport({
+      url: smtpUrl,
+      connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+    });
   }
 
   async send(message: EmailMessage): Promise<void> {
