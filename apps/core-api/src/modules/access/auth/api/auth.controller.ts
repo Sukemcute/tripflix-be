@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Inject, Post, Req, Res, UseFilters } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiAcceptedResponse,
@@ -76,6 +76,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: TokenPairDto })
@@ -97,6 +98,7 @@ export class AuthController {
    */
   @Post('google')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
   @ApiBody({ type: GoogleLoginDto })
   @ApiOkResponse({ type: TokenPairDto })
@@ -120,6 +122,7 @@ export class AuthController {
    */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
   @ApiBody({ type: RefreshDto, required: false })
   @ApiOkResponse({ type: TokenPairDto })
@@ -161,6 +164,7 @@ export class AuthController {
 
   @Get('me')
   @Authenticated()
+  @Header('Cache-Control', 'no-store')
   @ApiBearerAuth()
   @ApiOkResponse({ type: MyProfileDto })
   getMe(@CurrentUser() user: AuthUser) {
@@ -168,8 +172,7 @@ export class AuthController {
   }
 
   private toWebResponse(res: Response, pair: TokenPair): Omit<TokenPair, 'refreshToken'> {
-    const { refreshToken, ...rest } = pair;
-    this.web.setRefreshCookie(res, refreshToken);
-    return rest;
+    this.web.setRefreshCookie(res, pair.refreshToken);
+    return { accessToken: pair.accessToken, tokenType: pair.tokenType, expiresIn: pair.expiresIn };
   }
 }
