@@ -92,7 +92,7 @@ export class EventRouter {
       const payload = CommerceOrderPaidV1Schema.parse(event.payload);
       // Notification chưa tra được email tài khoản theo userId nên đơn không có email liên hệ thì chưa gửi.
       if (payload.contactEmail) {
-        await this.mailer.send(buildOrderConfirmationEmail(payload, payload.contactEmail));
+        await this.mailer.send(buildOrderConfirmationEmail(payload, payload.contactEmail, this.links.webAppUrl));
         result = 'handled';
       }
     }
