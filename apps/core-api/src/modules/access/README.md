@@ -17,32 +17,54 @@
 
 | API | Ai gọi | Kết quả |
 |---|---|---|
-| `POST /api/auth/registration-code` `{ email, password }` | Ai cũng được | `202 { registrationId, resendAfterSeconds }`. Gửi mã khi email có thể đăng ký; email đã có tài khoản đang hoạt động thì trả y hệt nhưng gửi thư báo đã có tài khoản thay cho mã. Chưa tạo người dùng hay phiên đăng nhập. Mỗi email xin mã cách nhau 60 giây (`resendAfterSeconds`), xin sớm hơn hoặc quá giới hạn theo giờ trả `429` kèm `Retry-After` và `retryAfterSeconds` trong body |
-| `POST /api/auth/register` `{ email, password, displayName, registrationId, code }` | Ai cũng được | `201` người dùng `member` có email đã xác thực. Thiếu mã, mã sai, hết hạn hoặc đã dùng trả `400`. Email được dùng bởi tài khoản khác trong lúc đăng ký trả `409` |
-| `POST /api/auth/login` `{ email, password, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
+| `GET /api/auth/password-key` | Ai cũng được | `{ keyId, publicKey, algorithm, version, serverTime }`: khoá để mã hoá mật khẩu trước khi gửi (xem "Mã hoá mật khẩu trước khi gửi"). Server chưa có khoá: `503` |
+| `POST /api/auth/registration-code` `{ email }` | Ai cũng được | `202 { registrationId, resendAfterSeconds }`. Gửi mã khi email có thể đăng ký; email đã có tài khoản đang hoạt động thì trả y hệt nhưng gửi thư báo đã có tài khoản thay cho mã. Chưa tạo người dùng hay phiên đăng nhập. Mỗi email xin mã cách nhau 60 giây (`resendAfterSeconds`), xin sớm hơn hoặc quá giới hạn theo giờ trả `429` kèm `Retry-After` và `retryAfterSeconds` trong body |
+| `POST /api/auth/register` `{ email, encPassword, displayName, registrationId, code }` | Ai cũng được | `201` người dùng `member` có email đã xác thực. Thiếu mã, mã sai, hết hạn hoặc đã dùng trả `400`. Email được dùng bởi tài khoản khác trong lúc đăng ký trả `409` |
+| `POST /api/auth/login` `{ email, encPassword, deviceName? }` | Ai cũng được | `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn: 900 }`. Sai email hay mật khẩu đều `401 "Email hoặc mật khẩu không đúng"` |
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
 | `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
 | `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `emailVerified`, `phone`, `dateOfBirth`, `gender`, `nationality` (có thể `null`) |
 | `PATCH /api/auth/me` `{ displayName?, phone?, dateOfBirth?, gender?, nationality? }` | Bearer access token | Hồ sơ sau khi sửa. Chỉ gửi trường muốn đổi, gửi `null` hoặc `""` để xoá (trừ tên). Sai định dạng: `400 { errors: [{ field, message }] }` (xem "Thông tin cá nhân" bên dưới) |
-| `POST /api/auth/password/change` `{ currentPassword, newPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
+| `POST /api/auth/password/change` `{ encCurrentPassword, encNewPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
 | `GET /api/auth/sessions` | Bearer access token | Thiết bị đang đăng nhập: `{ id, deviceName, userAgent, createdAt, lastUsedAt, isCurrent }`, dùng gần nhất trước |
 | `DELETE /api/auth/sessions/{id}` | Bearer access token | `204`. Thoát thiết bị đó, token của nó nhận `401` ngay. Phiên không phải của mình: `404` |
 | `POST /api/auth/logout-all` | Bearer access token | `204`. Thoát mọi thiết bị, kể cả thiết bị đang gọi. Có cookie thì xoá cookie |
 | `GET /.well-known/jwks.json` | Gateway, service khác | Khoá công khai ES256. Nằm ngoài `/api` |
 | `POST /api/auth/password/forgot` `{ email }` | Ai cũng được | Luôn `202 { message }` cùng một câu, kể cả email không có tài khoản. Tài khoản đang hoạt động thì nhận email có link đặt lại (sống 30 phút). Quá 3 lần mỗi giờ theo email hoặc 20 lần theo IP: `429` |
-| `POST /api/auth/password/reset` `{ token, newPassword }` | Có link trong email | `204`. Đổi mật khẩu, thoát mọi thiết bị. Link sai, đã dùng, hết hạn hoặc tài khoản bị khoá: `400 "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"` |
+| `POST /api/auth/password/reset` `{ token, encNewPassword }` | Có link trong email | `204`. Đổi mật khẩu, thoát mọi thiết bị. Link sai, đã dùng, hết hạn hoặc tài khoản bị khoá: `400 "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"` |
 | `POST /api/auth/email/verify` `{ token }` | Có link trong email | `204`. Đánh dấu email đã xác thực. Link sai, đã dùng, hết hạn (24 giờ) hoặc tài khoản bị khoá: `400 "Liên kết xác thực email không hợp lệ hoặc đã hết hạn"`. Client đang đăng nhập gọi `refresh` để có access token mới `ev: true` |
 | `POST /api/auth/email/verification` | Bearer access token | `200 { status, message }`: `sent` (link mới, link cũ hết dùng được) hoặc `already_verified` (không gửi). Quá 3 lần mỗi giờ theo tài khoản hoặc 20 lần theo IP: `429` |
 | `POST /api/auth/service-token` `{ clientId, clientSecret, audience }` | Service khác (không phải người dùng) | `{ accessToken, tokenType: "Bearer", expiresIn: 300 }`. Sai bất kỳ thông tin nào: `401 "Thông tin service không đúng"`. Xem "Token giữa các service" |
 | `GET /api/admin/me` | `moderator`, `superadmin` | Nhân viên đang đăng nhập |
 | `GET /api/admin/staff` | `superadmin` | Danh sách tài khoản nhân viên |
 | `GET /api/admin/users?query=&page=` | `moderator`, `superadmin` | Tìm theo email, tên; 20 người mỗi trang. Moderator thấy email đã che (`kh***@example.com`) |
+| `POST /api/admin/users` `{ email, displayName, role? }` | `superadmin` | `201` tạo tài khoản kiểm duyệt viên (`role` chỉ nhận `moderator`, khác thì `400`). Superadmin không đặt mật khẩu hộ: tài khoản chưa có mật khẩu, nhân sự nhận email để tự đặt (link 30 phút, hết hạn thì dùng "Quên mật khẩu"); `password`, `encPassword` gửi kèm bị bỏ qua |
 | `POST /api/admin/staff` `{ userId }` | `superadmin` | Cấp `moderator` |
 | `DELETE /api/admin/staff/{userId}` | `superadmin` | Thu hồi về `member` |
 | `POST /api/admin/users/{userId}/lock`, `/unlock` | `superadmin` | Khoá: không đăng nhập được. Mở khoá: đăng nhập lại được |
 
 Chưa đăng nhập: `401`. Sai vai trò: `403`. Module khác chặn quyền bằng `@Roles(...)` của `@tripflix/auth` (xem `libs/auth/README.md`). Chưa xác thực email ở API có `@RequireVerifiedEmail()`: `403 { code: "email_unverified" }`.
+
+Các trường `enc*` (`encPassword`, `encCurrentPassword`, `encNewPassword`) có thể thay bằng trường mật khẩu thường cùng tên (`password`, ...) khi chưa bật `AUTH_PASSWORD_ENCRYPTION_REQUIRED`, để app bản cũ chạy tiếp trong lúc chuyển đổi.
+
+## Mã hoá mật khẩu trước khi gửi (TF056)
+
+Giống Facebook (`#PWD_BROWSER`): client mã hoá mật khẩu bằng khoá công khai của server, nên payload, log, proxy không có mật khẩu gốc. Server giải mã rồi kiểm Argon2 như cũ: database, bản băm, tài khoản cũ không đổi. HTTPS vẫn là lớp bảo vệ chính; lớp này không chống được JavaScript độc chạy trên trang.
+
+```
+1. GET /api/auth/password-key → { keyId, publicKey (X25519, base64url), serverTime }
+2. client: bản rõ = JSON { p: mật khẩu, n: nonce 16 byte base64url, t: ts }  (ts = giây, theo giờ server)
+   khoá tạm X25519 → bí mật chung với publicKey → HKDF-SHA256(salt = khoáTạm‖publicKey, info "tripflix-pwd-v1") → AES-256-GCM
+   AAD = "tripflix-pwd|1|<mục đích>|<keyId>|<ts>|<email chuẩn hoá hoặc rỗng>"
+3. gửi "#TFPWD:1:<keyId>:<ts>:<base64url(khoáTạm 32B ‖ iv 12B ‖ bản mã ‖ tag 16B)>"
+```
+
+- **Mục đích** (`auth/domain/password-envelope.ts`): `login`, `register`, `change_current`, `change_new`, `reset`. Email (trim, chữ thường) gắn vào AAD với `login`, `register`; đổi và đặt lại mật khẩu dùng chuỗi rỗng.
+- **Server kiểm** (`PasswordDecryptionInterceptor`, chạy trước ZodBody nên luật mật khẩu giữ nguyên): đúng `keyId`, ts trong 5 phút gần đây (nhanh hơn tối đa 60 giây), giải mã được với đúng AAD, `t` trong bản rõ khớp ts, nonce chưa dùng (Redis `auth:action:pwd-nonce:<n>`, 10 phút).
+- **Lỗi**: chuỗi sai, hết hạn, sai mục đích hay gửi lại: `400 { code: "password_envelope_invalid", errors: [{ field: "encPassword", ... }] }`; client lấy lại khoá rồi thử lại một lần. Gửi mật khẩu thường khi đã bắt buộc: `400 { code: "password_encryption_required" }`. Lý do cụ thể chỉ ghi log, không có mật khẩu hay chuỗi mã hoá.
+- **Đổi khoá**: `auth:password-keygen k2`, đặt `AUTH_PASSWORD_KEYS="k2:<mới>,k1:<cũ>"`, giữ khoá cũ ít nhất 10 phút rồi bỏ. Mất khoá thì sinh khoá mới: client lấy lại khoá, không ai bị khoá ngoài.
+- Chưa đặt `AUTH_PASSWORD_KEYS`: dev, test tự sinh khoá tạm (đổi mỗi lần khởi động); production tắt mã hoá (`GET /password-key` trả `503`, client gửi như cũ) và ghi log lỗi.
 
 ## Token
 
@@ -188,6 +210,8 @@ Chỉ có lệnh `DELETE`, nên nhiều worker cùng chạy hay chạy lại đ�
 | `AUTH_PASSWORD_RESET_URL` | `http://localhost:3100/dat-lai-mat-khau` | Trang đặt lại mật khẩu của web. Link trong email là địa chỉ này kèm `?token=...` |
 | `AUTH_EMAIL_VERIFY_URL` | `http://localhost:3100/xac-thuc-email` | Trang xác thực email của web. Link trong email là địa chỉ này kèm `?token=...` |
 | `AUTH_REGISTER_MAX_PER_IP_HOUR` | `5` | Số yêu cầu gửi mã đăng ký mỗi IP mỗi giờ. Máy dev, CI chạy e2e có thể đặt cao hơn |
+| `AUTH_PASSWORD_KEYS` | trống | Khoá X25519 để client mã hoá mật khẩu: `<keyId>:<khoá>,<keyId cũ>:<khoá cũ>`, khoá đầu đang dùng. Sinh bằng `pnpm --filter @tripflix/core-api auth:password-keygen` hoặc `deploy/init-server-env.sh`. Trống: dev dùng khoá tạm, production tắt mã hoá |
+| `AUTH_PASSWORD_ENCRYPTION_REQUIRED` | `false` | `true`: từ chối mật khẩu gửi thường. Chỉ bật khi web, admin, mobile đều đã mã hoá; bật mà thiếu `AUTH_PASSWORD_KEYS` thì core-api không khởi động |
 | `GOOGLE_CLIENT_IDS` | trống | OAuth Client ID (Web, Android, iOS) trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google (`503`) |
 | `GOOGLE_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` | Khoá công khai của Google. Test đổi sang server JWKS giả |
 | `SEED_PASSWORD` | | Chỉ cho `pnpm db:seed` |

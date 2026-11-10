@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
+import { ENC_PASSWORD_DESCRIPTION, PLAIN_PASSWORD_DESCRIPTION } from '../../auth/api/dto.js';
 import {
   currentPasswordField,
   dateOfBirthField,
@@ -61,8 +62,11 @@ export class UpdateProfileDto {
 }
 
 export class ChangePasswordDto {
-  @ApiProperty() currentPassword!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) newPassword!: string;
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encCurrentPassword?: string;
+  @ApiPropertyOptional({ description: PLAIN_PASSWORD_DESCRIPTION }) currentPassword?: string;
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encNewPassword?: string;
+  @ApiPropertyOptional({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX, description: PLAIN_PASSWORD_DESCRIPTION })
+  newPassword?: string;
 }
 
 export class SessionDto {

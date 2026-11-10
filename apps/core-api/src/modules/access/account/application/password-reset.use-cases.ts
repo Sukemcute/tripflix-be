@@ -72,6 +72,14 @@ export class PasswordResetUseCases {
     await this.issueResetToken(user, meta);
   }
 
+  /**
+   * Gửi link đặt mật khẩu cho tài khoản vừa được superadmin tạo mà không đặt mật khẩu (TF056: bỏ mật khẩu mặc định).
+   * Dùng chung luồng và email của "Quên mật khẩu"; không qua giới hạn số lần vì chỉ superadmin gọi được.
+   */
+  async sendPasswordSetupLink(user: UserRecord, meta: RequestMeta): Promise<void> {
+    await this.issueResetToken(user, meta);
+  }
+
   /** Token đúng, chưa dùng, chưa hết hạn: đổi mật khẩu, đánh dấu đã dùng, thu hồi mọi phiên. Sai: 400 cùng một câu. */
   async resetPassword(input: { token: string; newPassword: string }, meta: RequestMeta): Promise<void> {
     const tokenHash = hashRefreshToken(input.token);

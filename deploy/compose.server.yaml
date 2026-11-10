@@ -17,6 +17,10 @@ x-core-env: &core-env
   DATABASE_URL_ANALYTICS: postgres://tf_analytics:${DB_PASS_ANALYTICS:?}@postgres:5432/core
   DATABASE_URL_COMMERCE: postgres://tf_commerce:${DB_PASS_COMMERCE:?}@postgres:5432/core
   AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:?}
+  # Khoá để client mã hoá mật khẩu (TF056; sinh bằng init-server-env.sh hoặc auth:password-keygen).
+  # Trống: tắt mã hoá, client gửi mật khẩu như cũ. Chỉ bật REQUIRED khi web, admin, mobile đều đã mã hoá.
+  AUTH_PASSWORD_KEYS: ${AUTH_PASSWORD_KEYS:-}
+  AUTH_PASSWORD_ENCRYPTION_REQUIRED: ${AUTH_PASSWORD_ENCRYPTION_REQUIRED:-false}
   AUTH_JWT_ISSUER: tripflix-core
   AUTH_JWT_AUDIENCE: tripflix
   AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100}

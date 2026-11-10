@@ -172,8 +172,9 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: UpdatePostUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new UpdatePostUseCase(postRepo),
+      inject: [PostRepository, CONTENT_OUTBOX],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
+        new UpdatePostUseCase(postRepo, outbox),
     },
     {
       provide: PublishPostUseCase,

@@ -20,18 +20,18 @@ export class GrantStaffDto {
   @ApiProperty({ format: 'uuid' }) userId!: string;
 }
 
+// TF056: superadmin không đặt mật khẩu hộ. Tài khoản tạo ra chưa có mật khẩu, nhân sự nhận email để tự đặt;
+// trường password/encPassword gửi kèm bị bỏ qua. Chỉ tạo được kiểm duyệt viên: superadmin tạo nhầm không gỡ được qua giao diện.
 export const CreateUserRequestSchema = z.object({
   email: z.string().trim().email('Email không hợp lệ').max(255),
   displayName: z.string().trim().min(2, 'Tên hiển thị tối thiểu 2 ký tự').max(100),
-  password: z.string().min(8, 'Mật khẩu tối thiểu 8 ký tự').max(100).optional(),
-  role: z.enum(['member', 'moderator', 'superadmin']).default('moderator'),
+  role: z.enum(['moderator'], 'Chỉ tạo được tài khoản kiểm duyệt viên').default('moderator'),
 });
 
 export class CreateUserDto {
   @ApiProperty({ example: 'mod_015@tripflix.vn' }) email!: string;
   @ApiProperty({ example: 'Nguyễn Văn A' }) displayName!: string;
-  @ApiProperty({ example: 'Tripflix@2025', required: false }) password?: string;
-  @ApiProperty({ enum: ['member', 'moderator', 'superadmin'], default: 'moderator', required: false }) role?: 'member' | 'moderator' | 'superadmin';
+  @ApiProperty({ enum: ['moderator'], default: 'moderator', required: false }) role?: 'moderator';
 }
 
 export class AdminUserDto extends UserDto {

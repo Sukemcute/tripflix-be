@@ -5,11 +5,14 @@ import {
   ApiBody,
   ApiNoContentResponse,
   ApiProperty,
+  ApiPropertyOptional,
   ApiTags,
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
+import { ENC_PASSWORD_DESCRIPTION, PLAIN_PASSWORD_DESCRIPTION } from '../../auth/api/dto.js';
+import { EncryptedPasswords } from '../../auth/api/encrypted-passwords.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { lookupEmailField, newPasswordField } from '../../auth/api/validation.js';
 import { NEW_PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
@@ -39,7 +42,9 @@ export class ForgotPasswordAcceptedDto {
 
 export class ResetPasswordDto {
   @ApiProperty({ description: 'Giá trị ?token= trên link trong email' }) token!: string;
-  @ApiProperty({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX }) newPassword!: string;
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encNewPassword?: string;
+  @ApiPropertyOptional({ minLength: PASSWORD_MIN, maxLength: NEW_PASSWORD_MAX, description: PLAIN_PASSWORD_DESCRIPTION })
+  newPassword?: string;
 }
 
 /** Quên mật khẩu: không cần đăng nhập. */
@@ -66,6 +71,7 @@ export class PasswordResetController {
   /** Link dùng một lần. Xong thì mọi thiết bị bị đăng xuất, người dùng đăng nhập lại bằng mật khẩu mới. */
   @Post('reset')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @EncryptedPasswords({ fields: [{ encrypted: 'encNewPassword', plain: 'newPassword', purpose: 'reset' }] })
   @ApiBody({ type: ResetPasswordDto })
   @ApiNoContentResponse()
   @ApiBadRequestResponse({ description: INVALID_RESET_TOKEN_MESSAGE })

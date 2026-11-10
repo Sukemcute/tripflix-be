@@ -1,9 +1,11 @@
 package transcode
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,6 +17,8 @@ const (
 )
 
 // BuildMasterPlaylist: worker ghi lại master mỗi khi xong thêm một mức, nên chỉ liệt kê các mức đã có trên S3.
+// Xếp mức cao nhất lên đầu: trình phát iOS bắt đầu từ mức đầu tiên rồi mới đo mạng, mà reels ngắn
+// thường hết trước khi kịp lên mức cao. Mạng yếu thì trình phát tự hạ xuống.
 func BuildMasterPlaylist(rungs []QualityRung, video VideoMetadata) string {
 	codecs := videoCodec
 	if video.HasAudio {
@@ -22,7 +26,9 @@ func BuildMasterPlaylist(rungs []QualityRung, video VideoMetadata) string {
 	}
 	var b strings.Builder
 	b.WriteString("#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-INDEPENDENT-SEGMENTS\n")
-	for _, rung := range rungs {
+	ordered := slices.Clone(rungs)
+	slices.SortFunc(ordered, func(a, b QualityRung) int { return cmp.Compare(b.Level, a.Level) })
+	for _, rung := range ordered {
 		width, height := OutputSize(video, rung.Level)
 		// BANDWIDTH phải là mức đỉnh: maxrate của video cộng âm thanh.
 		peak := peakKbps(rung.VideoKbps)

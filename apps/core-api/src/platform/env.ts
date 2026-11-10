@@ -71,6 +71,14 @@ export const coreEnvSchema = baseEnvSchema
     AUTH_EMAIL_VERIFY_URL: z.url().default(DEFAULT_EMAIL_VERIFY_URL),
     // Số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ (TF05D). Máy dev, CI chạy e2e đăng ký nhiều lần thì đặt cao hơn.
     AUTH_REGISTER_MAX_PER_IP_HOUR: z.coerce.number().int().positive().default(5),
+    // Khoá X25519 để client mã hoá mật khẩu trước khi gửi (TF056): "<keyId>:<khoá>,<keyId cũ>:<khoá cũ>", khoá đầu đang dùng.
+    // Sinh bằng pnpm --filter @tripflix/core-api auth:password-keygen. Dev bỏ trống: dùng khoá tạm.
+    AUTH_PASSWORD_KEYS: OptionalStringSchema,
+    // true: từ chối mật khẩu gửi thường. Chỉ bật khi web, admin, mobile đều đã gửi mật khẩu mã hoá.
+    AUTH_PASSWORD_ENCRYPTION_REQUIRED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     // OAuth Client ID (Android, iOS, Web) tạo trên Google Cloud Console, cách nhau bởi dấu phẩy. Trống: tắt đăng nhập Google.
     GOOGLE_CLIENT_IDS: z
       .string()
@@ -91,6 +99,15 @@ export const coreEnvSchema = baseEnvSchema
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.AUTH_JWT_PRIVATE_KEY) {
       ctx.addIssue({ code: 'custom', path: ['AUTH_JWT_PRIVATE_KEY'], message: 'bắt buộc ở production' });
+    }
+    // Bắt buộc mã hoá mà không có khoá thì không ai đăng nhập được: dừng ngay lúc khởi động.
+    // Production chưa bắt buộc mà thiếu khoá: vẫn chạy, tắt mã hoá (log lỗi), để lần deploy chưa kịp đặt khoá không làm sập server.
+    if (env.AUTH_PASSWORD_ENCRYPTION_REQUIRED && !env.AUTH_PASSWORD_KEYS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AUTH_PASSWORD_KEYS'],
+        message: 'bắt buộc khi AUTH_PASSWORD_ENCRYPTION_REQUIRED=true',
+      });
     }
   });
 

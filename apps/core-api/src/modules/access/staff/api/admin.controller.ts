@@ -72,7 +72,7 @@ export class AdminController {
     return this.staff.searchUsers(actor, query);
   }
 
-  /** Tạo tài khoản nhân sự mới (chỉ superadmin). */
+  /** Tạo tài khoản kiểm duyệt viên (chỉ superadmin). Tài khoản chưa có mật khẩu: nhân sự nhận email để tự đặt. */
   @Post('users')
   @HttpCode(HttpStatus.CREATED)
   @Roles('superadmin')
