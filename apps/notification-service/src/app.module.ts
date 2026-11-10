@@ -20,24 +20,32 @@ import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
-import { DB, ENV, MAILER, PROCESSED_EVENTS, REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
+import { RealtimeGateway } from './realtime/realtime.gateway.js';
+import { RealtimeService } from './realtime/realtime.service.js';
+import { isRealtimeRedisReady, type RealtimeRedis } from './realtime/redis-io.adapter.js';
+import { DB, ENV, MAILER, PROCESSED_EVENTS, REALTIME_REDIS, REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
 
 export { envSchema, type Env } from './env.js';
-export { ENV, MAILER, PROCESSED_EVENTS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
+export { ENV, MAILER, PROCESSED_EVENTS, REALTIME_REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
+export { RealtimeService } from './realtime/realtime.service.js';
 
 @Controller('health')
 class HealthController {
   constructor(
     @Inject(DB) private readonly db: pg.Pool,
     @Inject(REDIS) private readonly redis: Redis,
+    @Inject(REALTIME_REDIS) private readonly realtimeRedis: RealtimeRedis,
   ) {}
 
   @Get()
   async check() {
     const db = await ping(this.db);
     const redis = await this.redis.ping().then((r) => r === 'PONG').catch(() => false);
-    const body = { status: db && redis ? 'ok' : 'degraded', checks: { db, redis } };
-    if (!db || !redis) throw new ServiceUnavailableException(body);
+    // Pub/sub của /ws mất kết nối thì replica này phát không tới socket ở replica khác mà không báo lỗi gì.
+    const realtime = isRealtimeRedisReady(this.realtimeRedis);
+    const ok = db && redis && realtime;
+    const body = { status: ok ? 'ok' : 'degraded', checks: { db, redis, realtime } };
+    if (!ok) throw new ServiceUnavailableException(body);
     return body;
   }
 }
@@ -53,8 +61,8 @@ export class MeController {
 }
 
 /**
- * notification-service. Đã có: consumers/ (group "notification", email đặt lại mật khẩu). Sẽ làm (Dũng): inbox/ (WebSocket),
- * push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
+ * notification-service. Đã có: consumers/ (group "notification", email), realtime/ (WebSocket /ws, TF26A).
+ * Sẽ làm (Dũng): inbox/, push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
  */
 @Module({
   providers: [
@@ -73,8 +81,14 @@ export class MeController {
     { provide: SID_BLOCKLIST_PROVIDER, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
     { provide: MAILER, inject: [ENV], useFactory: (env: Env): Mailer => new SmtpMailer(env.SMTP_URL, env.MAIL_FROM) },
     { provide: PROCESSED_EVENTS, inject: [REDIS], useFactory: (redis: Redis): ProcessedEvents => new RedisProcessedEvents(redis) },
+    // Chỉ mở kết nối khi main.ts gắn Redis adapter (lazyConnect lấy theo REDIS).
+    {
+      provide: REALTIME_REDIS,
+      inject: [REDIS],
+      useFactory: (redis: Redis): RealtimeRedis => ({ pub: redis.duplicate(), sub: redis.duplicate() }),
+    },
   ],
-  exports: [ENV, DB, REDIS, SID_BLOCKLIST_PROVIDER, MAILER, PROCESSED_EVENTS],
+  exports: [ENV, DB, REDIS, SID_BLOCKLIST_PROVIDER, MAILER, PROCESSED_EVENTS, REALTIME_REDIS],
 })
 export class InfraModule {}
 
@@ -100,16 +114,19 @@ export class InfraModule {}
     }),
   ],
   controllers: [HealthController, MeController],
-  providers: [NotificationConsumer, DeadLetterReplayJob],
+  providers: [NotificationConsumer, DeadLetterReplayJob, RealtimeService, RealtimeGateway],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(
     @Inject(DB) private readonly db: pg.Pool,
     @Inject(REDIS) private readonly redis: Redis,
+    @Inject(REALTIME_REDIS) private readonly realtimeRedis: RealtimeRedis,
   ) {}
 
   async onApplicationShutdown() {
     await this.db.end();
     this.redis.disconnect();
+    this.realtimeRedis.pub.disconnect();
+    this.realtimeRedis.sub.disconnect();
   }
 }

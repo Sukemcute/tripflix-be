@@ -15,7 +15,39 @@ Consumer group `notification` đọc `stream:core.access`, `stream:core.content`
 | `access.registration_code_requested` v1 | Email "Mã xác thực đăng ký Tripflix". Mã gồm 8 chữ số, hiệu lực 10 phút |
 | `access.registration_attempted_existing` v1 | Email "Email này đã có tài khoản Tripflix", nút "Đăng nhập" mở `WEB_APP_URL/login`, kèm link `WEB_APP_URL/forgot-password` (đặt lại hoặc tạo mật khẩu cho tài khoản Google) |
 | `access.email_verification_requested` v1 (TF05D) | Email chứa link xác thực 24 giờ cho tài khoản cũ. Vẫn nhận sự kiện `reason: "signup"` còn tồn từ bản trước |
+| `access.user.locked` v1, `access.user.role_changed` v1 (TF26A) | Ngắt mọi kết nối `/ws` của người đó ở mọi replica (access đã thu hồi mọi phiên) |
 | Sự kiện khác | Ghi log "Đã nhận sự kiện" |
+
+## WebSocket `/ws` (TF26A)
+
+Socket.IO, chỉ transport `websocket` (không long-polling, nên nhiều replica không cần sticky session). Redis adapter (pub/sub, hai kết nối riêng) để replica nào phát thì socket ở replica khác cũng nhận. Code ở `src/realtime/`.
+
+```ts
+import { io } from 'socket.io-client';
+
+const socket = io(GATEWAY_URL, {
+  path: '/ws',
+  transports: ['websocket'],
+  // Hàm: mỗi lần kết nối lại đều lấy access token mới nhất.
+  auth: (cb) => cb({ token: getAccessToken() }),
+});
+socket.on('connect_error', (err) => {
+  // err.data.code: 'unauthorized' → làm mới token rồi socket.connect(); 'unavailable' → thử lại sau.
+});
+socket.on('auth.expired', async () => {
+  await refreshAccessToken(); // server ngắt ngay sau sự kiện này
+  socket.connect();
+});
+socket.on('connect', () => {
+  // Kết nối lại thì gọi lại API để lấy phần đã lỡ: socket chỉ báo "có mới", không lưu thông báo.
+});
+```
+
+- **Bắt tay:** kiểm access token như `AccessTokenGuard` của HTTP (chữ ký qua JWKS, `iss`, `aud`, `exp`) và sid chưa bị thu hồi. Thiếu hoặc sai thì `connect_error` với `data.code = 'unauthorized'`; Redis hoặc JWKS lỗi thì `'unavailable'` (không cho qua khi chưa kiểm được phiên).
+- **Room:** server tự cho socket vào `user:<userId>` và `sid:<sid>` lấy từ token. Không có `@SubscribeMessage` nào: client gửi gì lên cũng không vào được room của người khác.
+- **Token hết hạn khi đang mở:** tới `exp` server gửi `auth.expired` rồi ngắt (`io server disconnect`); client làm mới token và gọi `socket.connect()`.
+- **Gửi từ code:** `RealtimeService.emitToUser(userId, event, data)`, `disconnectUser(userId)`, `disconnectSession(sid)`.
+- **`/health`:** có thêm `checks.realtime`, `false` khi kết nối pub/sub của adapter đang mất (lúc đó replica này phát không tới socket ở replica khác).
 
 ## Biến môi trường
 
@@ -27,4 +59,4 @@ Consumer group `notification` đọc `stream:core.access`, `stream:core.content`
 | `NOTIFICATION_CONSUMER_ENABLED` | `true` | Tắt khi chạy test không có Redis |
 | `NOTIFICATION_CONSUMER_NAME` | hostname | Mỗi replica một tên |
 
-Chưa có: hộp thư in-app (`inbox`, `/notifications`), WebSocket `/ws`, push qua Expo, gom thông báo, tuỳ chọn người dùng.
+Chưa có: hộp thư in-app (`inbox`, `/notifications`), push qua Expo, gom thông báo, tuỳ chọn người dùng.

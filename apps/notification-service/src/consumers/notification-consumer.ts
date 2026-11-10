@@ -1,11 +1,33 @@
 import { hostname } from 'node:os';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import { AccessUserLockedV1Schema, AccessUserRoleChangedV1Schema, type EventEnvelope } from '@tripflix/contracts';
 import { RedisStreamsConsumer, STREAMS } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { EventRouter, type ProcessedEvents } from './event-router.js';
+
+/** Sự kiện mà access đã thu hồi mọi phiên của người dùng (staff.use-cases: blockSessions). */
+const SESSIONS_REVOKED_SCHEMAS = {
+  'access.user.locked': AccessUserLockedV1Schema,
+  'access.user.role_changed': AccessUserRoleChangedV1Schema,
+} as const;
+
+/**
+ * Bị khoá hoặc đổi vai trò thì access đã thu hồi mọi phiên: ngắt luôn mọi kết nối /ws của người đó ở mọi replica,
+ * không chờ tới lúc access token hết hạn. Sid đã bị chặn nên không kết nối lại bằng token cũ được.
+ * Ngắt lại nhiều lần cũng không sao, nên không cần chống trùng.
+ */
+export function disconnectRevokedUser(event: EventEnvelope, realtime: Pick<RealtimeService, 'disconnectUser'>): boolean {
+  const schema = SESSIONS_REVOKED_SCHEMAS[event.type as keyof typeof SESSIONS_REVOKED_SCHEMAS];
+  if (!schema) return false;
+  const payload = schema.safeParse(event.payload);
+  if (!payload.success) return false;
+  realtime.disconnectUser(payload.data.userId);
+  return true;
+}
 
 /** Consumer group "notification": nghe sự kiện của core, gửi email, ghi log. */
 @Injectable()
@@ -20,6 +42,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(MAILER) private readonly mailer: Mailer,
     @Inject(PROCESSED_EVENTS) private readonly processed: ProcessedEvents,
+    @Inject(RealtimeService) private readonly realtime: RealtimeService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -41,6 +64,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       consumer: this.env.NOTIFICATION_CONSUMER_NAME ?? hostname(),
       streams: [STREAMS.access, STREAMS.content, STREAMS.commerce],
       handler: async (event) => {
+        disconnectRevokedUser(event, this.realtime);
         await router.route(event);
       },
       onError: (err, delivery) => this.logger.error({ err, ...delivery }, 'Xử lý sự kiện lỗi, sẽ thử lại'),
