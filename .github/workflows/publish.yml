@@ -22,7 +22,7 @@ jobs:
   check:
     uses: ./.github/workflows/ci.yml
 
-  # Chỉ build image của app có thay đổi; đổi libs/ hay file gốc thì build lại cả ba. Server ghim sha riêng cho từng app,
+  # Chỉ build image của app có thay đổi; đổi libs/ hay file gốc thì build lại tất cả. Server ghim sha riêng cho từng app,
   # nên app không đổi giữ nguyên image cũ. Mỗi image tốn khoảng 2 phút Actions và một bản trong GHCR.
   changes:
     runs-on: ubuntu-latest
@@ -38,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bash .github/scripts/changed-images.sh
-          "core-api notification-service video-worker"
+          "core-api notification-service video-worker video-worker-go"
           '^(libs/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|tsconfig\.base\.json$|\.nvmrc$|\.github/workflows/publish\.yml$|\.github/scripts/)'
 
   image:

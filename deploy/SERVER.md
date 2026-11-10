@@ -2,7 +2,7 @@
 
 `compose.server.yaml` chạy image production trên một máy. Postgres và Redis không mở cổng, API chỉ nghe trên `127.0.0.1`. `compose.yaml` vẫn chỉ dùng cho máy dev.
 
-Đã làm: giai đoạn 1 đến 5, deploy web và backend từ CI (backup database trước mỗi lần deploy backend). Chưa làm: `video-worker`, backup định kỳ.
+Đã làm: giai đoạn 1 đến 6, deploy web và backend từ CI (backup database trước mỗi lần deploy backend). Chưa làm: deploy `video-worker` tự động, backup định kỳ.
 
 ## Chuẩn bị máy
 
@@ -207,6 +207,56 @@ dc --profile api exec -T core-api node -e "console.log(process.env.AI_SERVICE_UR
 
 Ra `http://ai-service:8000` và một số lớn hơn 0 là đạt. Bỏ kiểm duyệt bằng AI: xoá `AI_SERVICE_URL` trong `.env.server` rồi chạy lại lệnh `up` ở trên, core quay về lọc bằng regex.
 
+## Giai đoạn 6: chuyển mã video (`video-worker`)
+
+Server chạy bản Go (`apps/video-worker-go`, image `video-worker-go`), không chạy bản TypeScript. Hai bản nhận cùng sự kiện và ghi cùng bố cục file trên S3, nhưng không chạy cùng lúc vì chung consumer group `video-worker`. Service trong profile `video`, giới hạn 1 nhân, 1 GB RAM.
+
+1. Tạo IAM user riêng cho server, chỉ được đọc, ghi trong thư mục của server trên bucket:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["s3:GetObject", "s3:PutObject", "s3:AbortMultipartUpload"],
+         "Resource": "arn:aws:s3:::tripflix-media-dev/staging/*"
+       },
+       {
+         "Effect": "Allow",
+         "Action": "s3:ListBucket",
+         "Resource": "arn:aws:s3:::tripflix-media-dev",
+         "Condition": { "StringLike": { "s3:prefix": "staging/*" } }
+       }
+     ]
+   }
+   ```
+
+   `s3:ListBucket` giới hạn trong `staging/`, để file không có thì S3 trả 404 thay vì 403, worker báo đúng lỗi "không thấy file".
+
+   Tạo access key cho user đó. Không gửi key qua chat.
+2. Ghi key vào `.env.server` mà không để key hiện trên màn hình hay trong lịch sử lệnh:
+
+   ```bash
+   cd ~/tripflix-be/deploy
+   read -rs -p 'AWS_ACCESS_KEY_ID: ' k; echo; read -rs -p 'AWS_SECRET_ACCESS_KEY: ' s; echo
+   sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$k|; s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$s|" .env.server; unset k s
+   ```
+
+   Kiểm `S3_KEY_PREFIX=staging/` khớp với thư mục trong chính sách IAM. Thêm `VIDEO_WORKER_TAG=sha-<7 ký tự>` (bản có image `video-worker-go`).
+3. Chạy lại core-api để nhận key (core-api cấp link tải lên), rồi bật worker:
+
+   ```bash
+   dc --profile api up -d --no-deps --wait core-api
+   dc --profile video pull video-worker && dc --profile video up -d video-worker
+   dc --profile video logs --tail 20 video-worker
+   ```
+
+   Log có dòng `video-worker đã chạy, đang chờ việc từ stream:media` là đạt.
+4. Đăng một video trên app. Bài hiện video sau khi xong 360p (video 60 giây khoảng 3 phút), các mức cao hơn có sau.
+
+Tắt worker: `dc --profile video stop video-worker`. Việc đang làm dở sẽ được nhận lại khi bật lên.
+
 ## Đăng nhập Google
 
 Backend kiểm ID token của Google theo `GOOGLE_CLIENT_IDS`. Web gắn `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vào bundle lúc build. Thiếu một trong hai thì không đăng nhập bằng Google được: backend trả `503`, web không hiện nút.
@@ -236,7 +286,7 @@ dc --profile api logs -f core-api
 dc --profile api --profile gateway --profile mail pull && dc --profile api --profile gateway --profile mail up -d --wait   # cập nhật bản mới, migrate chạy lại trước API
 ```
 
-`CORE_API_TAG` (core-api và migrate) và `NOTIFICATION_TAG` (notification-service) trong `.env.server` chọn bản chạy. Mỗi app một biến vì CI chỉ build image của app có thay đổi, nên sha mới nhất của app này có thể không có ở app kia. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy. Biến nào chưa đặt thì dùng `IMAGE_TAG` cũ, không có cả hai thì dùng `develop`.
+`CORE_API_TAG` (core-api và migrate), `NOTIFICATION_TAG` (notification-service) và `VIDEO_WORKER_TAG` (video-worker) trong `.env.server` chọn bản chạy. Mỗi app một biến vì CI chỉ build image của app có thay đổi, nên sha mới nhất của app này có thể không có ở app kia. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy. Biến nào chưa đặt thì dùng `IMAGE_TAG` cũ, không có cả hai thì dùng `develop`.
 
 Khi bật deploy backend tự động, mỗi lần merge vào `develop` có image mới thì CI ghi đè `CORE_API_TAG`, `NOTIFICATION_TAG`. Muốn giữ một bản cũ thì tắt `API_AUTO_DEPLOY` trước (mục Deploy backend tự động).
 
