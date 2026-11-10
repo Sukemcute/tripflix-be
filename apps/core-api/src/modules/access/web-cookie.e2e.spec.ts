@@ -84,7 +84,7 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
   });
 
   async function register(email: string) {
-    await registerTestAccount(app, { email, password: PASSWORD, displayName: 'Web' });
+    return registerTestAccount(app, { email, password: PASSWORD, displayName: 'Web' });
   }
 
   async function webLogin(email: string) {
@@ -96,13 +96,52 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
     await register('web-login@example.com');
     const { res, cookie } = await webLogin('web-login@example.com');
 
-    expect(res.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
-    expect(res.body.accessToken).toEqual(expect.any(String));
-    expect(res.body).not.toHaveProperty('refreshToken');
+    expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(cookie.value.length).toBeGreaterThan(20);
     expect(cookie.attrs).toEqual(expect.arrayContaining(['httponly', 'samesite=lax', 'path=/api/auth', 'max-age=2592000']));
     // Môi trường test chạy http: không bật Secure (production bật, xem web-session.spec.ts).
     expect(cookie.attrs).not.toContain('secure');
+  });
+
+  it('đăng nhập đồng thời hai tài khoản bằng hai phiên web độc lập', async () => {
+    const emails = ['first-session@example.com', 'second-session@example.com'];
+    for (const email of emails) {
+      const registration = await register(email);
+      expect(registration.body).toEqual({
+        id: expect.any(String),
+        email,
+        displayName: 'Web',
+        role: 'member',
+        createdAt: expect.any(String),
+      });
+    }
+
+    const anonymous = await http().get('/api/auth/me').expect(401);
+    expect(anonymous.body).not.toHaveProperty('email');
+
+    const sessions = await Promise.all(emails.map(webLogin));
+    expect(sessions[0]?.cookie.value).not.toBe(sessions[1]?.cookie.value);
+
+    for (const [index, { res }] of sessions.entries()) {
+      const profile = await http()
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${res.body.accessToken}`)
+        .expect(200);
+      expect(profile.headers['cache-control']).toBe('no-store');
+      expect(profile.body).toEqual({
+        id: expect.any(String),
+        email: emails[index],
+        displayName: 'Web',
+        role: 'member',
+        createdAt: expect.any(String),
+        emailVerified: true,
+        phone: null,
+        dateOfBirth: expect.any(String),
+        gender: expect.any(String),
+        nationality: expect.any(String),
+      });
+    }
   });
 
   it('đăng nhập web với Origin lạ hoặc thiếu Origin: 403, không tạo phiên', async () => {
@@ -128,8 +167,8 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
 
     const res = await http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`).expect(200);
     const next = readSetCookie(res)!;
-    expect(res.body).not.toHaveProperty('refreshToken');
-    expect(res.body.accessToken).toEqual(expect.any(String));
+    expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(next.value).not.toBe(cookie.value);
 
     // Admin cũng là origin tin cậy; chỉ có cookie, không gửi header web vẫn được coi là chế độ web.
