@@ -155,6 +155,12 @@
         "null"
       ]
     },
+    "contactPhone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "contactEmail": {
       "type": [
         "string",
