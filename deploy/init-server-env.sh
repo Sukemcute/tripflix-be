@@ -52,6 +52,8 @@ NOTIFICATION_TAG=develop
 
 # AI (profile ai, deploy/SERVER.md Giai đoạn 5): tóm tắt dùng DeepSeek, kiểm duyệt dùng OpenAI. Secret tạo bằng auth:create-service-client.
 AI_TAG=develop
+# Trợ lý Tripi (POST /ai/chat): true thì gọi DeepSeek để hiểu câu hỏi, tốn tiền theo mỗi câu chat.
+CHAT_LLM_ENABLED=false
 
 # Chuyển mã video (profile video, deploy/SERVER.md Giai đoạn 6), bản Go. Cần key AWS ở trên.
 VIDEO_WORKER_TAG=develop
