@@ -8,6 +8,23 @@ const required = {
   DATABASE_URL_COMMERCE: 'postgres://co',
 };
 
+describe('AUTH_JWT_PREVIOUS_JWKS', () => {
+  const jwk = { kty: 'EC', crv: 'P-256', x: 'x1', y: 'y1', kid: 'k1', alg: 'ES256', use: 'sig' };
+
+  it('nhận nguyên JSON của /.well-known/jwks.json, để trống là không có', () => {
+    const env = coreEnvSchema.parse({ ...required, AUTH_JWT_PREVIOUS_JWKS: JSON.stringify({ keys: [jwk] }) });
+    expect(env.AUTH_JWT_PREVIOUS_JWKS?.keys).toEqual([{ kty: 'EC', crv: 'P-256', x: 'x1', y: 'y1', kid: 'k1' }]);
+    expect(coreEnvSchema.parse({ ...required, AUTH_JWT_PREVIOUS_JWKS: '' }).AUTH_JWT_PREVIOUS_JWKS).toBeUndefined();
+  });
+
+  it('từ chối JSON hỏng, khoá riêng (có d), thiếu kid, danh sách rỗng', () => {
+    const { kid: _kid, ...noKid } = jwk;
+    for (const bad of ['{keys', JSON.stringify({ keys: [{ ...jwk, d: 'secret' }] }), JSON.stringify({ keys: [noKid] }), '{"keys":[]}']) {
+      expect(coreEnvSchema.safeParse({ ...required, AUTH_JWT_PREVIOUS_JWKS: bad }).success).toBe(false);
+    }
+  });
+});
+
 describe('AUTH_WEB_ORIGINS', () => {
   it('mặc định là web 3100 và admin 3200', () => {
     expect(coreEnvSchema.parse(required).AUTH_WEB_ORIGINS).toEqual(DEFAULT_WEB_ORIGINS);
