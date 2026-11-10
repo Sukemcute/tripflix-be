@@ -16,6 +16,7 @@ export interface OrderRecord {
   holdExpiresAt: Date;
   confirmationCode: string | null;
   cancelReason: string | null;
+  cancelledAt?: Date | null;
   createdAt: Date;
   paidAt: Date | null;
 }
@@ -55,6 +56,8 @@ export interface PaymentRecord {
   status: 'initiated' | 'requires_action' | 'succeeded' | 'failed';
   gateway: string;
   gatewayRef: string | null;
+  gatewayBankCode?: string | null;
+  gatewayPaidAt?: Date | null;
   failureCode: string | null;
   cardLast4: string | null;
   challengeId: string | null;
@@ -69,8 +72,16 @@ export interface RefundRecord {
   gatewayKey: string;
   amount: number;
   status: 'initiated' | 'succeeded';
+  needsReview: boolean;
   checkAttempts: number;
   parentRef: string | null;
+  parentGatewayKey: string;
+  parentCreatedAt: Date;
+  parentAmount: number;
+  gatewayRef: string | null;
+  gatewayBankCode?: string | null;
+  gatewayRefundedAt?: Date | null;
+  updatedAt?: Date | null;
   /** Cổng của khoản trừ gốc: hoàn qua đúng cổng đó. */
   gateway: string;
 }
@@ -102,7 +113,8 @@ export interface OrderStore {
   lockOrderSkipLocked(orderId: string): Promise<OrderRecord | null>;
   lockPaymentSkipLocked(paymentId: string): Promise<PaymentRecord | null>;
   /** Đơn của người dùng, mới nhất trước (created_at, id giảm dần), sau con trỏ nếu có. Đọc không khoá. */
-  listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }): Promise<OrderRecord[]>;
+  /** hidesUnpaidClosed: bỏ đơn chưa từng trả tiền mà đã hết hạn hoặc huỷ (giữ chỗ hết giờ thì coi như không có). */
+  listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number; hidesUnpaidClosed?: boolean }): Promise<OrderRecord[]>;
   /** Mục của nhiều đơn trong một câu truy vấn. */
   findItemsOfOrders(orderIds: string[]): Promise<OrderItemRecord[]>;
   insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
@@ -122,6 +134,8 @@ export interface OrderStore {
    */
   holdCell(cell: InventoryCell): Promise<boolean>;
   releaseCell(cell: InventoryCell): Promise<void>;
+  /** sold → trống khi huỷ đơn đã trả. */
+  unsellCell(cell: InventoryCell): Promise<void>;
   /** held → sold khi đã trả tiền. */
   sellCell(cell: InventoryCell): Promise<boolean>;
 
@@ -131,20 +145,23 @@ export interface OrderStore {
   findPaymentsByKey(gatewayKey: string): Promise<PaymentRecord[]>;
   findPaymentByChallenge(orderId: string, challengeId: string): Promise<PaymentRecord | null>;
   findPaymentsOfOrder(orderId: string): Promise<PaymentRecord[]>;
-  updatePayment(paymentId: string, patch: Partial<Pick<PaymentRecord, 'status' | 'gatewayRef' | 'failureCode' | 'cardLast4' | 'challengeId'>>): Promise<void>;
+  updatePayment(paymentId: string, patch: Partial<Pick<PaymentRecord, 'status' | 'gatewayRef' | 'gatewayBankCode' | 'gatewayPaidAt' | 'failureCode' | 'cardLast4' | 'challengeId'>>): Promise<void>;
   countFailedCharges(orderId: string): Promise<number>;
 
   /** Chèn khoản hoàn; khoá đã có thì bỏ qua (chạy lại không hoàn hai lần). */
   insertRefund(refund: { orderId: string; paymentId: string; gatewayKey: string; amount: number; reason: string; needsReview: boolean }): Promise<void>;
   findInitiatedRefunds(orderId: string): Promise<RefundRecord[]>;
-  markRefundSucceeded(refundId: string, gatewayRef: string): Promise<void>;
+  findRefundsOfOrder(orderId: string): Promise<RefundRecord[]>;
+  markRefundSucceeded(refundId: string, gatewayRef: string, metadata?: Pick<RefundRecord, 'gatewayBankCode' | 'gatewayRefundedAt'>): Promise<void>;
+  markRefundAccepted(refundId: string, gatewayRef: string): Promise<void>;
+  markRefundSubmitted(refundId: string, gatewayRef: string | null, options?: { expectedRef: string | null; checkAttempts: number }): Promise<boolean>;
 
   /**
    * Đối soát: nhận một lô khoản đang initiated đã quá olderThanSeconds, đẩy lịch hỏi lần sau (giãn dần);
    * FOR UPDATE SKIP LOCKED để nhiều bản core-api không làm trùng.
    */
   claimDueCharges(input: { gateway: string; olderThanSeconds: number; limit: number; backoffSeconds: number[] }): Promise<PaymentRecord[]>;
-  claimDueRefunds(input: { gateway: string; olderThanSeconds: number; limit: number; backoffSeconds: number[] }): Promise<RefundRecord[]>;
+  claimDueRefunds(input: { gateway?: string; orderId?: string; olderThanSeconds: number; limit: number; backoffSeconds: number[] }): Promise<RefundRecord[]>;
   markForReview(kind: 'charge' | 'refund', id: string): Promise<void>;
 }
 

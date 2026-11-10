@@ -23,6 +23,7 @@ import type { ChargeResult } from './payment/application/gateway.port.js';
 import { PAYMENT_GATEWAY } from './payment/application/gateway.port.js';
 import { PaymentUseCases } from './payment/application/payment.use-cases.js';
 import { VNPAY_CONFIG } from './payment/application/vnpay.use-cases.js';
+import { REFUND_GATEWAYS, type RefundClient } from './payment/application/refund-gateways.port.js';
 import { buildSignData } from './payment/domain/vnpay-signature.js';
 import { MockGateway } from './payment/infra/mock-gateway.js';
 
@@ -32,6 +33,10 @@ const POLICY = '2026-11-03';
 const VISA = '4242424242424242';
 const THREE_DS = '4000002500003155';
 const VNPAY_TEST_CONFIG = { tmnCode: 'TESTTMN1', hashSecret: 'TEST_SECRET_FOR_SIGNING', paymentUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', returnUrl: 'http://localhost/return' };
+const vnpayRefundClient: RefundClient = {
+  refund: async ({ requestId }) => ({ status: 'succeeded', ref: `vnpay-refund:${requestId}` }),
+  query: async ({ requestId }) => ({ status: 'succeeded', ref: `vnpay-refund:${requestId}` }),
+};
 const signVnpay = (params: Record<string, string>) => ({
   ...params,
   vnp_SecureHash: createHmac('sha512', VNPAY_TEST_CONFIG.hashSecret).update(buildSignData(params)).digest('hex'),
@@ -159,6 +164,7 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
       .overrideProvider(PAYMENT_GATEWAY).useValue(gateway)
       .overrideProvider(TODAY).useValue(() => TODAY_DATE)
       .overrideProvider(VNPAY_CONFIG).useValue(VNPAY_TEST_CONFIG)
+      .overrideProvider(REFUND_GATEWAYS).useValue(new Map([['vnpay', vnpayRefundClient]]))
       .compile();
     app = moduleRef.createNestApplication();
     applyGlobalPrefix(app);
@@ -393,7 +399,7 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
     expect((await http().get('/api/payments/vnpay/ipn').query(ipn)).body.RspCode).toBe('00');
     const [charge] = await paymentsOf(order.orderId);
     expect(charge).toMatchObject({ status: 'failed', failure_code: 'vnpay_expired', gateway_ref: '15000011' });
-    expect(await refundsOf(order.orderId)).toEqual([{ payment_id: charge!.id, gateway_key: `refund:late:${charge!.id}`, amount: String(order.total), reason: 'late_success', status: 'initiated', needs_review: true }]);
+    expect(await refundsOf(order.orderId)).toEqual([{ payment_id: charge!.id, gateway_key: `refund:late:${charge!.id}`, amount: String(order.total), reason: 'late_success', status: 'succeeded', needs_review: false }]);
     expect(await orderStatus(order.orderId)).toBe('expired');
     expect(await inventoryOf(date)).toMatchObject({ held: after.held, sold: after.sold });
     expect((await http().get('/api/payments/vnpay/ipn').query(ipn)).body.RspCode).toBe('00');
@@ -573,7 +579,7 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
     expect((await inventoryOf(date)).sold).toBe(before.sold + 1);
   });
 
-  it('server chết ngay sau TX2 của tiền về muộn: khoản hoàn VNPay vẫn đã chuyển người xử lý', async () => {
+  it('server chết ngay sau TX2 của tiền về muộn: job vẫn tự hoàn VNPay đúng một lần', async () => {
     const date = addDays(TODAY_DATE, 39);
     const user = newUser();
     const order = await ready(user, date);
@@ -584,6 +590,11 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
     const [charge] = await paymentsOf(order.orderId);
     // Chỉ chạy TX2, không có bước processRefunds phía sau.
     expect(await payment.applyResult(charge!.gateway_key, { status: 'succeeded', ref: '15000031' })).toEqual({ kind: 'compensated' });
-    expect(await refundsOf(order.orderId)).toMatchObject([{ status: 'initiated', needs_review: true }]);
+    expect(await refundsOf(order.orderId)).toMatchObject([{ status: 'initiated', needs_review: false }]);
+    await pool.query("update commerce.refunds set updated_at = now() - interval '2 minutes' where order_id = $1", [order.orderId]);
+    expect((await payment.reconcile(0)).refunds).toBeGreaterThanOrEqual(1);
+    expect(await refundsOf(order.orderId)).toMatchObject([{ status: 'succeeded', needs_review: false }]);
+    expect((await payment.reconcile(0)).refunds).toBe(0);
+    expect(await refundsOf(order.orderId)).toHaveLength(1);
   });
 });

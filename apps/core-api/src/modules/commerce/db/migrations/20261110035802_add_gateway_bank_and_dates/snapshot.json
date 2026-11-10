@@ -1,0 +1,149 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9e844a46-194a-44cf-ac50-223481cdd9ae",
+  "prevIds": [
+    "d5fdfadf-4519-4a38-a934-564c30f91021"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "payments",
+        "gateway_bank_code"
+      ],
+      "writes": [
+        "s|col|commerce.payments.gateway_bank_code",
+        "n|col|commerce.payments.gateway_bank_code",
+        "e|col|commerce.payments.gateway_bank_code"
+      ],
+      "reads": [
+        "n|tbl|commerce.payments",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "payments",
+        "gateway_paid_at"
+      ],
+      "writes": [
+        "s|col|commerce.payments.gateway_paid_at",
+        "n|col|commerce.payments.gateway_paid_at",
+        "e|col|commerce.payments.gateway_paid_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.payments",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "refunds",
+        "gateway_bank_code"
+      ],
+      "writes": [
+        "s|col|commerce.refunds.gateway_bank_code",
+        "n|col|commerce.refunds.gateway_bank_code",
+        "e|col|commerce.refunds.gateway_bank_code"
+      ],
+      "reads": [
+        "n|tbl|commerce.refunds",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "refunds",
+        "gateway_refunded_at"
+      ],
+      "writes": [
+        "s|col|commerce.refunds.gateway_refunded_at",
+        "n|col|commerce.refunds.gateway_refunded_at",
+        "e|col|commerce.refunds.gateway_refunded_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.refunds",
+        "n|sch|commerce"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "payments",
+        "name": "gateway_bank_code",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "payments",
+        "name": "gateway_paid_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "refunds",
+        "name": "gateway_bank_code",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "refunds",
+        "name": "gateway_refunded_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

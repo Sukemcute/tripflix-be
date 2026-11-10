@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
+import { SUBMITTED_REFUND_REF } from '../../payment/application/refund-gateways.port.js';
 import type { OrderStatus, PassengerType } from '../domain/order-rules.js';
 import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
 
@@ -25,6 +26,7 @@ const mapOrder = (row: OrderRow): OrderRecord => ({
   holdExpiresAt: row.holdExpiresAt,
   confirmationCode: row.confirmationCode,
   cancelReason: row.cancelReason,
+  cancelledAt: row.cancelledAt,
   createdAt: row.createdAt,
   paidAt: row.paidAt,
 });
@@ -43,6 +45,8 @@ const mapPayment = (row: PaymentRow): PaymentRecord => ({
   status: row.status as PaymentRecord['status'],
   gateway: row.gateway,
   gatewayRef: row.gatewayRef,
+  gatewayBankCode: row.gatewayBankCode,
+  gatewayPaidAt: row.gatewayPaidAt,
   failureCode: row.failureCode,
   cardLast4: row.cardLast4,
   challengeId: row.challengeId,
@@ -123,7 +127,7 @@ export class DrizzleOrderStore implements OrderStore {
     return row ? mapPayment(row) : null;
   }
 
-  async listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number }) {
+  async listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number; hidesUnpaidClosed?: boolean }) {
     // Postgres giữ tới micro giây, Date của JS chỉ tới mili giây: so và sắp theo mili giây để con trỏ không bỏ sót đơn.
     const createdAtMs = sql`date_trunc('milliseconds', ${orders.createdAt})`;
     const rows = await this.db
@@ -133,6 +137,10 @@ export class DrizzleOrderStore implements OrderStore {
         and(
           eq(orders.userId, input.userId),
           input.statuses?.length ? inArray(orders.status, input.statuses) : undefined,
+          // Giữ chỗ chưa trả mà đã hết giờ hoặc bị huỷ thì không còn ý nghĩa với khách; đơn đã trả rồi huỷ vẫn hiện để theo dõi hoàn tiền.
+          input.hidesUnpaidClosed
+            ? sql`not ((${orders.status} in ('expired', 'cancelled') and ${orders.paidAt} is null) or (${orders.status} = 'pending' and ${orders.holdExpiresAt} <= now()))`
+            : undefined,
           input.after ? or(sql`${createdAtMs} < ${input.after.createdAt.toISOString()}::timestamptz`, and(sql`${createdAtMs} = ${input.after.createdAt.toISOString()}::timestamptz`, lt(orders.id, input.after.id))) : undefined,
         ),
       )
@@ -224,6 +232,20 @@ export class DrizzleOrderStore implements OrderStore {
     }
   }
 
+  async unsellCell(cell: InventoryCell) {
+    if (cell.productType === 'room') {
+      await this.db
+        .update(roomInventory)
+        .set({ sold: sql`greatest(0, ${roomInventory.sold} - ${cell.qty})` })
+        .where(and(eq(roomInventory.roomTypeId, cell.productId), eq(roomInventory.date, cell.date)));
+    } else {
+      await this.db
+        .update(flightInventory)
+        .set({ sold: sql`greatest(0, ${flightInventory.sold} - ${cell.qty})` })
+        .where(and(eq(flightInventory.flightId, cell.productId), eq(flightInventory.date, cell.date)));
+    }
+  }
+
   async sellCell(cell: InventoryCell) {
     const rows =
       cell.productType === 'room'
@@ -285,8 +307,16 @@ export class DrizzleOrderStore implements OrderStore {
         gatewayKey: refunds.gatewayKey,
         amount: refunds.amount,
         status: refunds.status,
+        needsReview: refunds.needsReview,
         checkAttempts: refunds.checkAttempts,
         parentRef: payments.gatewayRef,
+        parentGatewayKey: payments.gatewayKey,
+        parentCreatedAt: payments.createdAt,
+        parentAmount: payments.amount,
+        gatewayRef: refunds.gatewayRef,
+        gatewayBankCode: refunds.gatewayBankCode,
+        gatewayRefundedAt: refunds.gatewayRefundedAt,
+        updatedAt: refunds.updatedAt,
         gateway: payments.gateway,
       })
       .from(refunds)
@@ -298,8 +328,26 @@ export class DrizzleOrderStore implements OrderStore {
     return rows.map((r) => ({ ...r, status: r.status as RefundRecord['status'] }));
   }
 
-  async markRefundSucceeded(refundId: string, gatewayRef: string) {
-    await this.db.update(refunds).set({ status: 'succeeded', gatewayRef, updatedAt: new Date() }).where(eq(refunds.id, refundId));
+  async findRefundsOfOrder(orderId: string) {
+    const rows = await this.refundSelect().where(eq(refunds.orderId, orderId)).orderBy(asc(refunds.createdAt), asc(refunds.id));
+    return rows.map((r) => ({ ...r, status: r.status as RefundRecord['status'] }));
+  }
+
+  async markRefundSucceeded(refundId: string, gatewayRef: string, metadata: Parameters<OrderStore['markRefundSucceeded']>[2] = {}) {
+    await this.db.update(refunds).set({ status: 'succeeded', gatewayRef, ...metadata, updatedAt: new Date() }).where(and(eq(refunds.id, refundId), eq(refunds.status, 'initiated')));
+  }
+
+  async markRefundAccepted(refundId: string, gatewayRef: string) {
+    await this.db.update(refunds).set({ gatewayRef, updatedAt: new Date() }).where(and(eq(refunds.id, refundId), eq(refunds.status, 'initiated')));
+  }
+
+  async markRefundSubmitted(refundId: string, gatewayRef: string | null, options?: Parameters<OrderStore['markRefundSubmitted']>[2]) {
+    // Chỉ một tác vụ được chuyển từ chưa gửi sang đã gửi, kể cả lease cũ vừa hết hạn.
+    const expectedRef = options ? options.expectedRef : gatewayRef === null ? SUBMITTED_REFUND_REF : null;
+    const changed = await this.db.update(refunds).set({ gatewayRef, updatedAt: new Date() })
+      .where(and(eq(refunds.id, refundId), eq(refunds.status, 'initiated'), eq(refunds.needsReview, false), expectedRef === null ? sql`${refunds.gatewayRef} is null` : eq(refunds.gatewayRef, expectedRef), options ? eq(refunds.checkAttempts, options.checkAttempts) : undefined))
+      .returning({ id: refunds.id });
+    return changed.length === 1;
   }
 
   async claimDueCharges(input: { gateway: string; olderThanSeconds: number; limit: number; backoffSeconds: number[] }) {
@@ -320,9 +368,9 @@ export class DrizzleOrderStore implements OrderStore {
     return due.map((p) => ({ ...mapPayment(p), checkAttempts: p.checkAttempts + 1 }));
   }
 
-  async claimDueRefunds(input: { gateway: string; olderThanSeconds: number; limit: number; backoffSeconds: number[] }) {
+  async claimDueRefunds(input: Parameters<OrderStore['claimDueRefunds']>[0]) {
     const due = await this.refundSelect()
-      .where(and(eq(refunds.status, 'initiated'), eq(payments.gateway, input.gateway), eq(refunds.needsReview, false), sql`${refunds.nextCheckAt} <= now()`, sql`${refunds.updatedAt} < now() - make_interval(secs => ${input.olderThanSeconds})`))
+      .where(and(eq(refunds.status, 'initiated'), input.gateway === undefined ? undefined : eq(payments.gateway, input.gateway), input.orderId === undefined ? undefined : eq(refunds.orderId, input.orderId), eq(refunds.needsReview, false), sql`${refunds.nextCheckAt} <= now()`, sql`${refunds.updatedAt} < now() - make_interval(secs => ${input.olderThanSeconds})`))
       .orderBy(asc(refunds.nextCheckAt))
       .limit(input.limit)
       .for('update', { of: refunds, skipLocked: true });

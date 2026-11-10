@@ -5,6 +5,8 @@ export interface ChargeResult {
   last4?: string;
   code?: string;
   message?: string;
+  gatewayBankCode?: string | null;
+  gatewayPaidAt?: Date | null;
 }
 
 /**

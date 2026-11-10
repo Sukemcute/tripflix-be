@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type Today } from '../../inventory/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
+import { summarizeRefunds, type RefundSummary } from '../domain/refund-summary.js';
 import { MAX_NIGHTS, addDays, calculatePassengerFares, countNights, countSeats, findPassengerMixError, isIsoDate, quoteFlight, quoteStay, calculateChildStayDiscount, countRoomsForGuests, type PassengerMix, type PricePlan } from '../../inventory/domain/sales-rules.js';
 import {
   HOLD_MINUTES,
@@ -49,6 +50,8 @@ export interface CheckoutView {
   infants: number;
   confirmationCode: string | null;
   cancelReason: string | null;
+  cancelledAt?: string | null;
+  refund?: RefundSummary | null;
   items: (Omit<OrderItemRecord, 'orderId'> & { dateTo: string })[];
   isGuestInfoComplete: boolean;
   passengersRequired: number;
@@ -380,6 +383,8 @@ export class CheckoutUseCases {
       infants: order.infants,
       confirmationCode: order.confirmationCode,
       cancelReason: order.cancelReason,
+      cancelledAt: order.cancelledAt?.toISOString() ?? null,
+      refund: summarizeRefunds(order, await this.orders.findRefundsOfOrder(orderId)),
       items: toItemViews(items),
       isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates: await this.orders.findGuestBirthdates(orderId), passengersRequired }),
       passengersRequired,
@@ -392,7 +397,7 @@ export class CheckoutUseCases {
   async listTrips(userId: string, query: ListTripsQuery = {}): Promise<TripPage> {
     const limit = Math.min(Math.max(query.limit ?? TRIPS_DEFAULT_LIMIT, 1), TRIPS_MAX_LIMIT);
     const after = query.cursor ? decodeTripCursor(query.cursor) : undefined;
-    const rows = await this.orders.listOrdersOfUser({ userId, statuses: query.statuses, after, limit: limit + 1 });
+    const rows = await this.orders.listOrdersOfUser({ userId, statuses: query.statuses, after, limit: limit + 1, hidesUnpaidClosed: true });
     const page = rows.slice(0, limit);
     const itemsByOrder = new Map<string, OrderItemRecord[]>();
     for (const item of await this.orders.findItemsOfOrders(page.map((o) => o.id))) {

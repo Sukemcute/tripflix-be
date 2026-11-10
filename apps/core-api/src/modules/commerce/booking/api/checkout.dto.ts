@@ -130,6 +130,15 @@ class CheckoutItemDto {
   @ApiProperty({ type: String, nullable: true }) confirmationCode!: string | null;
 }
 
+export class CheckoutRefundDto {
+  @ApiProperty({ description: 'Tổng số tiền hoàn (VND)' }) amount!: number;
+  @ApiProperty({ minimum: 0, description: 'Phí huỷ đơn đã thanh toán (VND)' }) feeAmount!: number;
+  @ApiProperty({ enum: ['refunded', 'processing', 'needs_review'] }) status!: 'refunded' | 'processing' | 'needs_review';
+  @ApiProperty({ enum: ['vnpay', 'card'] }) method!: 'vnpay' | 'card';
+  @ApiProperty({ type: String, nullable: true }) bankCode!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) refundedAt!: string | null;
+}
+
 export class CheckoutDto {
   @ApiProperty({ format: 'uuid' }) orderId!: string;
   @ApiProperty({ enum: ['pending', 'paying', 'paid', 'cancelled', 'expired'] }) status!: string;
@@ -140,6 +149,8 @@ export class CheckoutDto {
   @ApiProperty({ description: 'Em bé dưới 2 tuổi (vé bay)' }) infants!: number;
   @ApiProperty({ type: String, nullable: true }) confirmationCode!: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason!: string | null;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true }) cancelledAt?: string | null;
+  @ApiPropertyOptional({ type: CheckoutRefundDto, nullable: true }) refund?: CheckoutRefundDto | null;
   @ApiProperty({ type: [CheckoutItemDto] }) items!: CheckoutItemDto[];
   @ApiProperty() isGuestInfoComplete!: boolean;
   @ApiProperty({ description: 'Số hành khách cần nhập (0 khi không có vé bay)' }) passengersRequired!: number;
@@ -157,12 +168,44 @@ export class CancelHoldResultDto {
   @ApiProperty({ enum: ['cancelled'] }) status!: 'cancelled';
 }
 
+export class CancelQuoteLineDto {
+  @ApiProperty() itemId!: string;
+  @ApiProperty({ enum: ['free_cancel', 'first_night_fee', 'non_refundable'] }) rule!: string;
+  @ApiProperty() refundAmount!: number;
+  @ApiProperty() feeAmount!: number;
+}
+
+export class CancelQuoteDto {
+  @ApiProperty() isCancellable!: boolean;
+  @ApiPropertyOptional({ enum: ['ALREADY_STARTED', 'NOT_PAID'] }) reason?: string;
+  @ApiProperty() refundAmount!: number;
+  @ApiProperty() feeAmount!: number;
+  @ApiProperty({ type: [CancelQuoteLineDto] }) lines!: CancelQuoteLineDto[];
+}
+
+export class CancelQuoteResultDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ type: CancelQuoteDto }) quote!: CancelQuoteDto;
+}
+
+export class CancelPaidResultDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ enum: ['cancelled'] }) status!: 'cancelled';
+  @ApiProperty() refundAmount!: number;
+  @ApiProperty() feeAmount!: number;
+  @ApiProperty({ enum: ['none', 'refunded', 'processing', 'needs_review'] }) refundStatus!: string;
+  @ApiPropertyOptional({ description: 'Mã ngân hàng của giao dịch hoàn tiền tại VNPay' }) bankCode?: string;
+  @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Thời điểm hoàn tiền do VNPay trả về' }) refundedAt?: string;
+}
+
 export class PayResultDto {
   @ApiProperty({ enum: ['paid', 'requires_action', 'pending'] }) outcome!: string;
   @ApiProperty({ format: 'uuid' }) orderId!: string;
   @ApiPropertyOptional({ type: String, nullable: true }) confirmationCode?: string | null;
   @ApiPropertyOptional({ description: 'Khi outcome = requires_action: gửi kèm OTP tới /3ds' }) challengeId?: string;
   @ApiPropertyOptional({ description: 'Khi outcome = pending: chưa rõ kết quả, gọi lại GET /checkout/:id sau ít giây' }) message?: string;
+  @ApiPropertyOptional({ description: 'Mã ngân hàng của giao dịch thanh toán tại VNPay' }) bankCode?: string;
+  @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Thời điểm thanh toán do VNPay trả về' }) paidAt?: string;
   @ApiPropertyOptional({ type: CheckoutDto }) checkout?: CheckoutDto;
 }
 

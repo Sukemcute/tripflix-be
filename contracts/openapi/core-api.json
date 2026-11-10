@@ -3743,6 +3743,85 @@
         ]
       }
     },
+    "/api/checkout/{id}/cancel-quote": {
+      "get": {
+        "operationId": "CheckoutController_cancelQuote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelQuoteResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/api/checkout/{id}/cancel-paid": {
+      "post": {
+        "operationId": "CheckoutController_cancelPaid",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelPaidResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
     "/api/checkout/{id}/cancel": {
       "post": {
         "operationId": "CheckoutController_cancel",
@@ -8681,6 +8760,52 @@
           "items"
         ]
       },
+      "CheckoutRefundDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Tổng số tiền hoàn (VND)"
+          },
+          "feeAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Phí huỷ đơn đã thanh toán (VND)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "refunded",
+              "processing",
+              "needs_review"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "vnpay",
+              "card"
+            ]
+          },
+          "bankCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "amount",
+          "feeAmount",
+          "status",
+          "method",
+          "bankCode",
+          "refundedAt"
+        ]
+      },
       "CheckoutItemDto": {
         "type": "object",
         "properties": {
@@ -8818,6 +8943,20 @@
           "cancelReason": {
             "type": "string",
             "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "refund": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CheckoutRefundDto"
+              }
+            ]
           },
           "items": {
             "type": "array",
@@ -9100,6 +9239,15 @@
             "type": "string",
             "description": "Khi outcome = pending: chưa rõ kết quả, gọi lại GET /checkout/:id sau ít giây"
           },
+          "bankCode": {
+            "type": "string",
+            "description": "Mã ngân hàng của giao dịch thanh toán tại VNPay"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Thời điểm thanh toán do VNPay trả về"
+          },
           "checkout": {
             "$ref": "#/components/schemas/CheckoutDto"
           }
@@ -9123,6 +9271,129 @@
         "required": [
           "challengeId",
           "otp"
+        ]
+      },
+      "CancelQuoteLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "free_cancel",
+              "first_night_fee",
+              "non_refundable"
+            ]
+          },
+          "refundAmount": {
+            "type": "number"
+          },
+          "feeAmount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "itemId",
+          "rule",
+          "refundAmount",
+          "feeAmount"
+        ]
+      },
+      "CancelQuoteDto": {
+        "type": "object",
+        "properties": {
+          "isCancellable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ALREADY_STARTED",
+              "NOT_PAID"
+            ]
+          },
+          "refundAmount": {
+            "type": "number"
+          },
+          "feeAmount": {
+            "type": "number"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CancelQuoteLineDto"
+            }
+          }
+        },
+        "required": [
+          "isCancellable",
+          "refundAmount",
+          "feeAmount",
+          "lines"
+        ]
+      },
+      "CancelQuoteResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quote": {
+            "$ref": "#/components/schemas/CancelQuoteDto"
+          }
+        },
+        "required": [
+          "orderId",
+          "quote"
+        ]
+      },
+      "CancelPaidResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          },
+          "refundAmount": {
+            "type": "number"
+          },
+          "feeAmount": {
+            "type": "number"
+          },
+          "refundStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "refunded",
+              "processing",
+              "needs_review"
+            ]
+          },
+          "bankCode": {
+            "type": "string",
+            "description": "Mã ngân hàng của giao dịch hoàn tiền tại VNPay"
+          },
+          "refundedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Thời điểm hoàn tiền do VNPay trả về"
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "refundAmount",
+          "feeAmount",
+          "refundStatus"
         ]
       },
       "CancelHoldResultDto": {
