@@ -19,6 +19,7 @@ export interface ListCommentsQuery {
 export type EnrichedCommentItem = CommentRecord & {
   isLiked: boolean;
   likeCount: number;
+  replyCount: number;
   authorName: string | null;
 };
 
@@ -90,6 +91,9 @@ export class ListCommentsUseCase {
       );
     }
 
+    // App chỉ hiện "Xem N trả lời" khi có trả lời, nên cần số này cho cả trang.
+    const replyCounts = await this.commentRepository.countRepliesByParentIds(rawItems.map((c) => c.id));
+
     // Tên tác giả chỉ để hiển thị: lỗi tra cứu không được làm hỏng danh sách bình luận.
     let authorNames = new Map<string, string>();
     if (rawItems.length > 0 && this.userDirectory) {
@@ -104,6 +108,7 @@ export class ListCommentsUseCase {
       ...comment,
       authorName: authorNames.get(comment.authorId) ?? null,
       likeCount: comment.likeCount ?? 0,
+      replyCount: replyCounts.get(comment.id) ?? 0,
       isLiked: likedIds.has(comment.id),
     }));
 

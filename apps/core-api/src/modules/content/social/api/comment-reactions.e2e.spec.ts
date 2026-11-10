@@ -116,6 +116,15 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
       },
       findByPostId: async () => Array.from(commentsStore.values()).filter((c) => !c.deletedAt),
       countByPostId: async () => Array.from(commentsStore.values()).filter((c) => !c.deletedAt).length,
+      countRepliesByParentIds: async (parentIds: string[]) => {
+        const counts = new Map<string, number>();
+        for (const c of commentsStore.values()) {
+          if (!c.deletedAt && c.parentCommentId && parentIds.includes(c.parentCommentId)) {
+            counts.set(c.parentCommentId, (counts.get(c.parentCommentId) ?? 0) + 1);
+          }
+        }
+        return counts;
+      },
       create: async (data: any) => {
         const id = '018d9f30-0000-7000-8000-000000000099';
         const rec = {
