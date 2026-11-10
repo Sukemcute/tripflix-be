@@ -24,4 +24,31 @@ describe('vnpay-signature', () => {
     expect(isVnpaySuccess({ vnp_ResponseCode: '00', vnp_TransactionStatus: '00' })).toBe(true);
     expect(isVnpaySuccess({ vnp_ResponseCode: '24', vnp_TransactionStatus: '02' })).toBe(false);
   });
+
+  it('chấp nhận chữ ký HMAC-SHA512 đúng ở dạng chữ thường và chữ hoa', () => {
+    const signature = hmac('SECRET', buildSignData(params));
+    expect(isValidSignature({ ...params, vnp_SecureHash: signature }, 'SECRET', hmac)).toBe(true);
+    expect(isValidSignature({ ...params, vnp_SecureHash: signature.toUpperCase() }, 'SECRET', hmac)).toBe(true);
+  });
+
+  it.each(['first', 'last'] as const)('từ chối chữ ký sai cùng độ dài ở vị trí %s', (position) => {
+    const signature = hmac('SECRET', buildSignData(params));
+    const index = position === 'first' ? 0 : signature.length - 1;
+    const replacement = signature[index] === '0' ? '1' : '0';
+    const invalid = signature.slice(0, index) + replacement + signature.slice(index + 1);
+    expect(isValidSignature({ ...params, vnp_SecureHash: invalid }, 'SECRET', hmac)).toBe(false);
+  });
+
+  it.each([
+    ['ngắn hơn', (signature: string) => signature.slice(0, -2)],
+    ['dài hơn', (signature: string) => `${signature}00`],
+    ['độ dài lẻ', (signature: string) => signature.slice(0, -1)],
+    ['không phải hex', (signature: string) => `${signature.slice(0, -1)}g`],
+    ['hậu tố không phải hex', (signature: string) => `${signature}zz`],
+    ['rỗng', () => ''],
+    ['thiếu', () => undefined as unknown as string],
+  ])('chữ ký %s trả false và không throw', (_label, makeInvalid) => {
+    const signature = hmac('SECRET', buildSignData(params));
+    expect(isValidSignature({ ...params, vnp_SecureHash: makeInvalid(signature) }, 'SECRET', hmac)).toBe(false);
+  });
 });
