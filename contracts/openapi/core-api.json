@@ -708,6 +708,40 @@
         "tags": [
           "admin"
         ]
+      },
+      "post": {
+        "operationId": "AdminController_createStaff",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
       }
     },
     "/api/admin/staff/{userId}": {
@@ -4467,6 +4501,36 @@
           "total",
           "page",
           "pageSize"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "mod_015@tripflix.vn"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "password": {
+            "type": "string",
+            "example": "Tripflix@2025"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "superadmin"
+            ],
+            "default": "moderator"
+          }
+        },
+        "required": [
+          "email",
+          "displayName"
         ]
       },
       "GrantStaffDto": {
