@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { buildIndex } from '../domain/explore/build.js';
 import { searchExplore, type ExploreItem } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
@@ -155,6 +155,8 @@ async function readAll<T>(list: (cursor: string | null) => Promise<{ items: T[];
 /** Tìm khám phá (app): một ô tìm, kết quả chia theo vùng. Chỉ mục ở schema discovery, dựng lại bằng job. */
 @Injectable()
 export class ExploreUseCases {
+  private readonly logger = new Logger(ExploreUseCases.name);
+
   constructor(
     @Inject(EXPLORE_STORE) private readonly store: ExploreStore,
     @Inject(EXPLORE_CATALOG) private readonly catalog: ExploreCatalog,
@@ -171,7 +173,7 @@ export class ExploreUseCases {
     return {
       understood: understoodOf(r.understood),
       nearUser: r.nearUser,
-      // ponytail: total chưa trừ bài bị ẩn trong chu kỳ job (tối đa 10 phút); trừ khi cần đếm chính xác.
+      // total đếm trên chỉ mục: bài bị ẩn được gỡ trong vài giây (dropHidden), giữa lúc đó total có thể dư.
       sections: r.sections.map((s) => ({ kind: s.kind, label: s.label, total: s.total, items: s.items.filter(isShown).map(toItem) })),
       suggest: r.suggest.filter(isShown).map((i) => ({ ...toItem(i), section: i.section ?? '' })),
       dropped: r.dropped,
@@ -203,6 +205,27 @@ export class ExploreUseCases {
       readAll((c) => this.catalog.listPosts(c)),
     ]);
     const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject)]);
-    return (await this.store.replaceAll(index)) ? index.docs.length : null;
+    if (!(await this.store.replaceAll(index))) return null;
+    // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
+    // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.
+    // Lỗi ở đây chỉ để lại bài ẩn tới lượt sau, chỉ mục mới vẫn dùng được.
+    // ponytail: hỏi một lần cho mọi bài; chia lô khi lên hàng chục nghìn bài.
+    try {
+      await this.dropHidden(posts.map((p) => p.id));
+    } catch (error) {
+      this.logger.error(`Dọn bài ẩn sau khi dựng chỉ mục lỗi: ${(error as Error).message}`);
+    }
+    return index.docs.length;
+  }
+
+  /**
+   * Gỡ khỏi chỉ mục những bài trong postIds không còn hiện công khai, trả số bài thật sự bị gỡ
+   * (0 nếu bài ẩn đã không còn trong chỉ mục). Gọi lại nhiều lần vẫn cho cùng chỉ mục.
+   */
+  async dropHidden(postIds: string[]): Promise<number> {
+    if (!postIds.length) return 0;
+    const visible = await this.catalog.findVisiblePostIds(postIds);
+    const hidden = postIds.filter((id) => !visible.has(id));
+    return this.store.deleteDocuments(hidden.map((id) => `post:${id}`));
   }
 }
