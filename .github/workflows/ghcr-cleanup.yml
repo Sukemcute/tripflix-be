@@ -30,7 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
-          PACKAGES: "tripflix-be/core-api tripflix-be/notification-service tripflix-be/video-worker"
+          PACKAGES: "tripflix-be/core-api tripflix-be/notification-service tripflix-be/video-worker tripflix-be/video-worker-go"
           # Tag server đang ghim (ví dụ "sha-8d2192a sha-8ec93ca"): không bao giờ xoá. Cập nhật khi đổi bản ghim.
           KEEP_TAGS: ${{ vars.GHCR_KEEP_TAGS }}
           KEEP_RECENT: "5"

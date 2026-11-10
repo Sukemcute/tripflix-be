@@ -28,7 +28,7 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_REGION=ap-southeast-2
 S3_MEDIA_BUCKET=tripflix-media-dev
-S3_KEY_PREFIX=dev/phong/
+S3_KEY_PREFIX=staging/
 MEDIA_CDN_URL=https://d399hxccn6y84z.cloudfront.net
 
 # Địa chỉ công khai. DNS của cả hai, và của www.<WEB_HOST>, phải trỏ về máy này trước khi bật gateway.
@@ -52,6 +52,9 @@ NOTIFICATION_TAG=develop
 
 # AI (profile ai, deploy/SERVER.md Giai đoạn 5): tóm tắt dùng DeepSeek, kiểm duyệt dùng OpenAI. Secret tạo bằng auth:create-service-client.
 AI_TAG=develop
+
+# Chuyển mã video (profile video, deploy/SERVER.md Giai đoạn 6), bản Go. Cần key AWS ở trên.
+VIDEO_WORKER_TAG=develop
 DEEPSEEK_API_KEY=
 OPENAI_API_KEY=
 AI_SERVICE_CLIENT_SECRET=

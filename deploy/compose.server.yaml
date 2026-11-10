@@ -193,6 +193,32 @@ services:
     depends_on:
       redis: { condition: service_healthy }
 
+  # ---------- Giai đoạn 6: chuyển mã video ----------
+  # video-worker bản Go (apps/video-worker-go): nhận content.media.transcode_requested trên stream:media, tải file gốc từ S3,
+  # chuyển sang HLS 360p, 540p, 720p bằng FFmpeg rồi tải lên S3. Cần key AWS ghi được S3_KEY_PREFIX (deploy/SERVER.md, Giai đoạn 6).
+  # Không chạy cùng bản TypeScript trên cùng Redis vì chung consumer group video-worker.
+  # FFmpeg ăn hết CPU được cấp, nên giới hạn 1 nhân để core-api vẫn trả lời nhanh; đo thật một video 60 giây đỉnh khoảng 400 MB.
+  video-worker:
+    profiles: [video]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/video-worker-go:${VIDEO_WORKER_TAG:-${IMAGE_TAG:-develop}}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_URL: redis://redis:6379
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
+      # Tên cố định: tạo lại container không để lại consumer cũ trong group.
+      VIDEO_WORKER_CONSUMER_NAME: server-1
+      VIDEO_WORKER_JOB_TIMEOUT: ${VIDEO_WORKER_JOB_TIMEOUT:-30m}
+    cpus: 1
+    mem_limit: 1g
+    depends_on:
+      redis: { condition: service_healthy }
+
   # Dữ liệu mẫu, chạy tay một lần. Image production không có file seed và cli/seed chặn NODE_ENV=production,
   # nên service này build stage dev từ mã nguồn trên server.
   seed:
