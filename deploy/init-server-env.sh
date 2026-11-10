@@ -55,5 +55,8 @@ AI_TAG=develop
 DEEPSEEK_API_KEY=
 OPENAI_API_KEY=
 AI_SERVICE_CLIENT_SECRET=
+# Kiểm duyệt: core-api gọi ai-service. Đặt AI_SERVICE_URL=http://ai-service:8000 khi ai-service đã chạy.
+AI_SERVICE_URL=
+MODERATION_SERVICE_CLIENT_SECRET=
 ENV
 echo "Đã tạo $target (quyền 600). Còn phải điền AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY."
