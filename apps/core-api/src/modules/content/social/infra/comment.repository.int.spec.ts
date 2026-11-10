@@ -32,7 +32,7 @@ describe('CommentRepository.countRepliesByParentIds', () => {
 
   it('chỉ đếm trả lời còn hiển thị, bình luận không có trả lời thì không có trong kết quả', async () => {
     const authorId = randomUUID();
-    const [post] = await db.insert(posts).values({ authorId, postType: 'text', title: 'Bài thử' }).returning();
+    const [post] = await db.insert(posts).values({ authorId, postType: 'vlog', title: 'Bài thử' }).returning();
     const postId = post!.id;
     const [withReplies, withoutReplies] = await db
       .insert(comments)
