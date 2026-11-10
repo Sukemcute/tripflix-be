@@ -16,6 +16,7 @@ export const postSummaries = contentSchema.table(
     content: jsonb('content'),
     safety: jsonb('safety'),
     inputHash: varchar('input_hash', { length: 128 }),
+    sourceCommentIds: jsonb('source_comment_ids').$type<string[] | null>(),
     commentCountAtSummary: integer('comment_count_at_summary').notNull().default(0),
     promptVersion: varchar('prompt_version', { length: 32 }),
     modelName: varchar('model_name', { length: 64 }),

@@ -14,7 +14,14 @@ export const STREAMS = {
 export type StreamName = (typeof STREAMS)[keyof typeof STREAMS];
 
 /** Consumer group: một sự kiện đến được mọi group, mỗi group tự XACK. */
-export const CONSUMER_GROUPS = ['notification', 'video-worker', 'core-discovery', 'core-analytics', 'core-media'] as const;
+export const CONSUMER_GROUPS = [
+  'notification',
+  'video-worker',
+  'core-discovery',
+  'core-analytics',
+  'core-media',
+  'core-moderation',
+] as const;
 
 /** Code nghiệp vụ chỉ phụ thuộc interface này, để sau đổi sang Kafka không phải sửa nghiệp vụ. */
 export interface EventBus {

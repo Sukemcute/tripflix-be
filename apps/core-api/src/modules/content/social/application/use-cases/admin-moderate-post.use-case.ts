@@ -3,10 +3,7 @@ import { Post, PostNotFoundException } from '../../domain/index.js';
 import { ModerationActionRepository } from '../../infra/moderation-action.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
-import type {
-  ModerationActionType,
-  PostStatus,
-} from '../../../db/schema/index.js';
+import type { ModerationActionType, PostStatus } from '../../../db/schema/index.js';
 
 export interface AdminModeratePostCommand {
   postId: string;
@@ -15,6 +12,8 @@ export interface AdminModeratePostCommand {
   reasonCode: string;
   reasonDetail?: string;
   reportIds?: string[];
+  actorType?: 'staff' | 'system';
+  caseId?: string;
 }
 
 export interface AdminModeratePostResult {
@@ -35,7 +34,7 @@ export class AdminModeratePostUseCase {
 
   @Transactional('content')
   async execute(command: AdminModeratePostCommand): Promise<AdminModeratePostResult> {
-    const record = await this.postRepository.findById(command.postId);
+    const record = await this.postRepository.findByIdForUpdate(command.postId);
     if (!record) {
       throw new PostNotFoundException(command.postId);
     }
@@ -76,12 +75,14 @@ export class AdminModeratePostUseCase {
     const actionRecord = await this.moderationActionRepository.create({
       postId: command.postId,
       moderatorId: command.moderatorId,
-      action: command.action,
+      action: command.actorType === 'system' && command.action === 'hide' ? 'auto_hide' : command.action,
       previousStatus,
       postStatus: newStatus,
       reasonCode: command.reasonCode,
       reasonDetail: command.reasonDetail,
       reportIds: command.reportIds ?? [],
+      actorType: command.actorType ?? 'staff',
+      caseId: command.caseId,
     });
 
     // Ghi sự kiện outbox content.post.moderated trong cùng transaction DB
@@ -98,6 +99,22 @@ export class AdminModeratePostUseCase {
         moderatorId: command.moderatorId,
       },
     });
+
+    if (previousStatus !== newStatus && ['hidden', 'removed', 'published'].includes(newStatus)) {
+      await this.outbox.add({
+        type: newStatus === 'published' ? 'content.post.restored' : 'content.post.hidden',
+        userId: command.moderatorId,
+        payload: {
+          postId: record.id,
+          authorId: record.authorId,
+          previousStatus,
+          postStatus: newStatus,
+          actionId: actionRecord.id,
+          reasonCode: command.reasonCode,
+          hiddenAt: actionRecord.createdAt.toISOString(),
+        },
+      });
+    }
 
     return {
       actionId: actionRecord.id,

@@ -12,10 +12,15 @@ export const SavePostSummaryRequestSchema = z
     content: SummaryObjectSchema.optional().nullable(),
     safety: SummaryObjectSchema.optional().nullable(),
     inputHash: z.string().max(128).optional().nullable(),
+    sourceCommentIds: z.array(z.uuid()).max(10_000).optional(),
     commentCount: z.number().int().min(0).max(1_000_000).optional().default(0),
     promptVersion: z.string().max(32).optional().nullable(),
     modelName: z.string().max(64).optional().nullable(),
-    generatedAt: z.string().datetime().optional().default(() => new Date().toISOString()),
+    generatedAt: z
+      .string()
+      .datetime()
+      .optional()
+      .default(() => new Date().toISOString()),
   })
   .refine(
     (data) => {
@@ -37,6 +42,7 @@ export const SavePostSummaryRequestSchema = z
     content: data.content ?? null,
     safety: data.safety ?? null,
     inputHash: data.inputHash ?? null,
+    sourceCommentIds: data.sourceCommentIds === undefined ? null : [...new Set(data.sourceCommentIds)],
     commentCount: data.commentCount,
     promptVersion: data.promptVersion ?? null,
     modelName: data.modelName ?? null,
@@ -46,6 +52,12 @@ export const SavePostSummaryRequestSchema = z
 export type SavePostSummaryRequest = z.infer<typeof SavePostSummaryRequestSchema>;
 
 export class SavePostSummaryDto {
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description: 'ID mọi bình luận thực sự vào LLM, kể cả ngữ cảnh; thiếu nghĩa là chưa biết nguồn',
+  })
+  sourceCommentIds?: string[];
   @ApiPropertyOptional({
     enum: ['no_comments', 'insufficient_data', 'ready', 'failed'],
     default: 'ready',
@@ -126,6 +138,12 @@ export class SavePostSummaryDto {
 }
 
 export class PostSummaryResponseDto {
+  @ApiProperty({
+    type: [String],
+    nullable: true,
+    description: 'Nguồn bình luận; null cho bản cũ, [] nếu không dùng bình luận',
+  })
+  sourceCommentIds!: string[] | null;
   @ApiProperty({
     type: String,
     format: 'uuid',
@@ -215,7 +233,8 @@ export class PostSummaryResponseDto {
   @ApiProperty({
     type: Boolean,
     example: false,
-    description: 'Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)',
+    description:
+      'Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)',
   })
   isStale!: boolean;
 

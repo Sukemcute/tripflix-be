@@ -4,6 +4,7 @@ import { CommentRepository } from '../../infra/comment.repository.js';
 import { CommentReactionRepository } from '../../infra/comment-reaction.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentReactionType } from '../../../db/schema/index.js';
+import { PostRepository } from '../../infra/post.repository.js';
 
 export interface SetCommentReactionCommand {
   commentId: string;
@@ -22,13 +23,24 @@ export class SetCommentReactionUseCase {
     private readonly commentRepository: CommentRepository,
     private readonly commentReactionRepository: CommentReactionRepository,
     private readonly outbox: ContentOutbox,
+    private readonly postRepository?: PostRepository,
   ) {}
 
   @Transactional('content')
   async execute(command: SetCommentReactionCommand): Promise<SetCommentReactionResult> {
     const comment = await this.commentRepository.findById(command.commentId);
-    if (!comment || comment.deletedAt) {
+    if (!comment || comment.deletedAt || comment.status !== 'visible') {
       throw new CommentNotFoundException(command.commentId);
+    }
+    if (this.postRepository) {
+      const post = await this.postRepository.findById(comment.postId);
+      if (
+        !post ||
+        post.status !== 'published' ||
+        post.deletedAt ||
+        (post.visibility !== 'public' && post.authorId !== command.userId)
+      )
+        throw new CommentNotFoundException(command.commentId);
     }
 
     const existing = await this.commentReactionRepository.findByCommentAndUser(
@@ -66,10 +78,7 @@ export class SetCommentReactionUseCase {
       }
       isLiked = true;
     } else {
-      const deleted = await this.commentReactionRepository.delete(
-        command.commentId,
-        command.userId,
-      );
+      const deleted = await this.commentReactionRepository.delete(command.commentId, command.userId);
       if (deleted) {
         likeCount = await this.commentRepository.incrementLikeCount(command.commentId, -1);
       } else {

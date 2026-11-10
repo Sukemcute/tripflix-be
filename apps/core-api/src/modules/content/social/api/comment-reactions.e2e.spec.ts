@@ -83,6 +83,9 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
         id: validCommentId,
         postId: validPostId,
         authorId: '018d9f00-0000-7000-8000-000000000001',
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
         parentCommentId: null,
         body: 'Bình luận test thả tim',
         likeCount: 0,
@@ -115,7 +118,14 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
       countByPostId: async () => Array.from(commentsStore.values()).filter((c) => !c.deletedAt).length,
       create: async (data: any) => {
         const id = '018d9f30-0000-7000-8000-000000000099';
-        const rec = { ...data, id, likeCount: 0, createdAt: new Date(), updatedAt: new Date(), deletedAt: null };
+        const rec = {
+          ...data,
+          id,
+          likeCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+        };
         commentsStore.set(id, rec);
         return rec;
       },
@@ -226,10 +236,13 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
       password: PASSWORD,
       displayName: 'User A',
     });
-    const loginA = await http().post('/api/auth/login').send({
-      email: 'user-a@tripflix.vn',
-      password: PASSWORD,
-    }).expect(200);
+    const loginA = await http()
+      .post('/api/auth/login')
+      .send({
+        email: 'user-a@tripflix.vn',
+        password: PASSWORD,
+      })
+      .expect(200);
     userAToken = loginA.body.accessToken;
 
     await registerTestAccount(app, {
@@ -237,10 +250,13 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
       password: PASSWORD,
       displayName: 'User B',
     });
-    const loginB = await http().post('/api/auth/login').send({
-      email: 'user-b@tripflix.vn',
-      password: PASSWORD,
-    }).expect(200);
+    const loginB = await http()
+      .post('/api/auth/login')
+      .send({
+        email: 'user-b@tripflix.vn',
+        password: PASSWORD,
+      })
+      .expect(200);
     userBToken = loginB.body.accessToken;
   });
 
@@ -250,14 +266,13 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     }
   });
 
-  it.each([
-    '/api/v1/posts',
-    `/api/v1/posts/${validPostId}/publish`,
-    `/api/v1/posts/${validPostId}/comments`,
-  ])('POST %s yêu cầu xác thực email', async (path) => {
-    const response = await http().post(path).set(bearer(userAToken)).expect(403);
-    expect(response.body).toMatchObject({ code: 'email_unverified' });
-  });
+  it.each(['/api/v1/posts', `/api/v1/posts/${validPostId}/publish`, `/api/v1/posts/${validPostId}/comments`])(
+    'POST %s yêu cầu xác thực email',
+    async (path) => {
+      const response = await http().post(path).set(bearer(userAToken)).expect(403);
+      expect(response.body).toMatchObject({ code: 'email_unverified' });
+    },
+  );
 
   it('PUT /api/v1/comments/:id/reaction không có token: 401 Unauthorized', async () => {
     await http().put(`/api/v1/comments/${validCommentId}/reaction`).expect(401);
@@ -313,9 +328,7 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
   });
 
   it('GET /api/v1/posts/:postId/comments với khách vãng lai (không token): likeCount=2, isLiked=false', async () => {
-    const res = await http()
-      .get(`/api/v1/posts/${validPostId}/comments`)
-      .expect(200);
+    const res = await http().get(`/api/v1/posts/${validPostId}/comments`).expect(200);
 
     expect(res.body.items).toHaveLength(1);
     expect(res.body.items[0]).toMatchObject({
@@ -326,10 +339,7 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
   });
 
   it('GET /api/v1/posts/:postId/comments với User A (đã thả tim): likeCount=2, isLiked=true', async () => {
-    const res = await http()
-      .get(`/api/v1/posts/${validPostId}/comments`)
-      .set(bearer(userAToken))
-      .expect(200);
+    const res = await http().get(`/api/v1/posts/${validPostId}/comments`).set(bearer(userAToken)).expect(200);
 
     expect(res.body.items[0]).toMatchObject({
       id: validCommentId,

@@ -708,6 +708,40 @@
         "tags": [
           "admin"
         ]
+      },
+      "post": {
+        "operationId": "AdminController_createStaff",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
       }
     },
     "/api/admin/staff/{userId}": {
@@ -2113,6 +2147,403 @@
         "summary": "Bảng tin video: chỉ gồm bài phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.",
         "tags": [
           "feed"
+        ]
+      }
+    },
+    "/api/v1/posts/{id}/reports": {
+      "post": {
+        "operationId": "ReportsController_reportPost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationReportDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Reports"
+        ]
+      }
+    },
+    "/api/v1/comments/{id}/reports": {
+      "post": {
+        "operationId": "ReportsController_reportComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationReportDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Reports"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/queue": {
+      "get": {
+        "operationId": "AdminModerationController_queue",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationQueuePageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hàng chờ kiểm duyệt theo mức ưu tiên",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/queue/{id}": {
+      "get": {
+        "operationId": "AdminModerationController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/queue/{id}/decisions": {
+      "post": {
+        "operationId": "AdminModerationController_decision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationDecisionResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/comments/{id}/actions": {
+      "post": {
+        "operationId": "AdminModerationController_commentAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationDecisionResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ẩn, khôi phục hoặc xoá bình luận ngoài hồ sơ đã đóng",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/actions": {
+      "get": {
+        "operationId": "AdminModerationController_actions",
+        "parameters": [
+          {
+            "name": "moderatorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationLogPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
         ]
       }
     },
@@ -4072,6 +4503,36 @@
           "pageSize"
         ]
       },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "mod_015@tripflix.vn"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "password": {
+            "type": "string",
+            "example": "Tripflix@2025"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "superadmin"
+            ],
+            "default": "moderator"
+          }
+        },
+        "required": [
+          "email",
+          "displayName"
+        ]
+      },
       "GrantStaffDto": {
         "type": "object",
         "properties": {
@@ -5133,6 +5594,14 @@
       "SavePostSummaryDto": {
         "type": "object",
         "properties": {
+          "sourceCommentIds": {
+            "description": "ID mọi bình luận thực sự vào LLM, kể cả ngữ cảnh; thiếu nghĩa là chưa biết nguồn",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5208,6 +5677,14 @@
       "PostSummaryResponseDto": {
         "type": "object",
         "properties": {
+          "sourceCommentIds": {
+            "nullable": true,
+            "description": "Nguồn bình luận; null cho bản cũ, [] nếu không dùng bình luận",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "postId": {
             "type": "string",
             "format": "uuid",
@@ -5302,6 +5779,7 @@
           }
         },
         "required": [
+          "sourceCommentIds",
           "postId",
           "status",
           "keyTakeaways",
@@ -5722,6 +6200,407 @@
             "type": "string",
             "nullable": true,
             "description": "null nghĩa là hết bài"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ReportDto": {
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "SPAM_OR_COMMERCIAL",
+              "SCAM",
+              "HARASSMENT",
+              "SEXUAL",
+              "VIOLENCE",
+              "MISINFORMATION",
+              "OTHER"
+            ]
+          },
+          "reasonDetail": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reasonCode"
+        ]
+      },
+      "ModerationReportDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reporterId": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonDetail": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reporterId",
+          "reasonCode",
+          "reasonDetail",
+          "createdAt"
+        ]
+      },
+      "ModerationCaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "resolved"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severity": {
+            "type": "number"
+          },
+          "flags": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "reportCount": {
+            "type": "number"
+          },
+          "isAutoHidden": {
+            "type": "boolean"
+          },
+          "resolution": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "postId",
+          "authorId",
+          "status",
+          "sources",
+          "severity",
+          "flags",
+          "reportCount",
+          "isAutoHidden",
+          "resolution",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ModerationQueuePageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationCaseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "nextCursor"
+        ]
+      },
+      "ModerationTargetDto": {
+        "type": "object",
+        "properties": {
+          "coverUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "text": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "text",
+          "status",
+          "coverMediaId"
+        ]
+      },
+      "ModerationLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string",
+            "nullable": true
+          },
+          "commentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "moderatorId": {
+            "type": "string"
+          },
+          "actorType": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonDetail": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "postId",
+          "commentId",
+          "moderatorId",
+          "actorType",
+          "action",
+          "reasonCode",
+          "reasonDetail",
+          "createdAt"
+        ]
+      },
+      "ModerationDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "resolved"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severity": {
+            "type": "number"
+          },
+          "flags": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "reportCount": {
+            "type": "number"
+          },
+          "isAutoHidden": {
+            "type": "boolean"
+          },
+          "resolution": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "target": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationTargetDto"
+              }
+            ]
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationReportDto"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationLogDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "postId",
+          "authorId",
+          "status",
+          "sources",
+          "severity",
+          "flags",
+          "reportCount",
+          "isAutoHidden",
+          "resolution",
+          "createdAt",
+          "updatedAt",
+          "target",
+          "reports",
+          "actions"
+        ]
+      },
+      "DecisionDto": {
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "SPAM_OR_COMMERCIAL",
+              "SCAM",
+              "HARASSMENT",
+              "SEXUAL",
+              "VIOLENCE",
+              "MISINFORMATION",
+              "OTHER"
+            ]
+          },
+          "reasonDetail": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "hide",
+              "restore",
+              "remove",
+              "dismiss"
+            ]
+          }
+        },
+        "required": [
+          "reasonCode",
+          "action"
+        ]
+      },
+      "ModerationDecisionResultDto": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "changedCount": {
+            "type": "number"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId",
+          "changedCount",
+          "previousStatus",
+          "status"
+        ]
+      },
+      "ModerationLogPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationLogDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
