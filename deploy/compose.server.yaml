@@ -36,6 +36,10 @@ x-core-env: &core-env
   VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
   # Không để trống: core-api kiểm biến này là URL, chuỗi rỗng làm app không khởi động được.
   VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-https://tripflix.io.vn/payments/vnpay/return}
+  # Kiểm duyệt bằng AI (TF32, deploy/SERVER.md mục Kiểm duyệt). Thiếu AI_SERVICE_URL hoặc secret thì core chỉ lọc bằng regex.
+  AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+  CORE_API_INTERNAL_URL: http://core-api:3000
+  MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
 
 services:
   # ---------- Giai đoạn 1: database, Redis ----------

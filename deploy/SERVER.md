@@ -187,6 +187,26 @@ dc --profile api exec -T core-api node -e "fetch('http://ai-service:8000/moderat
 
 Thiếu key thì `/moderate` trả `503` và core giữ bước lọc regex. Thu hồi key: xoá dòng `OPENAI_API_KEY` rồi chạy lại lệnh `up`.
 
+3. Cho core-api gọi ai-service. Cần client `core-api` với audience `ai-service`: core-api dùng nó lấy token gửi kèm `/moderate`. Client này khác client `ai-service` của phần tóm tắt. Tạo client, ghi secret thẳng vào `.env.server`, không in ra màn hình. Secret chỉ tạo được một lần; client `core-api` đã có thì lệnh báo lỗi, khi đó hỏi người đang giữ secret.
+
+```bash
+cd ~/tripflix-be
+dc --profile api run --rm --no-deps -T core-api node dist/cli/service-client.js create core-api ai-service \
+  | sed -n 's/^SERVICE_CLIENT_SECRET=/MODERATION_SERVICE_CLIENT_SECRET=/p' >> deploy/.env.server
+grep -c '^MODERATION_SERVICE_CLIENT_SECRET=.' deploy/.env.server   # 1 là đạt
+grep -q '^AI_SERVICE_URL=' deploy/.env.server && sed -i 's#^AI_SERVICE_URL=.*#AI_SERVICE_URL=http://ai-service:8000#' deploy/.env.server \
+  || echo 'AI_SERVICE_URL=http://ai-service:8000' >> deploy/.env.server
+```
+
+4. Chạy lại core-api để nhận biến mới (`--no-deps`: không chạy lại migrate), rồi kiểm core-api đã thấy cả hai biến. Lệnh chỉ in độ dài secret, không in secret.
+
+```bash
+dc --profile api up -d --no-deps --wait core-api
+dc --profile api exec -T core-api node -e "console.log(process.env.AI_SERVICE_URL, (process.env.MODERATION_SERVICE_CLIENT_SECRET||'').length)"
+```
+
+Ra `http://ai-service:8000` và một số lớn hơn 0 là đạt. Bỏ kiểm duyệt bằng AI: xoá `AI_SERVICE_URL` trong `.env.server` rồi chạy lại lệnh `up` ở trên, core quay về lọc bằng regex.
+
 ## Đăng nhập Google
 
 Backend kiểm ID token của Google theo `GOOGLE_CLIENT_IDS`. Web gắn `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vào bundle lúc build. Thiếu một trong hai thì không đăng nhập bằng Google được: backend trả `503`, web không hiện nút.
