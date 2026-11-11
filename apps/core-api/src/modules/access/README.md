@@ -72,9 +72,9 @@ Giống Facebook (`#PWD_BROWSER`): client mã hoá mật khẩu bằng khoá cô
 |---|---|
 | Access token | JWT ES256 ký bằng `jose`, sống 15 phút. Claim `sub`, `role`, `sid`, `iat`, `exp`, `iss`, `aud`; header có `kid` |
 | Đổi khoá ký | 1) Lưu kết quả `GET /.well-known/jwks.json` vào `AUTH_JWT_PREVIOUS_JWKS`. 2) Đặt `AUTH_JWT_PRIVATE_KEY` mới (`AUTH_JWT_KID` để trống hoặc đổi giá trị), khởi động lại core-api: ký bằng khoá mới, JWKS có cả khoá cũ nên token cũ còn hạn vẫn dùng được. 3) Sau ít nhất 15 phút, xoá `AUTH_JWT_PREVIOUS_JWKS` rồi khởi động lại. Service khác tự tải lại JWKS khi gặp `kid` lạ, không cần làm gì |
-| Refresh token | Chuỗi ngẫu nhiên 256 bit. Database chỉ lưu SHA-256 của nó trong `sessions`. Sống 30 ngày, tính lại mỗi lần làm mới |
+| Refresh token | Chuỗi ngẫu nhiên 256 bit. Database chỉ lưu SHA-256 của nó trong `sessions`. Sống 30 ngày, tính lại mỗi lần làm mới, nhưng không quá 180 ngày kể từ lúc đăng nhập (sau đó phải đăng nhập lại) |
 | Xoay vòng | Mỗi lần `/auth/refresh` cấp refresh token mới; token vừa dùng thành `previous_token_hash` |
-| Dùng lại token cũ | Trong 10 giây sau lần xoay: vẫn cấp cặp mới (phòng mạng làm mất phản hồi). Quá 10 giây: xoá phiên, chặn `sid`, ghi `auth.refresh_reused`, trả `401` |
+| Dùng lại token cũ | Trong 10 giây sau lần xoay: vẫn cấp cặp mới (phòng mạng làm mất phản hồi). Quá 10 giây: xoá phiên, chặn `sid`, ghi `auth.refresh_reused`, phát `access.session_reuse_detected` (email báo chủ tài khoản), trả `401` |
 | Thu hồi ngay | Đăng xuất, thoát thiết bị, đổi mật khẩu hoặc dùng lại token cũ: ghi `auth:revoked-sid:<sid>` vào Redis tới khi access token hết hạn. Mọi service dùng `@tripflix/auth` đều kiểm khoá này |
 | Đăng nhập sai | Sai 5 lần theo email hoặc 20 lần theo IP trong 15 phút: `429` kèm `Retry-After`. Email không tồn tại vẫn chạy argon2 để không lộ email nào có tài khoản. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào giới hạn này |
 | Mật khẩu | argon2id. Mật khẩu mới 8–64 ký tự (đăng ký 12–64), mật khẩu đang dùng nhận tới 128 ký tự |
@@ -186,6 +186,7 @@ Ghi vào `access.outbox_events` trong cùng transaction, relay gửi sang `strea
 | `access.user.welcome_email_requested` v1 | Đã tạo tài khoản bằng mã đăng ký hoặc lần đầu qua Google | `{ userId, email, displayName, provider }`. Chỉ `notification-service` dùng |
 | `access.registration_code_requested` v1 | Người dùng yêu cầu mã đăng ký | `{ email, code, expiresAt }`. Chỉ `notification-service` dùng |
 | `access.registration_attempted_existing` v1 | Xin mã đăng ký bằng email đã có tài khoản đang hoạt động. API vẫn trả 202 như email mới, không tạo mã | `{ userId, email, displayName, hasPassword }`. Chỉ `notification-service` dùng: gửi thư báo đã có tài khoản kèm link đăng nhập, quên mật khẩu |
+| `access.session_reuse_detected` v1 | Refresh token cũ bị dùng lại quá 10 giây sau lần xoay; phiên đã bị huỷ | `{ userId, email, displayName, deviceName }`. Chỉ `notification-service` dùng: gửi thư báo phiên bị đăng xuất kèm link đăng nhập lại, đặt lại mật khẩu |
 | `access.email_verification_requested` v1 (TF05D) | Tài khoản cũ chưa xác thực yêu cầu gửi link | `{ userId, email, displayName, verifyUrl, expiresAt, reason }`. Chỉ `notification-service` dùng |
 | `access.password_reset_requested` v1 | Quên mật khẩu, tài khoản đang hoạt động | `{ userId, email, displayName, resetUrl, expiresAt }`. Có email vì `notification-service` cần người nhận (docs/10 §3.5). `resetUrl` chứa token dùng một lần: chỉ `notification-service` được dùng sự kiện này |
 

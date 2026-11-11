@@ -62,6 +62,8 @@ const mapSessionRow = (row: SessionRow): SessionRecord => ({
   previousTokenHash: row.previousTokenHash,
   rotatedAt: row.rotatedAt,
   expiresAt: row.expiresAt,
+  deviceName: row.deviceName,
+  createdAt: row.createdAt,
 });
 
 class DrizzleUserRepository implements UserRepository {

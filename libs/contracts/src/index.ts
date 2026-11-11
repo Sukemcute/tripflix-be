@@ -254,6 +254,18 @@ export type AccessRegistrationAttemptedExistingV1 = z.infer<
   typeof AccessRegistrationAttemptedExistingV1Schema
 >;
 
+/**
+ * access.session_reuse_detected v1: refresh token cũ của một phiên bị dùng lại, nghi bị đánh cắp; phiên đã bị huỷ.
+ * notification-service báo chủ tài khoản để đăng nhập lại và đổi mật khẩu nếu không phải họ. Chỉ notification-service dùng.
+ */
+export const AccessSessionReuseDetectedV1Schema = z.object({
+  userId: z.uuid(),
+  email: z.email(),
+  displayName: z.string().min(1),
+  deviceName: z.string().nullable(),
+});
+export type AccessSessionReuseDetectedV1 = z.infer<typeof AccessSessionReuseDetectedV1Schema>;
+
 /** content.media.ready v1: video đã có mức 360p, phát được. Phát một lần cho mỗi video. */
 export const ContentMediaReadyV1Schema = z.object({
   assetId: z.uuid(),
@@ -339,4 +351,5 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.email_verification_requested.v1': AccessEmailVerificationRequestedV1Schema,
   'access.registration_code_requested.v1': AccessRegistrationCodeRequestedV1Schema,
   'access.registration_attempted_existing.v1': AccessRegistrationAttemptedExistingV1Schema,
+  'access.session_reuse_detected.v1': AccessSessionReuseDetectedV1Schema,
 };
