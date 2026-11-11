@@ -6784,6 +6784,11 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "targetPreview": {
+            "type": "string",
+            "nullable": true,
+            "description": "Text preview returned in the queue."
           }
         },
         "required": [
@@ -6957,6 +6962,11 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "targetPreview": {
+            "type": "string",
+            "nullable": true,
+            "description": "Text preview returned in the queue."
           },
           "target": {
             "nullable": true,

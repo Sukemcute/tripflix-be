@@ -64,6 +64,8 @@ export class ModerationCaseDto {
   @ApiProperty({ type: String, nullable: true }) resolution!: string | null;
   @ApiProperty() createdAt!: string;
   @ApiProperty() updatedAt!: string;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Text preview returned in the queue.' })
+  targetPreview?: string | null;
 }
 export class ModerationQueuePageDto {
   @ApiProperty({ type: [ModerationCaseDto] }) items!: ModerationCaseDto[];
