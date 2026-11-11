@@ -104,6 +104,7 @@ import { StaffUseCases } from './staff/application/staff.use-cases.js';
           {
             privateKeyPem: env.AUTH_JWT_PRIVATE_KEY,
             kid: env.AUTH_JWT_KID,
+            previousKeys: env.AUTH_JWT_PREVIOUS_JWKS?.keys,
             issuer: env.AUTH_JWT_ISSUER,
             audience: env.AUTH_JWT_AUDIENCE,
           },

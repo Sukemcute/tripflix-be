@@ -44,6 +44,33 @@ const WebOriginsSchema = z
     ),
   );
 
+// Khoá công khai ES256 của khoá đã nghỉ; có `d` là dán nhầm khoá riêng nên từ chối.
+const PublicEcJwkSchema = z.object({
+  kty: z.literal('EC'),
+  crv: z.literal('P-256'),
+  x: z.string().min(1),
+  y: z.string().min(1),
+  kid: z.string().min(1),
+  d: z.never({ error: 'chỉ dán khoá công khai, không dán khoá riêng' }).optional(),
+});
+
+// Dán nguyên kết quả GET /.well-known/jwks.json trước khi đổi khoá (README của module access).
+const PreviousJwksSchema = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z
+    .string()
+    .transform((v, ctx) => {
+      try {
+        return JSON.parse(v) as unknown;
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'phải là JSON dạng { "keys": [...] }' });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.object({ keys: z.array(PublicEcJwkSchema).min(1) }))
+    .optional(),
+);
+
 export const coreEnvSchema = baseEnvSchema
   .extend({
     APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
@@ -63,6 +90,7 @@ export const coreEnvSchema = baseEnvSchema
     // Khoá ký access token ES256, PEM PKCS8 (sinh bằng pnpm --filter @tripflix/core-api auth:keygen).
     AUTH_JWT_PRIVATE_KEY: OptionalStringSchema,
     AUTH_JWT_KID: OptionalStringSchema,
+    AUTH_JWT_PREVIOUS_JWKS: PreviousJwksSchema,
     AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
     AUTH_JWT_AUDIENCE: z.string().default('tripflix'),
     // Web, admin được gọi API từ trình duyệt (CORS) và dùng cookie refresh token (chặn CSRF theo Origin).
@@ -114,6 +142,6 @@ export const coreEnvSchema = baseEnvSchema
 export type CoreEnv = z.infer<typeof coreEnvSchema>;
 
 export function dbUrlOf(env: CoreEnv, module: ModuleName): string {
-  const key = `DATABASE_URL_${module.toUpperCase()}` as keyof CoreEnv;
+  const key = `DATABASE_URL_${module.toUpperCase()}` as Extract<keyof CoreEnv, `DATABASE_URL_${string}`>;
   return String(env[key]);
 }

@@ -71,6 +71,7 @@ Giống Facebook (`#PWD_BROWSER`): client mã hoá mật khẩu bằng khoá cô
 | | Cách làm |
 |---|---|
 | Access token | JWT ES256 ký bằng `jose`, sống 15 phút. Claim `sub`, `role`, `sid`, `iat`, `exp`, `iss`, `aud`; header có `kid` |
+| Đổi khoá ký | 1) Lưu kết quả `GET /.well-known/jwks.json` vào `AUTH_JWT_PREVIOUS_JWKS`. 2) Đặt `AUTH_JWT_PRIVATE_KEY` mới (`AUTH_JWT_KID` để trống hoặc đổi giá trị), khởi động lại core-api: ký bằng khoá mới, JWKS có cả khoá cũ nên token cũ còn hạn vẫn dùng được. 3) Sau ít nhất 15 phút, xoá `AUTH_JWT_PREVIOUS_JWKS` rồi khởi động lại. Service khác tự tải lại JWKS khi gặp `kid` lạ, không cần làm gì |
 | Refresh token | Chuỗi ngẫu nhiên 256 bit. Database chỉ lưu SHA-256 của nó trong `sessions`. Sống 30 ngày, tính lại mỗi lần làm mới |
 | Xoay vòng | Mỗi lần `/auth/refresh` cấp refresh token mới; token vừa dùng thành `previous_token_hash` |
 | Dùng lại token cũ | Trong 10 giây sau lần xoay: vẫn cấp cặp mới (phòng mạng làm mất phản hồi). Quá 10 giây: xoá phiên, chặn `sid`, ghi `auth.refresh_reused`, trả `401` |
