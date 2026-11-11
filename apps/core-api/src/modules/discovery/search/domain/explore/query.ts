@@ -189,7 +189,7 @@ export async function squashFix(folded: string, st: Stats): Promise<[text: strin
       const text = win.join(' ');
       if (!win.every(alpha) || sq.length < SQUASH_EXACT_MIN || !win.some(isStrange)) continue;
       if (LEX.phrase.has(text) || LEX.normPh.has(text) || LEX.names.has(text)) continue; // từ điển đã hiểu cụm này
-      if (k === 1 && LEX.norm.has(text)) continue;
+      if (k === 1 && (LEX.norm.has(text) || st.df(text) > 0)) continue; // từ đã có trong dữ liệu thì khớp thẳng được, không tách
       if (k > 1) {
         // Cụm đã xuất hiện trong dữ liệu (hoặc là tên riêng) là người dùng gõ đúng: 'dong khoi' là tên đường, không ghép thành 'dongkhoi'.
         await st.load([NS.ngram, NS.street, NS.brand, NS.brandPlaces, NS.titleGram].map((ns) => ({ ns, key: text })));
@@ -204,7 +204,10 @@ export async function squashFix(folded: string, st: Stats): Promise<[text: strin
         // Cùng số từ là việc của typoFix (từng từ một); ở đây chỉ xử lý khi số từ khác: ghép, tách.
         // Đích có chữ số ('vincom dong khoi 5' từ tiêu đề 'Vincom Đồng Khởi: 5 quán') không phải tên: câu gõ chỉ có chữ cái.
         if (c.split(' ').length === k || Math.abs(cs.length - sq.length) > 2 || /\d/.test(c)) continue;
-        const score = cs === sq ? 1 : sq.length >= SQUASH_FUZZY_MIN ? ratio(cs, sq) : 0;
+        // Đích có từ một chữ cái ('tuan s') thường là mảnh vỡ của tiêu đề, không phải tên.
+        if (c.split(' ').some((w) => w.length < 2)) continue;
+        // Gần đúng chỉ cho cùng độ dài (gõ nhầm/đảo chữ): thiếu hay thừa chữ ('tamihouse' ~ 'tam house') sai nhiều hơn đúng.
+        const score = cs === sq ? 1 : sq.length >= SQUASH_FUZZY_MIN && cs.length === sq.length ? ratio(cs, sq) : 0;
         if (score < (cs === sq ? 1 : SQUASH_FUZZY_RATIO)) continue;
         if (!best || score > best.score || (score === best.score && c < best.c)) best = { c, score };
       }
