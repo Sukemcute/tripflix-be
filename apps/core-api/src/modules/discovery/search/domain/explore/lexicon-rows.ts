@@ -43,6 +43,13 @@ export const LEXICON_ROWS: readonly LexiconRow[] = [
   ["norm", "cafe", "ca phe", 0],
   ["norm", "mi quang", "my quang", 0],
   ["norm", "banh mi", "banh my", 0],
+  // Tên thương hiệu Vin hay bị gõ tách: không có dòng này "vin" bị sửa nhầm thành "vinh".
+  ["norm", "vincom", "vin com", 0],
+  ["norm", "vinpearl", "vin pearl", 0],
+  ["norm", "vinwonders", "vin wonders", 0],
+  ["norm", "vinhomes", "vin homes", 0],
+  ["norm", "vinfast", "vin fast", 0],
+  ["norm", "vinmec", "vin mec", 0],
   ["norm", "hu tieu", "hu tiu", 0],
   ["norm", "cafe", "coffee", 0],
   ["norm", "cafe", "coffe", 0],

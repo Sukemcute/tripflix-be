@@ -33,6 +33,15 @@ describe('hiểu câu', () => {
     expect(parse('quán ngon').quality).toBe(true);
   });
 
+  it('tên thương hiệu Vin gõ tách vẫn ghép lại, không bị sửa thành "vinh"', async () => {
+    expect(norm('Vin Com')).toBe('vincom');
+    expect(parse('vin pearl nha trang').terms).toContain('vinpearl');
+    const hotel = o({ id: 'v1', kind: 'stay', title: 'Vincom Center Hotel' });
+    const found = await searchExplore(src([hotel]), 'vin com');
+    expect(found.understood.fixed).toEqual({});
+    expect(found.sections.find((s) => s.kind === 'stay')!.items.map((i) => i.obj.id)).toEqual(['v1']);
+  });
+
   it('chuẩn hoá chữ', () => {
     expect(norm('Ngonnn qá ko')).toBe('ngon qua khong');
     expect(fold('Mỳ Quảng')).toBe(fold('mì quảng'));
