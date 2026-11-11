@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
 import {
   MAX_ADULTS,
@@ -13,7 +13,7 @@ import {
   type UnavailableReason,
 } from '../domain/sales-rules.js';
 import type { HotelAmenity } from '../../db/schema/index.js';
-import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type CommerceStore, type MediaUrl, type Today } from './ports.js';
+import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type ReadCalendar, type MediaUrl, type Today } from './ports.js';
 
 const DEFAULT_ADULTS = 2;
 const DEFAULT_CALENDAR_DAYS = 14;
@@ -102,6 +102,8 @@ export class HotelDetailUseCases {
     @Inject(COMMERCE_STORE) private readonly store: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
     @Inject(MEDIA_URL) private readonly mediaUrl: MediaUrl = keepMediaKey,
+    // Lịch chỉ để hiển thị: bản trong bộ nhớ khi chạy thật; test dựng tay thì đọc thẳng store.
+    @Optional() @Inject(READ_CALENDAR) private readonly calendar: ReadCalendar = store.calendar,
   ) {}
 
   async getHotelDetail(hotelId: string, query: HotelDetailQuery = {}): Promise<HotelDetail> {
@@ -126,7 +128,7 @@ export class HotelDetailUseCases {
     // Một lần đọc cho cả kỳ ở (gồm ngày trả phòng để xét CTD) và lịch giá.
     const from = checkIn < today ? checkIn : today;
     const to = checkOut > calendarEnd ? checkOut : calendarEnd;
-    const days = await this.store.calendar.loadRoomDays(roomTypes.map((r) => r.id), from, to);
+    const days = await this.calendar.loadRoomDays(roomTypes.map((r) => r.id), from, to);
 
     const rooms = roomTypes.map((r): HotelRoomOffer => {
       const roomsNeeded = countRoomsNeeded(adults, r.maxGuests);

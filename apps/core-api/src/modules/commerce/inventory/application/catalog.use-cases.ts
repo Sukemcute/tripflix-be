@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
 import {
   MAX_ADULTS,
@@ -24,7 +24,7 @@ import type {
   CheckAvailabilityQuery,
   ListCatalogQuery,
 } from './catalog-types.js';
-import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type CommerceStore, type FlightRecord, type MediaUrl, type RoomTypeRecord, type Today } from './ports.js';
+import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type ReadCalendar, type FlightRecord, type MediaUrl, type RoomTypeRecord, type Today } from './ports.js';
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
@@ -51,6 +51,8 @@ export class CatalogUseCases {
     @Inject(COMMERCE_STORE) private readonly store: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
     @Inject(MEDIA_URL) private readonly mediaUrl: MediaUrl = keepMediaKey,
+    // Lịch chỉ để hiển thị: bản trong bộ nhớ khi chạy thật; test dựng tay thì đọc thẳng store.
+    @Optional() @Inject(READ_CALENDAR) private readonly calendar: ReadCalendar = store.calendar,
   ) {}
 
   async listCatalog(query: ListCatalogQuery = {}): Promise<CatalogPage> {
@@ -72,7 +74,7 @@ export class CatalogUseCases {
     const rows = await this.store.catalog.listProperties({ provinceSlug: q.provinceSlug, afterId: q.cursor, limit: q.limit + 1 });
     const page = rows.slice(0, q.limit);
     const roomTypes = await this.store.catalog.findRoomTypesByPropertyIds(page.map((p) => p.id));
-    const calendar = await this.store.calendar.loadRoomDays(roomTypes.map((r) => r.id), q.from, q.to);
+    const calendar = await this.calendar.loadRoomDays(roomTypes.map((r) => r.id), q.from, q.to);
     const items = page.map((p): CatalogHotel => {
       const options = roomTypes
         .filter((r) => r.propertyId === p.id)
@@ -116,7 +118,7 @@ export class CatalogUseCases {
     const cabins = await this.store.catalog.listFlights({ destinationSlug: q.provinceSlug, afterKey: q.cursor, limit: q.limit + 1 });
     const keys = [...new Set(cabins.map((c) => c.flightKey))];
     const pageKeys = keys.slice(0, q.limit);
-    const calendar = await this.store.calendar.loadFlightDays(cabins.map((c) => c.id), q.from, q.to);
+    const calendar = await this.calendar.loadFlightDays(cabins.map((c) => c.id), q.from, q.to);
     const items = pageKeys.map((key): CatalogFlight => {
       const group = cabins.filter((c) => c.flightKey === key);
       const first = group[0]!;
@@ -177,8 +179,8 @@ export class CatalogUseCases {
       throw new CommerceError('invalid_query', `Ngày trả phòng phải sau ngày nhận phòng, ở tối đa ${MAX_NIGHTS} đêm.`, 'checkOut');
     }
     const [roomDays, flightDays] = await Promise.all([
-      roomTypes.length ? this.store.calendar.loadRoomDays(roomTypes.map((r) => r.id), query.checkIn, query.checkOut!) : new Map(),
-      flightCabins.length ? this.store.calendar.loadFlightDays(flightCabins.map((f) => f.id), query.checkIn, query.checkIn) : new Map(),
+      roomTypes.length ? this.calendar.loadRoomDays(roomTypes.map((r) => r.id), query.checkIn, query.checkOut!) : new Map(),
+      flightCabins.length ? this.calendar.loadFlightDays(flightCabins.map((f) => f.id), query.checkIn, query.checkIn) : new Map(),
     ]);
 
     const quoteRoom = (r: RoomTypeRecord) => {

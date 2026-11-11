@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
-import { and, asc, desc, eq, gt, gte, inArray, lte, max, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lte, max, or, sql, type SQL } from 'drizzle-orm';
 import { auditLogs, flightInventory, flights, properties, reviews, roomInventory, roomRates, roomTypes, type FlightRow, type PropertyRow, type ReviewRow, type RoomTypeRow } from '../../db/schema/index.js';
 import type {
   CalendarAdminRepository,
@@ -175,6 +175,10 @@ class DrizzleCatalogRepository implements CatalogRepository {
   }
 }
 
+/** Số loại phòng / hạng ghế mỗi lần nạp khi dựng lịch trong bộ nhớ: khoảng vài nghìn dòng, vài ms mỗi nhóm. */
+const BULK_CHUNK_SIZE = 25;
+const LAST_DATE = '9999-12-31';
+
 class DrizzleCalendarRepository implements CalendarRepository {
   constructor(private readonly host: DbHost) {}
 
@@ -184,6 +188,33 @@ class DrizzleCalendarRepository implements CalendarRepository {
 
   async loadRoomDays(roomTypeIds: string[], from: string, toInclusive: string) {
     if (!roomTypeIds.length) return new Map<string, RoomDay[]>();
+    return this.selectRoomDays(and(inArray(roomInventory.roomTypeId, roomTypeIds), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive)));
+  }
+
+  /**
+   * Mọi ngày từ `from` trở đi của mọi loại phòng, cho CalendarSnapshot. Nạp theo từng nhóm nhỏ và nhường event loop
+   * giữa các nhóm: đọc cả trăm nghìn dòng một lần làm tiến trình đứng hàng trăm ms, request khác bị treo (đo tải TF29).
+   */
+  async loadAllRoomDays(from: string) {
+    const ids = (await this.db.select({ id: roomTypes.id }).from(roomTypes)).map((r) => r.id);
+    return this.loadInChunks(ids, (chunk) => this.loadRoomDays(chunk, from, LAST_DATE));
+  }
+
+  async loadAllFlightDays(from: string) {
+    const ids = (await this.db.select({ id: flights.id }).from(flights)).map((r) => r.id);
+    return this.loadInChunks(ids, (chunk) => this.loadFlightDays(chunk, from, LAST_DATE));
+  }
+
+  private async loadInChunks<T>(ids: string[], load: (chunk: string[]) => Promise<Map<string, T[]>>) {
+    const out = new Map<string, T[]>();
+    for (let i = 0; i < ids.length; i += BULK_CHUNK_SIZE) {
+      for (const [id, days] of await load(ids.slice(i, i + BULK_CHUNK_SIZE))) out.set(id, days);
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    return out;
+  }
+
+  private async selectRoomDays(where: SQL | undefined) {
     const rows = await this.db
       .select({
         roomTypeId: roomInventory.roomTypeId,
@@ -200,7 +231,7 @@ class DrizzleCalendarRepository implements CalendarRepository {
       })
       .from(roomInventory)
       .innerJoin(roomRates, and(eq(roomRates.roomTypeId, roomInventory.roomTypeId), eq(roomRates.date, roomInventory.date)))
-      .where(and(inArray(roomInventory.roomTypeId, roomTypeIds), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive)))
+      .where(where)
       .orderBy(asc(roomInventory.date));
     const grouped = groupBy(rows, (r) => r.roomTypeId);
     return new Map([...grouped].map(([id, list]) => [id, list.map(({ roomTypeId: _id, ...day }) => day)]));
@@ -208,6 +239,10 @@ class DrizzleCalendarRepository implements CalendarRepository {
 
   async loadFlightDays(flightIds: string[], from: string, toInclusive: string) {
     if (!flightIds.length) return new Map<string, FlightDay[]>();
+    return this.selectFlightDays(and(inArray(flightInventory.flightId, flightIds), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive)));
+  }
+
+  private async selectFlightDays(where: SQL | undefined) {
     const rows = await this.db
       .select({
         flightId: flightInventory.flightId,
@@ -219,7 +254,7 @@ class DrizzleCalendarRepository implements CalendarRepository {
         isStopSell: flightInventory.stopSell,
       })
       .from(flightInventory)
-      .where(and(inArray(flightInventory.flightId, flightIds), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive)))
+      .where(where)
       .orderBy(asc(flightInventory.date));
     const grouped = groupBy(rows, (r) => r.flightId);
     return new Map([...grouped].map(([id, list]) => [id, list.map(({ flightId: _id, ...day }) => day)]));

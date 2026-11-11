@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
-import { COMMERCE_STORE, TODAY, type CommerceStore, type Today } from '../../inventory/application/ports.js';
+import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type RoomTypeRecord, type Today } from '../../inventory/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
 import { summarizeRefunds, type RefundSummary } from '../domain/refund-summary.js';
-import { MAX_NIGHTS, addDays, calculatePassengerFares, countNights, countSeats, findPassengerMixError, isIsoDate, quoteFlight, quoteStay, calculateChildStayDiscount, countRoomsForGuests, type PassengerMix, type PricePlan } from '../../inventory/domain/sales-rules.js';
+import { MAX_NIGHTS, addDays, calculatePassengerFares, countNights, countSeats, findPassengerMixError, isIsoDate, quoteFlight, quoteStay, calculateChildStayDiscount, countRoomsForGuests, type FlightDay, type PassengerMix, type PricePlan, type RoomDay } from '../../inventory/domain/sales-rules.js';
 import {
   HOLD_MINUTES,
   HOLDS_PER_HOUR,
@@ -160,7 +160,8 @@ export class CheckoutUseCases {
       if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
       throw error;
     });
-    return this.getCheckout(userId, orderId);
+    // Đơn vừa tạo chưa có hoàn tiền, chưa có khách: bỏ 2 truy vấn chắc chắn trả rỗng.
+    return this.getCheckout(userId, orderId, { isNewOrder: true });
   }
 
   @Transactional('commerce')
@@ -168,10 +169,12 @@ export class CheckoutUseCases {
     const mix = { adults: input.adults, children: input.children ?? 0, infants: input.infants ?? 0 };
     const mixError = findPassengerMixError(mix);
     // Luật mỗi em bé một người lớn chỉ dành cho vé bay; ở phòng em bé tính vào sức chứa.
-    const hasFlight = (await this.catalog.catalog.findFlightsByIds(input.items.map((i) => i.productId))).length > 0;
-    if (mixError && (hasFlight || mixError.field !== 'infants')) throw new CommerceError('invalid_query', mixError.message, mixError.field);
+    const ids = input.items.map((i) => i.productId);
+    // Đọc loại phòng, vé bay một lần: dùng để xét luật em bé rồi dùng lại khi tính giá.
+    const [roomTypes, flights] = await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
+    if (mixError && (flights.length > 0 || mixError.field !== 'infants')) throw new CommerceError('invalid_query', mixError.message, mixError.field);
     if (!input.items.length || input.items.length > MAX_ITEMS_PER_ORDER) throw new CommerceError('invalid_query', `Giỏ có từ 1 đến ${MAX_ITEMS_PER_ORDER} mục.`, 'items');
-    const priced = await this.priceItems(input.items, mix);
+    const priced = await this.priceItems(input.items, mix, { roomTypes, flights });
 
     await this.orders.limitLockWait(HOLD_LOCK_WAIT_MS);
     await this.orders.lockUser(userId);
@@ -218,12 +221,16 @@ export class CheckoutUseCases {
    * Tính giá và kiểm luật bán từng mục từ lịch trống; một mục không đặt được thì báo lý do, chưa giữ gì.
    * Phòng tính theo người lớn như trước; vé bay giữ ghế cho người lớn + trẻ em và tính giá cả em bé.
    */
-  async priceItems(items: CheckoutItemInput[], mix: PassengerMix): Promise<PricedItem[]> {
+  async priceItems(items: CheckoutItemInput[], mix: PassengerMix, products?: { roomTypes: RoomTypeRecord[]; flights: FlightRecord[] }): Promise<PricedItem[]> {
     const { adults, children } = mix;
     const guests = adults + children + mix.infants;
     const ids = items.map((i) => i.productId);
-    const [roomTypes, flights] = await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
+    const [roomTypes, flights] = products
+      ? [products.roomTypes, products.flights]
+      : await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
     const today = this.today();
+    // (b) Lịch của mọi mục đọc một lần thay vì mỗi mục một truy vấn; mỗi mục chỉ lấy đúng khoảng ngày của nó bên dưới.
+    const { roomDays, flightDays } = await this.loadCalendarOf(items, roomTypes, flights);
     const out: PricedItem[] = [];
     // Đoàn có thể chia nhiều loại phòng: sức chứa tính gộp theo một khách sạn trong cùng kỳ ở.
     const stays = new Map<string, { capacity: number; lines: number; roomId: string; roomName: string; maxGuests: number; rooms: number; total: number; lineIndexes: number[] }>();
@@ -241,7 +248,7 @@ export class CheckoutUseCases {
         const stay = stays.get(stayKey);
         stays.set(stayKey, { capacity: (stay?.capacity ?? 0) + qty * room.maxGuests, lines: (stay?.lines ?? 0) + 1, roomId: room.id, roomName: room.name, maxGuests: room.maxGuests, rooms: (stay?.rooms ?? 0) + qty, total: stay?.total ?? 0, lineIndexes: [...(stay?.lineIndexes ?? []), out.length] });
         const plan = this.findPlan(room.ratePlans, item.ratePlanCode);
-        const days = (await this.catalog.calendar.loadRoomDays([room.id], item.checkIn, item.checkOut)).get(room.id) ?? [];
+        const days = (roomDays.get(room.id) ?? []).filter((d) => d.date >= item.checkIn && d.date <= item.checkOut!);
         const quote = quoteStay({ days, checkIn: item.checkIn, checkOut: item.checkOut, rooms: qty, plan });
         if (!quote.isAvailable) throw new CommerceError('conflict', `${room.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: room.id });
         const nights = countNights(item.checkIn, item.checkOut);
@@ -249,7 +256,7 @@ export class CheckoutUseCases {
         out.push(this.toPriced({ productType: 'room', productId: room.id, productName: room.name, date: item.checkIn, nights, qty, lineTotal: quote.totalPrice, unitPrice: Math.round(quote.totalPrice / qty / nights), plan }));
       } else if (flight) {
         const plan = this.findPlan(flight.farePlans, item.ratePlanCode);
-        const day = ((await this.catalog.calendar.loadFlightDays([flight.id], item.checkIn, item.checkIn)).get(flight.id) ?? [])[0];
+        const day = (flightDays.get(flight.id) ?? []).find((d) => d.date === item.checkIn);
         const quote = quoteFlight({ day, passengers: adults, children: mix.children, infants: mix.infants, plan });
         if (!quote.isAvailable) throw new CommerceError('conflict', `${flight.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: flight.id });
         // Đơn giá vé bay là giá người lớn, kèm giá trẻ em, em bé: lineTotal / qty không phải giá của loại khách nào.
@@ -291,6 +298,22 @@ export class CheckoutUseCases {
       }
     }
     return out;
+  }
+
+  /** Lịch của các mục có ngày hợp lệ, một truy vấn cho phòng và một cho vé bay. Ngày sai để vòng kiểm tra báo lỗi như cũ. */
+  private async loadCalendarOf(items: CheckoutItemInput[], roomTypes: RoomTypeRecord[], flights: FlightRecord[]) {
+    const roomIds = new Set(roomTypes.map((r) => r.id));
+    const flightIds = new Set(flights.map((f) => f.id));
+    const roomItems = items.filter((i) => roomIds.has(i.productId) && isIsoDate(i.checkIn) && isIsoDate(i.checkOut) && i.checkOut > i.checkIn);
+    const flightItems = items.filter((i) => flightIds.has(i.productId) && isIsoDate(i.checkIn));
+    const span = (dates: string[]) => [dates.reduce((a, b) => (b < a ? b : a)), dates.reduce((a, b) => (b > a ? b : a))] as const;
+    const [roomDays, flightDays] = await Promise.all([
+      roomItems.length
+        ? this.catalog.calendar.loadRoomDays([...new Set(roomItems.map((i) => i.productId))], ...span([...roomItems.map((i) => i.checkIn), ...roomItems.map((i) => i.checkOut!)]))
+        : new Map<string, RoomDay[]>(),
+      flightItems.length ? this.catalog.calendar.loadFlightDays([...new Set(flightItems.map((i) => i.productId))], ...span(flightItems.map((i) => i.checkIn))) : new Map<string, FlightDay[]>(),
+    ]);
+    return { roomDays, flightDays };
   }
 
   private findPlan(plans: PricePlan[], code: string | undefined): PricePlan {
@@ -368,9 +391,10 @@ export class CheckoutUseCases {
     return { orderId, status: 'cancelled' };
   }
 
-  async getCheckout(userId: string, orderId: string): Promise<CheckoutView> {
+  async getCheckout(userId: string, orderId: string, options: { isNewOrder?: boolean } = {}): Promise<CheckoutView> {
     const order = await this.ownOrder(userId, orderId);
     const items = await this.orders.findItems(orderId);
+    const [refunds, guestBirthdates] = options.isNewOrder ? [[], []] : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
     const passengerTypes = listRequiredPassengers(order, items);
     const passengersRequired = passengerTypes.length;
     return {
@@ -384,9 +408,9 @@ export class CheckoutUseCases {
       confirmationCode: order.confirmationCode,
       cancelReason: order.cancelReason,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
-      refund: summarizeRefunds(order, await this.orders.findRefundsOfOrder(orderId)),
+      refund: summarizeRefunds(order, refunds),
       items: toItemViews(items),
-      isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates: await this.orders.findGuestBirthdates(orderId), passengersRequired }),
+      isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates, passengersRequired }),
       passengersRequired,
       passengerTypes,
       policyVersion: POLICY_VERSION,
