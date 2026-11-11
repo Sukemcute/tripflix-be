@@ -42,6 +42,26 @@ describe('hiểu câu', () => {
     expect(found.sections.find((s) => s.kind === 'stay')!.items.map((i) => i.obj.id)).toEqual(['v1']);
   });
 
+  it('ghép/tách chữ theo khoá bỏ khoảng trắng: gõ liền, gõ tách, gõ sai', async () => {
+    const objs = [
+      o({ id: 'l1', kind: 'stay', title: 'Lotte Hotel Saigon' }),
+      o({ id: 'l2', kind: 'stay', title: 'Lotte Center Hanoi' }),
+      o({ id: 's1', kind: 'stay', title: 'Khu nghỉ dưỡng Sun World Ba Na' }),
+      o({ id: 'q1', kind: 'stay', title: 'Quán ăn Cô Ba' }),
+    ];
+    const understood = async (q: string) => (await searchExplore(src(objs), q)).understood;
+    expect((await understood('lot te')).fixed).toEqual({ 'lot te': 'lotte' }); // gõ tách -> từ đơn
+    expect((await understood('sunworld')).fixed).toEqual({ sunworld: 'sun world' }); // gõ liền -> cụm
+    expect((await understood('lottecenter')).fixed).toEqual({ lottecenter: 'lotte center' });
+    expect((await understood('lottecetner')).fixed).toEqual({ lottecetner: 'lotte center' }); // gõ liền + sai
+    const found = (await searchExplore(src(objs), 'lot te')).sections.find((s) => s.kind === 'stay')!;
+    expect(found.items.map((i) => i.obj.id).sort()).toEqual(['l1', 'l2']);
+    // Từ quen / từ điển đã hiểu: không bao giờ đụng tới.
+    for (const q of ['ha noi', 'da lat', 'khach san', 'quan an', 'nha trang', 'sun world']) {
+      expect((await understood(q)).fixed).toEqual({});
+    }
+  });
+
   it('chuẩn hoá chữ', () => {
     expect(norm('Ngonnn qá ko')).toBe('ngon qua khong');
     expect(fold('Mỳ Quảng')).toBe(fold('mì quảng'));

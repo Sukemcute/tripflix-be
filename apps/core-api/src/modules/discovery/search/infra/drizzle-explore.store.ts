@@ -2,6 +2,7 @@ import type { Db } from '@tripflix/db';
 import { and, arrayOverlaps, asc, between, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import { searchCounts, searchDocuments } from '../../db/schema/index.js';
 import type { ExploreStore } from '../application/ports.js';
+import { PHRASE_NS } from '../domain/explore/stats.js';
 import type { BuiltIndex, CandidateFilter, CountRow, IndexedDoc } from '../domain/explore/types.js';
 
 const CHUNK = 1000;
@@ -35,6 +36,21 @@ export class DrizzleExploreStore implements ExploreStore {
         ),
       );
     return rows;
+  }
+
+  async phrasePool(first: string, minLen: number, maxLen: number) {
+    const rows = await this.db
+      .selectDistinct({ term: searchCounts.key })
+      .from(searchCounts)
+      .where(
+        and(
+          inArray(searchCounts.ns, [...PHRASE_NS]),
+          eq(sql`left(${searchCounts.key}, 1)`, first),
+          sql`strpos(${searchCounts.key}, ' ') > 0`,
+          between(sql`length(replace(${searchCounts.key}, ' ', ''))`, minLen, maxLen),
+        ),
+      );
+    return rows.map((r) => r.term);
   }
 
   /** Cùng điều kiện với isCandidate trong domain/explore/memory-source.ts. */
