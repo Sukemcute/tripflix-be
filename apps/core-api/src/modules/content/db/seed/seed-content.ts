@@ -158,11 +158,6 @@ export async function seedContent(
             mediaIds: sql`excluded.media_ids`,
             coverMediaId: sql`excluded.cover_media_id`,
             tripAttachment: sql`excluded.trip_attachment`,
-            reactionCounts: sql`excluded.reaction_counts`,
-            reactionTotal: sql`excluded.reaction_total`,
-            commentCount: sql`excluded.comment_count`,
-            shareCount: sql`excluded.share_count`,
-            bookmarkCount: sql`excluded.bookmark_count`,
             updatedAt: sql`now()`,
           },
         });
@@ -210,6 +205,34 @@ export async function seedContent(
           },
         });
     }
+
+    // Đồng bộ lại comment_count, reaction_total và reaction_counts từ dữ liệu hiển thị thực tế
+    await tx.update(posts).set({
+      commentCount: sql<number>`(
+        SELECT count(*)::int
+        FROM ${comments} c
+        WHERE c.post_id = ${posts.id}
+          AND c.status = 'visible'
+          AND c.deleted_at IS NULL
+      )`,
+      reactionTotal: sql<number>`(
+        SELECT count(*)::int
+        FROM ${reactions} r
+        WHERE r.post_id = ${posts.id}
+      )`,
+      reactionCounts: sql<Record<string, number>>`(
+        SELECT COALESCE(
+          jsonb_object_agg(sub.type, sub.cnt),
+          '{}'::jsonb
+        )
+        FROM (
+          SELECT r.type, count(*)::int as cnt
+          FROM ${reactions} r
+          WHERE r.post_id = ${posts.id}
+          GROUP BY r.type
+        ) sub
+      )`,
+    });
 
     // 5. Seed Bookmarks
     for (const bookmark of seed.bookmarks) {

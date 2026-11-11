@@ -45,8 +45,8 @@ export interface Understood {
 
 const replaceAll = (s: string, a: string, b: string) => s.split(a).join(b);
 
-export function parse(q: string, fix?: ReadonlyMap<string, string>): Understood {
-  let t = ` ${fold(q)} `;
+export function parse(q: string, fix?: ReadonlyMap<string, string>, folded: string = fold(q)): Understood {
+  let t = ` ${folded} `;
   const [budget, raw] = budgetOf(t); // trước khi đổi teencode ('500k' không thành '500 khong')
   if (raw) t = replaceAll(t, raw, ' ');
   t = normTokens(t, fix);
@@ -158,6 +158,62 @@ export async function typoFix(ws: readonly string[], st: Stats): Promise<Map<str
   return fix;
 }
 
+// ---------------- Ghép/tách chữ: so khớp sau khi bỏ khoảng trắng
+const SQUASH_MAX_WORDS = 3;
+const SQUASH_EXACT_MIN = 5; // khoá ngắn hơn 5 ký tự không thử: quá dễ trùng ngẫu nhiên
+const SQUASH_FUZZY_MIN = 7; // dưới 7 ký tự không cho lệch: 'hanoi' ~ 'hanol' là rác
+const SQUASH_FUZZY_RATIO = 0.9;
+const noSpace = (s: string) => s.split(' ').join('');
+
+/**
+ * 'sunworld' -> 'sun world', 'lot te' -> 'lotte', 'lotte cetner' -> 'lotte center': bỏ khoảng trắng ở cả câu lẫn từ điển rồi so.
+ * Đích = từ đơn (df > 0 hoặc lexicon) và cụm nhiều từ (tên đường, chuỗi, cụm tiêu đề, tên nhập tay).
+ * Chỉ nhận khi đích có SỐ TỪ KHÁC cụm gõ (ghép, tách); cùng số từ thì typoFix lo.
+ * Chỉ thử cụm chứa ít nhất một từ "lạ" (hiếm, không thuộc lexicon): 'quan an', 'ha noi' gồm toàn từ quen nên không bao giờ bị ghép.
+ * Nhận khi khoá trùng khít (>= 5 ký tự) hoặc ratio >= 0,9 (>= 7 ký tự). Từ đơn -> từ đơn là việc của typoFix nên bỏ qua.
+ * Trả câu đã bỏ dấu sau khi thay, và các chỗ đã sửa { cụm gõ: dạng chuẩn }.
+ */
+export async function squashFix(folded: string, st: Stats): Promise<[text: string, joined: Record<string, string>]> {
+  const ws = words(folded);
+  const alpha = (w: string) => /^[a-z]+$/.test(w);
+  await st.load(ws.filter(alpha).map((key) => ({ ns: NS.df, key })));
+  const isStrange = (w: string) =>
+    alpha(w) && w.length >= 2 && st.df(w) <= RARE && !LEX.vocab.has(w) && !LEX.stop.has(w) && !LEX.phrase.has(w) && !ABBR.test(w);
+  const out: string[] = [];
+  const joined: Record<string, string> = {};
+  for (let i = 0; i < ws.length; ) {
+    let taken = 0;
+    for (let k = Math.min(SQUASH_MAX_WORDS, ws.length - i); k >= 1 && !taken; k--) {
+      const win = ws.slice(i, i + k);
+      const sq = noSpace(win.join(' '));
+      const text = win.join(' ');
+      if (!win.every(alpha) || sq.length < SQUASH_EXACT_MIN || !win.some(isStrange)) continue;
+      if (LEX.phrase.has(text) || LEX.normPh.has(text) || LEX.names.has(text)) continue; // từ điển đã hiểu cụm này
+      if (k === 1 && LEX.norm.has(text)) continue;
+      await st.loadPhrasePool(sq);
+      if (k > 1) await st.loadTypoPool(sq);
+      const singles = k > 1 ? st.typoCandidates(sq) : [];
+      let best: { c: string; score: number } | null = null;
+      for (const c of [...singles, ...st.phraseCandidates(sq)]) {
+        const cs = noSpace(c);
+        // Cùng số từ là việc của typoFix (từng từ một); ở đây chỉ xử lý khi số từ khác: ghép, tách.
+        if (c.split(' ').length === k || Math.abs(cs.length - sq.length) > 2) continue;
+        const score = cs === sq ? 1 : sq.length >= SQUASH_FUZZY_MIN ? ratio(cs, sq) : 0;
+        if (score < (cs === sq ? 1 : SQUASH_FUZZY_RATIO)) continue;
+        if (!best || score > best.score || (score === best.score && c < best.c)) best = { c, score };
+      }
+      if (best) {
+        out.push(best.c);
+        joined[text] = best.c;
+        taken = k;
+      }
+    }
+    if (!taken) out.push(ws[i]!);
+    i += taken || 1;
+  }
+  return [out.join(' '), joined];
+}
+
 /** Cắt chuỗi từ thành tên riêng dài nhất (2-4 âm tiết) + từ lẻ. 'vincom dong khoi' -> [vincom][dong khoi]. */
 export function nameSegment(seq: readonly string[], isName: (ph: string) => boolean, maxn = 4): string[][] {
   const out: string[][] = [];
@@ -178,15 +234,16 @@ export function nameSegment(seq: readonly string[], isName: (ph: string) => bool
 
 /** Hiểu câu: parse, sửa lỗi gõ, tách tên riêng, tách cụm dính, đánh dấu từ lạ. Trả [u, u0]; u0 = câu gốc nếu có sửa. */
 export async function understand(q: string, st: Stats): Promise<[Understood, Understood | null]> {
-  const u0 = parse(q);
+  const [text, joined] = await squashFix(fold(q), st);
+  const u0 = parse(q, undefined, text);
   await st.loadSeq(u0.seq);
   const keep = new Set(nameSegment(u0.seq, (ph) => st.isName(ph)).filter((g) => g.length > 1).flat()); // chữ thuộc tên riêng: không sửa
   // Từ gõ có dấu và đúng dạng âm tiết là người dùng cố ý gõ ('dịp' không phải gõ sai của 'đi'), dù dữ liệu chưa có từ đó:
   // không sửa. Có dấu nhưng sai dạng ('trứg') vẫn sửa.
   const typed = (w: string) => Object.hasOwn(u0.accents, w) && SYLLABLE.test(w);
   const fix = await typoFix(u0.terms.filter((w) => !w.includes(' ') && !keep.has(w) && !typed(w)), st);
-  const u = fix.size ? parse(q, fix) : u0;
-  u.fixed = Object.fromEntries(fix);
+  const u = fix.size ? parse(q, fix, text) : u0;
+  u.fixed = { ...joined, ...Object.fromEntries(fix) };
   await st.loadSeq(u.seq);
   const segs = nameSegment(u.seq, (ph) => st.isName(ph));
   u.names = segs.filter((g) => g.length > 1).map((g) => g.join(' ')); // tên riêng: phải khớp nguyên cụm

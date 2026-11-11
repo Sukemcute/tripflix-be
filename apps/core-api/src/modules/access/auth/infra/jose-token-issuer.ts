@@ -16,6 +16,8 @@ export interface TokenIssuerConfig {
   /** PEM PKCS8 của khoá ES256. Bỏ trống ở dev, test thì tự sinh khoá tạm. */
   privateKeyPem?: string | undefined;
   kid?: string | undefined;
+  /** Khoá công khai của khoá đã nghỉ: không ký nữa, chỉ để token cũ còn hạn vẫn kiểm được khi đổi khoá. */
+  previousKeys?: JWK[] | undefined;
   issuer: string;
   audience: string;
 }
@@ -39,6 +41,10 @@ export class JoseTokenIssuer implements TokenIssuer {
     const { d: _secret, ...publicPart } = await exportJWK(privateKey);
     const kid = config.kid || (await calculateJwkThumbprint(publicPart));
     const publicJwk: JWK = { ...publicPart, kid, alg: ACCESS_TOKEN_ALG, use: 'sig' };
+    // Trùng kid thì service khác không biết dùng khoá nào: dừng lúc khởi động thay vì từ chối token lúc chạy.
+    if (config.previousKeys?.some((key) => key.kid === kid)) {
+      throw new Error(`Khoá cũ trùng kid "${kid}" với khoá đang ký: đổi AUTH_JWT_KID hoặc để trống`);
+    }
     return { issuer: new JoseTokenIssuer(privateKey, publicJwk, config, now), isEphemeral: !pem };
   }
 
@@ -80,6 +86,7 @@ export class JoseTokenIssuer implements TokenIssuer {
   }
 
   getJwks(): { keys: JWK[] } {
-    return { keys: [this.publicJwk] };
+    const previous = (this.config.previousKeys ?? []).map((key) => ({ ...key, alg: ACCESS_TOKEN_ALG, use: 'sig' }));
+    return { keys: [this.publicJwk, ...previous] };
   }
 }
