@@ -195,6 +195,23 @@ export class CommentRepository {
    * - parentCommentId: đếm số phản hồi con của bình luận cha.
    * - Mặc định: đếm số bình luận gốc (parentCommentId IS NULL).
    */
+  /** Số trả lời còn hiển thị của từng bình luận, một truy vấn cho cả trang. Bình luận không có trả lời thì không có trong Map. */
+  async countRepliesByParentIds(parentIds: string[]): Promise<Map<string, number>> {
+    if (parentIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ parentCommentId: comments.parentCommentId, count: sql<number>`count(*)::int` })
+      .from(comments)
+      .where(
+        and(
+          inArray(comments.parentCommentId, parentIds),
+          isNull(comments.deletedAt),
+          eq(comments.status, 'visible'),
+        ),
+      )
+      .groupBy(comments.parentCommentId);
+    return new Map(rows.flatMap((row) => (row.parentCommentId ? [[row.parentCommentId, row.count] as const] : [])));
+  }
+
   async countByPostId(postId: string, options?: CountCommentsOptions): Promise<number> {
     const conditions = [
       eq(comments.postId, postId),

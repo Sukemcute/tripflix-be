@@ -75,6 +75,12 @@ export class SocialCommentDto {
   @ApiProperty() isEdited!: boolean;
   @ApiProperty({ example: 0, description: 'Số lượt thích bình luận' }) likeCount!: number;
   @ApiProperty({ example: false, description: 'Người xem hiện tại đã thích bình luận hay chưa' }) isLiked!: boolean;
+  @ApiProperty({
+    example: 0,
+    required: false,
+    description: 'Số trả lời còn hiển thị. Có trong danh sách bình luận; bình luận vừa tạo hoặc vừa sửa thì không có',
+  })
+  replyCount?: number;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ type: String, nullable: true }) deletedAt!: string | null;

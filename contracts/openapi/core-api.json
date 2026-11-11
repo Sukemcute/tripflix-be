@@ -5310,6 +5310,11 @@
             "example": false,
             "description": "Người xem hiện tại đã thích bình luận hay chưa"
           },
+          "replyCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số trả lời còn hiển thị. Có trong danh sách bình luận; bình luận vừa tạo hoặc vừa sửa thì không có"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"

@@ -139,9 +139,9 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
-## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt)
+## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt, TF31 trợ lý Tripi)
 
-Hai service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-service` nhận `POST /moderate` từ core-api.
+Hai service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-service` nhận `POST /moderate` từ core-api và `POST /chat` từ app.
 
 ### Tóm tắt bình luận
 
@@ -168,7 +168,7 @@ Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPU
 
 ### Kiểm duyệt (`ai-service`)
 
-core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway không có đường tới ai-service, nên chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 384 MB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
+core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway chỉ mở `/ai/chat` (mục Trợ lý Tripi), nên `/moderate` chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 384 MB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
 
 1. Nhập key OpenAI thẳng vào `.env.server`, không gửi qua chat, không in ra màn hình:
 
@@ -206,6 +206,30 @@ dc --profile api exec -T core-api node -e "console.log(process.env.AI_SERVICE_UR
 ```
 
 Ra `http://ai-service:8000` và một số lớn hơn 0 là đạt. Bỏ kiểm duyệt bằng AI: xoá `AI_SERVICE_URL` trong `.env.server` rồi chạy lại lệnh `up` ở trên, core quay về lọc bằng regex.
+
+### Trợ lý Tripi (`POST /ai/chat`)
+
+App gọi `https://<API_HOST>/ai/chat`. Gateway chỉ nhận đúng `POST` vào đường này, bỏ tiền tố `/ai` rồi chuyển tới `ai-service:8000/chat` (`traefik/server.yml`, router `ai-chat`), chung giới hạn tốc độ với `/api`. ai-service chỉ nhận token người dùng, kiểm bằng JWKS của core-api rồi hỏi `/api/auth/me` để chặn phiên đã thu hồi. Cần `AI_TAG` từ `sha-164c7db` trở lên.
+
+`CHAT_LLM_ENABLED=false` (mặc định): Tripi chỉ tìm bài, chỗ ở, chuyến bay bằng API của core, không gọi DeepSeek. Đặt `true` thì mỗi câu chat gọi DeepSeek một lần để hiểu câu hỏi, dùng `DEEPSEEK_API_KEY` sẵn có của phần tóm tắt.
+
+1. Sau khi chép `compose.server.yaml` và `traefik/server.yml` mới lên máy, đổi tag rồi chạy lại AI và gateway:
+
+```bash
+cd ~/tripflix-be
+sed -i 's/^AI_TAG=.*/AI_TAG=sha-164c7db/' deploy/.env.server
+grep -q '^CHAT_LLM_ENABLED=' deploy/.env.server || echo 'CHAT_LLM_ENABLED=false' >> deploy/.env.server
+dc --profile ai up -d --wait ai-service ai-summary-worker
+dc --profile gateway up -d --wait traefik
+```
+
+2. Gọi thử từ laptop không kèm token: `401` là đạt (gateway tới được ai-service, ai-service chặn người chưa đăng nhập). `404` là gateway chưa có router mới.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.tripflix.io.vn/ai/chat
+```
+
+3. Chạy app với `EXPO_PUBLIC_AI_URL=https://api.tripflix.io.vn/ai`. Tắt trợ lý khẩn cấp: xoá router `ai-chat` trong `traefik/server.yml` rồi chạy lại gateway; chỉ tắt DeepSeek: đặt `CHAT_LLM_ENABLED=false` rồi chạy lại `ai-service`.
 
 ## Giai đoạn 6: chuyển mã video (`video-worker`)
 

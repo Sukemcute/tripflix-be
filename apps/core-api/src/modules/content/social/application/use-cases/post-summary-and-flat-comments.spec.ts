@@ -62,6 +62,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       findById: vi.fn(),
       findByPostId: vi.fn().mockResolvedValue([]),
       countByPostId: vi.fn().mockResolvedValue(0),
+      countRepliesByParentIds: vi.fn().mockResolvedValue(new Map()),
       hasDiscussionChangedSince: vi.fn().mockResolvedValue(false),
       hasUnavailableSince: vi.fn().mockResolvedValue(false),
       findVisibleIds: vi.fn().mockResolvedValue([]),
@@ -125,6 +126,23 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         flat: undefined,
         parentCommentId: undefined,
       });
+    });
+
+    it('trả số trả lời của từng bình luận, bình luận không có trả lời là 0', async () => {
+      mockCommentRepo.findByPostId.mockResolvedValue([
+        { id: 'c1', postId, authorId, parentCommentId: null, body: 'Có trả lời', createdAt: new Date() },
+        { id: 'c2', postId, authorId, parentCommentId: null, body: 'Chưa ai trả lời', createdAt: new Date() },
+      ]);
+      mockCommentRepo.countRepliesByParentIds.mockResolvedValue(new Map([['c1', 3]]));
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const result = await useCase.execute({ postId });
+
+      expect(mockCommentRepo.countRepliesByParentIds).toHaveBeenCalledWith(['c1', 'c2']);
+      expect(result.items.map((item) => [item.id, item.replyCount])).toEqual([
+        ['c1', 3],
+        ['c2', 0],
+      ]);
     });
 
     it('tự động fallback limit về 20 khi client truyền limit không hợp lệ (NaN hoặc số âm)', async () => {
