@@ -1,6 +1,8 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord, PostType } from '../../../db/schema/index.js';
+import type { ReactionRepository } from '../../infra/reaction.repository.js';
+import type { BookmarkRepository } from '../../infra/bookmark.repository.js';
+import type { PostRecord, PostType, ReactionType } from '../../../db/schema/index.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListPostsQuery {
@@ -10,10 +12,15 @@ export interface ListPostsQuery {
   postType?: PostType;
   hashtag?: string;
   keyword?: string;
+  viewerId?: string | null;
 }
 
 export type EnrichedPostItem = PostRecord & {
   authorName: string | null;
+  viewerContext?: {
+    myReaction: ReactionType | null;
+    isBookmarked: boolean;
+  } | null;
 };
 
 export interface ListPostsResult {
@@ -26,6 +33,8 @@ export class ListPostsUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly userDirectory?: UserDirectoryPort,
+    private readonly reactionRepository?: ReactionRepository,
+    private readonly bookmarkRepository?: BookmarkRepository,
   ) {}
 
   async execute(query: ListPostsQuery): Promise<ListPostsResult> {
@@ -58,9 +67,32 @@ export class ListPostsUseCase {
       }
     }
 
+    const postIds = items.map((p) => p.id);
+    let reactionsMap = new Map<string, ReactionType>();
+    let bookmarkedSet = new Set<string>();
+
+    if (query.viewerId && postIds.length > 0) {
+      const [reactionsResult, bookmarksResult] = await Promise.all([
+        this.reactionRepository
+          ? this.reactionRepository.findByPostsAndUser(postIds, query.viewerId)
+          : Promise.resolve(new Map<string, ReactionType>()),
+        this.bookmarkRepository
+          ? this.bookmarkRepository.findBookmarkedPostIds(postIds, query.viewerId)
+          : Promise.resolve(new Set<string>()),
+      ]);
+      reactionsMap = reactionsResult;
+      bookmarkedSet = bookmarksResult;
+    }
+
     const enrichedItems: EnrichedPostItem[] = items.map((post) => ({
       ...post,
       authorName: authorNames.get(post.authorId) ?? null,
+      viewerContext: query.viewerId
+        ? {
+            myReaction: reactionsMap.get(post.id) ?? null,
+            isBookmarked: bookmarkedSet.has(post.id),
+          }
+        : null,
     }));
 
     return {
