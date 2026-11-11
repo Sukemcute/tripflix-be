@@ -77,6 +77,8 @@ export interface ExploreSource {
   counts(keys: ReadonlyArray<{ ns: string; key: string }>): Promise<CountRow[]>;
   /** Từ đơn trong chỉ mục (df chung) bắt đầu bằng `first`, độ dài trong [minLen, maxLen]. */
   typoPool(first: string, minLen: number, maxLen: number): Promise<Array<{ term: string; df: number }>>;
+  /** Cụm nhiều từ (tên đường, chuỗi, cụm trong tiêu đề) bắt đầu bằng `first`; độ dài SAU KHI bỏ khoảng trắng trong [minLen, maxLen]. */
+  phrasePool(first: string, minLen: number, maxLen: number): Promise<string[]>;
   /** Tài liệu của một nhánh, theo `ord` tăng dần. */
   candidates(filter: CandidateFilter): Promise<IndexedDoc[]>;
 }

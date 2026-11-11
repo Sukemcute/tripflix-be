@@ -1,4 +1,5 @@
 // ExploreSource trong RAM: cho test và so kết quả với bản Python. Điều kiện lọc ứng viên giống hệt câu SQL ở infra.
+import { PHRASE_NS } from './stats.js';
 import type { BuiltIndex, CandidateFilter, CountRow, ExploreSource, IndexedDoc } from './types.js';
 
 /** Tài liệu có thể được bước chấm điểm chấp nhận không (tập cha). SQL ở drizzle-explore.store.ts phải giữ đúng điều kiện này. */
@@ -36,6 +37,14 @@ export class MemoryExploreSource implements ExploreSource {
       .filter((r) => r.ns === 'df' && r.key.startsWith(first) && !r.key.includes('_') && r.key[0] !== '#')
       .filter((r) => r.key.length >= minLen && r.key.length <= maxLen)
       .map((r) => ({ term: r.key, df: r.n }));
+  }
+
+  async phrasePool(first: string, minLen: number, maxLen: number) {
+    const keys = this.index.counts
+      .filter((r) => PHRASE_NS.includes(r.ns) && r.key.startsWith(first) && r.key.includes(' '))
+      .map((r) => r.key)
+      .filter((k) => k.split(' ').join('').length >= minLen && k.split(' ').join('').length <= maxLen);
+    return [...new Set(keys)];
   }
 
   async candidates(filter: CandidateFilter): Promise<IndexedDoc[]> {

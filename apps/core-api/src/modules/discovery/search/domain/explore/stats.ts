@@ -26,6 +26,9 @@ export const NS = {
   centerLon: 'clon',
 } as const;
 
+/** Namespace bộ đếm chứa cụm nhiều từ có nghĩa (tên đường, chuỗi cửa hàng, cụm trong tiêu đề): đích của sửa lỗi bỏ khoảng trắng. */
+export const PHRASE_NS: readonly string[] = [NS.street, NS.brand, NS.titleGram];
+
 const grams = (seq: readonly string[], from: number, to: number): string[] => {
   const out: string[] = [];
   for (let k = from; k <= to; k++) for (let i = 0; i + k <= seq.length; i++) out.push(seq.slice(i, i + k).join(' '));
@@ -99,6 +102,25 @@ export class Stats {
 
   typoCandidates(w: string): string[] {
     return this.pools.get(`${w[0]}|${w.length}`) ?? [];
+  }
+
+  private readonly phrasePools = new Map<string, string[]>();
+
+  /** Cụm nhiều từ cùng chữ đầu với w, độ dài (bỏ khoảng trắng) lệch <= 2: tên nhập tay + cụm trong chỉ mục. */
+  async loadPhrasePool(w: string): Promise<void> {
+    const id = `${w[0]}|${w.length}`;
+    if (this.phrasePools.has(id)) return;
+    const [minLen, maxLen] = [w.length - 2, w.length + 2];
+    const rows = await this.source.phrasePool(w[0]!, minLen, maxLen);
+    const names = [...LEX.names.keys()].filter((n) => {
+      const len = n.split(' ').join('').length;
+      return n.includes(' ') && n[0] === w[0] && len >= minLen && len <= maxLen;
+    });
+    this.phrasePools.set(id, [...new Set([...names, ...rows])]);
+  }
+
+  phraseCandidates(w: string): string[] {
+    return this.phrasePools.get(`${w[0]}|${w.length}`) ?? [];
   }
 
   isChain(b: string): boolean {
