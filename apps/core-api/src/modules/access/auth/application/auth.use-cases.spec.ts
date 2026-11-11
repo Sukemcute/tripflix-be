@@ -68,6 +68,7 @@ describe('AuthUseCases.refresh', () => {
     expect(row.refreshTokenHash).toBe(hashRefreshToken(second.refreshToken));
     expect(row.previousTokenHash).toBe(hashRefreshToken(first.refreshToken));
     expect(JSON.stringify(row)).not.toContain(second.refreshToken);
+    expect(store.auditRows.map((a) => a.action)).not.toContain('auth.refresh');
   });
 
   it('dùng lại token cũ trong 10 giây vẫn được cấp cặp mới, không thu hồi phiên', async () => {

@@ -254,7 +254,7 @@ export class AuthUseCases {
     if (!user || user.status !== 'active') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
 
     const next = createRefreshToken();
-    const hasRotated = await this.rotateSession(session, { presented, nextHash: hashRefreshToken(next), decision, now }, meta);
+    const hasRotated = await this.rotateSession(session, { presented, nextHash: hashRefreshToken(next), decision, now });
     if (!hasRotated) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
     return this.issueTokenPair(user, session.id, next);
   }
@@ -413,18 +413,19 @@ export class AuthUseCases {
     });
   }
 
-  /** Cập nhật có điều kiện: trả false khi request khác đã xoay trước. */
+  /**
+   * Cập nhật có điều kiện: trả false khi request khác đã xoay trước.
+   * Không ghi audit: mỗi người dùng refresh 15 phút một lần nên audit_logs phình theo số người; lần dùng cuối đã có ở last_used_at.
+   */
   @Transactional('access')
   private async rotateSession(
     session: SessionRecord,
     rotation: { presented: string; nextHash: string; decision: Exclude<RefreshDecision, 'invalid' | 'reuse'>; now: Date },
-    meta: RequestMeta,
   ): Promise<boolean> {
     const { presented, nextHash, decision, now } = rotation;
     const expiresAt = new Date(now.getTime() + REFRESH_TTL_MS);
     // grace: giữ nguyên token liền trước và mốc xoay, để khoảng 10 giây không bị kéo dài.
-    const hasUpdated =
-      decision === 'rotate'
+    return decision === 'rotate'
         ? await this.store.sessions.rotate(session.id, presented, {
             refreshTokenHash: nextHash,
             previousTokenHash: presented,
@@ -439,15 +440,6 @@ export class AuthUseCases {
             expiresAt,
             lastUsedAt: now,
           });
-    if (hasUpdated) {
-      await this.store.audit.record({
-        action: 'auth.refresh',
-        actorUserId: session.userId,
-        ...meta,
-        meta: { sid: session.id, decision },
-      });
-    }
-    return hasUpdated;
   }
 
   @Transactional('access')
