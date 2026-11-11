@@ -4835,6 +4835,27 @@
           "title"
         ]
       },
+      "PostViewerContextDto": {
+        "type": "object",
+        "properties": {
+          "myReaction": {
+            "type": "string",
+            "enum": [
+              "like",
+              "love",
+              "helpful"
+            ],
+            "nullable": true
+          },
+          "isBookmarked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "myReaction",
+          "isBookmarked"
+        ]
+      },
       "SocialPostDto": {
         "type": "object",
         "properties": {
@@ -4925,6 +4946,15 @@
           "bookmarkCount": {
             "type": "number"
           },
+          "viewerContext": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PostViewerContextDto"
+              }
+            ]
+          },
           "publishedAt": {
             "type": "string",
             "format": "date-time",
@@ -4989,27 +5019,6 @@
           "items",
           "nextCursor",
           "hasMore"
-        ]
-      },
-      "PostViewerContextDto": {
-        "type": "object",
-        "properties": {
-          "myReaction": {
-            "type": "string",
-            "enum": [
-              "like",
-              "love",
-              "helpful"
-            ],
-            "nullable": true
-          },
-          "isBookmarked": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "myReaction",
-          "isBookmarked"
         ]
       },
       "SocialPostDetailDto": {
@@ -5300,6 +5309,11 @@
             "type": "boolean",
             "example": false,
             "description": "Người xem hiện tại đã thích bình luận hay chưa"
+          },
+          "replyCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số trả lời còn hiển thị. Có trong danh sách bình luận; bình luận vừa tạo hoặc vừa sửa thì không có"
           },
           "createdAt": {
             "type": "string",

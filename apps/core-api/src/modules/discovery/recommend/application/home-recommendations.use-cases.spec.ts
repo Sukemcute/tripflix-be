@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogHotel, CatalogPage } from '../../../commerce/index.js';
 import { HomeRecommendationUseCases, type HomeCommerce } from './home-recommendations.use-cases.js';
 
@@ -35,5 +35,67 @@ describe('HomeRecommendationUseCases', () => {
     expect(picks.map((p) => p.hotels[0]?.hotelId)).toEqual(['a', 'b']);
     expect(listCatalog).toHaveBeenCalledTimes(2);
     expect(listCatalog).toHaveBeenCalledWith(expect.objectContaining({ type: 'hotel', days: 30, limit: 200 }));
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  const onePage = (items: CatalogHotel[]): CatalogPage => ({ from: '', to: '', items, nextCursor: null });
+
+  it('nhiều request tới lúc chưa có cache chỉ đọc danh mục một lần', async () => {
+    const listCatalog = vi.fn(() => Promise.resolve(onePage([hotel('a', 'da-lat', 5, 3_000_000)])));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+
+    await Promise.all(Array.from({ length: 20 }, () => useCases.recommendForHome({ recentPlaceIds: [], limit: 8 })));
+
+    expect(listCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('cùng tham số thì dùng lại kết quả đã tính cho tới lần đọc danh mục sau', async () => {
+    const listCatalog = vi.fn(() => Promise.resolve(onePage([hotel('a', 'da-lat', 5, 3_000_000)])));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+
+    const first = await useCases.recommendForHome({ recentPlaceIds: ['da-lat'], limit: 8 });
+    const again = await useCases.recommendForHome({ recentPlaceIds: ['da-lat'], limit: 8 });
+    const other = await useCases.recommendForHome({ recentPlaceIds: [], limit: 8 });
+
+    expect(again).toBe(first);
+    expect(other).not.toBe(first);
+  });
+
+  it('cache hết hạn thì trả danh mục cũ ngay, đọc lại ở nền một lần, lần sau thấy danh mục mới', async () => {
+    vi.useFakeTimers();
+    let price = 3_000_000;
+    const listCatalog = vi.fn(() => Promise.resolve(onePage([hotel('a', 'da-lat', 5, price)])));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+    const query = { recentPlaceIds: ['da-lat'], limit: 8 };
+    await useCases.recommendForHome(query);
+
+    price = 2_000_000;
+    vi.advanceTimersByTime(11 * 60_000);
+    const stale = await Promise.all([useCases.recommendForHome(query), useCases.recommendForHome(query)]);
+    expect(stale.map((picks) => picks[0]?.hotels[0]?.priceFrom)).toEqual([3_000_000, 3_000_000]);
+    expect(listCatalog).toHaveBeenCalledTimes(2);
+
+    await vi.waitFor(async () => {
+      const fresh = await useCases.recommendForHome(query);
+      expect(fresh[0]?.hotels[0]?.priceFrom).toBe(2_000_000);
+    });
+    expect(listCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('đọc lại ở nền lỗi thì vẫn giữ danh mục cũ', async () => {
+    vi.useFakeTimers();
+    const listCatalog = vi
+      .fn()
+      .mockResolvedValueOnce(onePage([hotel('a', 'da-lat', 5, 3_000_000)]))
+      .mockRejectedValueOnce(new Error('db down'));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+    const query = { recentPlaceIds: ['da-lat'], limit: 8 };
+    await useCases.recommendForHome(query);
+
+    vi.advanceTimersByTime(11 * 60_000);
+    const picks = await useCases.recommendForHome(query);
+
+    expect(picks[0]?.hotels[0]?.hotelId).toBe('a');
   });
 });

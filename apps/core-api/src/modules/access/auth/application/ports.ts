@@ -156,7 +156,6 @@ export type AuditAction =
   | 'auth.register'
   | 'auth.login'
   | 'auth.login_failed'
-  | 'auth.refresh'
   | 'auth.refresh_reused'
   | 'auth.logout'
   | 'auth.logout_all'

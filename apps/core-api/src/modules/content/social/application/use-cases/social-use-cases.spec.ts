@@ -356,6 +356,37 @@ describe('Social Application Use Cases', () => {
       expect(result.items[1]?.authorName).toBe('Người Dùng 2');
       expect(mockUserDir.getDisplayNames).toHaveBeenCalledWith(['u1', 'u2']);
     });
+
+    it('gắn viewerContext chính xác khi có viewerId', async () => {
+      const post1 = samplePostRecord({ id: 'p1', authorId: 'u1' });
+      const post2 = samplePostRecord({ id: 'p2', authorId: 'u2' });
+      mockPostRepo.findPublicPosts.mockResolvedValue([post1, post2]);
+
+      const mockReactionRepoLocal = {
+        findByPostsAndUser: vi.fn().mockResolvedValue(new Map([['p1', 'like']])),
+      };
+      const mockBookmarkRepoLocal = {
+        findBookmarkedPostIds: vi.fn().mockResolvedValue(new Set(['p2'])),
+      };
+
+      const useCase = new ListPostsUseCase(
+        mockPostRepo,
+        undefined,
+        mockReactionRepoLocal as any,
+        mockBookmarkRepoLocal as any,
+      );
+      const result = await useCase.execute({ viewerId: 'user-xyz' });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]?.viewerContext).toEqual({
+        myReaction: 'like',
+        isBookmarked: false,
+      });
+      expect(result.items[1]?.viewerContext).toEqual({
+        myReaction: null,
+        isBookmarked: true,
+      });
+    });
   });
 
   describe('SetReactionUseCase', () => {

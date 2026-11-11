@@ -100,6 +100,7 @@ describe('Social API Controllers', () => {
         hashtag: 'travel',
         keyword: undefined,
         authorId: undefined,
+        viewerId: null,
       });
     });
 

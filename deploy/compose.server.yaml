@@ -147,8 +147,10 @@ services:
   # ---------- Giai đoạn 5: AI (repo tripflix-ai) ----------
   # ai-service và worker dùng chung image và AI_TAG. App đọc tóm tắt, kết quả kiểm duyệt qua core-api.
   # ai-service (TF32): POST /moderate cho core-api gọi kiểm duyệt chữ và ảnh qua OpenAI moderation.
-  # Chỉ nghe trong mạng nội bộ (gateway không có đường /ai), chỉ nhận service token của core-api,
+  # /moderate chỉ nghe trong mạng nội bộ, chỉ nhận service token của core-api,
   # kiểm bằng JWKS của core-api. Thiếu OPENAI_API_KEY thì /moderate trả 503 và core giữ bước lọc regex.
+  # POST /chat (TF31, trợ lý Tripi): gateway mở đúng https://<API_HOST>/ai/chat, chỉ nhận token người dùng.
+  # CHAT_LLM_ENABLED=false thì Tripi chỉ tìm kiếm thường, không gọi DeepSeek.
   # Không tải bộ phân loại, không gọi LLM nên nhẹ, giới hạn nửa nhân.
   ai-service:
     profiles: [ai]
@@ -158,6 +160,8 @@ services:
     environment:
       CORE_API_URL: http://core-api:3000
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LOG_LEVEL: INFO
     cpus: 0.5
     mem_limit: 384m
