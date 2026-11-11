@@ -35,12 +35,14 @@ export class PostSummaryRepository {
       sql`EXISTS (
         SELECT 1
         FROM jsonb_array_elements_text(${postSummaries.sourceCommentIds}) AS src(id)
-        LEFT JOIN content.comments c ON c.id = src.id::uuid
+        LEFT JOIN content.comments c
+          ON src.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+         AND c.id = src.id::uuid
         WHERE c.id IS NULL OR c.status != 'visible' OR c.deleted_at IS NOT NULL
       )`,
     ];
 
-    if (cursor) {
+    if (cursor && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)) {
       conditions.push(sql`${postSummaries.postId} > ${cursor}::uuid`);
     }
 

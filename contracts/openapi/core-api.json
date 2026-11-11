@@ -1667,7 +1667,7 @@
     },
     "/api/v1/posts/{postId}/comment-stats": {
       "get": {
-        "description": "Phục vụ AI Summary hoặc FE hiển thị số lượng thảo luận thực tế.",
+        "description": "Chỉ dành cho ai-service. Phục vụ suy luận thống kê mẫu (Population Estimation).",
         "operationId": "CommentsController_getCommentStats",
         "parameters": [
           {
@@ -1690,10 +1690,21 @@
               }
             }
           },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
           "404": {
             "description": "Không tìm thấy bài viết"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Lấy thống kê số bình luận visible và số người viết khác nhau của bài đăng",
         "tags": [
           "Social - Comments"

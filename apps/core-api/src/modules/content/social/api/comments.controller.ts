@@ -194,25 +194,20 @@ export class CommentsController {
   }
 
   @Get('posts/:postId/comment-stats')
-  @OptionalAuthenticated()
+  @ApiBearerAuth()
+  @ServiceOnly('ai-service')
   @ApiOperation({
     summary: 'Lấy thống kê số bình luận visible và số người viết khác nhau của bài đăng',
-    description: 'Phục vụ AI Summary hoặc FE hiển thị số lượng thảo luận thực tế.',
+    description: 'Chỉ dành cho ai-service. Phục vụ suy luận thống kê mẫu (Population Estimation).',
   })
   @ApiResponse({ status: 200, description: 'Thống kê bình luận và tác giả visible', type: PostCommentStatsResponseDto })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực hoặc token không hợp lệ' })
+  @ApiResponse({ status: 403, description: 'Từ chối: Token không có quyền ai-service' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy bài viết' })
-  async getCommentStats(
-    @Param('postId') postId: string,
-    @OptionalCurrentUser() user?: AuthUser,
-  ) {
+  async getCommentStats(@Param('postId') postId: string) {
     if (!this.getCommentStatsUseCase) {
       throw new Error('getCommentStatsUseCase chưa được inject');
     }
-    const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
-    return this.getCommentStatsUseCase.execute({
-      postId,
-      viewerId: user?.userId,
-      isStaff,
-    });
+    return this.getCommentStatsUseCase.execute({ postId });
   }
 }
