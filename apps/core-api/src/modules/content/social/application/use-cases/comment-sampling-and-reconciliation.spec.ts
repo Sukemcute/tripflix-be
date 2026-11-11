@@ -271,11 +271,9 @@ describe('Comment Sampling and AI Reconciliation', () => {
         mockStatsUseCase as any,
       );
 
-      const res = await controller.getCommentStats(postId, { userId: 'u1', role: 'user' } as any);
+      const res = await controller.getCommentStats(postId);
       expect(mockStatsUseCase.execute).toHaveBeenCalledWith({
         postId,
-        viewerId: 'u1',
-        isStaff: false,
       });
       expect(res.visibleCommentCount).toBe(100);
     });

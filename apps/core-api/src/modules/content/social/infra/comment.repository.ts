@@ -252,9 +252,9 @@ export class CommentRepository {
       eq(comments.status, 'visible'),
     ];
 
-    const orderClause = options.seed
-      ? sql`hashtext(${comments.id}::text || ${options.seed})`
-      : sql`hashtext(${comments.id}::text)`;
+    const orderClauses = options.seed
+      ? [sql`hashtext(${comments.id}::text || ${options.seed})`, comments.id]
+      : [sql`hashtext(${comments.id}::text)`, comments.id];
 
     const parentComments = alias(comments, 'parent_comments');
 
@@ -273,7 +273,7 @@ export class CommentRepository {
         ),
       )
       .where(and(...conditions))
-      .orderBy(orderClause)
+      .orderBy(...orderClauses)
       .limit(options.size);
 
     return rows.map((r) => ({
