@@ -14,6 +14,7 @@ Consumer group `notification` đọc `stream:core.access`, `stream:core.content`
 | `access.user.welcome_email_requested` v1 | Email "Chào mừng bạn đến với Tripflix", nút "Khám phá ngay" mở `WEB_APP_URL`; tài khoản tạo bằng Google có thêm cách tạo mật khẩu |
 | `access.registration_code_requested` v1 | Email "Mã xác thực đăng ký Tripflix". Mã gồm 8 chữ số, hiệu lực 10 phút |
 | `access.registration_attempted_existing` v1 | Email "Email này đã có tài khoản Tripflix", nút "Đăng nhập" mở `WEB_APP_URL/login`, kèm link `WEB_APP_URL/forgot-password` (đặt lại hoặc tạo mật khẩu cho tài khoản Google) |
+| `access.session_reuse_detected` v1 | Email "Phiên đăng nhập Tripflix của bạn đã bị đăng xuất" (nêu tên thiết bị nếu có), nút "Đăng nhập lại" mở `WEB_APP_URL/login`, kèm link `WEB_APP_URL/forgot-password` |
 | `access.email_verification_requested` v1 (TF05D) | Email chứa link xác thực 24 giờ cho tài khoản cũ. Vẫn nhận sự kiện `reason: "signup"` còn tồn từ bản trước |
 | `access.user.locked` v1, `access.user.role_changed` v1 (TF26A) | Ngắt mọi kết nối `/ws` của người đó ở mọi replica (access đã thu hồi mọi phiên) |
 | Sự kiện khác | Ghi log "Đã nhận sự kiện" |
