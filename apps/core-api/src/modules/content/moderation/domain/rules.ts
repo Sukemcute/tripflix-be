@@ -6,6 +6,7 @@ export interface RuleHit {
 }
 // Chạy trên chuỗi đã bỏ dấu, nên "óc chó" thành "oc cho". Chỉ nhận cụm đủ rõ nghĩa:
 // không đưa từ đơn dễ trùng nghĩa vô hại khi bỏ dấu ("deo" = đeo, "ngu" = ngủ, "lon" = lon bia).
+// vcl/vkl/vcc/clgt cũng dùng để cảm thán; chỉ bắt công kích qua các cụm rõ nghĩa còn lại.
 const PROFANITY_PATTERN = new RegExp(
   '\\b(?:' +
     [
@@ -22,7 +23,7 @@ const PROFANITY_PATTERN = new RegExp(
       'dit bo',
       'mat (?:nhu )?lon',
       'du ma',
-      'dm|dmm|dcm|dkm|cmm|vcl|vkl|vcc|clgt',
+      'dm|dmm|dcm|dkm|cmm',
     ].join('|') +
     ')\\b',
 );
