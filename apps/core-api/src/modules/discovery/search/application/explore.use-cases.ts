@@ -35,6 +35,10 @@ export interface PostSearchPage {
   /** Số bài khớp (đã bỏ bài bị ẩn), trên mọi trang. */
   total: number;
   nextCursor: string | null;
+  /** Từ trong câu mà dữ liệu không có (chỉ có khi `isFallback`), để FE nói "không thấy 'mùa thu', gợi ý theo Hà Nội". */
+  dropped: string[];
+  /** true: không bài nào khớp đủ câu, `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách). */
+  isFallback: boolean;
 }
 
 export interface ExploreResultItem {
@@ -192,10 +196,22 @@ export class ExploreUseCases {
       .filter((s) => kinds.includes(s.kind))
       .flatMap((s) => s.items)
       .filter((i) => !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)));
-    const visible = found.length ? await this.catalog.findVisiblePostIds(found.map((i) => i.obj.refId ?? '')) : new Set<string>();
-    const shown = found.filter((i) => visible.has(i.obj.refId ?? ''));
+    // Không bài nào khớp đủ câu ('mùa thu hà nội' khi chưa ai viết về mùa thu): dùng gợi ý theo phần hiểu được (Hà Nội), như /search.
+    const isFallback = found.length === 0 && r.suggest.length > 0;
+    const candidates = isFallback
+      ? r.suggest.filter((i) => (query.postType === 'all' ? POST_KINDS.has(i.obj.kind) : kinds.includes(i.obj.kind)) && !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)))
+      : found;
+    const visible = candidates.length ? await this.catalog.findVisiblePostIds(candidates.map((i) => i.obj.refId ?? '')) : new Set<string>();
+    const shown = candidates.filter((i) => visible.has(i.obj.refId ?? ''));
     const page = paginate(shown, query.cursor, query.limit);
-    return { understood: understoodOf(r.understood), items: page.items.map((i) => toItem({ ...i, reason: postReason(i) })), total: shown.length, nextCursor: page.nextCursor };
+    return {
+      understood: understoodOf(r.understood),
+      items: page.items.map((i) => toItem({ ...i, reason: postReason(i) })),
+      total: shown.length,
+      nextCursor: page.nextCursor,
+      dropped: isFallback && shown.length > 0 ? r.dropped : [],
+      isFallback: isFallback && shown.length > 0,
+    };
   }
 
   /** Dựng lại toàn bộ chỉ mục từ commerce + content. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */

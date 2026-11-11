@@ -2942,7 +2942,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu nhưng hiểu được nơi hoặc ý muốn (vd \"mùa thu hà nội\"): `isFallback: true`, `items` là bài theo phần hiểu được, `dropped` là các từ không có trong dữ liệu.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -7617,13 +7617,26 @@
             "type": "string",
             "nullable": true,
             "description": "Con trỏ trang sau; null = hết"
+          },
+          "dropped": {
+            "description": "Từ trong câu mà dữ liệu không có. Chỉ có giá trị khi `isFallback = true`, rỗng nếu không",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFallback": {
+            "type": "boolean",
+            "description": "true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo \"không thấy <dropped>, gợi ý theo ...\""
           }
         },
         "required": [
           "understood",
           "items",
           "total",
-          "nextCursor"
+          "nextCursor",
+          "dropped",
+          "isFallback"
         ]
       },
       "HomeProvinceDto": {
