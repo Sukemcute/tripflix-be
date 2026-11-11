@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   comments,
@@ -181,8 +181,17 @@ export class ModerationRepository {
     )`);
     const [items, count] = await Promise.all([
       this.db
-        .select()
+        .select({
+          ...getTableColumns(moderationCases),
+          targetPreview: sql<string | null>`left(coalesce(
+            nullif(btrim(${posts.title}), ''),
+            nullif(btrim(${posts.body}), ''),
+            nullif(btrim(${comments.body}), '')
+          ), 160)`,
+        })
         .from(moderationCases)
+        .leftJoin(posts, and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId)))
+        .leftJoin(comments, and(eq(moderationCases.targetType, 'comment'), eq(comments.id, moderationCases.targetId)))
         .where(and(...conditions))
         .orderBy(desc(moderationCases.severity), asc(moderationCases.createdAt), asc(moderationCases.id))
         .limit(options.limit)
