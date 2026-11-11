@@ -113,6 +113,20 @@ describe('ExploreUseCases', () => {
     expect(plans).toMatchObject({ total: 0, items: [], nextCursor: null, understood: { budget: 2_000_000 } });
   });
 
+  it('tìm bài: không bài nào khớp đủ câu thì gợi ý theo phần hiểu được và nói rõ từ nào bị bỏ', async () => {
+    const trip = { destinationName: 'Hà Nội', daysCount: 2, estimatedCostPerPerson: 1_800_000 };
+    const posts = [post('P1', 'Hà Nội 2N1Đ phố cổ', { tripAttachment: trip }), post('P2', 'Ăn gì ở Hà Nội'), post('P3', 'Đà Nẵng mùa mưa'), post('P4', 'Hà Nội ẩn')];
+    const { explore } = setup([], posts, ['P4']);
+    // 'mùa thu' không có trong dữ liệu, 'hà nội' thì có: không để trang trắng.
+    const page = await explore.searchPosts({ q: 'mùa thu hà nội', postType: 'all', limit: 20 });
+    expect(page).toMatchObject({ isFallback: true, dropped: ['mùa thu'], understood: { place: 'Hà Nội' } });
+    expect(new Set(page.items.map((i) => i.refId))).toEqual(new Set(['P1', 'P2'])); // P3 khác nơi, P4 bị ẩn
+    // Khớp đủ thì không phải gợi ý.
+    expect(await explore.searchPosts({ q: 'hà nội', postType: 'all', limit: 20 })).toMatchObject({ isFallback: false, dropped: [] });
+    // Không hiểu gì (không nơi, không ý muốn) thì vẫn rỗng, không đoán bừa.
+    expect(await explore.searchPosts({ q: 'zzzz', postType: 'all', limit: 20 })).toMatchObject({ total: 0, items: [], isFallback: false });
+  });
+
   it('dựng lại chỉ mục từ cả hai nguồn', async () => {
     const { explore, store } = setup([hotel('H1', 'A', 'Huế')], [post('P1', 'B')]);
     expect(await explore.rebuildIndex()).toBe(2);

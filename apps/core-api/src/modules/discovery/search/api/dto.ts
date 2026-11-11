@@ -190,4 +190,14 @@ export class SearchPostsResponseDto {
   items!: ExploreItemDto[];
   @ApiProperty({ example: 12, description: 'Số bài khớp trên mọi trang' }) total!: number;
   @ApiProperty({ type: String, nullable: true, description: 'Con trỏ trang sau; null = hết' }) nextCursor!: string | null;
+  @ApiProperty({
+    type: [String],
+    description: 'Từ trong câu mà dữ liệu không có. Chỉ có giá trị khi `isFallback = true`, rỗng nếu không',
+  })
+  dropped!: string[];
+  @ApiProperty({
+    description:
+      'true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo "không thấy <dropped>, gợi ý theo ..."',
+  })
+  isFallback!: boolean;
 }

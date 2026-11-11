@@ -190,6 +190,11 @@ export async function squashFix(folded: string, st: Stats): Promise<[text: strin
       if (!win.every(alpha) || sq.length < SQUASH_EXACT_MIN || !win.some(isStrange)) continue;
       if (LEX.phrase.has(text) || LEX.normPh.has(text) || LEX.names.has(text)) continue; // từ điển đã hiểu cụm này
       if (k === 1 && LEX.norm.has(text)) continue;
+      if (k > 1) {
+        // Cụm đã xuất hiện trong dữ liệu (hoặc là tên riêng) là người dùng gõ đúng: 'dong khoi' là tên đường, không ghép thành 'dongkhoi'.
+        await st.load([NS.ngram, NS.street, NS.brand, NS.brandPlaces, NS.titleGram].map((ns) => ({ ns, key: text })));
+        if (st.get(NS.ngram, text) > 0 || st.isName(text)) continue;
+      }
       await st.loadPhrasePool(sq);
       if (k > 1) await st.loadTypoPool(sq);
       const singles = k > 1 ? st.typoCandidates(sq) : [];
@@ -197,7 +202,8 @@ export async function squashFix(folded: string, st: Stats): Promise<[text: strin
       for (const c of [...singles, ...st.phraseCandidates(sq)]) {
         const cs = noSpace(c);
         // Cùng số từ là việc của typoFix (từng từ một); ở đây chỉ xử lý khi số từ khác: ghép, tách.
-        if (c.split(' ').length === k || Math.abs(cs.length - sq.length) > 2) continue;
+        // Đích có chữ số ('vincom dong khoi 5' từ tiêu đề 'Vincom Đồng Khởi: 5 quán') không phải tên: câu gõ chỉ có chữ cái.
+        if (c.split(' ').length === k || Math.abs(cs.length - sq.length) > 2 || /\d/.test(c)) continue;
         const score = cs === sq ? 1 : sq.length >= SQUASH_FUZZY_MIN ? ratio(cs, sq) : 0;
         if (score < (cs === sq ? 1 : SQUASH_FUZZY_RATIO)) continue;
         if (!best || score > best.score || (score === best.score && c < best.c)) best = { c, score };

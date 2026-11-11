@@ -62,6 +62,14 @@ describe('hiểu câu', () => {
     }
   });
 
+  it('ghép/tách chữ không đụng cụm có thật trong dữ liệu: "vincom đồng khởi" giữ nguyên, không thành "dongkhoi" hay "... 5"', async () => {
+    const objs = [
+      o({ id: 'p1', kind: 'post', title: 'Ăn gì ở Vincom Đồng Khởi: 5 quán đáng thử' }),
+      o({ id: 'p2', kind: 'post', title: 'Vincom Đồng Khởi cuối tuần', text: '#dongkhoi' }), // hashtag viết liền không được kéo cụm gõ tách sang
+    ];
+    expect((await searchExplore(src(objs), 'vincom đồng khởi')).understood.fixed).toEqual({});
+  });
+
   it('chuẩn hoá chữ', () => {
     expect(norm('Ngonnn qá ko')).toBe('ngon qua khong');
     expect(fold('Mỳ Quảng')).toBe(fold('mì quảng'));
