@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { postSummaries, type NewPostSummaryRecord, type PostSummaryRecord } from '../../db/schema/index.js';
 
@@ -16,6 +16,47 @@ export class PostSummaryRepository {
       .where(eq(postSummaries.postId, postId))
       .limit(1);
     return record ?? null;
+  }
+
+  /**
+   * Tìm danh sách các bài viết có tóm tắt đang bị giữ lại (held) do nguồn bị ẩn hoặc xóa (Reconciliation).
+   * Phục vụ worker AI đối soát bù khi Redis stream bị rụng hoặc quá tải (TF33).
+   */
+  async findHeldSummaryPostIds(options?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ postIds: string[]; nextCursor: string | null }> {
+    const limit = options?.limit ?? 50;
+    const cursor = options?.cursor;
+
+    const conditions = [
+      sql`${postSummaries.sourceCommentIds} IS NOT NULL`,
+      sql`jsonb_array_length(${postSummaries.sourceCommentIds}) > 0`,
+      sql`EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(${postSummaries.sourceCommentIds}) AS src(id)
+        LEFT JOIN content.comments c ON c.id = src.id::uuid
+        WHERE c.id IS NULL OR c.status != 'visible' OR c.deleted_at IS NOT NULL
+      )`,
+    ];
+
+    if (cursor) {
+      conditions.push(sql`${postSummaries.postId} > ${cursor}::uuid`);
+    }
+
+    const rows = await this.db
+      .select({ postId: postSummaries.postId })
+      .from(postSummaries)
+      .where(and(...conditions))
+      .orderBy(postSummaries.postId)
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const postIds = items.map((r) => r.postId);
+    const nextCursor = hasMore ? (items[items.length - 1]?.postId ?? null) : null;
+
+    return { postIds, nextCursor };
   }
 
   /**

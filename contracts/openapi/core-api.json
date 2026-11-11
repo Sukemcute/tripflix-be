@@ -1597,6 +1597,109 @@
         ]
       }
     },
+    "/api/v1/posts/{postId}/comments/sample": {
+      "get": {
+        "description": "Chỉ dành cho ai-service. Trả về mẫu ngẫu nhiên các bình luận visible kèm bộ đếm tổng thể để ước lượng thống kê.",
+        "operationId": "CommentsController_sampleComments",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng mẫu ngẫu nhiên cần lấy (mặc định 1000, tối đa 5000)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "seed",
+            "required": false,
+            "in": "query",
+            "description": "Chuỗi seed phục vụ deterministic sampling (tái lập mẫu)",
+            "schema": {
+              "example": "seed-20261111",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mẫu bình luận kèm metadata thống kê",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleCommentsResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lấy mẫu ngẫu nhiên có kiểm soát các bình luận visible (TF14/TF33 chịu tải AI Summary)",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
+    "/api/v1/posts/{postId}/comment-stats": {
+      "get": {
+        "description": "Phục vụ AI Summary hoặc FE hiển thị số lượng thảo luận thực tế.",
+        "operationId": "CommentsController_getCommentStats",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thống kê bình luận và tác giả visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostCommentStatsResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "summary": "Lấy thống kê số bình luận visible và số người viết khác nhau của bài đăng",
+        "tags": [
+          "Social - Comments"
+        ]
+      }
+    },
     "/api/v1/posts/{id}/bookmark": {
       "put": {
         "operationId": "BookmarksController_setBookmark",
@@ -1929,6 +2032,61 @@
         "summary": "Lấy kết quả tóm tắt cộng đồng của bài viết",
         "tags": [
           "Social - AI Summary"
+        ]
+      }
+    },
+    "/api/v1/internal/ai-summary/reconciliation": {
+      "get": {
+        "description": "Chỉ dành cho ai-service. Quét danh sách bài tóm tắt bị held để worker AI chạy tóm tắt bù khi bị sót event.",
+        "operationId": "AiSummaryInternalController_reconcile",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số lượng bài viết cần lấy",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor phân trang keyset theo postId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách postId cần tóm tắt bù kèm keyset cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileHeldSummariesResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đối soát các bài viết có tóm tắt đang bị giữ lại do nguồn bị ẩn/xoá (TF33)",
+        "tags": [
+          "Social - AI Summary Internal"
         ]
       }
     },
@@ -5413,6 +5571,122 @@
           "body"
         ]
       },
+      "CommentStatsDto": {
+        "type": "object",
+        "properties": {
+          "visibleCommentCount": {
+            "type": "number",
+            "example": 125000,
+            "description": "Tổng số bình luận visible của bài viết"
+          },
+          "uniqueAuthorCount": {
+            "type": "number",
+            "example": 48200,
+            "description": "Tổng số tác giả khác nhau của các bình luận visible"
+          }
+        },
+        "required": [
+          "visibleCommentCount",
+          "uniqueAuthorCount"
+        ]
+      },
+      "SampleCommentItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "c1-uuid"
+          },
+          "postId": {
+            "type": "string",
+            "example": "p1-uuid"
+          },
+          "authorId": {
+            "type": "string",
+            "example": "u1-uuid"
+          },
+          "body": {
+            "type": "string",
+            "example": "Trải nghiệm rất tuyệt vời!"
+          },
+          "parentCommentId": {
+            "type": "string",
+            "nullable": true,
+            "example": "parent-uuid"
+          },
+          "parentCommentBody": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bài viết chia sẻ rất chi tiết..."
+          },
+          "likeCount": {
+            "type": "number",
+            "example": 5,
+            "description": "Số lượt thích bình luận"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "editedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Thời điểm chỉnh sửa bình luận (null nếu chưa từng sửa)"
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "authorId",
+          "body",
+          "parentCommentId",
+          "likeCount",
+          "createdAt"
+        ]
+      },
+      "SampleCommentsResponseDto": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "$ref": "#/components/schemas/CommentStatsDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleCommentItemDto"
+            }
+          }
+        },
+        "required": [
+          "stats",
+          "items"
+        ]
+      },
+      "PostCommentStatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "example": "p1-uuid"
+          },
+          "visibleCommentCount": {
+            "type": "number",
+            "example": 125000,
+            "description": "Tổng số bình luận visible"
+          },
+          "uniqueAuthorCount": {
+            "type": "number",
+            "example": 48200,
+            "description": "Tổng số tác giả khác nhau của các bình luận visible"
+          }
+        },
+        "required": [
+          "postId",
+          "visibleCommentCount",
+          "uniqueAuthorCount"
+        ]
+      },
       "SetBookmarkDto": {
         "type": "object",
         "properties": {
@@ -5943,6 +6217,33 @@
           "isStale",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "ReconcileHeldSummariesResponseDto": {
+        "type": "object",
+        "properties": {
+          "postIds": {
+            "description": "Danh sách postId có tóm tắt đang bị giữ lại cần tóm tắt bù",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cursor cho trang tiếp theo (null nếu hết)"
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Tổng số bài viết trong trang hiện tại"
+          }
+        },
+        "required": [
+          "postIds",
+          "nextCursor",
+          "total"
         ]
       },
       "CreateUploadDto": {
