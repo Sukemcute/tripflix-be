@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, RequireVerifiedEmail, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, RequireVerifiedEmail, ServiceOnly, type AuthUser } from '@tripflix/auth';
 import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import {
   DeletedSocialItemDto,
@@ -25,12 +25,19 @@ import {
   ListCommentsQueryDto,
   UpdateCommentDto,
 } from './dto/comment.dto.js';
+import {
+  SampleCommentsQueryDto,
+  SampleCommentsResponseDto,
+  PostCommentStatsResponseDto,
+} from './dto/comment-sample.dto.js';
 import { SetCommentReactionDto } from './dto/reaction.dto.js';
 import {
   AddCommentUseCase,
   DeleteCommentUseCase,
   EditCommentUseCase,
+  GetCommentStatsUseCase,
   ListCommentsUseCase,
+  SampleCommentsUseCase,
   SetCommentReactionUseCase,
 } from '../application/index.js';
 import { CommentReactionRepository } from '../infra/comment-reaction.repository.js';
@@ -46,6 +53,8 @@ export class CommentsController {
     private readonly listCommentsUseCase: ListCommentsUseCase,
     private readonly setCommentReactionUseCase: SetCommentReactionUseCase,
     private readonly commentReactionRepository?: CommentReactionRepository,
+    private readonly sampleCommentsUseCase?: SampleCommentsUseCase,
+    private readonly getCommentStatsUseCase?: GetCommentStatsUseCase,
   ) {}
 
   @Post('posts/:postId/comments')
@@ -155,6 +164,55 @@ export class CommentsController {
       commentId,
       userId: user.userId,
       isSuperAdmin,
+    });
+  }
+
+  @Get('posts/:postId/comments/sample')
+  @ApiBearerAuth()
+  @ServiceOnly('ai-service')
+  @ApiOperation({
+    summary: 'Lấy mẫu ngẫu nhiên có kiểm soát các bình luận visible (TF14/TF33 chịu tải AI Summary)',
+    description:
+      'Chỉ dành cho ai-service. Trả về mẫu ngẫu nhiên các bình luận visible kèm bộ đếm tổng thể để ước lượng thống kê.',
+  })
+  @ApiResponse({ status: 200, description: 'Mẫu bình luận kèm metadata thống kê', type: SampleCommentsResponseDto })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực hoặc token không hợp lệ' })
+  @ApiResponse({ status: 403, description: 'Từ chối: Token không có quyền ai-service' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy bài viết' })
+  async sampleComments(
+    @Param('postId') postId: string,
+    @Query() query: SampleCommentsQueryDto,
+  ) {
+    if (!this.sampleCommentsUseCase) {
+      throw new Error('sampleCommentsUseCase chưa được inject');
+    }
+    return this.sampleCommentsUseCase.execute({
+      postId,
+      size: query.size ? Number(query.size) : undefined,
+      seed: query.seed,
+    });
+  }
+
+  @Get('posts/:postId/comment-stats')
+  @OptionalAuthenticated()
+  @ApiOperation({
+    summary: 'Lấy thống kê số bình luận visible và số người viết khác nhau của bài đăng',
+    description: 'Phục vụ AI Summary hoặc FE hiển thị số lượng thảo luận thực tế.',
+  })
+  @ApiResponse({ status: 200, description: 'Thống kê bình luận và tác giả visible', type: PostCommentStatsResponseDto })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy bài viết' })
+  async getCommentStats(
+    @Param('postId') postId: string,
+    @OptionalCurrentUser() user?: AuthUser,
+  ) {
+    if (!this.getCommentStatsUseCase) {
+      throw new Error('getCommentStatsUseCase chưa được inject');
+    }
+    const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
+    return this.getCommentStatsUseCase.execute({
+      postId,
+      viewerId: user?.userId,
+      isStaff,
     });
   }
 }

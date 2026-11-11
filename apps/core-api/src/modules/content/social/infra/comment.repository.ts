@@ -1,6 +1,11 @@
 import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '@tripflix/db';
 import { comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
+
+export type SampledCommentRecord = CommentRecord & {
+  parentCommentBody: string | null;
+};
 
 export interface FindCommentsOptions {
   postId: string;
@@ -232,5 +237,73 @@ export class CommentRepository {
       .from(comments)
       .where(and(...conditions));
     return result?.count ?? 0;
+  }
+
+  /**
+   * Lấy mẫu ngẫu nhiên có kiểm soát các bình luận visible của bài viết (Deterministic Pseudo-Random Sampling).
+   * Phục vụ AI summary phân tích chịu tải trên bài viết nhiều bình luận (TF14/TF33).
+   * Dùng hashtext(id::text || seed) trong Postgres để đảm bảo tính tái lập và query trúng index,
+   * tuyệt đối không dùng ORDER BY random() để tránh full table scan.
+   */
+  async sampleComments(options: { postId: string; size: number; seed?: string }): Promise<SampledCommentRecord[]> {
+    const conditions = [
+      eq(comments.postId, options.postId),
+      isNull(comments.deletedAt),
+      eq(comments.status, 'visible'),
+    ];
+
+    const orderClause = options.seed
+      ? sql`hashtext(${comments.id}::text || ${options.seed})`
+      : sql`hashtext(${comments.id}::text)`;
+
+    const parentComments = alias(comments, 'parent_comments');
+
+    const rows = await this.db
+      .select({
+        comment: comments,
+        parentCommentBody: parentComments.body,
+      })
+      .from(comments)
+      .leftJoin(
+        parentComments,
+        and(
+          eq(comments.parentCommentId, parentComments.id),
+          isNull(parentComments.deletedAt),
+          eq(parentComments.status, 'visible'),
+        ),
+      )
+      .where(and(...conditions))
+      .orderBy(orderClause)
+      .limit(options.size);
+
+    return rows.map((r) => ({
+      ...r.comment,
+      parentCommentBody: r.parentCommentBody ?? null,
+    }));
+  }
+
+  /**
+   * Lấy thống kê số bình luận visible và số người viết khác nhau (unique authors).
+   * Phục vụ suy luận thống kê mẫu (Population Estimation / Confidence Interval) của AI Summary.
+   */
+  async getCommentStats(postId: string): Promise<{ visibleCommentCount: number; uniqueAuthorCount: number }> {
+    const [row] = await this.db
+      .select({
+        visibleCommentCount: sql<number>`count(*)::int`,
+        uniqueAuthorCount: sql<number>`count(distinct ${comments.authorId})::int`,
+      })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postId, postId),
+          isNull(comments.deletedAt),
+          eq(comments.status, 'visible'),
+        ),
+      );
+
+    return {
+      visibleCommentCount: row?.visibleCommentCount ?? 0,
+      uniqueAuthorCount: row?.uniqueAuthorCount ?? 0,
+    };
   }
 }

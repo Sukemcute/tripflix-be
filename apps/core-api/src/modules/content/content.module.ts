@@ -13,6 +13,7 @@ import { MediaModule } from './media/media.module.js';
 import { ModerationModule } from './moderation/moderation.module.js';
 import {
   AdminPostsController,
+  AiSummaryInternalController,
   BookmarksController,
   CommentsController,
   OptionalAuthGuard,
@@ -34,6 +35,7 @@ import {
   EditCommentUseCase,
   EVENT_PUBLISHER_PORT,
   GetAdminPostDetailUseCase,
+  GetCommentStatsUseCase,
   GetMyReactionUseCase,
   GetPostDetailUseCase,
   GetPostStatsUseCase,
@@ -44,6 +46,8 @@ import {
   ListPostsUseCase,
   ListUserPostsUseCase,
   PublishPostUseCase,
+  ReconcileHeldSummariesUseCase,
+  SampleCommentsUseCase,
   SavePostSummaryUseCase,
   SetCommentReactionUseCase,
   SetReactionUseCase,
@@ -80,6 +84,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     BookmarksController,
     AdminPostsController,
     PostSummaryController,
+    AiSummaryInternalController,
   ],
   providers: [
     // 1. Drizzle DB Client cho schema 'content' (kết nối trực tiếp khi không ở trong transaction)
@@ -320,6 +325,24 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
         postSummaryRepo: PostSummaryRepository,
         commentRepo: CommentRepository,
       ) => new GetPostSummaryUseCase(postRepo, postSummaryRepo, commentRepo),
+    },
+    {
+      provide: SampleCommentsUseCase,
+      inject: [PostRepository, CommentRepository],
+      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository) =>
+        new SampleCommentsUseCase(postRepo, commentRepo),
+    },
+    {
+      provide: GetCommentStatsUseCase,
+      inject: [PostRepository, CommentRepository],
+      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository) =>
+        new GetCommentStatsUseCase(postRepo, commentRepo),
+    },
+    {
+      provide: ReconcileHeldSummariesUseCase,
+      inject: [PostSummaryRepository],
+      useFactory: (postSummaryRepo: PostSummaryRepository) =>
+        new ReconcileHeldSummariesUseCase(postSummaryRepo),
     },
 
     // 6. Guard cho optional authentication
