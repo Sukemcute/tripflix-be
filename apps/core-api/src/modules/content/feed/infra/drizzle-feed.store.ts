@@ -2,8 +2,10 @@ import type { Db } from '@tripflix/db';
 import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { bookmarks, mediaAssets, posts, reactions, renditions } from '../../db/schema/index.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
-import { HOT_SCORE_WEIGHTS } from '../domain/hot-score.js';
+import { HOT_SCORE_WEIGHTS, HOT_WINDOW_DAYS } from '../domain/hot-score.js';
 import type { FeedPostRow, FeedStore } from '../application/ports.js';
+
+const UUID_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
 export class DrizzleFeedStore implements FeedStore {
   constructor(private readonly getDb: () => Db) {}
@@ -15,7 +17,9 @@ export class DrizzleFeedStore implements FeedStore {
   listPlayablePosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
     return this.selectPlayablePosts({
       limit,
-      cursorFilter: after ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)` : undefined,
+      cursorFilter: after
+        ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`
+        : undefined,
       orderBy: [desc(posts.createdAt), desc(posts.id)],
     });
   }
@@ -28,12 +32,16 @@ export class DrizzleFeedStore implements FeedStore {
       + ${posts.bookmarkCount} * ${HOT_SCORE_WEIGHTS.save}::int
       + ${posts.shareCount} * ${HOT_SCORE_WEIGHTS.share}::int
     )`;
+    // Chỉ bài gần đây: index (status, visibility, created_at) quét đúng khoảng này thay vì chấm điểm mọi bài (100k bài mất ~1 giây).
+    const recentOnly = sql`${posts.createdAt} > now() - make_interval(days => ${HOT_WINDOW_DAYS})`;
     return this.selectPlayablePosts({
       limit,
-      cursorFilter:
+      cursorFilter: and(
+        recentOnly,
         after?.score !== undefined
           ? sql`(${hotScore}, ${posts.createdAt}, ${posts.id}) < (${after.score}::int, ${after.at}::timestamptz, ${after.id}::uuid)`
           : undefined,
+      ),
       orderBy: [desc(hotScore), desc(posts.createdAt), desc(posts.id)],
     });
   }
@@ -68,10 +76,14 @@ export class DrizzleFeedStore implements FeedStore {
           eq(posts.visibility, 'public'),
           isNull(posts.deletedAt),
           // Lọc ngay trong câu truy vấn để một trang không bị thiếu bài vì video chưa phát được.
+          // So theo uuid để tra khoá chính media_assets; so theo chuỗi (id::text) thì mỗi bài quét cả bảng.
+          // Mã không đúng dạng uuid coi như không có video, thay vì làm cả câu lỗi khi ép kiểu.
           sql`exists (
             select 1
             from jsonb_array_elements_text(${posts.mediaIds}) as post_media(id)
-            join ${mediaAssets} on ${mediaAssets.id}::text = post_media.id
+            join ${mediaAssets} on ${mediaAssets.id} = (
+              case when post_media.id ~* ${UUID_PATTERN} then post_media.id::uuid end
+            )
             join ${renditions} on ${renditions.assetId} = ${mediaAssets.id}
             where ${mediaAssets.status} = 'ready'
           )`,
