@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { buildDrizzleToken, buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
 import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
 import { OutboxWriter } from '@tripflix/outbox';
@@ -22,7 +22,8 @@ import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
 import { FlightSearchUseCases } from './inventory/application/flight-search.use-cases.js';
 import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
 import { ReviewUseCases } from './inventory/application/review.use-cases.js';
-import { COMMERCE_STORE, MEDIA_URL, TODAY, keepMediaKey, type MediaUrl, type Today } from './inventory/application/ports.js';
+import { CalendarSnapshot, hasBulkLoad } from './inventory/application/calendar-snapshot.js';
+import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type MediaUrl, type ReadCalendar, type Today } from './inventory/application/ports.js';
 import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
 import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
 import { MockGatewayController } from './payment/api/mock-gateway.controller.js';
@@ -37,7 +38,28 @@ import { VNPAY_GATEWAY } from './payment/domain/vnpay-signature.js';
 import { VNPAY_DEFAULT_API_URL, VnpayRefundClient } from './payment/infra/vnpay-refund-gateway.js';
 
 /** Ngày theo giờ Việt Nam: lịch trống và luật bán tính theo ngày địa phương, không theo UTC. */
-const todayInVietnam: Today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+// Tạo Intl.DateTimeFormat có múi giờ tốn khoảng 85µs mỗi lần: tạo một lần rồi dùng lại (đo tải TF29).
+const VIETNAM_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+const todayInVietnam: Today = () => VIETNAM_DATE_FORMAT.format(new Date());
+
+/** Lịch hiển thị nạp lại mỗi 10 giây: trang tìm và trang khách sạn thấy số phòng cũ tối đa chừng đó. */
+const READ_CALENDAR_REFRESH_MS = 10_000;
+
+/**
+ * Trang chỉ đọc lấy lịch từ bộ nhớ (đo tải TF29: lịch là phần đọc database nhiều nhất của trang tìm).
+ * Tiến trình chỉ chạy job (APP_ROLE=worker) và test đọc thẳng database: test cần thấy ngay thay đổi vừa ghi.
+ */
+function buildReadCalendar(store: CommerceStore, today: Today, env: CoreEnv): ReadCalendar {
+  if (process.env.NODE_ENV === 'test' || env.APP_ROLE === 'worker' || !hasBulkLoad(store.calendar)) return store.calendar;
+  const logger = new Logger('CommerceCalendarSnapshot');
+  return new CalendarSnapshot({
+    fallback: store.calendar,
+    source: store.calendar,
+    today,
+    refreshMs: READ_CALENDAR_REFRESH_MS,
+    onError: (error) => logger.warn({ err: error }, 'Nạp lịch vào bộ nhớ lỗi, dùng bản cũ'),
+  });
+}
 
 /** VNPay sandbox: chỉ bật khi có đủ mã merchant và khoá ký; thiếu thì các endpoint VNPay trả 404. Khoá chỉ để trong .env. */
 const VnpayEnvSchema = z.object({
@@ -80,6 +102,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     { provide: ORDER_STORE, useClass: DrizzleOrderStore },
     { provide: TODAY, useValue: todayInVietnam },
+    { provide: READ_CALENDAR, inject: [COMMERCE_STORE, TODAY, CORE_ENV], useFactory: buildReadCalendar },
     { provide: COMMERCE_CLOCK, useValue: (() => new Date()) satisfies Clock },
     {
       provide: COMMERCE_OUTBOX,
