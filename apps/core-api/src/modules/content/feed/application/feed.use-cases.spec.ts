@@ -1,0 +1,115 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { MediaFacade, PlaybackInfo } from '../../media/media.facade.js';
+import { FEED_FIRST_PAGE_TTL_SECONDS, FeedUseCases } from './feed.use-cases.js';
+import type { FeedPageCache, FeedPostRow, FeedStore, SharedFeedPage } from './ports.js';
+
+const row = (id: string): FeedPostRow => ({
+  id,
+  authorId: `author-${id}`,
+  title: `Bài ${id}`,
+  body: '',
+  hashtags: [],
+  mediaIds: [`media-${id}`],
+  reactionTotal: 1,
+  commentCount: 0,
+  bookmarkCount: 0,
+  shareCount: 0,
+  cursorAt: '2026-11-11T00:00:00.000000Z',
+});
+
+const playback = (id: string): PlaybackInfo => ({
+  hlsUrl: `https://cdn/${id}/master.m3u8`,
+  posters: { w360: 'a', w540: 'b', w720: 'c' },
+  durationSec: 10,
+  aspect: '9:16',
+  levels: [360],
+});
+
+function setup(cache?: FeedPageCache) {
+  const store = {
+    listPlayablePosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
+    listHotPosts: vi.fn(() => Promise.resolve([row('p2'), row('p1')])),
+    findLikedPostIds: vi.fn((userId: string) => Promise.resolve(userId === 'u1' ? ['p1'] : [])),
+    findSavedPostIds: vi.fn(() => Promise.resolve([])),
+  } satisfies FeedStore;
+  const media = {
+    getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, playback(id)])))),
+  } as unknown as MediaFacade;
+  return { store, feed: new FeedUseCases(store, media, undefined, cache) };
+}
+
+function memoryCache(): FeedPageCache & { set: ReturnType<typeof vi.fn> } {
+  const entries = new Map<string, string>();
+  return {
+    get: <Card>(key: string) => {
+      const raw = entries.get(key);
+      return Promise.resolve(raw ? (JSON.parse(raw) as SharedFeedPage<Card>) : null);
+    },
+    set: vi.fn((key: string, page: SharedFeedPage<unknown>) => {
+      entries.set(key, JSON.stringify(page));
+      return Promise.resolve();
+    }),
+  };
+}
+
+describe('FeedUseCases cache trang đầu', () => {
+  it('nhiều người mở trang đầu cùng lúc chỉ đọc database một lần, rồi lấy từ cache', async () => {
+    const cache = memoryCache();
+    const { store, feed } = setup(cache);
+
+    await Promise.all(Array.from({ length: 10 }, () => feed.getPage({ limit: 10, after: null, viewerId: null })));
+    const later = await feed.getPage({ limit: 10, after: null, viewerId: null });
+
+    expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
+    expect(cache.set).toHaveBeenCalledWith('feed:first-page:v1:for_you:10', expect.anything(), FEED_FIRST_PAGE_TTL_SECONDS);
+    expect(later.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
+    expect(later.items[0]?.viewerState).toBeNull();
+  });
+
+  it('phần chung lấy từ cache nhưng thích, lưu vẫn đúng của từng người xem', async () => {
+    const { store, feed } = setup(memoryCache());
+
+    const mine = await feed.getPage({ limit: 10, after: null, viewerId: 'u1' });
+    const theirs = await feed.getPage({ limit: 10, after: null, viewerId: 'u2' });
+
+    expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
+    expect(mine.items.map((item) => item.viewerState?.liked)).toEqual([true, false]);
+    expect(theirs.items.map((item) => item.viewerState?.liked)).toEqual([false, false]);
+  });
+
+  it('tab hot và for_you cache riêng', async () => {
+    const { store, feed } = setup(memoryCache());
+
+    const hot = await feed.getPage({ tab: 'hot', limit: 10, after: null, viewerId: null });
+    await feed.getPage({ limit: 10, after: null, viewerId: null });
+
+    expect(hot.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(store.listHotPosts).toHaveBeenCalledTimes(1);
+    expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
+  });
+
+  it('trang sau (có con trỏ) luôn đọc database, không cache', async () => {
+    const cache = memoryCache();
+    const { store, feed } = setup(cache);
+    const after = { at: '2026-11-11T00:00:00.000000Z', id: 'p0' };
+
+    await feed.getPage({ limit: 10, after, viewerId: null });
+    await feed.getPage({ limit: 10, after, viewerId: null });
+
+    expect(store.listPlayablePosts).toHaveBeenCalledTimes(2);
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('Redis lỗi thì feed vẫn trả từ database', async () => {
+    const broken: FeedPageCache = {
+      get: () => Promise.reject(new Error('redis down')),
+      set: () => Promise.reject(new Error('redis down')),
+    };
+    const { store, feed } = setup(broken);
+
+    const page = await feed.getPage({ limit: 10, after: null, viewerId: 'u1' });
+
+    expect(page.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
+    expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
+  });
+});

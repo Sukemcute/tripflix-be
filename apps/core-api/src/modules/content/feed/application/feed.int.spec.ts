@@ -27,6 +27,7 @@ import type pg from 'pg';
 import { DrizzleMediaAssetStore } from '../../media/infra/drizzle-media-asset.store.js';
 import { MediaFacade } from '../../media/media.facade.js';
 import { decodeFeedCursor } from '../domain/feed-cursor.js';
+import { HOT_WINDOW_DAYS } from '../domain/hot-score.js';
 import { DrizzleFeedStore } from '../infra/drizzle-feed.store.js';
 import { FeedUseCases } from './feed.use-cases.js';
 
@@ -190,10 +191,13 @@ describe('Feed trên Postgres thật', () => {
   });
 
   describe('tab hot', () => {
+    // Tab hot chỉ xếp hạng bài trong HOT_WINDOW_DAYS ngày gần đây, nên ngày tạo bài tính lùi từ hôm nay.
+    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
     it('hai bài cùng điểm: ẩn bình luận làm đổi thứ tự hot; xoá bình luận hidden không đổi bộ đếm', async () => {
       const asset = await insertAsset('ready', [360]);
-      const first = await insertPost([asset], { createdAt: '2026-11-05T00:00:00Z' });
-      const second = await insertPost([asset], { createdAt: '2026-11-04T00:00:00Z' });
+      const first = await insertPost([asset], { createdAt: daysAgo(1) });
+      const second = await insertPost([asset], { createdAt: daysAgo(2) });
       await setCounts(first, { comments: 1 });
       await setCounts(second, { comments: 1 });
       const commentId = randomUUID();
@@ -266,11 +270,11 @@ describe('Feed trên Postgres thật', () => {
 
     it('xếp theo trọng số thích 1, bình luận 2, lưu 3, chia sẻ 4; bằng điểm thì mới nhất trước', async () => {
       const asset = await insertAsset('ready', [360]);
-      const noEngagement = await insertPost([asset], { createdAt: '2026-11-05T00:00:00Z' });
-      const threeLikes = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
-      const oneShare = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
-      const oneSave = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
-      const oneComment = await insertPost([asset], { createdAt: '2026-11-04T00:00:00Z' });
+      const noEngagement = await insertPost([asset], { createdAt: daysAgo(1) });
+      const threeLikes = await insertPost([asset], { createdAt: daysAgo(5) });
+      const oneShare = await insertPost([asset], { createdAt: daysAgo(4) });
+      const oneSave = await insertPost([asset], { createdAt: daysAgo(3) });
+      const oneComment = await insertPost([asset], { createdAt: daysAgo(2) });
       await setCounts(threeLikes, { likes: 3 });
       await setCounts(oneShare, { shares: 1 });
       await setCounts(oneSave, { saves: 1 });
@@ -287,11 +291,12 @@ describe('Feed trên Postgres thật', () => {
 
     it('sang trang không lặp, không rớt bài khi nhiều bài trùng điểm và trùng thời điểm', async () => {
       const asset = await insertAsset('ready', [360]);
-      const createdAt = '2026-11-05T10:00:00.123456Z';
+      // Giữ phần micro-giây để thử con trỏ khi trùng thời điểm.
+      const createdAt = `${daysAgo(1).slice(0, 19)}.123456Z`;
       const sameScore = await Promise.all(
         Array.from({ length: 5 }, () => insertPost([asset], { createdAt })),
       );
-      const top = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
+      const top = await insertPost([asset], { createdAt: daysAgo(5) });
       await setCounts(top, { likes: 10 });
 
       const ids = await readHotPages(2);
@@ -306,6 +311,20 @@ describe('Feed trên Postgres thật', () => {
       await setCounts(processing, { likes: 100 });
 
       await expect(readHotPages(20)).resolves.toEqual([playable]);
+    });
+
+    it(`chỉ xếp hạng bài trong ${HOT_WINDOW_DAYS} ngày gần đây; bài cũ hơn dù nhiều tương tác vẫn có ở for_you`, async () => {
+      const asset = await insertAsset('ready', [360]);
+      const recent = await insertPost([asset], { createdAt: daysAgo(HOT_WINDOW_DAYS - 1) });
+      const old = await insertPost([asset], { createdAt: daysAgo(HOT_WINDOW_DAYS + 1) });
+      await setCounts(old, { likes: 1_000 });
+
+      await expect(readHotPages(20)).resolves.toEqual([recent]);
+      expect(
+        (await feed.getPage({ tab: 'for_you', limit: 20, after: null, viewerId: null })).items.map(
+          (item) => item.postId,
+        ),
+      ).toContain(old);
     });
   });
 

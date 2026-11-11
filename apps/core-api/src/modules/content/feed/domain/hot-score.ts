@@ -1,4 +1,7 @@
 /** Trọng số theo docs/10 mục trending. Bản đầu tính trên bộ đếm của bài, chưa có bán rã vì bộ đếm không lưu thời điểm tương tác. */
+/** Tab hot chỉ xếp hạng bài đăng trong chừng này ngày: "đang hot" là bài gần đây, và để không phải chấm điểm mọi bài. */
+export const HOT_WINDOW_DAYS = 7;
+
 export const HOT_SCORE_WEIGHTS = { like: 1, comment: 2, save: 3, share: 4 } as const;
 
 export interface HotScoreCounts {
