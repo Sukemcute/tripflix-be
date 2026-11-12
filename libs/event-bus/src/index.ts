@@ -6,6 +6,7 @@ export const STREAMS = {
   access: 'stream:core.access',
   content: 'stream:core.content',
   commerce: 'stream:core.commerce',
+  discovery: 'stream:core.discovery',
   media: 'stream:media',
   ai: 'stream:ai',
   appEvents: 'stream:app-events',

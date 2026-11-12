@@ -321,6 +321,40 @@ export type ContentModerationDecidedV1 = z.infer<typeof ContentModerationDecided
 export type ContentCommentHiddenV1 = z.infer<typeof ContentCommentHiddenV1Schema>;
 export type ContentCommentRestoredV1 = z.infer<typeof ContentCommentRestoredV1Schema>;
 
+/**
+ * discovery.search.performed v1: người dùng đã đăng nhập tìm ở explore (POST /api/search) hoặc bài viết
+ * (POST /api/search/posts). Chỉ giữ tín hiệu gu cho gợi ý: không lưu nguyên câu tìm, không lưu vị trí GPS.
+ */
+export const DiscoverySearchPerformedV1Schema = z.object({
+  userId: z.uuid(),
+  surface: z.enum(['explore', 'posts']),
+  /** Nơi nhận ra từ câu tìm, có thể rỗng. */
+  placeIds: z.array(z.string()).max(10),
+  /** Loại ý định explore đã nhận ra, null nếu không có. */
+  intent: z.string().nullable(),
+  budgetMax: z.number().int().nonnegative().nullable(),
+  /** Chỉ có với surface 'posts'. */
+  postType: z.string().nullable(),
+  resultCount: z.number().int().nonnegative(),
+});
+export type DiscoverySearchPerformedV1 = z.infer<typeof DiscoverySearchPerformedV1Schema>;
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** discovery.stays.searched v1: người dùng đã đăng nhập tìm chỗ ở (GET /api/stays). */
+export const DiscoveryStaysSearchedV1Schema = z.object({
+  userId: z.uuid(),
+  placeId: z.string(),
+  checkIn: isoDate,
+  checkOut: isoDate,
+  adults: z.number().int().min(1),
+  rooms: z.number().int().min(1).nullable(),
+  minStars: z.number().int().min(1).max(5).nullable(),
+  priceMax: z.number().int().nonnegative().nullable(),
+  resultCount: z.number().int().nonnegative(),
+});
+export type DiscoveryStaysSearchedV1 = z.infer<typeof DiscoveryStaysSearchedV1Schema>;
+
 export const exportedSchemas: Record<string, z.ZodType> = {
   'content.comment.hidden.v1': ContentCommentHiddenV1Schema,
   'content.comment.restored.v1': ContentCommentRestoredV1Schema,
@@ -352,4 +386,6 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.registration_code_requested.v1': AccessRegistrationCodeRequestedV1Schema,
   'access.registration_attempted_existing.v1': AccessRegistrationAttemptedExistingV1Schema,
   'access.session_reuse_detected.v1': AccessSessionReuseDetectedV1Schema,
+  'discovery.search.performed.v1': DiscoverySearchPerformedV1Schema,
+  'discovery.stays.searched.v1': DiscoveryStaysSearchedV1Schema,
 };
