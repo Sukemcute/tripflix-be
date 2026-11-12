@@ -19,13 +19,19 @@ export interface FeedPostRow {
   cursorAt: string;
 }
 
+export interface FeedListQuery {
+  limit: number;
+  after: FeedCursor | null;
+  authorId?: string;
+}
+
 export interface FeedStore {
   /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước. */
-  listPlayablePosts(query: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
+  listPlayablePosts(query: FeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài trong HOT_WINDOW_DAYS ngày gần đây, xếp theo điểm hot giảm dần rồi mới nhất trước. */
-  listHotPosts(query: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
+  listHotPosts(query: FeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc và thứ tự với listPlayablePosts nhưng chỉ bài người dùng đã lưu. */
-  listSavedPlayablePosts(query: { userId: string; limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
+  listSavedPlayablePosts(query: FeedListQuery & { userId: string }): Promise<FeedPostRow[]>;
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]>;
   findSavedPostIds(userId: string, postIds: string[]): Promise<string[]>;
 }

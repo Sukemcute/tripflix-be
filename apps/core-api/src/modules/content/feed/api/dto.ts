@@ -14,6 +14,7 @@ export const FeedQuerySchema = z
     // Chưa có tab following. Báo lỗi với tab khác, không âm thầm trả nhầm nội dung.
     tab: z.enum(FEED_TABS).default('for_you'),
     limit: z.coerce.number().int().min(1).max(FEED_MAX_LIMIT).default(FEED_DEFAULT_LIMIT),
+    author_id: z.uuid().optional(),
     cursor: z
       .string()
       .transform((value, ctx): FeedCursor => {

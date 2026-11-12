@@ -28,6 +28,7 @@ export class FeedController {
   @ApiQuery({ name: 'tab', required: false, enum: FEED_TABS })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: FEED_DEFAULT_LIMIT, description: `Tối đa ${FEED_MAX_LIMIT}` })
   @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'author_id', required: false, schema: { type: 'string', format: 'uuid' } })
   @ApiQuery({
     name: 'saved',
     required: false,
@@ -35,7 +36,7 @@ export class FeedController {
     description: 'true: chỉ Reels người xem đã lưu, mới nhất trước. Cần đăng nhập, chỉ dùng với tab for_you',
   })
   @ApiOkResponse({ type: FeedPageDto })
-  @ApiBadRequestResponse({ description: 'tab, limit, cursor hoặc saved không hợp lệ' })
+  @ApiBadRequestResponse({ description: 'tab, limit, cursor, author_id hoặc saved không hợp lệ' })
   @ApiUnauthorizedResponse({ description: 'saved=true khi chưa đăng nhập' })
   getFeed(
     @Query(new ZodBody(FeedQuerySchema)) query: z.infer<typeof FeedQuerySchema>,
@@ -48,6 +49,7 @@ export class FeedController {
       after: query.cursor ?? null,
       viewerId: user?.userId ?? null,
       isSavedOnly: query.saved,
+      authorId: query.author_id,
     });
   }
 }

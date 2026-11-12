@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { bookmarks, mediaAssets, posts, reactions, renditions } from '../../db/schema/index.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
 import { HOT_SCORE_WEIGHTS, HOT_WINDOW_DAYS } from '../domain/hot-score.js';
-import type { FeedPostRow, FeedStore } from '../application/ports.js';
+import type { FeedListQuery, FeedPostRow, FeedStore } from '../application/ports.js';
 
 const UUID_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
@@ -18,9 +18,10 @@ export class DrizzleFeedStore implements FeedStore {
     return this.getDb();
   }
 
-  listPlayablePosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+  listPlayablePosts({ limit, after, authorId }: FeedListQuery): Promise<FeedPostRow[]> {
     return this.selectPlayablePosts({
       limit,
+      authorId,
       cursorFilter: newestFirstCursor(after),
       orderBy: [desc(posts.createdAt), desc(posts.id)],
     });
@@ -30,23 +31,21 @@ export class DrizzleFeedStore implements FeedStore {
     userId,
     limit,
     after,
-  }: {
-    userId: string;
-    limit: number;
-    after: FeedCursor | null;
-  }): Promise<FeedPostRow[]> {
+    authorId,
+  }: FeedListQuery & { userId: string }): Promise<FeedPostRow[]> {
     const savedByUser = sql`exists (
       select 1 from ${bookmarks}
       where ${bookmarks.postId} = ${posts.id} and ${bookmarks.userId} = ${userId}
     )`;
     return this.selectPlayablePosts({
       limit,
+      authorId,
       cursorFilter: and(savedByUser, newestFirstCursor(after)),
       orderBy: [desc(posts.createdAt), desc(posts.id)],
     });
   }
 
-  listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+  listHotPosts({ limit, after, authorId }: FeedListQuery): Promise<FeedPostRow[]> {
     // Cùng công thức với calculateHotScore, cursor lấy điểm từ hàm đó.
     const hotScore = sql`(
       ${posts.reactionTotal} * ${HOT_SCORE_WEIGHTS.like}::int
@@ -58,6 +57,7 @@ export class DrizzleFeedStore implements FeedStore {
     const recentOnly = sql`${posts.createdAt} > now() - make_interval(days => ${HOT_WINDOW_DAYS})`;
     return this.selectPlayablePosts({
       limit,
+      authorId,
       cursorFilter: and(
         recentOnly,
         after?.score !== undefined
@@ -70,10 +70,12 @@ export class DrizzleFeedStore implements FeedStore {
 
   private selectPlayablePosts({
     limit,
+    authorId,
     cursorFilter,
     orderBy,
   }: {
     limit: number;
+    authorId?: string;
     cursorFilter: SQL | undefined;
     orderBy: SQL[];
   }): Promise<FeedPostRow[]> {
@@ -97,6 +99,7 @@ export class DrizzleFeedStore implements FeedStore {
         and(
           eq(posts.status, 'published'),
           eq(posts.visibility, 'public'),
+          authorId ? eq(posts.authorId, authorId) : undefined,
           isNull(posts.deletedAt),
           // Feed là luồng Reels: bài viết (vlog) cũ lỡ kèm video cũng không được lọt vào.
           eq(posts.postType, 'video'),

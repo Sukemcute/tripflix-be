@@ -873,6 +873,49 @@
         ]
       }
     },
+    "/api/v1/users/search": {
+      "get": {
+        "operationId": "UserSearchController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1–5",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "2–50 ký tự sau khi bỏ khoảng trắng thừa",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "20 người mỗi trang",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSearchResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bạn tìm kiếm quá nhanh, vui lòng thử lại sau ít phút"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/posts": {
       "post": {
         "operationId": "PostsController_createDraft",
@@ -2334,6 +2377,15 @@
             }
           },
           {
+            "name": "author_id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -2376,7 +2428,7 @@
             }
           },
           "400": {
-            "description": "tab, limit, cursor hoặc saved không hợp lệ"
+            "description": "tab, limit, cursor, author_id hoặc saved không hợp lệ"
           },
           "401": {
             "description": "saved=true khi chưa đăng nhập"
@@ -4901,6 +4953,72 @@
           "userId"
         ]
       },
+      "UserSearchItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Bảo Lê"
+          }
+        },
+        "required": [
+          "id",
+          "displayName"
+        ]
+      },
+      "UserSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSearchItemDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "false ở trang 5 dù còn người khớp"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "hasMore"
+        ]
+      },
+      "TripTransportDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "flight",
+              "bus",
+              "train",
+              "car",
+              "other"
+            ]
+          },
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "DLI"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
       "TripItineraryItemDto": {
         "type": "object",
         "properties": {
@@ -4923,6 +5041,14 @@
             "type": "string",
             "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
             "description": "Ghi chú"
+          },
+          "transport": {
+            "description": "Phương tiện được chọn khi soạn lộ trình",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripTransportDto"
+              }
+            ]
           }
         },
         "required": [

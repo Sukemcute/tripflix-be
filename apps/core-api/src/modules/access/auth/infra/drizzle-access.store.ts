@@ -1,7 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { Db } from '@tripflix/db';
 import { OutboxWriter } from '@tripflix/outbox';
-import { and, asc, inArray, count, desc, eq, gt, ilike, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, inArray, count, desc, eq, gt, ilike, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import {
   accessOutboxEvents,
   auditLogs,
@@ -24,6 +24,7 @@ import type {
   NewSession,
   OneTimeTokenRepository,
   ProfilePatch,
+  PublicUserSearchOptions,
   RegistrationChallenge,
   RegistrationChallengeRepository,
   SessionRecord,
@@ -37,6 +38,7 @@ import type {
   UserRecord,
   UserRepository,
 } from '../application/ports.js';
+import { VIETNAMESE_TRANSLATE_FROM, VIETNAMESE_TRANSLATE_TO } from '../../account/domain/name-search.js';
 
 const mapUserRow = (row: UserRow): UserRecord => ({
   id: row.id,
@@ -115,6 +117,29 @@ class DrizzleUserRepository implements UserRepository {
       this.db.select({ total: count() }).from(users).where(where),
     ]);
     return { items: rows.map(mapUserRow), total: counted?.total ?? 0 };
+  }
+
+  async searchPublic({ query, bornOnOrBefore, limit, offset }: PublicUserSearchOptions) {
+    // shortcut: quét tuần tự bảng users (đủ cho pilot vài nghìn tài khoản); lớn hơn thì thêm cột tên đã bỏ dấu + index trigram.
+    const pattern = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const foldedName = sql`translate(lower(${users.displayName}), ${VIETNAMESE_TRANSLATE_FROM}, ${VIETNAMESE_TRANSLATE_TO})`;
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.status, 'active'),
+          eq(users.role, 'member'),
+          isNotNull(users.emailVerifiedAt),
+          or(isNull(users.dateOfBirth), lte(users.dateOfBirth, bornOnOrBefore)),
+          // Ghi rõ ESCAPE (gửi dạng tham số): không dựa vào mặc định riêng của PostgreSQL.
+          sql`${foldedName} like ${pattern} escape ${'\\'}`,
+        ),
+      )
+      .orderBy(asc(users.displayName), asc(users.id))
+      .limit(limit)
+      .offset(offset);
+    return rows.map(mapUserRow);
   }
 
   async updateRole(id: string, role: UserRecord['role']) {

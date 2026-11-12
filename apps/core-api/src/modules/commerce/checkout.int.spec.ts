@@ -293,6 +293,29 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     expect((await holdRoom(newUser(), checkIn)).status).toBe(201);
   });
 
+  it('giữ vé bay và phòng trong cùng đơn từ một lộ trình', async () => {
+    const user = newUser();
+    const checkIn = addDays(TODAY_DATE, 29);
+    const response = await http()
+      .post('/api/checkout')
+      .set({ ...user.auth, ...key() })
+      .send({
+        adults: 2,
+        sourcePostId: 'trip-plan-post',
+        items: [
+          { productId: flightId, checkIn },
+          { productId: roomTypeId, checkIn, checkOut: addDays(checkIn, 1) },
+        ],
+      });
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    expect(response.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ productId: flightId, productType: 'flight', qty: 2 }),
+      expect.objectContaining({ productId: roomTypeId, productType: 'room', qty: 1 }),
+    ]));
+    expect((await pool.query('select source_post_id from commerce.orders where id = $1', [response.body.orderId])).rows)
+      .toEqual([{ source_post_id: 'trip-plan-post' }]);
+  });
+
   it('giữ giỏ thiếu một mục thì không giữ gì; giỏ mới thay giỏ cũ và trả chỗ cũ về kho', async () => {
     const user = newUser();
     const checkIn = addDays(TODAY_DATE, 30);

@@ -179,7 +179,10 @@ describe('Post Entity Domain Rules', () => {
         destinationName: 'Phú Quốc',
         daysCount: 3,
         estimatedCostPerPerson: 3500000,
-        items: [{ day: 1, title: 'Check in' }],
+        items: [
+          { day: 1, title: 'Bay từ Sài Gòn', transport: { mode: 'flight', fromAirport: 'SGN', toAirport: 'PQC' } },
+          { day: 2, title: 'Check in' },
+        ],
       },
     });
 
@@ -188,6 +191,8 @@ describe('Post Entity Domain Rules', () => {
     expect(masked?.priceDisclaimer).toBe('Giá chỉ mang tính chất tham khảo');
     expect((masked as any).bookingId).toBeUndefined(); // Không chứa bookingId
     expect(masked?.hotelName).toBe('Vinpearl Phú Quốc');
+    expect(masked?.items?.[0]?.transport).toEqual({ mode: 'flight', fromAirport: 'SGN', toAirport: 'PQC' });
+    expect(masked?.items?.[1]?.transport).toBeUndefined();
   });
 });
 
