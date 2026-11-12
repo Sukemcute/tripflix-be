@@ -65,6 +65,7 @@ export class SetReactionUseCase {
       userId: command.userId,
       payload: {
         postId: command.postId,
+        postAuthorId: post.authorId,
         userId: command.userId,
         type: command.type,
         reactionTotal,

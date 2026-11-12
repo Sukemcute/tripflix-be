@@ -1,14 +1,18 @@
 import type { EventEnvelope } from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
 import type { DirectoryRepository } from '../directory/directory.repository.js';
+import type { ReactionNotificationRepository } from '../grouping/reaction-notification.repository.js';
 import type { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
+import type { PostNotificationRepository } from '../inbox/post-notification.repository.js';
 import type { InboxRepository } from '../inbox/inbox.repository.js';
 import type { Mailer } from '../outapp/mailer.js';
 import type { RealtimeService } from '../realtime/realtime.service.js';
 import { createAccountEmailHandlers } from './handlers/account-email.js';
 import { createBookingHandlers } from './handlers/booking.js';
 import { createCommentHandlers } from './handlers/comment.js';
+import { createContentStatusHandlers } from './handlers/content-status.js';
 import { createDirectoryHandlers } from './handlers/directory.js';
+import { createReactionHandlers } from './handlers/reaction-updated.js';
 import type { EventHandler } from './handlers/event-handler.js';
 
 /** Trang web mở từ nút "Khám phá ngay" trong email chào mừng khi chưa cấu hình WEB_APP_URL. */
@@ -64,12 +68,16 @@ export class EventRouter {
     realtime?: Pick<RealtimeService, 'emitToUser'>,
     directory?: Pick<DirectoryRepository, 'upsertUser' | 'upsertPost'>,
     comments?: Pick<CommentNotificationRepository, 'create' | 'hide'>,
+    reactions?: Pick<ReactionNotificationRepository, 'apply'>,
+    posts?: Pick<PostNotificationRepository, 'moderate'>,
   ) {
     this.handlers = {
       ...createAccountEmailHandlers(mailer, links.webAppUrl),
       ...createBookingHandlers({ mailer, webAppUrl: links.webAppUrl, log, inbox, realtime }),
       ...(directory ? createDirectoryHandlers(directory) : {}),
       ...(comments ? createCommentHandlers({ comments, inbox, realtime, log }) : {}),
+      ...(inbox ? createContentStatusHandlers({ inbox, posts, realtime, log }) : {}),
+      ...(reactions ? createReactionHandlers({ reactions, inbox, realtime, log }) : {}),
     };
   }
 

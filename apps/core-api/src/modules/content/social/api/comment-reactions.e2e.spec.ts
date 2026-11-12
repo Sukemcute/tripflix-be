@@ -357,6 +357,26 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
     });
   });
 
+  it('focusCommentId chỉ trả lượt trả lời và bình luận cha còn hiển thị', async () => {
+    const replyId = '018d9f30-0000-7000-8000-000000000002';
+    const parent = commentsStore.get(validCommentId)!;
+    commentsStore.set(replyId, { ...parent, id: replyId, parentCommentId: validCommentId });
+    try {
+      const getFocus = () => http().get(`/api/v1/posts/${validPostId}/comments`).query({ focusCommentId: replyId });
+      const visible = await getFocus().expect(200);
+      expect(visible.body).toMatchObject({
+        items: [{ id: validCommentId }, { id: replyId, parentCommentId: validCommentId }],
+        nextCursor: null,
+      });
+      commentsStore.set(validCommentId, { ...parent, status: 'hidden' });
+      const hidden = await getFocus().expect(200);
+      expect(hidden.body).toMatchObject({ items: [], nextCursor: null });
+    } finally {
+      commentsStore.set(validCommentId, parent);
+      commentsStore.delete(replyId);
+    }
+  });
+
   it('User A hủy thả tim bằng type=null: 200 OK, isLiked=false, likeCount=1', async () => {
     const res = await http()
       .put(`/api/v1/comments/${validCommentId}/reaction`)

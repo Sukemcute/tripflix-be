@@ -26,8 +26,10 @@ import { NotificationConsumer } from './consumers/notification-consumer.js';
 import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
+import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
 import { InboxController } from './inbox/inbox.controller.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
+import { PostNotificationRepository } from './inbox/post-notification.repository.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
 import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
@@ -84,7 +86,7 @@ export class MeController {
 
 /**
  * notification-service. Đã có: consumers/ (email), inbox/ (TF46), realtime/ (WebSocket /ws, TF26A).
- * Sẽ làm (Dũng): push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
+ * Sẽ làm (Dũng): push và hàng đợi BullMQ, preferences/ — xem docs/architecture/10 §3.5.
  */
 @Module({
   providers: [
@@ -155,6 +157,8 @@ export class InfraModule {}
     RealtimeGateway,
     InboxRepository,
     CommentNotificationRepository,
+    PostNotificationRepository,
+    ReactionNotificationRepository,
     DirectoryRepository,
   ],
 })

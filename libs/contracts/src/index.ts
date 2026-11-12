@@ -147,6 +147,24 @@ export const MediaTranscodeFailedV1Schema = z.object({
 });
 export type MediaTranscodeFailedV1 = z.infer<typeof MediaTranscodeFailedV1Schema>;
 
+export const ContentReactionUpdatedV1Schema = z.object({
+  postId: z.uuid(),
+  postAuthorId: z.uuid().optional(),
+  userId: z.uuid(),
+  type: z.enum(['like', 'love', 'helpful']).nullable(),
+  reactionTotal: z.int().nonnegative(),
+  reactionCounts: z.record(z.string(), z.int().nonnegative()),
+});
+
+export const ContentCommentReactionUpdatedV1Schema = z.object({
+  commentId: z.uuid(),
+  postId: z.uuid(),
+  commentAuthorId: z.uuid(),
+  userId: z.uuid(),
+  isLiked: z.boolean(),
+  likeCount: z.int().nonnegative(),
+});
+
 /** content.comment.created v1: có bình luận mới dưới bài viết (hỗ trợ thông báo và AI worker tổng hợp). */
 export const ContentCommentCreatedV1Schema = z.object({
   commentId: z.uuid(),
@@ -155,6 +173,7 @@ export const ContentCommentCreatedV1Schema = z.object({
   authorId: z.uuid(),
   parentCommentId: z.uuid().nullable(),
   parentCommentAuthorId: z.uuid().nullable().optional(),
+  authorDisplayName: z.string().min(1).optional(),
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
 });
@@ -377,6 +396,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.media.failed.v1': ContentMediaFailedV1Schema,
   'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
   'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
+  'content.reaction.updated.v1': ContentReactionUpdatedV1Schema,
+  'content.comment_reaction.updated.v1': ContentCommentReactionUpdatedV1Schema,
   'content.comment.created.v1': ContentCommentCreatedV1Schema,
   'content.comment.updated.v1': ContentCommentUpdatedV1Schema,
   'content.comment.deleted.v1': ContentCommentDeletedV1Schema,

@@ -101,6 +101,7 @@ export class CommentsController {
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       parentCommentId: query.parent_comment_id,
+      ...(query.focusCommentId !== undefined ? { focusCommentId: query.focusCommentId } : {}),
       flat: isFlat,
       viewerId: user?.userId,
       isStaff,
