@@ -44,12 +44,20 @@ export interface PostRecommendationPage {
   nextCursor: string | null;
 }
 
-/** Cursor do server cấp: giữ thuật toán của trang đầu; khách thì mang offset (không có chống lặp Redis). */
+/** Bài gợi ý trước mốc này tính là "phiên trước" và bị đẩy xuống cuối; bài gợi ý trong phiên giữ chỗ. */
+const SESSION_MS = 30 * 60_000;
+
+/** Cursor do server cấp: giữ thuật toán, offset và mốc "phiên trước" của trang đầu. */
 interface Cursor {
   algo: string;
   page: number;
   offset: number;
+  seenBefore: number;
 }
+
+/** Bài đã xem ở phiên trước xuống cuối, giữ thứ tự xếp hạng trong từng nhóm. Kho ít bài thì vẫn còn bài để xem. */
+const demoteSeen = (ranked: RankedItem[], seen: Set<string>): RankedItem[] =>
+  seen.size ? [...ranked.filter((r) => !seen.has(r.postId)), ...ranked.filter((r) => seen.has(r.postId))] : ranked;
 
 export class InvalidRecommendCursorError extends Error {}
 
@@ -57,7 +65,14 @@ const encodeCursor = (c: Cursor) => Buffer.from(JSON.stringify(c)).toString('bas
 function decodeCursor(raw: string): Cursor {
   try {
     const c = JSON.parse(Buffer.from(raw, 'base64url').toString()) as Partial<Cursor>;
-    if (typeof c.algo === 'string' && Number.isInteger(c.page) && Number.isInteger(c.offset) && c.page! >= 0 && c.offset! >= 0) {
+    if (
+      typeof c.algo === 'string' &&
+      Number.isInteger(c.page) &&
+      Number.isInteger(c.offset) &&
+      Number.isInteger(c.seenBefore) &&
+      c.page! >= 0 &&
+      c.offset! >= 0
+    ) {
       return c as Cursor;
     }
   } catch {
@@ -86,15 +101,18 @@ export class PostRecommendationUseCases {
     const algo = await this.loadAlgo(algoName);
     const page = cursor?.page ?? 0;
     const offset = cursor?.offset ?? 0;
+    // Mốc "phiên trước" cố định từ trang đầu: cả phiên đẩy xuống cùng một tập bài nên trang không xô lệch.
+    const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
 
-    const [interacted, servedIds, userFeatures] = q.userId
+    const [interacted, seenIds, userFeatures] = q.userId
       ? await Promise.all([
           this.store.listInteractedPostIds(q.userId, now),
-          this.listServed(q.userId),
+          this.listSeen(q.userId, new Date(seenBefore)),
           this.store.findUserFeatures(algo.userBuilder.key, q.userId),
         ])
       : [[], [], null];
-    const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: [...new Set([...interacted, ...servedIds])], now };
+    const seen = new Set(seenIds);
+    const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: interacted, now };
     const [hot, fresh] = await Promise.all([
       this.store.listHotCandidates({ ...base, limit: HOT_LIMIT }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
@@ -102,29 +120,30 @@ export class PostRecommendationUseCases {
     const candidates = mergeCandidates(hot, fresh);
     const inCandidates = new Set(candidates.map((c) => c.postId));
     const explorePool = (await this.store.listExplorePool({ ...base, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS })).filter(
-      (c) => !inCandidates.has(c.postId),
+      (c) => !inCandidates.has(c.postId) && !seen.has(c.postId),
     );
 
     const slots = exploreSlots(q.limit);
-    const ranked = algo.ranker.rank({ candidates, userFeatures, now });
-    const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, q.userId ? 0 : page * slots);
+    const ranked = demoteSeen(algo.ranker.rank({ candidates, userFeatures, now }), seen);
+    const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, page * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
     const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
     const pageItems = interleave(rankedTake, explore, q.limit);
 
     const items = await this.hydrate(pageItems);
-    if (q.userId) await this.recordServed(q.userId, pageItems.map((i) => i.postId));
+    if (q.userId) await this.recordSeen(q.userId, pageItems.map((i) => i.postId), now);
     for (const item of items) {
       this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.post.id }, 'recommend.served');
     }
 
-    // Người dùng: trang sau loại bài đã phục vụ nên không cần offset. Khách: cộng offset.
-    const hasMore = ranked.length > offset + rankedTake.length || explorePool.length > (q.userId ? slots : (page + 1) * slots);
-    const nextOffset = q.userId ? 0 : offset + rankedTake.length;
+    // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
+    // ponytail: bài vừa tương tác rời danh sách ngay nên trang sau có thể hụt một bài; chấp nhận ở v0.
+    const nextOffset = offset + rankedTake.length;
+    const hasMore = ranked.length > nextOffset || explorePool.length > (page + 1) * slots;
     return {
       items,
       algo: algo.name,
-      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset }) : null,
+      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset, seenBefore }) : null,
     };
   }
 
@@ -165,19 +184,19 @@ export class PostRecommendationUseCases {
     return rows;
   }
 
-  /** Redis lỗi thì vẫn trả kết quả, chỉ mất chống lặp. */
-  private async listServed(userId: string): Promise<string[]> {
+  /** Redis lỗi thì vẫn trả kết quả, chỉ không đẩy bài đã xem xuống. */
+  private async listSeen(userId: string, before: Date): Promise<string[]> {
     try {
-      return await this.served.list(userId);
+      return await this.served.listBefore(userId, before);
     } catch (err) {
-      this.logger.warn({ err }, 'Đọc bài đã phục vụ lỗi (Redis), bỏ chống lặp lượt này');
+      this.logger.warn({ err }, 'Đọc bài đã phục vụ lỗi (Redis), bỏ đẩy bài đã xem xuống lượt này');
       return [];
     }
   }
 
-  private async recordServed(userId: string, postIds: string[]): Promise<void> {
+  private async recordSeen(userId: string, postIds: string[], at: Date): Promise<void> {
     try {
-      await this.served.add(userId, postIds);
+      await this.served.add(userId, postIds, at);
     } catch (err) {
       this.logger.warn({ err }, 'Ghi bài đã phục vụ lỗi (Redis)');
     }

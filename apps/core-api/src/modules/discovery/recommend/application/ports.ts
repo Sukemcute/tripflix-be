@@ -43,8 +43,9 @@ export const SERVED_STORE = Symbol('SERVED_STORE');
 
 /** Bài đã phục vụ cho mỗi người (chống lặp giữa các trang, 48 giờ, ≤ 100 id). Thật: Redis. */
 export interface ServedStore {
-  list(userId: string): Promise<string[]>;
-  add(userId: string, postIds: string[]): Promise<void>;
+  /** Bài đã gợi ý trước thời điểm `before` (các phiên trước). */
+  listBefore(userId: string, before: Date): Promise<string[]>;
+  add(userId: string, postIds: string[], at: Date): Promise<void>;
 }
 
 export interface RecommendPostRow extends PostMeta {

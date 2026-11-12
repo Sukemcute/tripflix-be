@@ -54,7 +54,7 @@ export class PostRecommendationsController {
       'Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.',
       '',
       '- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.',
-      '- Không trả bài đã tương tác. Người đăng nhập: không trả lại bài đã gợi ý trong 48 giờ (tối đa 100 bài); hết ứng viên thì trả ít hơn hoặc rỗng.',
+      '- Không trả bài đã tương tác. Người đăng nhập: bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài) bị đẩy xuống cuối, không bị bỏ; gọi lại cùng cursor ra cùng trang.',
       '- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.',
       '- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.',
     ].join('\n'),

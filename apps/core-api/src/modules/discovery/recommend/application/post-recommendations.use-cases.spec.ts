@@ -39,17 +39,18 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
   };
-  const servedIds: string[] = [];
-  const servedList = vi.fn(async () => [...servedIds]);
-  const servedAdd = vi.fn(async (_u: string, ids: string[]) => void servedIds.unshift(...ids));
-  const served: ServedStore = { list: servedList, add: servedAdd, ...opts.served };
+  /** id → lúc gợi ý (ms), như ZSET trong Redis. */
+  const seenAt = new Map<string, number>();
+  const servedList = vi.fn(async (_u: string, before: Date) => [...seenAt].filter(([, t]) => t < before.getTime()).map(([id]) => id));
+  const servedAdd = vi.fn(async (_u: string, ids: string[], at: Date) => ids.forEach((id) => seenAt.set(id, at.getTime())));
+  const served: ServedStore = { listBefore: servedList, add: servedAdd, ...opts.served };
   const catalog = {
     getVisiblePosts: vi.fn(async (ids: string[]) =>
       ids.filter((id) => !opts.hidden?.includes(id)).map((id) => ({ id, postType: 'video', title: id, hashtags: [], coverMediaId: null, authorId: 'a', reactionTotal: 0 })),
     ),
   };
   const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served);
-  return { useCases, store, servedList, servedAdd, servedIds, catalog };
+  return { useCases, store, servedList, servedAdd, seenAt, catalog };
 }
 
 const query = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>[0]> = {}) => ({
@@ -74,7 +75,7 @@ describe('PostRecommendationUseCases', () => {
     expect(page.items).toHaveLength(10);
     expect(page.items.filter((i) => i.source === 'explore')).toHaveLength(1);
     expect(page.items.find((i) => i.source === 'explore')!.post.id).toMatch(/^e0/);
-    expect(servedAdd).toHaveBeenCalledWith(U, ids(page));
+    expect(servedAdd).toHaveBeenCalledWith(U, ids(page), NOW);
     expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'hot@v0', limit: 150, excludePostIds: ['h00'] }));
     expect(store.listFreshCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, hours: 48 }));
   });
@@ -114,7 +115,7 @@ describe('PostRecommendationUseCases', () => {
 
   it('Redis lỗi: vẫn trả kết quả, chỉ mất chống lặp', async () => {
     const down = () => Promise.reject(new Error('ECONNREFUSED'));
-    const { useCases } = setup({ served: { list: down, add: down } });
+    const { useCases } = setup({ served: { listBefore: down, add: down } });
     const page = await useCases.recommend(query());
     expect(page.items).toHaveLength(10);
     expect(page.algo).toBe('for_you');
@@ -133,12 +134,23 @@ describe('PostRecommendationUseCases', () => {
     expect(store.listActiveAlgos).toHaveBeenCalledTimes(1);
   });
 
-  it('lọc hết ứng viên: trả rỗng, không trả lại bài đã phục vụ', async () => {
-    const { useCases, servedIds } = setup();
+  it('tải lại cùng trang (sau khi thả tim): ra đúng các bài cũ, không rỗng', async () => {
+    const { useCases } = setup();
+    const first = await useCases.recommend(query());
+    const second = await useCases.recommend(query({ cursor: first.nextCursor }));
+    const later = new Date(NOW.getTime() + 60_000);
+    expect(ids(await useCases.recommend(query({ now: later })))).toEqual(ids(first));
+    expect(ids(await useCases.recommend(query({ cursor: first.nextCursor, now: later })))).toEqual(ids(second));
+  });
+
+  it('bài đã xem ở phiên trước: đẩy xuống cuối chứ không bỏ; xem hết thì vẫn còn bài', async () => {
+    const { useCases, seenAt } = setup();
     const all = ['d1', 'f1', ...Array.from({ length: 30 }, (_, i) => `h${String(i).padStart(2, '0')}`), ...Array.from({ length: 10 }, (_, i) => `e0${i}`)];
-    servedIds.push(...all);
+    const yesterday = NOW.getTime() - 24 * 3600_000;
+    all.filter((id) => id !== 'h05').forEach((id) => seenAt.set(id, yesterday));
     const page = await useCases.recommend(query());
-    expect(page).toEqual({ items: [], algo: 'for_you', nextCursor: null });
+    expect(ids(page)[0]).toBe('h05');
+    expect(page.items).toHaveLength(10);
   });
 
   it('bài đã ẩn sau lần job gần nhất thì bỏ khỏi trang', async () => {
