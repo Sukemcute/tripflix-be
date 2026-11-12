@@ -11,10 +11,12 @@ export async function ensureInboxSchema(pool: pg.Pool): Promise<void> {
         applied_at timestamptz NOT NULL DEFAULT now()
       )
     `);
-    const migration = await client.query('SELECT 1 FROM __migrations WHERE version = 1');
-    if (migration.rowCount === 0) {
-      await client.query(INITIAL_NOTIFICATION_SCHEMA);
-      await client.query('INSERT INTO __migrations (version) VALUES (1)');
+    for (const [version, sql] of NOTIFICATION_MIGRATIONS) {
+      const migration = await client.query('SELECT 1 FROM __migrations WHERE version = $1', [version]);
+      if (migration.rowCount === 0) {
+        await client.query(sql);
+        await client.query('INSERT INTO __migrations (version) VALUES ($1)', [version]);
+      }
     }
     await client.query('COMMIT');
   } catch (error) {
@@ -74,3 +76,8 @@ const INITIAL_NOTIFICATION_SCHEMA = `
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 `;
+
+const NOTIFICATION_MIGRATIONS = [
+  [1, INITIAL_NOTIFICATION_SCHEMA],
+  [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
+] as const;

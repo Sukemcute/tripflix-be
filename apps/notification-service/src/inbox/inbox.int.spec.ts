@@ -66,28 +66,26 @@ describe('InboxRepository trên Postgres thật', () => {
     const indexes = await pool.query<{ indexname: string }>(
       "SELECT indexname FROM pg_indexes WHERE tablename = 'inbox' AND schemaname = current_schema()",
     );
-    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+    const indexNames = indexes.rows.map((row) => row.indexname);
+    expect(indexNames).toEqual(
       expect.arrayContaining([
         'inbox_pkey',
-        'uq_inbox_source_event_id',
         'uq_inbox_event_user_type',
         'idx_inbox_user_id_created_at',
         'idx_inbox_user_id_unread',
       ]),
     );
+    expect(indexNames).not.toContain('uq_inbox_source_event_id');
+    const migrations = await pool.query<{ version: number }>('SELECT version FROM __migrations ORDER BY version');
+    expect(migrations.rows).toEqual([{ version: 1 }, { version: 2 }]);
   });
 
-  it('giữ thông báo đã đọc và tương thích với câu lệnh ghi của phiên bản cũ', async () => {
+  it('giữ thông báo đã đọc và chống ghi lại sự kiện đã xử lý trước khi migrate', async () => {
     const page = await repository.listForUser(legacyItem.userId, { limit: 10 });
     expect(page.items).toEqual([
       expect.objectContaining({ source_event_id: legacyItem.sourceEventId, read_at: legacyReadAt }),
     ]);
-    const duplicate = await pool.query(
-      `INSERT INTO inbox (user_id, type, title, body, source_event_id)
-       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (source_event_id) DO NOTHING`,
-      [legacyItem.userId, legacyItem.type, legacyItem.title, legacyItem.body, legacyItem.sourceEventId],
-    );
-    expect(duplicate.rowCount).toBe(0);
+    expect(await repository.insert(legacyItem)).toBeNull();
     const tables = await pool.query<{ tablename: string }>(
       "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()",
     );
@@ -96,7 +94,7 @@ describe('InboxRepository trên Postgres thật', () => {
     );
   });
 
-  it('insert trả hàng với default; source_event_id trùng trả null và không ghi đè', async () => {
+  it('insert trả hàng với default; cùng sự kiện, người nhận và loại không ghi đè', async () => {
     const item = input();
     const row = await repository.insert(item);
     expect(row).toMatchObject({
@@ -112,6 +110,20 @@ describe('InboxRepository trên Postgres thật', () => {
     const page = await repository.listForUser(item.userId, { limit: 20 });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.title).toBe(item.title);
+  });
+
+  it('một sự kiện ghi được cho nhiều người và nhiều loại, phát lại đồng thời không tạo bản trùng', async () => {
+    const item = input();
+    const otherRecipient = { ...item, userId: randomUUID() };
+    const otherType = { ...item, type: 'booking.cancelled' };
+    const inserts = [item, otherRecipient, otherType];
+    const results = await Promise.all([...inserts, ...inserts].map((entry) => repository.insert(entry)));
+    expect(results.filter((row) => row !== null)).toHaveLength(3);
+
+    const first = await repository.listForUser(item.userId, { limit: 10 });
+    expect(first.items.map((row) => row.type).sort()).toEqual([item.type, otherType.type].sort());
+    const second = await repository.listForUser(otherRecipient.userId, { limit: 10 });
+    expect(second.items).toEqual([expect.objectContaining({ type: item.type, source_event_id: item.sourceEventId })]);
   });
 
   it('sắp mới nhất trước, phân trang theo id khi cùng thời gian, không lẫn người dùng', async () => {
