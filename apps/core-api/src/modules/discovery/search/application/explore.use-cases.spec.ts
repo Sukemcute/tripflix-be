@@ -4,6 +4,7 @@ import type { CoreEnv } from '../../../../platform/env.js';
 import { ExploreContentConsumer } from '../consumers/explore-content.consumer.js';
 import { buildIndex } from '../domain/explore/build.js';
 import { RebuildExploreIndexJob } from '../jobs/rebuild-explore-index.job.js';
+import { IndexHealth } from '../jobs/index-health.js';
 import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
 import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-cases.js';
@@ -175,7 +176,10 @@ describe('ExploreUseCases', () => {
       try {
         const hidden: string[] = [];
         const { explore } = setup([], plans, hidden);
-        const job = new RebuildExploreIndexJob({ APP_ROLE: 'worker' } as CoreEnv, explore);
+        const env = { APP_ROLE: 'worker', NODE_ENV: 'test' } as CoreEnv;
+        const job = new RebuildExploreIndexJob(
+          { APP_ROLE: 'worker' } as CoreEnv, explore, new IndexHealth(env, {} as Redis),
+        );
         const consumer = new ExploreContentConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore);
         const moderated = (action: string) =>
           consumer.route({ eventId: action, type: 'content.post.moderated', payload: { postId: 'P2', action } } as unknown as EventEnvelope);

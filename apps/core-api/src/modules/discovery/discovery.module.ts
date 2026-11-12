@@ -5,6 +5,7 @@ import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/i
 import { ContentFacade, ContentModule } from '../content/index.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
+import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -22,6 +23,7 @@ import { SuggestUseCases } from './search/application/suggest.use-cases.js';
 import { ExploreContentConsumer } from './search/consumers/explore-content.consumer.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
+import { IndexHealth } from './search/jobs/index-health.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from './search/jobs/rebuild-suggest-index.job.js';
 
@@ -52,7 +54,7 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
  */
 @Module({
   imports: [CommerceModule, ContentModule],
-  controllers: [SuggestController, StaysController, ExploreController, HomeRecommendationsController],
+  controllers: [SuggestController, StaysController, ExploreController, HomeRecommendationsController, AdminIndexHealthController],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
@@ -62,6 +64,7 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
     StaysUseCases,
     HomeRecommendationUseCases,
     ExploreUseCases,
+    IndexHealth,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     ExploreContentConsumer,
