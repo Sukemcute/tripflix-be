@@ -134,6 +134,8 @@ services:
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Tripflix <no-reply@tripflix.io.vn>}
       WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
+      # Web, admin gọi /notifications từ trình duyệt (TF46): cùng danh sách origin với core-api.
+      WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
