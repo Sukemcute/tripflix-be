@@ -16,6 +16,7 @@ import { PostRecommendationUseCases } from './recommend/application/post-recomme
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
+import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -95,6 +96,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     BuildFeaturesUseCases,
     PostRecommendationUseCases,
     BuildFeaturesJob,
+    PurgeInteractionsJob,
     DiscoveryEventsConsumer,
   ],
 })
