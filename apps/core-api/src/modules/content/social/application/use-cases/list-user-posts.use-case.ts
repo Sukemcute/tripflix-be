@@ -1,6 +1,6 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord, PostStatus } from '../../../db/schema/index.js';
+import type { PostRecord, PostStatus, PostType } from '../../../db/schema/index.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListUserPostsQuery {
@@ -8,6 +8,7 @@ export interface ListUserPostsQuery {
   limit?: number;
   cursor?: string;
   status?: PostStatus | 'all';
+  postType?: PostType;
 }
 
 export type EnrichedUserPostItem = PostRecord & {
@@ -36,6 +37,7 @@ export class ListUserPostsUseCase {
       cursorCreatedAt: decoded?.createdAt,
       cursorId: decoded?.id,
       status: query.status,
+      postType: query.postType,
     });
 
     const hasMore = records.length > limit;

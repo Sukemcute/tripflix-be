@@ -7,6 +7,7 @@ import type {
   TripAttachmentData,
   TripItineraryItem,
 } from '../../../db/schema/index.js';
+import { LIST_POST_TYPE_FILTERS, type ListPostTypeFilter } from './post-type-filter.dto.js';
 
 export class TripItineraryItemDto implements TripItineraryItem {
   @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })
@@ -130,4 +131,10 @@ export class ListUserPostsQueryDto {
 
   @ApiPropertyOptional({ enum: ['all', 'draft', 'published'], default: 'all', description: 'Trạng thái bài' })
   status?: PostStatus | 'all';
+
+  @ApiPropertyOptional({
+    enum: LIST_POST_TYPE_FILTERS,
+    description: 'Lọc theo loại bài. Không truyền thì trả mọi loại',
+  })
+  post_type?: ListPostTypeFilter;
 }

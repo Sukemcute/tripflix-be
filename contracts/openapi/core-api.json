@@ -1029,6 +1029,18 @@
                 "published"
               ]
             }
+          },
+          {
+            "name": "post_type",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo loại bài. Không truyền thì trả mọi loại",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "vlog"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1041,6 +1053,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "post_type không hợp lệ"
           }
         },
         "security": [
@@ -1783,7 +1798,7 @@
             "name": "post_type",
             "required": false,
             "in": "query",
-            "description": "Lọc theo loại bài. Không truyền thì trả mọi loại. Reels đã lưu lấy qua /v1/feed",
+            "description": "Lọc theo loại bài. Không truyền thì trả mọi loại. Reels đã lưu lấy qua /v1/feed?saved=true",
             "schema": {
               "type": "string",
               "enum": [
@@ -2306,6 +2321,19 @@
         "operationId": "FeedController_getFeed",
         "parameters": [
           {
+            "name": "saved",
+            "required": false,
+            "in": "query",
+            "description": "true: chỉ Reels người xem đã lưu, mới nhất trước. Cần đăng nhập, chỉ dùng với tab for_you",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -2348,10 +2376,13 @@
             }
           },
           "400": {
-            "description": "tab, limit hoặc cursor không hợp lệ"
+            "description": "tab, limit, cursor hoặc saved không hợp lệ"
+          },
+          "401": {
+            "description": "saved=true khi chưa đăng nhập"
           }
         },
-        "summary": "Bảng tin video: chỉ gồm bài phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.",
+        "summary": "Bảng tin Reels: chỉ gồm bài dạng video phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.",
         "tags": [
           "feed"
         ]
@@ -6630,6 +6661,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "tripAttachment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripAttachmentDto"
+              }
+            ]
           },
           "counts": {
             "$ref": "#/components/schemas/FeedCountsDto"

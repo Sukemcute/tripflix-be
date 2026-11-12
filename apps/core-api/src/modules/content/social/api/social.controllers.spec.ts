@@ -45,6 +45,21 @@ describe('Social API Controllers', () => {
       mockTrackShare as any,
     );
 
+    it('listMyPosts truyền post_type=vlog xuống use case', async () => {
+      await controller.listMyPosts(mockUser, { post_type: 'vlog' });
+      expect(mockListUserPosts.execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ authorId: mockUser.userId, postType: 'vlog' }),
+      );
+    });
+
+    it('listMyPosts từ chối post_type ngoài vlog bằng 400', async () => {
+      mockListUserPosts.execute.mockClear();
+      await expect(controller.listMyPosts(mockUser, { post_type: 'video' as never })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockListUserPosts.execute).not.toHaveBeenCalled();
+    });
+
     it('createDraft nên gọi createDraftUseCase', async () => {
       const res = await controller.createDraft(mockUser, {
         post_type: 'vlog',

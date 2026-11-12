@@ -1,8 +1,9 @@
 import { SocialErrorFilter } from './social-error.filter.js';
-import { UseFilters, BadRequestException, Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
+import { UseFilters, Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
-import { isBookmarkPostType, ListBookmarksQueryDto, SetBookmarkDto } from './dto/bookmark.dto.js';
+import { ListBookmarksQueryDto, SetBookmarkDto } from './dto/bookmark.dto.js';
+import { parseListPostTypeFilter } from './dto/post-type-filter.dto.js';
 import { SocialPostPageDto, UpdatedBookmarkDto } from './dto/response.dto.js';
 import { BookmarkPostUseCase, ListBookmarksUseCase } from '../application/index.js';
 
@@ -33,14 +34,11 @@ export class BookmarksController {
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng đã bookmark', type: SocialPostPageDto })
   @ApiResponse({ status: 400, description: 'post_type không hợp lệ' })
   async listMyBookmarks(@CurrentUser() user: AuthUser, @Query() query: ListBookmarksQueryDto) {
-    if (query.post_type !== undefined && !isBookmarkPostType(query.post_type)) {
-      throw new BadRequestException('post_type chỉ nhận giá trị: vlog');
-    }
     return this.listBookmarksUseCase.execute({
       userId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
-      postType: query.post_type,
+      postType: parseListPostTypeFilter(query.post_type),
     });
   }
 }
