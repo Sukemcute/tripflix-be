@@ -10,6 +10,7 @@ const row = (id: string): FeedPostRow => ({
   body: '',
   hashtags: [],
   mediaIds: [`media-${id}`],
+  tripAttachment: null,
   reactionTotal: 1,
   commentCount: 0,
   bookmarkCount: 0,
@@ -29,6 +30,7 @@ function setup(cache?: FeedPageCache) {
   const store = {
     listPlayablePosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
     listHotPosts: vi.fn(() => Promise.resolve([row('p2'), row('p1')])),
+    listSavedPlayablePosts: vi.fn(() => Promise.resolve([row('p2')])),
     findLikedPostIds: vi.fn((userId: string) => Promise.resolve(userId === 'u1' ? ['p1'] : [])),
     findSavedPostIds: vi.fn(() => Promise.resolve([])),
   } satisfies FeedStore;
@@ -61,7 +63,7 @@ describe('FeedUseCases cache trang đầu', () => {
     const later = await feed.getPage({ limit: 10, after: null, viewerId: null });
 
     expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
-    expect(cache.set).toHaveBeenCalledWith('feed:first-page:v1:for_you:10', expect.anything(), FEED_FIRST_PAGE_TTL_SECONDS);
+    expect(cache.set).toHaveBeenCalledWith('feed:first-page:v2:for_you:10', expect.anything(), FEED_FIRST_PAGE_TTL_SECONDS);
     expect(later.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
     expect(later.items[0]?.viewerState).toBeNull();
   });
@@ -111,5 +113,27 @@ describe('FeedUseCases cache trang đầu', () => {
 
     expect(page.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
     expect(store.listPlayablePosts).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FeedUseCases Reels đã lưu', () => {
+  it('đọc bài đã lưu của đúng người xem, không đụng cache và trả saved=true', async () => {
+    const cache = memoryCache();
+    const { store, feed } = setup(cache);
+    (store.findSavedPostIds as ReturnType<typeof vi.fn>).mockResolvedValue(['p2']);
+
+    const page = await feed.getPage({ limit: 10, after: null, viewerId: 'u2', isSavedOnly: true });
+
+    expect(store.listSavedPlayablePosts).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u2' }));
+    expect(store.listPlayablePosts).not.toHaveBeenCalled();
+    expect(cache.set).not.toHaveBeenCalled();
+    expect(page.items.map((item) => item.postId)).toEqual(['p2']);
+    expect(page.items[0]?.viewerState).toEqual({ liked: false, saved: true });
+  });
+
+  it('không có người xem thì từ chối thay vì trả feed chung', async () => {
+    const { store, feed } = setup();
+    await expect(feed.getPage({ limit: 10, after: null, viewerId: null, isSavedOnly: true })).rejects.toThrow();
+    expect(store.listSavedPlayablePosts).not.toHaveBeenCalled();
   });
 });
