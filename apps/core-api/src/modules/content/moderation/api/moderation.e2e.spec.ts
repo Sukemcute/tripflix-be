@@ -45,6 +45,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
   let app: INestApplication;
   const store = new MemoryAccessStore();
   const submit = vi.fn().mockImplementation(async (input) => ({ id: randomUUID(), ...input }));
+  const queue = vi.fn().mockResolvedValue({ items: [], total: 0 });
   const decide = vi
     .fn()
     .mockResolvedValue({
@@ -70,7 +71,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
         { provide: ChangeVisibilityUseCase, useValue: { execute: decide } },
         {
           provide: ModerationRepository,
-          useValue: { queue: async () => ({ items: [], total: 0 }), log: async () => [] },
+          useValue: { queue, log: async () => [] },
         },
       ],
     })
@@ -134,6 +135,16 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
       .expect(201);
     expect(replay.body).toEqual(first.body);
     expect(decide.mock.calls.length - before).toBe(1);
+  });
+  it('lọc tab lưu trữ bằng view và từ chối giá trị không hợp lệ', async () => {
+    const url = '/api/v1/admin/moderation/queue';
+    await http().get(url).query({ view: 'hidden', targetType: 'comment', cursor: '20' })
+      .auth(tokens.moderator!, { type: 'bearer' }).expect(200);
+    expect(queue).toHaveBeenLastCalledWith(expect.objectContaining({
+      view: 'hidden', targetType: 'comment', offset: 20,
+    }));
+    await http().get(url).query({ view: 'unknown' })
+      .auth(tokens.moderator!, { type: 'bearer' }).expect(400);
   });
   it('user báo cáo được, validate UUID/reason/detail, guest bị chặn', async () => {
     const url = `/api/v1/posts/${randomUUID()}/reports`;
