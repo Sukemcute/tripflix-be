@@ -2,6 +2,7 @@ import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException, Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord } from '../../../db/schema/index.js';
 
@@ -17,6 +18,7 @@ export class AddCommentUseCase {
     private readonly postRepository: PostRepository,
     private readonly commentRepository: CommentRepository,
     private readonly outbox: ContentOutbox,
+    private readonly userDirectory?: UserDirectoryPort,
   ) {}
 
   @Transactional('content')
@@ -56,6 +58,9 @@ export class AddCommentUseCase {
     // Tăng bộ đếm bình luận của bài viết
     await this.postRepository.incrementCounter(command.postId, 'commentCount', 1);
 
+    const names = await this.userDirectory?.getDisplayNames([command.authorId]).catch(() => undefined);
+    const authorDisplayName = names?.get(command.authorId)?.trim();
+
     // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
     await this.outbox.add({
       type: 'content.comment.created',
@@ -65,6 +70,7 @@ export class AddCommentUseCase {
         postId: command.postId,
         postAuthorId: post.authorId,
         authorId: command.authorId,
+        ...(authorDisplayName ? { authorDisplayName } : {}),
         parentCommentId: command.parentCommentId ?? null,
         parentCommentAuthorId,
         body: comment.body,

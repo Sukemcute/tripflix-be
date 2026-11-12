@@ -46,6 +46,10 @@
         }
       ]
     },
+    "authorDisplayName": {
+      "type": "string",
+      "minLength": 1
+    },
     "body": {
       "type": "string",
       "minLength": 1,

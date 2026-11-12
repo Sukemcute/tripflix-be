@@ -16,6 +16,8 @@ export class CommentNotificationRepository {
     commentId: string;
     postId: string;
     authorId: string;
+    authorDisplayName?: string;
+    parentCommentId: string | null;
     eventId: string;
     recipients: CommentRecipient[];
   }): Promise<InboxRow[]> {
@@ -25,7 +27,7 @@ export class CommentNotificationRepository {
          SELECT recipient.user_id,
            CASE WHEN recipient.is_reply THEN 'comment.replied' ELSE 'comment.created' END,
            CASE WHEN recipient.is_reply THEN 'Có người trả lời bình luận' ELSE 'Có bình luận mới' END,
-           COALESCE(actor.display_name, 'Một người dùng') ||
+           COALESCE($8::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') ||
              CASE WHEN recipient.is_reply THEN ' đã trả lời bình luận của bạn.' ELSE ' đã bình luận bài của bạn.' END,
            $4, $5::jsonb, $6, $7::uuid
          FROM unnest($1::uuid[], $2::boolean[]) AS recipient(user_id, is_reply)
@@ -37,10 +39,11 @@ export class CommentNotificationRepository {
           input.recipients.map((recipient) => recipient.userId),
           input.recipients.map((recipient) => recipient.isReplyRecipient),
           input.authorId,
-          `/trips/${input.postId}`,
-          JSON.stringify({ postId: input.postId, commentId: input.commentId }),
+          `/trips/${input.postId}?comment=${input.commentId}`,
+          JSON.stringify({ postId: input.postId, commentId: input.commentId, parentCommentId: input.parentCommentId }),
           input.eventId,
           input.commentId,
+          input.authorDisplayName ?? null,
         ],
       );
       return rows;
