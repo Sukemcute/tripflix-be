@@ -98,4 +98,35 @@ describe('HomeRecommendationUseCases', () => {
 
     expect(picks[0]?.hotels[0]?.hotelId).toBe('a');
   });
+
+  it('danh mục cũ quá 30 phút thì không trả bản cũ nữa: chờ đọc mới', async () => {
+    vi.useFakeTimers();
+    let price = 3_000_000;
+    const listCatalog = vi.fn(() => Promise.resolve(onePage([hotel('a', 'da-lat', 5, price)])));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+    const query = { recentPlaceIds: ['da-lat'], limit: 8 };
+    await useCases.recommendForHome(query);
+
+    price = 2_000_000;
+    vi.advanceTimersByTime(31 * 60_000);
+    const picks = await useCases.recommendForHome(query);
+
+    expect(picks[0]?.hotels[0]?.priceFrom).toBe(2_000_000);
+    expect(listCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('danh mục cũ quá 30 phút mà đọc lại lỗi thì báo lỗi, không trả bản cũ', async () => {
+    vi.useFakeTimers();
+    const listCatalog = vi
+      .fn()
+      .mockResolvedValueOnce(onePage([hotel('a', 'da-lat', 5, 3_000_000)]))
+      .mockRejectedValueOnce(new Error('db down'));
+    const useCases = new HomeRecommendationUseCases({ listCatalog } as unknown as HomeCommerce);
+    const query = { recentPlaceIds: ['da-lat'], limit: 8 };
+    await useCases.recommendForHome(query);
+
+    vi.advanceTimersByTime(31 * 60_000);
+
+    await expect(useCases.recommendForHome(query)).rejects.toThrow('db down');
+  });
 });

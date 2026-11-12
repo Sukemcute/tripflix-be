@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertMediaAllowedForPostType,
   Comment,
   InvalidPostStatusTransitionException,
   InvalidReactionTypeException,
   Post,
+  PostMediaNotAllowedException,
   PostPublishValidationException,
   Reaction,
   UnauthorizedCommentActionException,
@@ -91,6 +93,37 @@ describe('Post Entity Domain Rules', () => {
   it('không thể xuất bản bài khi không có cả media lẫn nội dung chữ', () => {
     const emptyDraft = createTestPost({ mediaIds: [], body: '' });
     expect(() => emptyDraft.publish(authorId, { isVerified: false })).toThrow(PostPublishValidationException);
+  });
+
+  it('bài viết (vlog) không được gắn video khi chỉnh sửa', () => {
+    const vlog = createTestPost({ postType: 'vlog', mediaIds: [] });
+    expect(() => vlog.update(authorId, { mediaIds: ['018d9f10-1234-7000-8000-000000000002'] })).toThrow(
+      PostMediaNotAllowedException,
+    );
+    expect(vlog.mediaIds).toEqual([]);
+  });
+
+  it('bản nháp vlog cũ đã lỡ gắn video thì không xuất bản được', () => {
+    const legacyVlog = createTestPost({ postType: 'vlog' });
+    expect(() => legacyVlog.publish(authorId, { isVerified: false })).toThrow(PostMediaNotAllowedException);
+    expect(legacyVlog.status).toBe('draft');
+  });
+
+  it('vlog chỉ có chữ xuất bản bình thường', () => {
+    const vlog = createTestPost({ postType: 'vlog', mediaIds: [] });
+    vlog.publish(authorId, { isVerified: false });
+    expect(vlog.status).toBe('published');
+  });
+
+  it('Reels không có video thì không xuất bản được', () => {
+    const reel = createTestPost({ postType: 'video', mediaIds: [] });
+    expect(() => reel.publish(authorId, { isVerified: false })).toThrow(PostPublishValidationException);
+  });
+
+  it('assertMediaAllowedForPostType chỉ chặn vlog có media', () => {
+    expect(() => assertMediaAllowedForPostType('vlog', ['m1'])).toThrow(PostMediaNotAllowedException);
+    expect(() => assertMediaAllowedForPostType('vlog', [])).not.toThrow();
+    expect(() => assertMediaAllowedForPostType('video', ['m1'])).not.toThrow();
   });
 
   it('chỉnh sửa bài đăng cập nhật đúng dữ liệu', () => {

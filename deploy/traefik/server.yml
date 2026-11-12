@@ -68,6 +68,13 @@ http:
       middlewares: [redirect-to-apex]
       tls:
         certResolver: letsencrypt
+    admin:
+      rule: Host(`{{ env "ADMIN_HOST" }}`)
+      service: admin
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
 
   services:
     core-api:
@@ -82,3 +89,7 @@ http:
       loadBalancer:
         servers:
           - url: http://web:3100
+    admin:
+      loadBalancer:
+        servers:
+          - url: http://admin:3200

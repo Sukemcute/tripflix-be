@@ -7,6 +7,11 @@ export type HomeCommerce = Pick<CommerceFacade, 'listCatalog'>;
 
 /** Danh mục đổi chậm (seed, admin sửa giá): đọc lại sau mỗi chừng này thời gian. */
 const CATALOG_TTL_MS = 10 * 60_000;
+/**
+ * Tuổi tối đa của danh mục cũ còn được trả khi đang đọc lại ở nền. Quá mức này thì request phải chờ đọc mới
+ * (lỗi thì báo lỗi), để không gợi ý mãi khách sạn đã hết phòng khi nguồn dữ liệu hỏng kéo dài.
+ */
+const CATALOG_MAX_STALE_MS = 30 * 60_000;
 const CATALOG_PAGE_SIZE = 200;
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_CATALOG_PAGES = 50;
@@ -37,12 +42,14 @@ export class HomeRecommendationUseCases {
   /**
    * ponytail: cache trong bộ nhớ từng tiến trình, đủ cho một bản core-api; nhiều bản thì mỗi bản tự đọc lại.
    * Hết hạn thì vẫn trả danh mục cũ ngay và đọc lại ở nền, để không request nào phải chờ cả lần đọc.
+   * Danh mục cũ quá CATALOG_MAX_STALE_MS thì không dùng nữa: request chờ đọc mới, đọc lỗi thì báo lỗi.
    */
   private async loadCandidates(): Promise<HomeCandidate[]> {
-    if (this.cache && Date.now() - this.cache.loadedAt < CATALOG_TTL_MS) return this.cache.candidates;
+    const age = this.cache ? Date.now() - this.cache.loadedAt : Infinity;
+    if (this.cache && age < CATALOG_TTL_MS) return this.cache.candidates;
     const refresh = this.refreshCandidates();
-    if (this.cache) {
-      // Đọc lại lỗi thì giữ danh mục cũ; request sau sẽ thử lại.
+    if (this.cache && age < CATALOG_MAX_STALE_MS) {
+      // Đọc lại lỗi thì tạm giữ danh mục cũ; request sau sẽ thử lại.
       refresh.catch(() => undefined);
       return this.cache.candidates;
     }

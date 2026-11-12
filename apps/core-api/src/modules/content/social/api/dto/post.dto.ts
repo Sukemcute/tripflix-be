@@ -7,6 +7,7 @@ import type {
   TripAttachmentData,
   TripItineraryItem,
 } from '../../../db/schema/index.js';
+import { LIST_POST_TYPE_FILTERS, type ListPostTypeFilter } from './post-type-filter.dto.js';
 
 export class TripItineraryItemDto implements TripItineraryItem {
   @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })
@@ -107,7 +108,11 @@ export class ListPostsQueryDto {
   @ApiPropertyOptional({ description: 'Lọc theo tác giả' })
   author_id?: string;
 
-  @ApiPropertyOptional({ enum: ['video', 'vlog'], description: 'Lọc theo loại bài' })
+  @ApiPropertyOptional({
+    enum: ['vlog'],
+    description:
+      'Lọc theo loại bài. Không truyền thì trả mọi loại (AI service đang dùng). Reels lấy qua /v1/feed; giá trị video vẫn được chấp nhận để client cũ không lỗi nhưng không còn trong hợp đồng',
+  })
   post_type?: PostType;
 
   @ApiPropertyOptional({ description: 'Lọc theo hashtag' })
@@ -126,4 +131,10 @@ export class ListUserPostsQueryDto {
 
   @ApiPropertyOptional({ enum: ['all', 'draft', 'published'], default: 'all', description: 'Trạng thái bài' })
   status?: PostStatus | 'all';
+
+  @ApiPropertyOptional({
+    enum: LIST_POST_TYPE_FILTERS,
+    description: 'Lọc theo loại bài. Không truyền thì trả mọi loại',
+  })
+  post_type?: ListPostTypeFilter;
 }

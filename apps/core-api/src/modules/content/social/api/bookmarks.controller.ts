@@ -3,6 +3,7 @@ import { UseFilters, Body, Controller, Get, Param, Put, Query } from '@nestjs/co
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { ListBookmarksQueryDto, SetBookmarkDto } from './dto/bookmark.dto.js';
+import { parseListPostTypeFilter } from './dto/post-type-filter.dto.js';
 import { SocialPostPageDto, UpdatedBookmarkDto } from './dto/response.dto.js';
 import { BookmarkPostUseCase, ListBookmarksUseCase } from '../application/index.js';
 
@@ -31,11 +32,13 @@ export class BookmarksController {
   @Get('me/bookmarks')
   @ApiOperation({ summary: 'Lấy danh sách bài viết đã lưu của tôi' })
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng đã bookmark', type: SocialPostPageDto })
+  @ApiResponse({ status: 400, description: 'post_type không hợp lệ' })
   async listMyBookmarks(@CurrentUser() user: AuthUser, @Query() query: ListBookmarksQueryDto) {
     return this.listBookmarksUseCase.execute({
       userId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
+      postType: parseListPostTypeFilter(query.post_type),
     });
   }
 }

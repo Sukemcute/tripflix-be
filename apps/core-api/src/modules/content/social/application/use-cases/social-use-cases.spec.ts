@@ -29,6 +29,7 @@ import type { PostRecord, CommentRecord } from '../../../db/schema/index.js';
 import {
   InvalidPostStatusTransitionException,
   InvalidReactionTypeException,
+  PostMediaNotAllowedException,
   PostNotFoundException,
 } from '../../domain/index.js';
 
@@ -157,6 +158,26 @@ describe('Social Application Use Cases', () => {
           status: 'draft',
           isVerified: false,
         }),
+      );
+    });
+
+    it('chặn tạo bài viết (vlog) kèm video và không ghi gì xuống DB', async () => {
+      const useCase = new CreateDraftUseCase(mockPostRepo);
+      await expect(
+        useCase.execute({ authorId, postType: 'vlog', title: 'Bài viết', mediaIds: ['media-1'] }),
+      ).rejects.toBeInstanceOf(PostMediaNotAllowedException);
+      expect(mockPostRepo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ListBookmarksUseCase', () => {
+    it('truyền bộ lọc postType xuống repository để lọc ngay trong câu truy vấn', async () => {
+      mockBookmarkRepo.findUserBookmarks.mockResolvedValue([]);
+      mockPostRepo.findByIds.mockResolvedValue([]);
+      const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo);
+      await useCase.execute({ userId: authorId, postType: 'vlog' });
+      expect(mockBookmarkRepo.findUserBookmarks).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: authorId, postType: 'vlog' }),
       );
     });
   });

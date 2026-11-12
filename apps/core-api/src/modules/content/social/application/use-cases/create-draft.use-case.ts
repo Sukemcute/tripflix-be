@@ -1,3 +1,4 @@
+import { assertMediaAllowedForPostType } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type {
   NewPostRecord,
@@ -27,6 +28,7 @@ export class CreateDraftUseCase {
     if (!title) {
       throw new Error('Tiêu đề bài đăng không được để trống');
     }
+    assertMediaAllowedForPostType(command.postType, command.mediaIds ?? []);
 
     const newPost: NewPostRecord = {
       authorId: command.authorId,

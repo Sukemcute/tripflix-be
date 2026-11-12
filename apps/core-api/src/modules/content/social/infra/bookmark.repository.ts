@@ -2,7 +2,9 @@ import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   bookmarks,
+  posts,
   type BookmarkRecord,
+  type PostType,
 } from '../../db/schema/index.js';
 
 export interface FindUserBookmarksOptions {
@@ -10,6 +12,7 @@ export interface FindUserBookmarksOptions {
   limit: number;
   cursorCreatedAt?: Date;
   cursorId?: string;
+  postType?: PostType;
 }
 
 export class BookmarkRepository {
@@ -64,6 +67,15 @@ export class BookmarkRepository {
    */
   async findUserBookmarks(options: FindUserBookmarksOptions): Promise<BookmarkRecord[]> {
     const conditions = [eq(bookmarks.userId, options.userId)];
+    if (options.postType) {
+      // Lọc ngay trong câu truy vấn; lọc sau khi lấy trang thì trang bị hụt bài.
+      conditions.push(
+        inArray(
+          bookmarks.postId,
+          this.db.select({ id: posts.id }).from(posts).where(eq(posts.postType, options.postType)),
+        ),
+      );
+    }
 
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(

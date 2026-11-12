@@ -34,9 +34,12 @@ S3_MEDIA_BUCKET=tripflix-media-dev
 S3_KEY_PREFIX=staging/
 MEDIA_CDN_URL=https://d399hxccn6y84z.cloudfront.net
 
-# Địa chỉ công khai. DNS của cả hai, và của www.<WEB_HOST>, phải trỏ về máy này trước khi bật gateway.
+# Địa chỉ công khai. DNS của API_HOST, WEB_HOST, www.<WEB_HOST> và ADMIN_HOST phải trỏ về máy này trước khi bật gateway.
 API_HOST=
 WEB_HOST=
+# Back Office. Trống thì dùng admin.<WEB_HOST>.
+ADMIN_HOST=
+# Gồm https://<WEB_HOST> và https://<ADMIN_HOST>, cách nhau bởi dấu phẩy. Thiếu admin thì Back Office không đăng nhập được.
 AUTH_WEB_ORIGINS=
 AUTH_PASSWORD_RESET_URL=
 AUTH_EMAIL_VERIFY_URL=

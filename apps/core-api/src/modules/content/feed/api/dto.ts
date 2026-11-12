@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MEDIA_QUALITY_LEVELS, type MediaAspect, type MediaQualityLevel } from '@tripflix/contracts';
 import { z } from 'zod';
+import { TripAttachmentDto } from '../../social/api/dto/post.dto.js';
 import { FEED_TABS } from '../application/feed.use-cases.js';
 import { decodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 
@@ -24,8 +25,16 @@ export const FeedQuerySchema = z
         return cursor;
       })
       .optional(),
+    // z.coerce.boolean() biến chuỗi "false" thành true nên nhận đúng hai giá trị chữ.
+    saved: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .default(false),
   })
   .superRefine((query, ctx) => {
+    if (query.saved && query.tab === 'hot') {
+      ctx.addIssue({ code: 'custom', path: ['saved'], message: 'saved chỉ dùng với tab for_you' });
+    }
     // Cursor của tab này dùng ở tab kia sẽ cắt danh sách sai vị trí.
     if (query.cursor && (query.tab === 'hot') !== (query.cursor.score !== undefined)) {
       ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor không thuộc tab này' });
@@ -85,6 +94,8 @@ export class FeedCardDto {
   @ApiProperty({ type: String, isArray: true }) tags!: string[];
   @ApiProperty({ type: String, isArray: true, description: 'Chưa có dữ liệu, hiện luôn rỗng' })
   linkedProductIds!: string[];
+  @ApiProperty({ type: TripAttachmentDto, nullable: true, required: false })
+  tripAttachment?: TripAttachmentDto | null;
   @ApiProperty({ type: FeedCountsDto }) counts!: FeedCountsDto;
   @ApiProperty({ type: FeedViewerStateDto, nullable: true, description: 'null với khách' })
   viewerState!: FeedViewerStateDto | null;

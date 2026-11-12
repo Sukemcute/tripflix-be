@@ -1,10 +1,21 @@
 import { hostname } from 'node:os';
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
-import { AccessUserLockedV1Schema, AccessUserRoleChangedV1Schema, type EventEnvelope } from '@tripflix/contracts';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
+import {
+  AccessUserLockedV1Schema,
+  AccessUserRoleChangedV1Schema,
+  type EventEnvelope,
+} from '@tripflix/contracts';
 import { RedisStreamsConsumer, STREAMS } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
+import { InboxRepository } from '../inbox/inbox.repository.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { EventRouter, type ProcessedEvents } from './event-router.js';
@@ -20,7 +31,10 @@ const SESSIONS_REVOKED_SCHEMAS = {
  * không chờ tới lúc access token hết hạn. Sid đã bị chặn nên không kết nối lại bằng token cũ được.
  * Ngắt lại nhiều lần cũng không sao, nên không cần chống trùng.
  */
-export function disconnectRevokedUser(event: EventEnvelope, realtime: Pick<RealtimeService, 'disconnectUser'>): boolean {
+export function disconnectRevokedUser(
+  event: EventEnvelope,
+  realtime: Pick<RealtimeService, 'disconnectUser'>,
+): boolean {
   const schema = SESSIONS_REVOKED_SCHEMAS[event.type as keyof typeof SESSIONS_REVOKED_SCHEMAS];
   if (!schema) return false;
   const payload = schema.safeParse(event.payload);
@@ -43,6 +57,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     @Inject(MAILER) private readonly mailer: Mailer,
     @Inject(PROCESSED_EVENTS) private readonly processed: ProcessedEvents,
     @Inject(RealtimeService) private readonly realtime: RealtimeService,
+    @Inject(InboxRepository) private readonly inbox: InboxRepository,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -53,6 +68,8 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       (message, event) =>
         this.logger.log({ eventId: event.eventId, type: event.type, producer: event.producer }, message),
       { webAppUrl: this.env.WEB_APP_URL },
+      this.inbox,
+      this.realtime,
     );
     // XREADGROUP BLOCK giữ kết nối, nên dùng kết nối riêng.
     this.connection = this.redis.duplicate();

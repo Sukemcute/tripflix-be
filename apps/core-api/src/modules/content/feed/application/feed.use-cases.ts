@@ -1,5 +1,6 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { AccessFacade } from '../../../access/index.js';
+import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 import { calculateHotScore } from '../domain/hot-score.js';
@@ -24,6 +25,7 @@ export interface FeedCard {
   region: string | null;
   tags: string[];
   linkedProductIds: string[];
+  tripAttachment: TripAttachmentData | null;
   counts: { likes: number; comments: number; saves: number; shares: number };
   viewerState: { liked: boolean; saved: boolean } | null;
   reason: { code: string; text: string } | null;
@@ -55,11 +57,16 @@ export class FeedUseCases {
     limit: number;
     after: FeedCursor | null;
     viewerId: string | null;
+    /** Chỉ Reels người xem đã lưu, mới nhất trước; bỏ qua tab và không dùng cache vì là dữ liệu riêng. */
+    isSavedOnly?: boolean;
   }): Promise<FeedPage> {
+    if (query.isSavedOnly && !query.viewerId) throw new Error('Feed đã lưu cần người xem đăng nhập');
     const tab = query.tab === 'hot' ? 'hot' : 'for_you';
-    const shared = query.after
-      ? await this.loadSharedPage(tab, query.limit, query.after)
-      : await this.loadFirstPage(tab, query.limit);
+    const shared = query.isSavedOnly
+      ? await this.loadSharedPage('for_you', query.limit, query.after, query.viewerId)
+      : query.after
+        ? await this.loadSharedPage(tab, query.limit, query.after)
+        : await this.loadFirstPage(tab, query.limit);
     if (!query.viewerId) return shared;
 
     // Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache.
@@ -80,7 +87,8 @@ export class FeedUseCases {
   }
 
   private async loadFirstPage(tab: FeedTab, limit: number): Promise<SharedFeedPage<FeedCard>> {
-    const key = `feed:first-page:v1:${tab}:${limit}`;
+    // v2: thẻ có thêm tripAttachment và feed chỉ còn bài video; không đọc nhầm trang cũ trong cache.
+    const key = `feed:first-page:v2:${tab}:${limit}`;
     const cached = await this.readCache(key);
     if (cached) return cached;
     const inFlight = this.loading.get(key);
@@ -105,10 +113,19 @@ export class FeedUseCases {
     }
   }
 
-  private async loadSharedPage(tab: FeedTab, limit: number, after: FeedCursor | null): Promise<SharedFeedPage<FeedCard>> {
-    const isHot = tab === 'hot';
+  private async loadSharedPage(
+    tab: FeedTab,
+    limit: number,
+    after: FeedCursor | null,
+    savedByUserId: string | null = null,
+  ): Promise<SharedFeedPage<FeedCard>> {
+    const isHot = tab === 'hot' && !savedByUserId;
     const listQuery = { limit: limit + 1, after };
-    const rows = await (isHot ? this.store.listHotPosts(listQuery) : this.store.listPlayablePosts(listQuery));
+    const rows = await (savedByUserId
+      ? this.store.listSavedPlayablePosts({ ...listQuery, userId: savedByUserId })
+      : isHot
+        ? this.store.listHotPosts(listQuery)
+        : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, limit);
     const [playback, authorNames] = await Promise.all([
       this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)),
@@ -140,6 +157,15 @@ export class FeedUseCases {
   }
 }
 
+function maskTripAttachment(attachment: TripAttachmentData | null): TripAttachmentData | null {
+  if (!attachment) return null;
+  const { bookingId: _bookingId, ...rest } = attachment;
+  return {
+    ...rest,
+    priceDisclaimer: attachment.priceDisclaimer ?? 'Giá chỉ mang tính chất tham khảo',
+  };
+}
+
 function buildCard(
   row: FeedPostRow,
   video: PlaybackInfo,
@@ -156,6 +182,7 @@ function buildCard(
     region: null,
     tags: row.hashtags,
     linkedProductIds: [],
+    tripAttachment: maskTripAttachment(row.tripAttachment),
     counts: {
       likes: row.reactionTotal,
       comments: row.commentCount,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { AuthUser } from '@tripflix/auth';
 import { PostNotFoundException } from '../domain/errors.js';
 import {
@@ -44,6 +44,21 @@ describe('Social API Controllers', () => {
       mockListUserPosts as any,
       mockTrackShare as any,
     );
+
+    it('listMyPosts truyền post_type=vlog xuống use case', async () => {
+      await controller.listMyPosts(mockUser, { post_type: 'vlog' });
+      expect(mockListUserPosts.execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ authorId: mockUser.userId, postType: 'vlog' }),
+      );
+    });
+
+    it('listMyPosts từ chối post_type ngoài vlog bằng 400', async () => {
+      mockListUserPosts.execute.mockClear();
+      await expect(controller.listMyPosts(mockUser, { post_type: 'video' as never })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockListUserPosts.execute).not.toHaveBeenCalled();
+    });
 
     it('createDraft nên gọi createDraftUseCase', async () => {
       const res = await controller.createDraft(mockUser, {
@@ -244,6 +259,21 @@ describe('Social API Controllers', () => {
         limit: 20,
         cursor: undefined,
       });
+    });
+
+    it('listMyBookmarks truyền post_type=vlog xuống use case', async () => {
+      await controller.listMyBookmarks(mockUser, { post_type: 'vlog' });
+      expect(mockListBookmarks.execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ userId: mockUser.userId, postType: 'vlog' }),
+      );
+    });
+
+    it('listMyBookmarks từ chối post_type ngoài vlog bằng 400', async () => {
+      mockListBookmarks.execute.mockClear();
+      await expect(controller.listMyBookmarks(mockUser, { post_type: 'video' as never })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockListBookmarks.execute).not.toHaveBeenCalled();
     });
   });
 
