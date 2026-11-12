@@ -81,10 +81,11 @@ export class DrizzleRecommendStore implements RecommendStore {
     }
   }
 
-  async replacePosts(posts: RecommendPostRow[]): Promise<void> {
+  async replacePosts(posts: RecommendPostRow[]): Promise<boolean> {
+    // content tạm rỗng (reseed) thì không xoá sạch metadata: bỏ lượt.
+    if (!posts.length) return false;
     await this.db.transaction(async (tx) => {
-      const ids = posts.map((p) => p.postId);
-      await tx.delete(recommendPosts).where(ids.length ? notInArray(recommendPosts.postId, ids) : undefined);
+      await tx.delete(recommendPosts).where(notInArray(recommendPosts.postId, posts.map((p) => p.postId)));
       for (const part of chunks(posts)) {
         await tx
           .insert(recommendPosts)
@@ -103,6 +104,7 @@ export class DrizzleRecommendStore implements RecommendStore {
           });
       }
     });
+    return true;
   }
 
   async countPostInteractions(now: Date): Promise<InteractionCounts> {
@@ -230,7 +232,7 @@ export class DrizzleRecommendStore implements RecommendStore {
     return row?.features ?? null;
   }
 
-  async listInteractedPostIds(userId: string): Promise<string[]> {
+  async listInteractedPostIds(userId: string, now: Date): Promise<string[]> {
     const rows = await this.db
       .selectDistinct({ id: recommendInteractions.targetId })
       .from(recommendInteractions)
@@ -240,6 +242,7 @@ export class DrizzleRecommendStore implements RecommendStore {
           eq(recommendInteractions.actorId, userId),
           eq(recommendInteractions.targetType, 'post'),
           eq(recommendInteractions.isRemoved, false),
+          lte(recommendInteractions.occurredAt, now),
         ),
       );
     return rows.flatMap((r) => (r.id ? [r.id] : []));
@@ -266,8 +269,10 @@ export class DrizzleRecommendStore implements RecommendStore {
       eq(recommendPostScores.builder, builder),
       eq(recommendPostScores.version, version),
     );
+    // hot lọc post_type trên bảng điểm để dùng index (builder, version, post_type, score desc).
+    const postTypeColumn = source === 'hot' ? recommendPostScores.postType : recommendPosts.postType;
     const where = and(
-      q.postType ? eq(recommendPosts.postType, q.postType) : undefined,
+      q.postType ? eq(postTypeColumn, q.postType) : undefined,
       q.excludePostIds.length ? notInArray(recommendPosts.postId, q.excludePostIds) : undefined,
       lte(recommendPosts.publishedAt, q.now),
       publishedAfter ? gt(recommendPosts.publishedAt, publishedAfter) : undefined,

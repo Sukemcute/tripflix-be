@@ -32,8 +32,8 @@ export interface RecommendStore {
   // Bộ điều phối
   /** Chạy fn khi giữ được khoá advisory `name`; worker khác đang giữ thì trả null (bỏ lượt). */
   withLock<T>(name: string, fn: () => Promise<T>): Promise<T | null>;
-  /** Thay toàn bộ recommend_posts bằng danh sách bài đang hiện. */
-  replacePosts(posts: RecommendPostRow[]): Promise<void>;
+  /** Thay toàn bộ recommend_posts bằng danh sách bài đang hiện. Danh sách rỗng thì không xoá gì, trả false (bỏ lượt). */
+  replacePosts(posts: RecommendPostRow[]): Promise<boolean>;
   /** Đếm tương tác theo bài, 30 ngày và 24 giờ, bỏ is_removed, chỉ occurred_at ≤ now. */
   countPostInteractions(now: Date): Promise<InteractionCounts>;
   /** Thay toàn bộ điểm của một post builder (một lô gồm mọi bài). */
@@ -51,7 +51,7 @@ export interface RecommendStore {
   listActiveAlgos(): Promise<AlgoRow[]>;
   findUserFeatures(builderKey: string, userId: string): Promise<Record<string, unknown> | null>;
   /** Bài người dùng đã tương tác (kể cả bài của chính họ). */
-  listInteractedPostIds(userId: string): Promise<string[]>;
+  listInteractedPostIds(userId: string, now: Date): Promise<string[]>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */
   listHotCandidates(q: CandidateQuery): Promise<Candidate[]>;
   /** Bài đăng trong `hours` giờ tới now, mới nhất trước. */

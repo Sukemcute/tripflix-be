@@ -114,8 +114,13 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(fresh).toEqual([expect.objectContaining({ postId: ids[2], score: 0, source: 'fresh', tags: ['dalat'] })]);
     expect((await store.listHotCandidates({ ...q, excludePostIds: [ids[1]!] })).map((c) => c.postId)).toEqual([ids[0]]);
 
-    await store.replacePosts([]);
-    expect(await store.listExplorePool({ ...q, days: 30 })).toEqual([]);
+    // post_type của hot đọc ở bảng điểm (index); đổi loại ở bảng điểm thì lọc theo đó.
+    await pool.query(`update discovery.recommend_post_scores set post_type = 'vlog' where post_id = $1`, [ids[0]]);
+    expect((await store.listHotCandidates({ ...q, postType: 'vlog' })).map((c) => c.postId)).toEqual([ids[0]]);
+
+    // content tạm rỗng: không xoá sạch metadata.
+    expect(await store.replacePosts([])).toBe(false);
+    expect(await store.listExplorePool({ ...q, days: 30 })).toHaveLength(3);
   });
 
   it('dòng của người dùng, bài đã tương tác, đặc trưng người dùng', async () => {
@@ -124,7 +129,10 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.listActiveUserIds(NOW)).toEqual([U]);
     expect(await store.listDirtyUserIds(hoursAgo(-1000))).toEqual([]);
     expect((await store.listUserRows([U], NOW)).map((r) => r.kind).sort()).toEqual(['reaction', 'search']);
-    expect(await store.listInteractedPostIds(U)).toEqual([p]);
+    expect(await store.listInteractedPostIds(U, NOW)).toEqual([p]);
+    // Dòng sau now không tính (đánh giá cuốn theo ngày).
+    await store.upsertInteractions([row({ refId: 'later', targetId: randomUUID(), occurredAt: hoursAgo(-1).toISOString() })], meta());
+    expect(await store.listInteractedPostIds(U, NOW)).toEqual([p]);
     await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { dalat: 1 } } }]);
     await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { bien: 1 } } }]);
     expect(await store.findUserFeatures('tag_affinity@v0', U)).toEqual({ tags: { bien: 1 } });
