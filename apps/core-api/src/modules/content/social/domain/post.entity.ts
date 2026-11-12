@@ -13,6 +13,11 @@ export interface TripItineraryItem {
   title: string;
   location?: string;
   notes?: string;
+  transport?: {
+    mode: 'flight' | 'bus' | 'train' | 'car' | 'other';
+    fromAirport?: string;
+    toAirport?: string;
+  };
 }
 
 export interface TripAttachment {
@@ -201,6 +206,13 @@ export class Post {
         title: item.title,
         location: item.location,
         notes: item.notes,
+        ...(item.transport && {
+          transport: {
+            mode: item.transport.mode,
+            fromAirport: item.transport.fromAirport,
+            toAirport: item.transport.toAirport,
+          },
+        }),
       })),
     };
   }

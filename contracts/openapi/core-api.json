@@ -4934,6 +4934,32 @@
           "hasMore"
         ]
       },
+      "TripTransportDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "flight",
+              "bus",
+              "train",
+              "car",
+              "other"
+            ]
+          },
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "DLI"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
       "TripItineraryItemDto": {
         "type": "object",
         "properties": {
@@ -4956,6 +4982,14 @@
             "type": "string",
             "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
             "description": "Ghi chú"
+          },
+          "transport": {
+            "description": "Phương tiện được chọn khi soạn lộ trình",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripTransportDto"
+              }
+            ]
           }
         },
         "required": [

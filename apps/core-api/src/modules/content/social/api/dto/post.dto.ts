@@ -8,6 +8,17 @@ import type {
   TripItineraryItem,
 } from '../../../db/schema/index.js';
 
+export class TripTransportDto implements NonNullable<TripItineraryItem['transport']> {
+  @ApiProperty({ enum: ['flight', 'bus', 'train', 'car', 'other'] })
+  mode!: NonNullable<TripItineraryItem['transport']>['mode'];
+
+  @ApiPropertyOptional({ example: 'SGN' })
+  fromAirport?: string;
+
+  @ApiPropertyOptional({ example: 'DLI' })
+  toAirport?: string;
+}
+
 export class TripItineraryItemDto implements TripItineraryItem {
   @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })
   day!: number;
@@ -20,6 +31,9 @@ export class TripItineraryItemDto implements TripItineraryItem {
 
   @ApiPropertyOptional({ example: 'Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất', description: 'Ghi chú' })
   notes?: string;
+
+  @ApiPropertyOptional({ type: TripTransportDto, description: 'Phương tiện được chọn khi soạn lộ trình' })
+  transport?: TripTransportDto;
 }
 
 export class TripAttachmentDto implements TripAttachmentData {

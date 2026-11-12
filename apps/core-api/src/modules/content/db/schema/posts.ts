@@ -19,6 +19,11 @@ export interface TripItineraryItem {
   title: string;
   location?: string;
   notes?: string;
+  transport?: {
+    mode: 'flight' | 'bus' | 'train' | 'car' | 'other';
+    fromAirport?: string;
+    toAirport?: string;
+  };
 }
 
 export interface TripAttachmentData {
