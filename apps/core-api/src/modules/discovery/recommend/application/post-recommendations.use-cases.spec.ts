@@ -1,6 +1,6 @@
 import type { Candidate } from '../domain/contracts.js';
 import type { AlgoRow } from '../domain/registry.js';
-import type { CandidateQuery, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
+import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
 import { InvalidRecommendCursorError, PostRecommendationUseCases } from './post-recommendations.use-cases.js';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
@@ -27,6 +27,7 @@ const ALGOS: AlgoRow[] = [
 function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[] } = {}) {
   const hot = Array.from({ length: 30 }, (_, i) => cand(`h${String(i).padStart(2, '0')}`, { score: 1 - i / 100 }));
   hot.push(cand('d1', { score: 0.1, tags: ['dalat'], placeId: 'da-lat' }));
+  hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang' }));
   const fresh = [cand('f1', { score: 0, source: 'fresh' })];
   const explore = Array.from({ length: 10 }, (_, i) => cand(`e0${i}`, { score: 0, source: 'explore' }));
   const without = (xs: Candidate[], q: CandidateQuery) => xs.filter((c) => !q.excludePostIds.includes(c.postId)).slice(0, q.limit);
@@ -38,6 +39,17 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listHotCandidates: vi.fn(async (q: CandidateQuery) => without(hot, q)),
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
+    findPostMetas: vi.fn(async (postIds: string[]) =>
+      postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang' })),
+    ),
+  };
+  /** Bài vừa tương tác: id → lúc (ms), như ZSET 2 giờ trong Redis. */
+  const recentAt = new Map<string, number>();
+  const recent: RecentPostsStore = {
+    list: vi.fn(async (_u: string, until: Date) =>
+      [...recentAt].filter(([, t]) => t <= until.getTime() && t > until.getTime() - 2 * 3600_000).map(([postId, at]) => ({ postId, at })),
+    ),
+    record: vi.fn(async () => undefined),
   };
   /** id → lúc gợi ý (ms), như ZSET trong Redis. */
   const seenAt = new Map<string, number>();
@@ -49,8 +61,8 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
       ids.filter((id) => !opts.hidden?.includes(id)).map((id) => ({ id, postType: 'video', title: id, hashtags: [], coverMediaId: null, authorId: 'a', reactionTotal: 0 })),
     ),
   };
-  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served);
-  return { useCases, store, servedList, servedAdd, seenAt, catalog };
+  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served, recent);
+  return { useCases, store, servedList, servedAdd, seenAt, catalog, recentAt };
 }
 
 const query = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>[0]> = {}) => ({
@@ -156,6 +168,37 @@ describe('PostRecommendationUseCases', () => {
   it('bài đã ẩn sau lần job gần nhất thì bỏ khỏi trang', async () => {
     const { useCases } = setup({ hidden: ['d1'] });
     expect(ids(await useCases.recommend(query()))).not.toContain('d1');
+  });
+
+  it('gu trong phiên: vừa thích bài biển thì lần tải feed sau bài biển lên ngay, không chờ job', async () => {
+    const { useCases, recentAt } = setup();
+    expect(ids(await useCases.recommend(query()))).not.toContain('b1');
+    recentAt.set('liked-beach', NOW.getTime() - 60_000);
+    const page = await useCases.recommend(query());
+    expect(ids(page).slice(0, 2)).toEqual(['d1', 'b1']);
+    expect(page.items[1]!.reason.code).not.toBe('trending');
+  });
+
+  it('gu trong phiên giảm dần: thích từ 90 phút trước thì gần như hết tác dụng', async () => {
+    const { useCases, recentAt } = setup();
+    recentAt.set('liked-beach', NOW.getTime() - 90 * 60_000);
+    expect(ids(await useCases.recommend(query()))).not.toContain('b1');
+  });
+
+  it('gu trong phiên chốt theo trang đầu: thích giữa chừng không làm trang sau xô lệch', async () => {
+    const { useCases, recentAt } = setup();
+    const first = await useCases.recommend(query());
+    const expected = ids(await setup().useCases.recommend(query({ cursor: first.nextCursor })));
+    recentAt.set('liked-beach', NOW.getTime() + 30_000);
+    const second = await useCases.recommend(query({ cursor: first.nextCursor, now: new Date(NOW.getTime() + 60_000) }));
+    expect(ids(second)).toEqual(expected);
+  });
+
+  it('trending không đọc gu trong phiên', async () => {
+    const { useCases, recentAt, store } = setup();
+    recentAt.set('liked-beach', NOW.getTime() - 60_000);
+    await useCases.recommend(query({ mode: 'trending' }));
+    expect(store.findPostMetas).not.toHaveBeenCalled();
   });
 
   it('cursor không do server cấp → lỗi', async () => {

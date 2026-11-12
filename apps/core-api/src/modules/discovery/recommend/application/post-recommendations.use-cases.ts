@@ -2,11 +2,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domain/candidates.js';
 import type { CandidateSource, RankedItem } from '../domain/contracts.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
+import { blendSessionTaste } from '../domain/session-taste.js';
 import {
+  RECENT_POSTS_STORE,
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   SERVED_STORE,
   type RecommendCardPost,
+  type RecentPostsStore,
   type RecommendCatalog,
   type RecommendStore,
   type ServedStore,
@@ -91,6 +94,7 @@ export class PostRecommendationUseCases {
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
     @Inject(RECOMMEND_CATALOG) private readonly catalog: RecommendCatalog,
     @Inject(SERVED_STORE) private readonly served: ServedStore,
+    @Inject(RECENT_POSTS_STORE) private readonly recentPosts: RecentPostsStore,
   ) {}
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
@@ -103,14 +107,18 @@ export class PostRecommendationUseCases {
     const offset = cursor?.offset ?? 0;
     // Mốc "phiên trước" cố định từ trang đầu: cả phiên đẩy xuống cùng một tập bài nên trang không xô lệch.
     const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
+    // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
+    const sessionAt = seenBefore + SESSION_MS;
 
-    const [interacted, seenIds, userFeatures] = q.userId
+    const [interacted, seenIds, longTaste, recent] = q.userId
       ? await Promise.all([
           this.store.listInteractedPostIds(q.userId, now),
           this.listSeen(q.userId, new Date(seenBefore)),
           this.store.findUserFeatures(algo.userBuilder.key, q.userId),
+          algo.userBuilder.key === 'tag_affinity@v0' ? this.listRecent(q.userId, new Date(sessionAt)) : [],
         ])
-      : [[], [], null];
+      : [[], [], null, []];
+    const userFeatures = await this.withSessionTaste(longTaste, recent, sessionAt);
     const seen = new Set(seenIds);
     const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: interacted, now };
     const [hot, fresh] = await Promise.all([
@@ -192,6 +200,30 @@ export class PostRecommendationUseCases {
       this.logger.warn({ err }, 'Đọc bài đã phục vụ lỗi (Redis), bỏ đẩy bài đã xem xuống lượt này');
       return [];
     }
+  }
+
+  /** Redis lỗi thì bỏ gu trong phiên, vẫn dùng gu dài hạn. */
+  private async listRecent(userId: string, until: Date): Promise<Array<{ postId: string; at: number }>> {
+    try {
+      return await this.recentPosts.list(userId, until);
+    } catch (err) {
+      this.logger.warn({ err }, 'Đọc bài vừa tương tác lỗi (Redis), bỏ gu trong phiên lượt này');
+      return [];
+    }
+  }
+
+  private async withSessionTaste(
+    longTaste: Record<string, unknown> | null,
+    recent: Array<{ postId: string; at: number }>,
+    sessionAt: number,
+  ): Promise<Record<string, unknown> | null> {
+    if (!recent.length) return longTaste;
+    const metas = new Map((await this.store.findPostMetas(recent.map((r) => r.postId))).map((m) => [m.postId, m]));
+    const withMeta = recent.flatMap((r) => {
+      const meta = metas.get(r.postId);
+      return meta ? [{ meta, at: r.at }] : [];
+    });
+    return blendSessionTaste(longTaste, withMeta, sessionAt);
   }
 
   private async recordSeen(userId: string, postIds: string[], at: Date): Promise<void> {

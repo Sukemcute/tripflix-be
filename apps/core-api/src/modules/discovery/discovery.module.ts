@@ -11,9 +11,10 @@ import { PostRecommendationsController } from './recommend/api/post-recommendati
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
-import { RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
+import { RECENT_POSTS_STORE, RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
+import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
@@ -103,6 +104,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: recommendCatalog },
     RecommendIngestUseCases,
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
+    { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
     BuildFeaturesUseCases,
     PostRecommendationUseCases,
     BuildFeaturesJob,

@@ -8,6 +8,7 @@ import { Redis } from 'ioredis';
 import type pg from 'pg';
 import type { CoreEnv } from '../../../platform/env.js';
 import { RecommendIngestUseCases } from '../recommend/application/ingest.use-cases.js';
+import { RedisRecentPostsStore } from '../recommend/infra/redis-recent-posts.store.js';
 import type { RecommendStore } from '../recommend/application/ports.js';
 import { DrizzleRecommendStore } from '../recommend/infra/drizzle-recommend.store.js';
 import type { ExploreUseCases } from '../search/application/explore.use-cases.js';
@@ -66,7 +67,7 @@ describe('DiscoveryEventsConsumer trên Redis + Postgres thật', () => {
       { APP_ROLE: 'api' } as CoreEnv,
       redis,
       { dropHidden } as unknown as ExploreUseCases,
-      new RecommendIngestUseCases(store),
+      new RecommendIngestUseCases(store, new RedisRecentPostsStore(redis)),
     );
     streams = new RedisStreamsConsumer({
       redis,
@@ -104,6 +105,8 @@ describe('DiscoveryEventsConsumer trên Redis + Postgres thật', () => {
     expect(await pending()).toBe(0);
     expect(await rows()).toEqual([{ is_removed: false, detail: { type: 'love' } }]);
     expect(dropHidden).toHaveBeenCalledTimes(1);
+    // Gu trong phiên: bài vừa thả cảm xúc vào Redis với điểm = lúc tương tác.
+    expect(await redis.zrange(`discovery:recommend:recent:${U}`, '0', '-1', 'WITHSCORES')).toEqual([P, String(Date.parse('2026-11-12T10:00:00.000Z'))]);
   });
 
   it('sự kiện cũ đến sau không đè dòng mới; gỡ mới hơn thì ghi đè', async () => {
@@ -114,6 +117,7 @@ describe('DiscoveryEventsConsumer trên Redis + Postgres thật', () => {
     await bus.publish(STREAMS.content, reaction(null, '2026-11-12T11:00:00.000Z'));
     await streams.pollOnce();
     expect(await rows()).toEqual([{ is_removed: true, detail: { type: null } }]);
+    expect(await redis.zcard(`discovery:recommend:recent:${U}`)).toBe(0);
   });
 
   it('đọc cả commerce, access, discovery trong cùng group', async () => {

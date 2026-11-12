@@ -9,7 +9,7 @@ import {
   recommendUserFeatures,
 } from '../../db/schema/index.js';
 import type { CandidateQuery, InteractionCounts, RecommendPostRow, RecommendStore } from '../application/ports.js';
-import { splitKey, type Candidate, type CandidateSource, type Kind, type RawRow } from '../domain/contracts.js';
+import { splitKey, type Candidate, type CandidateSource, type Kind, type PostMeta, type RawRow } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 
 const CHUNK = 1000;
@@ -246,6 +246,12 @@ export class DrizzleRecommendStore implements RecommendStore {
         ),
       );
     return rows.flatMap((r) => (r.id ? [r.id] : []));
+  }
+
+  async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
+    if (!postIds.length) return [];
+    const { postId, authorId, postType, tags, placeId } = recommendPosts;
+    return this.db.select({ postId, authorId, postType, tags, placeId }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
   }
 
   listHotCandidates(q: CandidateQuery) {

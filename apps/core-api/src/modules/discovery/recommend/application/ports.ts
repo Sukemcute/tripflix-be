@@ -48,6 +48,15 @@ export interface ServedStore {
   add(userId: string, postIds: string[], at: Date): Promise<void>;
 }
 
+export const RECENT_POSTS_STORE = Symbol('RECENT_POSTS_STORE');
+
+/** Bài người dùng vừa tương tác (gu trong phiên, ≤ 20 bài, 2 giờ). Thật: Redis. Mất thì job 10 phút vẫn tính đủ. */
+export interface RecentPostsStore {
+  /** Bài tương tác trong 2 giờ tới `until`, kèm lúc tương tác (ms). */
+  list(userId: string, until: Date): Promise<Array<{ postId: string; at: number }>>;
+  record(userId: string, change: { add: Array<{ postId: string; at: number }>; remove: string[] }): Promise<void>;
+}
+
 export interface RecommendPostRow extends PostMeta {
   isVerified: boolean;
   publishedAt: Date;
@@ -96,6 +105,8 @@ export interface RecommendStore {
   findUserFeatures(builderKey: string, userId: string): Promise<Record<string, unknown> | null>;
   /** Bài người dùng đã tương tác (kể cả bài của chính họ). */
   listInteractedPostIds(userId: string, now: Date): Promise<string[]>;
+  /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
+  findPostMetas(postIds: string[]): Promise<PostMeta[]>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */
   listHotCandidates(q: CandidateQuery): Promise<Candidate[]>;
   /** Bài đăng trong `hours` giờ tới now, mới nhất trước. */
