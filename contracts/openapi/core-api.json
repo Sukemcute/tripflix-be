@@ -3021,6 +3021,11 @@
             "description": "Thiếu hoặc sai tham số, nơi không tồn tại, ngày nhận phòng trước hôm nay, ở quá số đêm cho phép"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Khách sạn còn phòng ở một nơi cho ngày đã chọn (trang kết quả web OTA)",
         "tags": [
           "discovery"
@@ -3057,6 +3062,11 @@
             "description": "`q` rỗng hoặc dài hơn 200 ký tự, `loc` sai"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Tìm khám phá bằng câu tự nhiên, kết quả chia theo vùng (Ở đâu, Lộ trình, Bài viết, Video...)",
         "tags": [
           "discovery"
@@ -3093,6 +3103,11 @@
             "description": "`q` rỗng hoặc dài hơn 200 ký tự, `postType`, `cursor`, `limit` sai"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang",
         "tags": [
           "discovery"
@@ -3139,6 +3154,77 @@
           }
         },
         "summary": "Gợi ý điểm đến và khách sạn deal hời cho trang chủ web",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/recommendations/posts": {
+      "get": {
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không trả bài đã tương tác. Người đăng nhập: bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài) bị đẩy xuống cuối, không bị bỏ; gọi lại cùng cursor ra cùng trang.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "operationId": "PostRecommendationsController_recommendPosts",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 20",
+            "schema": {
+              "example": 20
+            }
+          },
+          {
+            "name": "postType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "video",
+                "vlog"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "for_you",
+                "trending"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostRecommendationsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số sai hoặc `cursor` không do server cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gợi ý bài viết cho bạn hoặc đang thịnh hành",
         "tags": [
           "discovery"
         ]
@@ -8040,6 +8126,131 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "RecommendedPostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "postType": {
+            "type": "string",
+            "enum": [
+              "video",
+              "vlog"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "example": "Săn mây Đà Lạt"
+          },
+          "hashtags": {
+            "example": [
+              "dalat"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reactionTotal": {
+            "type": "number",
+            "example": 120
+          }
+        },
+        "required": [
+          "id",
+          "postType",
+          "title",
+          "hashtags",
+          "coverMediaId",
+          "authorId",
+          "reactionTotal"
+        ]
+      },
+      "RecommendReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "matches_place",
+              "matches_interest",
+              "trending",
+              "explore"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "example": "Vì bạn quan tâm Đà Lạt",
+            "description": "Câu hiện dưới thẻ, tiếng Việt"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "PostRecommendationItemDto": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "$ref": "#/components/schemas/RecommendedPostDto"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "taste",
+              "fresh",
+              "explore"
+            ],
+            "description": "Nguồn ứng viên: hot (điểm nóng), fresh (đăng trong 48 giờ), explore (~5% ngẫu nhiên để đo)"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RecommendReasonDto"
+          }
+        },
+        "required": [
+          "post",
+          "source",
+          "reason"
+        ]
+      },
+      "PostRecommendationsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostRecommendationItemDto"
+            }
+          },
+          "algo": {
+            "type": "string",
+            "example": "for_you",
+            "description": "Thuật toán đã dùng (khách hoặc cấu hình lỗi thì là trending)"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Gửi lại ở `cursor` để lấy trang sau; null là hết"
+          }
+        },
+        "required": [
+          "items",
+          "algo",
+          "nextCursor"
         ]
       },
       "IndexJobLogDto": {
