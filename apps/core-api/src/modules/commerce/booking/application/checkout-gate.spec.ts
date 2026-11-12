@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { CommerceError } from '../../inventory/domain/errors.js';
 import { MemoryCommerceStore } from '../../inventory/infra/memory/memory-commerce.store.js';
 import { CheckoutUseCases, type CheckoutInput, type CheckoutView } from './checkout.use-cases.js';
 import type { OrderStore } from './ports.js';
@@ -17,6 +16,9 @@ function createPendingHold() {
   });
   return { promise, resolve, reject };
 }
+
+/** Chờ cổng giữ chỗ (async) cho các lượt vào. */
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 function createInput(productId = 'room-1', checkIn = '2026-12-01'): CheckoutInput {
   return { adults: 1, items: [{ productId, checkIn, checkOut: '2026-12-03', qty: 1 }] };
@@ -52,21 +54,38 @@ function setup(holdPromise: Promise<string>) {
 }
 
 describe('CheckoutUseCases: cổng giữ chỗ', () => {
-  it('lượt thứ tư cùng ô bị từ chối trước khi giữ chỗ', async () => {
+  it('lượt thứ tư cùng ô xếp hàng, không gọi database, được vào khi có lượt xong', async () => {
+    const pending = createPendingHold();
+    const { useCases, hold, view } = setup(pending.promise);
+    const input = createInput();
+    const running = Array.from({ length: 3 }, (_, index) => useCases.checkout(`user-${index}`, input));
+    const queued = useCases.checkout('user-4', input);
+    await flush();
+    expect(hold).toHaveBeenCalledTimes(3);
+
+    pending.resolve('order-1');
+    await expect(queued).resolves.toEqual(view);
+    expect(hold).toHaveBeenCalledTimes(4);
+    await Promise.allSettled(running);
+  });
+
+  it('chờ quá 2 giây thì trả 409 LOCK_BUSY, không giữ chỗ', async () => {
+    vi.useFakeTimers();
     const pending = createPendingHold();
     const { useCases, hold, getCheckout } = setup(pending.promise);
     const input = createInput();
     const running = Array.from({ length: 3 }, (_, index) => useCases.checkout(`user-${index}`, input));
     const blocked = useCases.checkout('user-4', input);
-
+    const outcome = expect(blocked).rejects.toMatchObject({ code: 'conflict', field: 'items', details: { reason: 'LOCK_BUSY' } });
     try {
+      await vi.advanceTimersByTimeAsync(2_000);
+      await outcome;
       expect(hold).toHaveBeenCalledTimes(3);
-      await expect(blocked).rejects.toBeInstanceOf(CommerceError);
-      await expect(blocked).rejects.toMatchObject({ code: 'conflict', field: 'items', details: { reason: 'LOCK_BUSY' } });
       expect(getCheckout).not.toHaveBeenCalled();
     } finally {
+      vi.useRealTimers();
       pending.resolve('order-1');
-      await Promise.allSettled([...running, blocked]);
+      await Promise.allSettled(running);
     }
   });
 
@@ -79,6 +98,7 @@ describe('CheckoutUseCases: cổng giữ chỗ', () => {
     const running = Array.from({ length: 3 }, (_, index) => useCases.checkout(`user-${index}`, createInput()));
     const otherInput = createInput(productId, checkIn);
     const other = useCases.checkout('user-other', otherInput);
+    await flush();
 
     try {
       expect(hold).toHaveBeenCalledTimes(4);
