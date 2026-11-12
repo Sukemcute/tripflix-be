@@ -493,7 +493,9 @@ describe('Social Application Use Cases', () => {
         mockCommentRepo.findById.mockResolvedValue({ ...commentRecord, id: parentCommentId, authorId, parentCommentId: null });
       }
 
-      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
+        getDisplayNames: async () => new Map([[otherUserId, 'Trang']]),
+      });
 
       const result = await useCase.execute({
         postId,
@@ -513,6 +515,7 @@ describe('Social Application Use Cases', () => {
             postId,
             authorId: otherUserId,
             parentCommentAuthorId: parentCommentId ? authorId : null,
+            authorDisplayName: 'Trang',
           }),
         }),
       );

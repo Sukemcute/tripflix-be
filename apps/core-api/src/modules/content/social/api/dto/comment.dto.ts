@@ -25,6 +25,9 @@ export class ListCommentsQueryDto {
   @ApiPropertyOptional({ default: 20, description: 'Số lượng bình luận (mặc định tối đa 50, chế độ phẳng tối đa 200)' })
   limit?: number;
 
+  @ApiPropertyOptional({ format: 'uuid', description: 'Chỉ lấy bình luận chỉ định và bình luận cha nếu có' })
+  focusCommentId?: string;
+
   @ApiPropertyOptional({ description: 'Keyset cursor' })
   cursor?: string;
 

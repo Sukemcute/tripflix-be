@@ -1483,6 +1483,16 @@
             }
           },
           {
+            "name": "focusCommentId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy bình luận chỉ định và bình luận cha nếu có",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",

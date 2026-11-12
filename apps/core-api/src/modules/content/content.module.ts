@@ -232,9 +232,10 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: AddCommentUseCase,
-      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX],
-      useFactory: (postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox) =>
-        new AddCommentUseCase(postRepo, commentRepo, outbox),
+      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX, USER_DIRECTORY_PORT],
+      useFactory: (
+        postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox, userDirectory: UserDirectoryPort,
+      ) => new AddCommentUseCase(postRepo, commentRepo, outbox, userDirectory),
     },
     {
       provide: EditCommentUseCase,

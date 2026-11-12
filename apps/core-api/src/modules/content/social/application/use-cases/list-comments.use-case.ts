@@ -1,4 +1,5 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
+import { z } from 'zod';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { CommentReactionRepository } from '../../infra/comment-reaction.repository.js';
@@ -11,6 +12,7 @@ export interface ListCommentsQuery {
   limit?: number;
   cursor?: string;
   parentCommentId?: string;
+  focusCommentId?: string;
   flat?: boolean;
   viewerId?: string;
   isStaff?: boolean;
@@ -56,6 +58,11 @@ export class ListCommentsUseCase {
       throw new PostNotFoundException(query.postId);
     }
 
+    if (query.focusCommentId !== undefined) {
+      const records = await this.findFocusThread(query.postId, query.focusCommentId);
+      return { items: await this.enrich(records, query.viewerId), nextCursor: null, total: records.length };
+    }
+
     // Khi bật chế độ flat (cho AI / Indexing / Web / Mobile), cho phép trang tối đa 200 phần tử để giảm I/O
     const maxLimit = query.flat ? 200 : 50;
     const limit = resolveLimit(query.limit, maxLimit);
@@ -82,11 +89,26 @@ export class ListCommentsUseCase {
     const lastItem = rawItems[rawItems.length - 1];
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id) : null;
 
+    return { items: await this.enrich(rawItems, query.viewerId), nextCursor, total };
+  }
+
+  private async findFocusThread(postId: string, commentId: string): Promise<CommentRecord[]> {
+    if (!z.uuid().safeParse(commentId).success) return [];
+    const comment = await this.commentRepository.findById(commentId);
+    if (!comment || comment.postId !== postId || comment.deletedAt || comment.status !== 'visible') return [];
+    if (!comment.parentCommentId) return [comment];
+    const parent = await this.commentRepository.findById(comment.parentCommentId);
+    if (!parent || parent.postId !== postId || parent.deletedAt || parent.status !== 'visible') return [];
+    return [parent, comment];
+  }
+
+  private async enrich(rawItems: CommentRecord[], viewerId?: string): Promise<EnrichedCommentItem[]> {
+    if (!rawItems.length) return [];
     let likedIds = new Set<string>();
-    if (query.viewerId && rawItems.length > 0 && this.commentReactionRepository) {
+    if (viewerId && this.commentReactionRepository) {
       const commentIds = rawItems.map((c) => c.id);
       likedIds = await this.commentReactionRepository.findLikedCommentIdsByUser(
-        query.viewerId,
+        viewerId,
         commentIds,
       );
     }
@@ -96,7 +118,7 @@ export class ListCommentsUseCase {
 
     // Tên tác giả chỉ để hiển thị: lỗi tra cứu không được làm hỏng danh sách bình luận.
     let authorNames = new Map<string, string>();
-    if (rawItems.length > 0 && this.userDirectory) {
+    if (this.userDirectory) {
       try {
         authorNames = await this.userDirectory.getDisplayNames(rawItems.map((c) => c.authorId));
       } catch {
@@ -104,18 +126,12 @@ export class ListCommentsUseCase {
       }
     }
 
-    const items: EnrichedCommentItem[] = rawItems.map((comment) => ({
+    return rawItems.map((comment) => ({
       ...comment,
       authorName: authorNames.get(comment.authorId) ?? null,
       likeCount: comment.likeCount ?? 0,
       replyCount: replyCounts.get(comment.id) ?? 0,
       isLiked: likedIds.has(comment.id),
     }));
-
-    return {
-      items,
-      nextCursor,
-      total,
-    };
   }
 }

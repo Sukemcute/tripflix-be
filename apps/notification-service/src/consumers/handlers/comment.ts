@@ -34,6 +34,8 @@ export function createCommentHandlers(options: {
         commentId: comment.commentId,
         postId: comment.postId,
         authorId: comment.authorId,
+        authorDisplayName: comment.authorDisplayName,
+        parentCommentId: comment.parentCommentId,
         eventId: event.eventId,
         occurredAt: event.occurredAt,
         recipients: Array.from(recipients, ([userId, isReplyRecipient]) => ({ userId, isReplyRecipient })),
