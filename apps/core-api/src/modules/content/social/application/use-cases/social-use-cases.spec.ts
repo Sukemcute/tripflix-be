@@ -14,7 +14,9 @@ import {
   GetAdminPostDetailUseCase,
   GetMyReactionUseCase,
   GetPostDetailUseCase,
+  GetPostStatsUseCase,
   ListAdminPostsUseCase,
+  ListBookmarksUseCase,
   ListPostsUseCase,
   PublishPostUseCase,
   SetReactionUseCase,
@@ -24,6 +26,11 @@ import {
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { PostRecord, CommentRecord } from '../../../db/schema/index.js';
+import {
+  InvalidPostStatusTransitionException,
+  InvalidReactionTypeException,
+  PostNotFoundException,
+} from '../../domain/index.js';
 
 describe('Social Application Use Cases', () => {
   beforeAll(async () => {
@@ -896,6 +903,96 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(null);
       const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo);
       await expect(useCase.execute({ postId: 'non-existent' })).rejects.toThrow();
+    });
+  });
+  describe('Bảo vệ quyền riêng tư khi tương tác (TF25)', () => {
+    const privatePost = () => samplePostRecord({ status: 'published', visibility: 'private' });
+
+    it('thống kê bài riêng tư: người lạ nhận 404, tác giả và staff vẫn xem được', async () => {
+      mockPostRepo.findById.mockResolvedValue(privatePost());
+      const useCase = new GetPostStatsUseCase(mockPostRepo);
+
+      await expect(useCase.execute({ postId, viewerId: otherUserId })).rejects.toBeInstanceOf(PostNotFoundException);
+      await expect(useCase.execute({ postId })).rejects.toBeInstanceOf(PostNotFoundException);
+      await expect(useCase.execute({ postId, viewerId: authorId })).resolves.toMatchObject({ postId });
+      await expect(useCase.execute({ postId, viewerId: moderatorId, isStaff: true })).resolves.toMatchObject({ postId });
+    });
+
+    it('thống kê bài đã ẩn: khách nhận 404 như bài không tồn tại', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'hidden' }));
+      const useCase = new GetPostStatsUseCase(mockPostRepo);
+      await expect(useCase.execute({ postId })).rejects.toBeInstanceOf(PostNotFoundException);
+    });
+
+    it('thả cảm xúc vào bài riêng tư của người khác bị 404 và không ghi gì', async () => {
+      mockPostRepo.findById.mockResolvedValue(privatePost());
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
+
+      await expect(useCase.execute({ postId, userId: otherUserId, type: 'like' })).rejects.toBeInstanceOf(
+        PostNotFoundException,
+      );
+      expect(mockReactionRepo.upsert).not.toHaveBeenCalled();
+      expect(mockOutbox.add).not.toHaveBeenCalled();
+    });
+
+    it('loại cảm xúc lạ bị từ chối bằng lỗi loại cảm xúc, không ghi xuống DB', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
+
+      await expect(
+        useCase.execute({ postId, userId: otherUserId, type: 'angry' as never }),
+      ).rejects.toBeInstanceOf(InvalidReactionTypeException);
+      expect(mockReactionRepo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('lưu bài đã ẩn bị 404 và không đổi bộ đếm', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'hidden' }));
+      const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
+
+      await expect(
+        useCase.execute({ postId, userId: otherUserId, isBookmarked: true }),
+      ).rejects.toBeInstanceOf(PostNotFoundException);
+      expect(mockBookmarkRepo.setBookmark).not.toHaveBeenCalled();
+      expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
+    });
+
+    it('danh sách bài công khai không lộ bookingId trong lộ trình', async () => {
+      mockPostRepo.findPublicPosts.mockResolvedValue([samplePostRecord({ status: 'published' })]);
+      const useCase = new ListPostsUseCase(mockPostRepo);
+
+      const result = await useCase.execute({});
+
+      expect(result.items[0]?.tripAttachment).not.toHaveProperty('bookingId');
+      expect(result.items[0]?.tripAttachment?.hotelName).toBe('Vinpearl Phú Quốc');
+    });
+
+    it('danh sách đã lưu bỏ bài riêng tư của người khác, giữ bài riêng tư của chính mình và ẩn bookingId', async () => {
+      const foreignPrivate = samplePostRecord({ id: 'foreign', authorId: otherUserId, status: 'published', visibility: 'private' });
+      const ownPrivate = samplePostRecord({ id: 'own', status: 'published', visibility: 'private' });
+      mockBookmarkRepo.findUserBookmarks.mockResolvedValue([
+        { id: 'b1', postId: 'foreign', userId: authorId, createdAt: new Date() },
+        { id: 'b2', postId: 'own', userId: authorId, createdAt: new Date() },
+      ]);
+      mockPostRepo.findByIds.mockResolvedValue([foreignPrivate, ownPrivate]);
+      const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo);
+
+      const result = await useCase.execute({ userId: authorId });
+
+      expect(result.items.map((item) => item.id)).toEqual(['own']);
+      expect(result.items[0]?.tripAttachment).not.toHaveProperty('bookingId');
+    });
+
+    it('hai lượt xuất bản cùng lúc: lượt sau thấy bài đã đăng trong khoá dòng thì báo xung đột, không đăng lại', async () => {
+      const draft = samplePostRecord();
+      mockPostRepo.findById.mockResolvedValue(draft);
+      mockPostRepo.findByIdForUpdate = vi.fn().mockResolvedValue({ ...draft, status: 'published' });
+      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
+
+      await expect(useCase.execute({ postId, userId: authorId })).rejects.toBeInstanceOf(
+        InvalidPostStatusTransitionException,
+      );
+      expect(mockPostRepo.update).not.toHaveBeenCalled();
+      expect(mockOutbox.add).not.toHaveBeenCalled();
     });
   });
 });
