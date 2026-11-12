@@ -15,6 +15,7 @@ import { RedisStreamsConsumer, STREAMS } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
+import { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
 import { DirectoryRepository } from '../directory/directory.repository.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
@@ -60,6 +61,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     @Inject(RealtimeService) private readonly realtime: RealtimeService,
     @Inject(InboxRepository) private readonly inbox: InboxRepository,
     @Inject(DirectoryRepository) private readonly directory: DirectoryRepository,
+    @Inject(CommentNotificationRepository) private readonly comments: CommentNotificationRepository,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -73,6 +75,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       this.inbox,
       this.realtime,
       this.directory,
+      this.comments,
     );
     // XREADGROUP BLOCK giữ kết nối, nên dùng kết nối riêng.
     this.connection = this.redis.duplicate();

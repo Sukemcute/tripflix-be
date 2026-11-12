@@ -77,7 +77,14 @@ const INITIAL_NOTIFICATION_SCHEMA = `
     );
 `;
 
+const COMMENT_NOTIFICATIONS_SCHEMA = `
+  ALTER TABLE inbox ADD COLUMN comment_id uuid, ADD COLUMN deleted_at timestamptz;
+  CREATE INDEX idx_inbox_comment_id ON inbox (comment_id) WHERE comment_id IS NOT NULL;
+  CREATE TABLE deleted_notification_comments (comment_id uuid PRIMARY KEY, deleted_at timestamptz NOT NULL);
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
+  [3, COMMENT_NOTIFICATIONS_SCHEMA],
 ] as const;

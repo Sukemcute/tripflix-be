@@ -154,6 +154,7 @@ export const ContentCommentCreatedV1Schema = z.object({
   postAuthorId: z.uuid(),
   authorId: z.uuid(),
   parentCommentId: z.uuid().nullable(),
+  parentCommentAuthorId: z.uuid().nullable().optional(),
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
 });

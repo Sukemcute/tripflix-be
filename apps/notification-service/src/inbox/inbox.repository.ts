@@ -105,7 +105,7 @@ export class InboxRepository implements OnModuleInit {
     const result = await this.pool.query<InboxRow & { cursor_created_at: string }>(
       `
       SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-      FROM inbox WHERE user_id = $1
+      FROM inbox WHERE user_id = $1 AND deleted_at IS NULL
         AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
         AND ($5 = 'all' OR ($5 = 'orders' AND type LIKE 'booking.%')
           OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%')))
@@ -126,7 +126,7 @@ export class InboxRepository implements OnModuleInit {
 
   async countUnread(userId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
-      'SELECT count(*) AS count FROM inbox WHERE user_id = $1 AND read_at IS NULL',
+      'SELECT count(*) AS count FROM inbox WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL',
       [userId],
     );
     return Number(result.rows[0]?.count ?? 0);
@@ -134,7 +134,7 @@ export class InboxRepository implements OnModuleInit {
 
   async markRead(userId: string, id: string): Promise<boolean> {
     const result = await this.pool.query(
-      'UPDATE inbox SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND id = $2',
+      'UPDATE inbox SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL',
       [userId, id],
     );
     return (result.rowCount ?? 0) > 0;
@@ -142,7 +142,7 @@ export class InboxRepository implements OnModuleInit {
 
   async markAllRead(userId: string): Promise<number> {
     const result = await this.pool.query(
-      'UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL',
+      'UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL',
       [userId],
     );
     return result.rowCount ?? 0;
@@ -155,7 +155,7 @@ export class InboxRepository implements OnModuleInit {
        ), updated AS (
          UPDATE inbox SET read_at = now()
          FROM boundary
-         WHERE inbox.user_id = $1 AND inbox.read_at IS NULL
+         WHERE inbox.user_id = $1 AND inbox.read_at IS NULL AND inbox.deleted_at IS NULL
            AND (inbox.created_at, inbox.id) <= (boundary.created_at, boundary.id)
        )
        SELECT EXISTS (SELECT 1 FROM boundary) AS found`,
