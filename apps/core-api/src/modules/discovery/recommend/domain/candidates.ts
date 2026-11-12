@@ -16,7 +16,8 @@ export function mergeCandidates(...sources: Candidate[][]): Candidate[] {
   return merged;
 }
 
-export const exploreSlots = (limit: number) => Math.round(limit * EXPLORE_RATE);
+/** Trang nhỏ (web lấy 7 bài) làm tròn 5% ra 0: giữ tối thiểu 1 ô explore để người dùng vẫn gặp bài ngoài gu. */
+export const exploreSlots = (limit: number) => (limit < 2 ? 0 : Math.max(1, Math.round(limit * EXPLORE_RATE)));
 
 const hash = (s: string) => createHash('md5').update(s).digest().readUInt32BE(0);
 

@@ -1,7 +1,7 @@
 import { hotV0, percentile } from './builders/hot.js';
 import { noneV0 } from './builders/none.js';
 import { tagAffinityV0 } from './builders/tag-affinity.js';
-import { interleave, mergeCandidates, pickExplore } from './candidates.js';
+import { exploreSlots, interleave, mergeCandidates, pickExplore } from './candidates.js';
 import type { Candidate, PostBuildItem, RawRow } from './contracts.js';
 import { popularRankerV0, tagAffinityRankerV0 } from './rankers/rankers.js';
 import { BUILDERS, RANKERS, resolveAlgo } from './registry.js';
@@ -45,6 +45,16 @@ const cand = (postId: string, over: Partial<Candidate> = {}): Candidate => ({
   postFeatures: {},
   source: 'hot',
   ...over,
+});
+
+describe('exploreSlots', () => {
+  it.each([
+    [1, 0],
+    [7, 1],
+    [10, 1],
+    [20, 1],
+    [50, 3],
+  ])('limit %i → %i ô explore', (limit, slots) => expect(exploreSlots(limit)).toBe(slots));
 });
 
 describe('percentile', () => {
