@@ -468,7 +468,7 @@ describe('Social Application Use Cases', () => {
   });
 
   describe('Comment Use Cases', () => {
-    it('tạo bình luận tăng commentCount và phát sự kiện outbox', async () => {
+    it.each([undefined, 'parent-1'])('tạo bình luận và phát outbox với parent %s', async (parentCommentId) => {
       const post = samplePostRecord({ status: 'published' });
       const commentRecord: CommentRecord = {
         id: 'comm-1',
@@ -477,7 +477,7 @@ describe('Social Application Use Cases', () => {
         status: 'visible',
         hiddenByActionId: null,
         cascadeRootCommentId: null,
-        parentCommentId: null,
+        parentCommentId: parentCommentId ?? null,
         body: 'Bài viết hay quá!',
         likeCount: 0,
         isEdited: false,
@@ -488,6 +488,9 @@ describe('Social Application Use Cases', () => {
 
       mockPostRepo.findById.mockResolvedValue(post);
       mockCommentRepo.create.mockResolvedValue(commentRecord);
+      if (parentCommentId) {
+        mockCommentRepo.findById.mockResolvedValue({ ...commentRecord, id: parentCommentId, authorId, parentCommentId: null });
+      }
 
       const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
 
@@ -495,6 +498,7 @@ describe('Social Application Use Cases', () => {
         postId,
         authorId: otherUserId,
         body: 'Bài viết hay quá!',
+        ...(parentCommentId ? { parentCommentId } : {}),
       });
 
       expect(result.id).toBe('comm-1');
@@ -507,6 +511,7 @@ describe('Social Application Use Cases', () => {
             commentId: 'comm-1',
             postId,
             authorId: otherUserId,
+            parentCommentAuthorId: parentCommentId ? authorId : null,
           }),
         }),
       );

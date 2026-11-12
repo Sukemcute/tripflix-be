@@ -35,12 +35,14 @@ export class AddCommentUseCase {
     const body = Comment.validateBody(command.body);
 
     // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
+    let parentCommentAuthorId: string | null = null;
     if (command.parentCommentId) {
       const parent = await this.commentRepository.findById(command.parentCommentId);
       if (!parent || parent.postId !== command.postId || parent.deletedAt || parent.status !== 'visible') {
         throw new CommentNotFoundException(command.parentCommentId);
       }
       Comment.validateParentForReply(parent);
+      parentCommentAuthorId = parent.authorId;
     }
 
     const comment = await this.commentRepository.create({
@@ -64,6 +66,7 @@ export class AddCommentUseCase {
         postAuthorId: post.authorId,
         authorId: command.authorId,
         parentCommentId: command.parentCommentId ?? null,
+        parentCommentAuthorId,
         body: comment.body,
         createdAt: comment.createdAt.toISOString(),
       },
