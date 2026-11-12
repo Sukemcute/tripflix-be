@@ -10,6 +10,9 @@ import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
 import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-cases.js';
 import type { ExploreCatalog, ExploreHotel, ExplorePost, ExploreStore } from './ports.js';
+import type { JobRuns } from '../../jobs/job-runs.js';
+
+const passThroughRuns = { track: (_job: string, _trigger: string, fn: () => Promise<unknown>) => fn() } as unknown as JobRuns;
 
 const hotel = (id: string, name: string, province: string, extra: Partial<ExploreHotel> = {}): ExploreHotel => ({
   id,
@@ -179,7 +182,7 @@ describe('ExploreUseCases', () => {
         const { explore } = setup([], plans, hidden);
         const env = { APP_ROLE: 'worker', NODE_ENV: 'test' } as CoreEnv;
         const job = new RebuildExploreIndexJob(
-          { APP_ROLE: 'worker' } as CoreEnv, explore, new IndexHealth(env, {} as Redis),
+          { APP_ROLE: 'worker' } as CoreEnv, explore, new IndexHealth(env, {} as Redis), passThroughRuns,
         );
         const recommend = { ingest: () => Promise.resolve() } as unknown as RecommendIngestUseCases;
         const consumer = new DiscoveryEventsConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore, recommend);

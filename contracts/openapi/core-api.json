@@ -3266,6 +3266,91 @@
         ]
       }
     },
+    "/api/v1/admin/discovery/jobs": {
+      "get": {
+        "operationId": "AdminDiscoveryJobsController_list",
+        "parameters": [
+          {
+            "name": "group",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "search",
+                "recommend"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryJobsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Trạng thái và lịch sử chạy của job tìm kiếm hoặc gợi ý",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
+    "/api/v1/admin/discovery/jobs/{job}/run": {
+      "post": {
+        "operationId": "AdminDiscoveryJobsController_run",
+        "parameters": [
+          {
+            "name": "job",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "explore",
+                "suggest",
+                "recommend_build",
+                "recommend_purge"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunJobDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có job này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chạy ngay một job (không chờ xong); theo dõi bằng GET",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
     "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
@@ -8434,6 +8519,271 @@
         "required": [
           "checkedAt",
           "workers"
+        ]
+      },
+      "JobSummaryDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Số mục trong chỉ mục (explore, suggest)"
+          },
+          "posts": {
+            "type": "number",
+            "description": "Số bài đã tính điểm (recommend_build)"
+          },
+          "users": {
+            "type": "number",
+            "description": "Số người đã tính gu (recommend_build)"
+          },
+          "deleted": {
+            "type": "number",
+            "description": "Số dòng thô đã xoá (recommend_purge)"
+          },
+          "failedBuilders": {
+            "description": "Builder lỗi trong lượt (recommend_build)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "JobRunDto": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "schedule",
+              "manual"
+            ]
+          },
+          "startedAt": {
+            "type": "number",
+            "description": "epoch ms"
+          },
+          "finishedAt": {
+            "type": "number",
+            "nullable": true,
+            "description": "epoch ms"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "skipped",
+              "failed"
+            ]
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobSummaryDto"
+              }
+            ]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "runId",
+          "trigger",
+          "startedAt",
+          "finishedAt",
+          "outcome",
+          "durationMs",
+          "summary",
+          "error"
+        ]
+      },
+      "DiscoveryJobDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest",
+              "recommend_build",
+              "recommend_purge"
+            ]
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "search",
+              "recommend"
+            ]
+          },
+          "intervalMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chu kỳ tự chạy (ms); null = chỉ chạy lúc khởi động"
+          },
+          "isRunning": {
+            "type": "boolean",
+            "description": "Đang chạy trên process trả lời request này"
+          },
+          "runs": {
+            "description": "20 lần chạy gần nhất, mới nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobRunDto"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "group",
+          "intervalMs",
+          "isRunning",
+          "runs"
+        ]
+      },
+      "RecommendAlgoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "postBuilder": {
+            "type": "string"
+          },
+          "userBuilder": {
+            "type": "string"
+          },
+          "ranker": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "postBuilder",
+          "userBuilder",
+          "ranker"
+        ]
+      },
+      "RecommendJobStateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "'build-features' hoặc khoá builder như 'hot@v0'"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "lastRunAt",
+          "lastError"
+        ]
+      },
+      "RecommendStatsDto": {
+        "type": "object",
+        "properties": {
+          "interactionsLast10m": {
+            "type": "number"
+          },
+          "interactionsLast24h": {
+            "type": "number"
+          },
+          "posts": {
+            "type": "number"
+          },
+          "usersWithFeatures": {
+            "type": "number"
+          },
+          "algos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendAlgoDto"
+            }
+          },
+          "jobStates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendJobStateDto"
+            }
+          }
+        },
+        "required": [
+          "interactionsLast10m",
+          "interactionsLast24h",
+          "posts",
+          "usersWithFeatures",
+          "algos",
+          "jobStates"
+        ]
+      },
+      "DiscoveryJobsDto": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "number",
+            "description": "epoch ms"
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryJobDto"
+            }
+          },
+          "recommendStats": {
+            "nullable": true,
+            "description": "Chỉ có khi group=recommend",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecommendStatsDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "checkedAt",
+          "jobs",
+          "recommendStats"
+        ]
+      },
+      "RunJobDto": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "running"
+            ],
+            "description": "'running': job đang chạy, không chạy chồng"
+          }
+        },
+        "required": [
+          "accepted",
+          "reason"
         ]
       },
       "ProvinceDto": {

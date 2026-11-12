@@ -138,6 +138,18 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.findUserFeatures('tag_affinity@v0', U)).toEqual({ tags: { bien: 1 } });
   });
 
+  it('số liệu admin: dòng nạp 10 phút/24 giờ, bài, người có gu, mốc builder; tra tag/nơi bài', async () => {
+    const p = randomUUID();
+    await store.replacePosts([{ postId: p, authorId: randomUUID(), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', isVerified: false, publishedAt: hoursAgo(2) }]);
+    await store.upsertInteractions([row({ refId: 'a', targetId: p }), row({ refId: 'b', targetId: randomUUID() })], meta());
+    await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { dalat: 1 } } }]);
+    await store.setJobState('hot@v0', { lastRunAt: NOW, lastError: 'boom' });
+    const stats = await store.getAdminStats(new Date());
+    expect(stats).toMatchObject({ interactionsLast10m: 2, interactionsLast24h: 2, posts: 1, usersWithFeatures: 1 });
+    expect(stats.jobStates).toContainEqual({ name: 'hot@v0', lastRunAt: NOW, lastError: 'boom' });
+    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat' }]);
+  });
+
   it('khoá advisory: lượt thứ hai cùng lúc bỏ lượt', async () => {
     let release!: () => void;
     const first = store.withLock('t', () => new Promise<string>((r) => (release = () => r('a'))));

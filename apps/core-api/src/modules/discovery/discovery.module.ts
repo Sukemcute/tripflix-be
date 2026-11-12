@@ -11,13 +11,16 @@ import { PostRecommendationsController } from './recommend/api/post-recommendati
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
-import { RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
+import { RECENT_POSTS_STORE, RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
+import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
+import { AdminDiscoveryJobsController } from './jobs/admin-discovery-jobs.controller.js';
+import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -84,6 +87,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     HomeRecommendationsController,
     PostRecommendationsController,
     AdminIndexHealthController,
+    AdminDiscoveryJobsController,
   ],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
@@ -97,12 +101,14 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     HomeRecommendationUseCases,
     ExploreUseCases,
     IndexHealth,
+    JobRuns,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
     { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: recommendCatalog },
     RecommendIngestUseCases,
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
+    { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
     BuildFeaturesUseCases,
     PostRecommendationUseCases,
     BuildFeaturesJob,

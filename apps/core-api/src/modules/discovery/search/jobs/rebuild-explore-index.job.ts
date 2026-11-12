@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
+import { JobRuns, type JobTrigger } from '../../jobs/job-runs.js';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
 import { EXPLORE_INDEX_INTERVAL_MS, IndexHealth } from './index-health.js';
 
@@ -13,12 +14,13 @@ import { EXPLORE_INDEX_INTERVAL_MS, IndexHealth } from './index-health.js';
 export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(RebuildExploreIndexJob.name);
   private timer?: NodeJS.Timeout;
-  private isRunning = false;
+  isRunning = false;
 
   constructor(
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(ExploreUseCases) private readonly explore: ExploreUseCases,
     @Inject(IndexHealth) private readonly health: IndexHealth,
+    @Inject(JobRuns) private readonly runs: JobRuns,
   ) {}
 
   onApplicationBootstrap() {
@@ -32,16 +34,22 @@ export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplica
     if (this.timer) clearInterval(this.timer);
   }
 
-  async run() {
+  async run(trigger: JobTrigger = 'schedule') {
     if (this.isRunning) return;
     this.isRunning = true;
     const startedAt = Date.now();
     try {
-      this.health.start('explore', startedAt);
-      const count = await this.explore.rebuildIndex();
-      this.health.finish('explore', startedAt, count === null ? 'skipped' : 'succeeded', count ?? undefined);
-      if (count === null) this.logger.log('Worker khác đang dựng chỉ mục tìm khám phá, bỏ lượt');
-      else this.logger.log(`Đã dựng chỉ mục tìm khám phá: ${count} mục trong ${Date.now() - startedAt} ms`);
+      await this.runs.track('explore', trigger, async () => {
+        this.health.start('explore', startedAt);
+        const count = await this.explore.rebuildIndex();
+        this.health.finish('explore', startedAt, count === null ? 'skipped' : 'succeeded', count ?? undefined);
+        if (count === null) {
+          this.logger.log('Worker khác đang dựng chỉ mục tìm khám phá, bỏ lượt');
+          return { outcome: 'skipped' };
+        }
+        this.logger.log(`Đã dựng chỉ mục tìm khám phá: ${count} mục trong ${Date.now() - startedAt} ms`);
+        return { outcome: 'succeeded', summary: { count } };
+      });
     } catch (error) {
       this.health.finish('explore', startedAt, 'failed', undefined, error);
       // Không chặn: /search vẫn chạy trên chỉ mục cũ.

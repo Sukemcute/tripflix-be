@@ -14,6 +14,9 @@
 - Sửa theo review D4: `occurred_at <= now`, lọc `post_type` trên `recommend_post_scores`, `replacePosts` 0 bài thì không xoá và bỏ lượt.
 - Sửa lỗi tìm thấy khi demo: kho khám phá rỗng làm trang thiếu một bài và mất cursor trang sau. Có test tái hiện.
 - Sửa lỗi tìm thấy khi nối thử web: chặn cứng bài đã gợi ý làm web nhận trang rỗng sau khi thả tim (tải lại feed). Nay bài đã gợi ý ở phiên trước (hơn 30 phút) chỉ bị đẩy xuống cuối, phân trang bằng offset cho mọi người. Kiểm lại trên stack: like một bài rồi tải lại 2 trang, không rỗng, chỉ bài vừa like rời danh sách.
+- Gu trong phiên (Duy yêu cầu sau khi thử web): bài vừa tương tác vào Redis (≤ 20 bài, 2 giờ), lần gọi gợi ý sau cộng thêm vào gu với trọng số giảm nửa mỗi 30 phút. Phản hồi ngay mà không đọc bảng thô, không đổi bảng gu, không thiên lệch lâu.
+- Feed 7 bài một trang: `exploreSlots` tối thiểu 1 khi `limit ≥ 2`, để trang nhỏ vẫn có bài khám phá.
+- API admin theo dõi job (cho 2 trang admin của Duy, Trang đồng ý): `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin) trả 20 lần chạy gần nhất của từng job (Redis, giữ 7 ngày) và, với nhóm gợi ý, số liệu bảng `recommend_*`; `POST /api/v1/admin/discovery/jobs/:job/run` (chỉ superadmin) chạy ngay, không chờ, từ chối khi job đang chạy. 4 job (`explore`, `suggest`, `recommend_build`, `recommend_purge`) bọc `JobRuns.track`, không đổi lệnh ghi IndexHealth của Trang.
 
 ## Đối chiếu "Xong khi"
 
@@ -26,11 +29,13 @@
 | Đổi `for_you.ranker='popular_v0'` có hiệu lực ≤ 1 phút | Có | Demo: đổi sau 54 giây |
 | Bộ ba sai bị từ chối, có log | Có | Log `recommend_algos có bộ ba không hợp lệ, dùng trending` (`user_builder không có: khong_co@v9`) |
 | Giao lại sự kiện không ghi đôi | Có | `discovery-events.consumer.int.spec.ts` |
+| Thả tim xong gọi lại thấy bài cùng gu lên ngay | Có | Stack local: thích 1 bài Sài Gòn, vào Redis sau 396 ms, bài Sài Gòn khác từ hạng 9 lên 3, một bài mới vào top 20 ("Vì bạn quan tâm Sài Gòn"); bỏ tim thì xoá khỏi Redis. Test `gu trong phiên: …` (4 test) |
+| Admin chạy ngay job và theo dõi được | Có | Stack local, superadmin: `recommend_build` 202 → `running` → `succeeded` (401 ms, 243 bài · 2 người); `explore` → `succeeded` 3,75 s, 2.443 mục; bấm lần 2 khi đang chạy → `accepted: false`; moderator GET 200, POST 403. Test `job-runs.spec.ts`, `admin-discovery-jobs.controller.spec.ts`, int `getAdminStats` |
 
 ## Kết quả kiểm tra
 
 - `pnpm --filter @tripflix/core-api test:int`: 16 file, 136 test pass.
-- Unit discovery (`vitest run src/modules/discovery`): 139 pass, 1 skip có sẵn (so khớp Python).
+- Unit discovery (`vitest run src/modules/discovery`): 161 pass, 1 skip có sẵn (so khớp Python).
 - `pnpm turbo run lint typecheck test --affected`: xem PR.
 
 Số đo (stack local, 51 bài):
@@ -47,6 +52,7 @@ Số đo (stack local, 51 bài):
 2. Đăng nhập `member@tripflix.local` trên Swagger `http://localhost:3000/docs`, thả cảm xúc 1–2 bài Đà Lạt, tìm "Đà Lạt".
 3. `docker restart tripflix-core-api-1` (job chạy lúc khởi động) hoặc chờ 10 phút.
 4. Gọi `GET /api/recommendations/posts`: bài Đà Lạt chưa tương tác lên đầu với lý do `matches_place`. Bỏ token thì nhận `trending`.
+5. Thay bước 3: đăng nhập superadmin, `POST /api/v1/admin/discovery/jobs/recommend_build/run`, theo dõi `GET /api/v1/admin/discovery/jobs?group=recommend` (hoặc trang admin **Job gợi ý**).
 
 ## Ảnh / video
 
@@ -54,5 +60,5 @@ Số đo (stack local, 51 bài):
 
 ## Ảnh hưởng tới phần của người khác
 
-- Không sửa code module khác. Chỉ gọi facade có sẵn: `content.listPosts`, `content.getVisiblePosts`, `commerce.listCatalog`.
+- Không sửa code module khác. Hai job tìm kiếm (Trang viết phần IndexHealth) chỉ được bọc thêm `runs.track` bên ngoài, giữ nguyên lệnh `health.start/finish`. Chỉ gọi facade có sẵn: `content.listPosts`, `content.getVisiblePosts`, `commerce.listCatalog`.
 - `contracts/openapi/core-api.json` sinh lại: thêm endpoint mới, các route search/stays thêm `security` tuỳ chọn. Chỉ thêm, không đổi hợp đồng cũ.
