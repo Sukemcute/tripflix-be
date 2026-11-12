@@ -1,7 +1,9 @@
-import { type ArgumentsHost, BadRequestException, Catch, ConflictException, type ExceptionFilter, HttpException, HttpStatus, NotFoundException, type PipeTransform } from '@nestjs/common';
+import { type ArgumentsHost, BadRequestException, Catch, ConflictException, HttpException, HttpStatus, Logger, NotFoundException, type PipeTransform } from '@nestjs/common';
+import { BaseExceptionFilter } from '@nestjs/core';
 import type { Response } from 'express';
 import type { z } from 'zod';
 import { CommerceError } from '../domain/errors.js';
+import { DATABASE_UNAVAILABLE_MESSAGE, RETRY_AFTER_SECONDS, isDatabaseUnavailable } from './database-unavailable.js';
 
 /** Kiểm query string hoặc body bằng schema zod; lỗi trả 400 kèm danh sách trường sai. */
 export class ZodQuery<T extends z.ZodType> implements PipeTransform<unknown, z.infer<T>> {
@@ -17,10 +19,27 @@ export class ZodQuery<T extends z.ZodType> implements PipeTransform<unknown, z.i
   }
 }
 
-/** Đổi lỗi nghiệp vụ của commerce sang mã HTTP. */
-@Catch(CommerceError)
-export class CommerceErrorFilter implements ExceptionFilter {
-  catch(err: CommerceError, host: ArgumentsHost) {
+/**
+ * Đổi lỗi nghiệp vụ của commerce sang mã HTTP. Database không phục vụ được (tắt, hết kết nối pool) thì trả 503
+ * kèm Retry-After thay vì 500 chung chung: client biết là lỗi tạm, thử lại sau. Lỗi khác để Nest xử lý như cũ.
+ */
+@Catch()
+export class CommerceErrorFilter extends BaseExceptionFilter {
+  private readonly logger = new Logger('CommerceErrorFilter');
+
+  override catch(exception: unknown, host: ArgumentsHost) {
+    if (exception instanceof CommerceError) return this.sendCommerceError(exception, host);
+    if (isDatabaseUnavailable(exception)) {
+      this.logger.warn({ err: exception }, 'Database không phục vụ được, trả 503');
+      const res = host.switchToHttp().getResponse<Response>();
+      res.setHeader('Retry-After', String(RETRY_AFTER_SECONDS));
+      res.status(HttpStatus.SERVICE_UNAVAILABLE).json({ statusCode: HttpStatus.SERVICE_UNAVAILABLE, message: DATABASE_UNAVAILABLE_MESSAGE, reason: 'SERVICE_UNAVAILABLE', error: 'Service Unavailable' });
+      return;
+    }
+    return super.catch(exception, host);
+  }
+
+  private sendCommerceError(err: CommerceError, host: ArgumentsHost) {
     const res = host.switchToHttp().getResponse<Response>();
     const errors = err.field ? [{ field: err.field, message: err.message }] : [];
     let http: HttpException;

@@ -5,6 +5,7 @@ import { TODAY, type Today } from './inventory/application/ports.js';
 import { addDays } from './inventory/domain/sales-rules.js';
 import type { AvailabilityResult, CatalogPage, CheckAvailabilityQuery, ListCatalogQuery } from './inventory/application/catalog-types.js';
 import { TtlCache } from './inventory/application/ttl-cache.js';
+import { isDatabaseUnavailable } from './inventory/api/database-unavailable.js';
 
 /**
  * Trang tìm khách sạn (discovery /stays) gọi hai hàm dưới mỗi lần tìm cho cả tỉnh. Cache ngắn để nhiều người tìm
@@ -14,6 +15,8 @@ import { TtlCache } from './inventory/application/ttl-cache.js';
 const CATALOG_TTL_MS = 60_000;
 const AVAILABILITY_TTL_MS = 15_000;
 const MAX_CACHE_ENTRIES = 2_000;
+/** Database lỗi thì trang tìm vẫn trả kết quả tốt gần nhất, cũ tối đa 30 phút, thay vì báo lỗi. */
+const STALE_MS = 30 * 60_000;
 
 /**
  * Cửa duy nhất để module khác đọc dữ liệu commerce, gọi trong tiến trình (docs/11 §3.2). Chỉ đọc.
@@ -32,11 +35,15 @@ export class CommerceFacade {
     ttlMs: CATALOG_TTL_MS,
     maxEntries: MAX_CACHE_ENTRIES,
     now: () => this.clock().getTime(),
+    staleMs: STALE_MS,
+    canServeStale: isDatabaseUnavailable,
   });
   private readonly availabilityCache = new TtlCache<AvailabilityResult[]>({
     ttlMs: AVAILABILITY_TTL_MS,
     maxEntries: MAX_CACHE_ENTRIES,
     now: () => this.clock().getTime(),
+    staleMs: STALE_MS,
+    canServeStale: isDatabaseUnavailable,
   });
 
   /**

@@ -45,4 +45,57 @@ describe('TtlCache', () => {
     expect(await cache.get('a', async () => 'a2')).toBe('a2');
     expect(await cache.get('c', async () => 'c2')).toBe('c1');
   });
+
+  it('nguồn lỗi được chấp nhận thì trả kết quả tốt gần nhất', async () => {
+    let now = 0;
+    const error = new Error('db');
+    const canServeStale = vi.fn((cause: unknown) => cause === error);
+    const cache = new TtlCache<number>({ ttlMs: 1_000, maxEntries: 10, staleMs: 5_000, canServeStale, now: () => now });
+    await cache.get('k', async () => 7);
+    now = 1_000;
+    await expect(cache.get('k', () => Promise.reject(error))).resolves.toBe(7);
+    expect(canServeStale).toHaveBeenCalledWith(error);
+  });
+
+  it('nguồn lỗi không được chấp nhận thì báo lỗi', async () => {
+    let now = 0;
+    const error = new Error('boom');
+    const canServeStale = vi.fn((_cause: unknown) => false);
+    const cache = new TtlCache<number>({ ttlMs: 1_000, maxEntries: 10, staleMs: 5_000, canServeStale, now: () => now });
+    await cache.get('k', async () => 7);
+    now = 1_000;
+    await expect(cache.get('k', () => Promise.reject(error))).rejects.toBe(error);
+    expect(canServeStale).toHaveBeenCalledWith(error);
+  });
+
+  it('kết quả cũ quá staleMs thì báo lỗi', async () => {
+    let now = 0;
+    const error = new Error('db');
+    const cache = new TtlCache<number>({ ttlMs: 1_000, maxEntries: 10, staleMs: 5_000, canServeStale: () => true, now: () => now });
+    await cache.get('k', async () => 7);
+    now = 5_001;
+    await expect(cache.get('k', () => Promise.reject(error))).rejects.toBe(error);
+  });
+
+  it('không có staleMs thì luôn báo lỗi nguồn', async () => {
+    let now = 0;
+    const error = new Error('db');
+    const cache = new TtlCache<number>({ ttlMs: 1_000, maxEntries: 10, canServeStale: () => true, now: () => now });
+    await cache.get('k', async () => 7);
+    now = 1_000;
+    await expect(cache.get('k', () => Promise.reject(error))).rejects.toBe(error);
+    await expect(cache.get('k', () => Promise.reject(error))).rejects.toBe(error);
+  });
+
+  it('nguồn hồi phục thì thay kết quả cũ bằng giá trị mới', async () => {
+    let now = 0;
+    const cache = new TtlCache<number>({ ttlMs: 1_000, maxEntries: 10, staleMs: 5_000, canServeStale: () => true, now: () => now });
+    await cache.get('k', async () => 7);
+    now = 1_000;
+    expect(await cache.get('k', () => Promise.reject(new Error('db')))).toBe(7);
+    now = 2_000;
+    expect(await cache.get('k', async () => 9)).toBe(9);
+    now = 3_000;
+    expect(await cache.get('k', () => Promise.reject(new Error('db')))).toBe(9);
+  });
 });
