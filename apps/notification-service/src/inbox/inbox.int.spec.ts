@@ -9,12 +9,32 @@ describe('InboxRepository trên Postgres thật', () => {
   let fixture: PostgresFixture;
   let pool: pg.Pool;
   let repository: InboxRepository;
+  const legacyItem = input();
+  const legacyReadAt = new Date('2026-11-12T10:00:00.000Z');
 
   beforeAll(async () => {
     fixture = await startPostgres();
     pool = new pg.Pool({ connectionString: fixture.buildModuleUrl('notification') });
+    await pool.query(`
+      CREATE TABLE inbox (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL,
+        type text NOT NULL,
+        title text NOT NULL,
+        body text NOT NULL,
+        link text,
+        data jsonb NOT NULL DEFAULT '{}',
+        source_event_id text NOT NULL CONSTRAINT uq_inbox_source_event_id UNIQUE,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        read_at timestamptz
+      )
+    `);
+    await pool.query(
+      'INSERT INTO inbox (user_id, type, title, body, source_event_id, read_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [legacyItem.userId, legacyItem.type, legacyItem.title, legacyItem.body, legacyItem.sourceEventId, legacyReadAt],
+    );
     repository = new InboxRepository(pool);
-    await repository.onModuleInit();
+    await Promise.all([repository.onModuleInit(), ensureInboxSchema(pool)]);
   });
 
   afterAll(async () => {
@@ -50,9 +70,29 @@ describe('InboxRepository trên Postgres thật', () => {
       expect.arrayContaining([
         'inbox_pkey',
         'uq_inbox_source_event_id',
+        'uq_inbox_event_user_type',
         'idx_inbox_user_id_created_at',
         'idx_inbox_user_id_unread',
       ]),
+    );
+  });
+
+  it('giữ thông báo đã đọc và tương thích với câu lệnh ghi của phiên bản cũ', async () => {
+    const page = await repository.listForUser(legacyItem.userId, { limit: 10 });
+    expect(page.items).toEqual([
+      expect.objectContaining({ source_event_id: legacyItem.sourceEventId, read_at: legacyReadAt }),
+    ]);
+    const duplicate = await pool.query(
+      `INSERT INTO inbox (user_id, type, title, body, source_event_id)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (source_event_id) DO NOTHING`,
+      [legacyItem.userId, legacyItem.type, legacyItem.title, legacyItem.body, legacyItem.sourceEventId],
+    );
+    expect(duplicate.rowCount).toBe(0);
+    const tables = await pool.query<{ tablename: string }>(
+      "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()",
+    );
+    expect(tables.rows.map((row) => row.tablename)).toEqual(
+      expect.arrayContaining(['deliveries', 'user_directory', 'post_directory']),
     );
   });
 
