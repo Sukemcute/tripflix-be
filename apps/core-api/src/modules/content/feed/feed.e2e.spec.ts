@@ -49,6 +49,7 @@ const buildRow = (n: number, mediaIds = [ASSET_ID]): FeedPostRow => ({
   body: `Nội dung ${n}`,
   hashtags: ['danang'],
   mediaIds,
+  tripAttachment: null,
   reactionTotal: 5,
   commentCount: 4,
   bookmarkCount: 3,
@@ -76,6 +77,13 @@ class FakeFeedStore implements FeedStore {
       this.liked.filter((like) => like.userId === userId && postIds.includes(like.postId)).map((like) => like.postId),
     );
   }
+
+  listSavedPlayablePosts({ userId, limit }: { userId: string; limit: number }): Promise<FeedPostRow[]> {
+    this.savedQueriedBy.push(userId);
+    return Promise.resolve(this.rows.slice(0, limit));
+  }
+
+  savedQueriedBy: string[] = [];
 
   findSavedPostIds(): Promise<string[]> {
     return Promise.resolve([]);
@@ -147,6 +155,7 @@ describe('GET /api/v1/feed E2E', () => {
   beforeEach(() => {
     feedStore.rows = [buildRow(1), buildRow(2), buildRow(3)];
     feedStore.liked = [];
+    feedStore.savedQueriedBy = [];
   });
 
   afterAll(async () => {
@@ -248,7 +257,19 @@ describe('GET /api/v1/feed E2E', () => {
     ['limit bằng 0', 'limit=0'],
     ['limit không phải số', 'limit=abc'],
     ['cursor sai', 'cursor=sai'],
+    ['saved sai', 'saved=yes'],
+    ['saved với tab hot', 'saved=true&tab=hot'],
   ])('%s thì trả 400', async (_name, query) => {
     await http().get(`/api/v1/feed?${query}`).expect(400);
+  });
+
+  it('saved=true khi chưa đăng nhập trả 401', async () => {
+    await http().get('/api/v1/feed?saved=true').expect(401);
+    expect(feedStore.savedQueriedBy).toEqual([]);
+  });
+
+  it('saved=true có token thì đọc Reels đã lưu của đúng người xem', async () => {
+    await http().get('/api/v1/feed?saved=true').auth(token, { type: 'bearer' }).expect(200);
+    expect(feedStore.savedQueriedBy).toEqual([userId]);
   });
 });

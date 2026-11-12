@@ -24,6 +24,7 @@ import {
   SocialPostPageDto,
 } from './dto/response.dto.js';
 import { CreatePostDto, ListPostsQueryDto, ListUserPostsQueryDto, UpdatePostDto } from './dto/post.dto.js';
+import { parseListPostTypeFilter } from './dto/post-type-filter.dto.js';
 import {
   CreateDraftUseCase,
   DeletePostUseCase,
@@ -91,12 +92,14 @@ export class PostsController {
   @Authenticated()
   @ApiOperation({ summary: 'Lấy danh sách bài đăng và bản nháp của chính mình (FR1)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài của người dùng', type: SocialPostPageDto })
+  @ApiResponse({ status: 400, description: 'post_type không hợp lệ' })
   async listMyPosts(@CurrentUser() user: AuthUser, @Query() query: ListUserPostsQueryDto) {
     return this.listUserPostsUseCase.execute({
       authorId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       status: query.status,
+      postType: parseListPostTypeFilter(query.post_type),
     });
   }
 

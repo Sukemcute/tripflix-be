@@ -7,6 +7,10 @@ import type { FeedPostRow, FeedStore } from '../application/ports.js';
 
 const UUID_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
+function newestFirstCursor(after: FeedCursor | null): SQL | undefined {
+  return after ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)` : undefined;
+}
+
 export class DrizzleFeedStore implements FeedStore {
   constructor(private readonly getDb: () => Db) {}
 
@@ -17,9 +21,27 @@ export class DrizzleFeedStore implements FeedStore {
   listPlayablePosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
     return this.selectPlayablePosts({
       limit,
-      cursorFilter: after
-        ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`
-        : undefined,
+      cursorFilter: newestFirstCursor(after),
+      orderBy: [desc(posts.createdAt), desc(posts.id)],
+    });
+  }
+
+  listSavedPlayablePosts({
+    userId,
+    limit,
+    after,
+  }: {
+    userId: string;
+    limit: number;
+    after: FeedCursor | null;
+  }): Promise<FeedPostRow[]> {
+    const savedByUser = sql`exists (
+      select 1 from ${bookmarks}
+      where ${bookmarks.postId} = ${posts.id} and ${bookmarks.userId} = ${userId}
+    )`;
+    return this.selectPlayablePosts({
+      limit,
+      cursorFilter: and(savedByUser, newestFirstCursor(after)),
       orderBy: [desc(posts.createdAt), desc(posts.id)],
     });
   }
@@ -63,6 +85,7 @@ export class DrizzleFeedStore implements FeedStore {
         body: posts.body,
         hashtags: posts.hashtags,
         mediaIds: posts.mediaIds,
+        tripAttachment: posts.tripAttachment,
         reactionTotal: posts.reactionTotal,
         commentCount: posts.commentCount,
         bookmarkCount: posts.bookmarkCount,
@@ -75,6 +98,8 @@ export class DrizzleFeedStore implements FeedStore {
           eq(posts.status, 'published'),
           eq(posts.visibility, 'public'),
           isNull(posts.deletedAt),
+          // Feed là luồng Reels: bài viết (vlog) cũ lỡ kèm video cũng không được lọt vào.
+          eq(posts.postType, 'video'),
           // Lọc ngay trong câu truy vấn để một trang không bị thiếu bài vì video chưa phát được.
           // So theo uuid để tra khoá chính media_assets; so theo chuỗi (id::text) thì mỗi bài quét cả bảng.
           // Mã không đúng dạng uuid coi như không có video, thay vì làm cả câu lỗi khi ép kiểu.
