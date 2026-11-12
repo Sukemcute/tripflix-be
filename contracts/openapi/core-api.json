@@ -2535,15 +2535,6 @@
         "operationId": "AdminModerationController_queue",
         "parameters": [
           {
-            "name": "view",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["pending", "reviewed", "hidden", "removed"]
-            }
-          },
-          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -2552,6 +2543,20 @@
               "enum": [
                 "pending",
                 "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
               ]
             }
           },
