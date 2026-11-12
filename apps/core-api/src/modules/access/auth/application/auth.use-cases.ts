@@ -5,6 +5,7 @@ import type {
   AccessUserGuestMergedV1,
   AccessRegistrationAttemptedExistingV1,
   AccessRegistrationCodeRequestedV1,
+  AccessSessionReuseDetectedV1,
   AccessUserRegisteredV1,
   AccessUserWelcomeEmailRequestedV1,
 } from '@tripflix/contracts';
@@ -38,6 +39,7 @@ import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TTL_MS,
   decideRefresh,
+  nextRefreshExpiry,
   type RefreshDecision,
 } from '../domain/refresh-rotation.js';
 import {
@@ -404,13 +406,23 @@ export class AuthUseCases {
 
   @Transactional('access')
   private async revokeReusedSession(session: SessionRecord, meta: RequestMeta): Promise<void> {
-    await this.store.sessions.delete(session.id);
+    // Hai request dùng lại cùng lúc: chỉ request xoá được phiên mới ghi audit và báo email, tránh gửi hai thư.
+    if (!(await this.store.sessions.delete(session.id))) return;
     await this.store.audit.record({
       action: 'auth.refresh_reused',
       actorUserId: session.userId,
       ...meta,
       meta: { sid: session.id },
     });
+    const user = await this.store.users.findById(session.userId);
+    if (!user) return;
+    const payload: AccessSessionReuseDetectedV1 = {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      deviceName: session.deviceName,
+    };
+    await this.store.outbox.add({ type: 'access.session_reuse_detected', userId: user.id, payload });
   }
 
   /**
@@ -423,7 +435,7 @@ export class AuthUseCases {
     rotation: { presented: string; nextHash: string; decision: Exclude<RefreshDecision, 'invalid' | 'reuse'>; now: Date },
   ): Promise<boolean> {
     const { presented, nextHash, decision, now } = rotation;
-    const expiresAt = new Date(now.getTime() + REFRESH_TTL_MS);
+    const expiresAt = nextRefreshExpiry(session.createdAt, now);
     // grace: giữ nguyên token liền trước và mốc xoay, để khoảng 10 giây không bị kéo dài.
     return decision === 'rotate'
         ? await this.store.sessions.rotate(session.id, presented, {

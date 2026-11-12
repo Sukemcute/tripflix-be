@@ -3,6 +3,7 @@ import {
   AccessRegistrationAttemptedExistingV1Schema,
   AccessRegistrationCodeRequestedV1Schema,
   AccessPasswordResetRequestedV1Schema,
+  AccessSessionReuseDetectedV1Schema,
   AccessUserWelcomeEmailRequestedV1Schema,
   CommerceOrderPaidV1Schema,
   CommerceOrderCancelledV1Schema,
@@ -17,6 +18,7 @@ import { buildExistingAccountEmail } from '../outapp/existing-account.email.js';
 import { buildRegistrationCodeEmail } from '../outapp/registration-code.email.js';
 import { buildOrderConfirmationEmail } from '../outapp/order-confirmation.email.js';
 import { buildPasswordResetEmail } from '../outapp/password-reset.email.js';
+import { buildSessionReuseEmail } from '../outapp/session-reuse.email.js';
 import { buildWelcomeEmail } from '../outapp/welcome.email.js';
 
 /** Trang web mở từ nút "Khám phá ngay" trong email chào mừng khi chưa cấu hình WEB_APP_URL. */
@@ -84,6 +86,10 @@ export class EventRouter {
     } else if (event.type === 'access.registration_attempted_existing') {
       const payload = AccessRegistrationAttemptedExistingV1Schema.parse(event.payload);
       await this.mailer.send(buildExistingAccountEmail(payload, this.links.webAppUrl));
+      result = 'handled';
+    } else if (event.type === 'access.session_reuse_detected') {
+      const payload = AccessSessionReuseDetectedV1Schema.parse(event.payload);
+      await this.mailer.send(buildSessionReuseEmail(payload, this.links.webAppUrl));
       result = 'handled';
     } else if (event.type === 'access.email_verification_requested') {
       const payload = AccessEmailVerificationRequestedV1Schema.parse(event.payload);

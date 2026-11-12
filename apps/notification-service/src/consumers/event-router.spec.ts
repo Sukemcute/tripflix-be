@@ -95,6 +95,20 @@ describe('EventRouter', () => {
     expect(mailer.sent[0]?.to).toBe('binh@example.com');
   });
 
+  it('access.session_reuse_detected thì gửi email báo phiên bị đăng xuất, giao lại không gửi lần hai', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log, { webAppUrl: 'https://tripflix.vn' });
+    const event = createEvent('access.session_reuse_detected', {
+      userId: randomUUID(),
+      email: 'binh@example.com',
+      displayName: 'Bình',
+      deviceName: 'iPhone',
+    });
+    expect(await router.route(event)).toBe('handled');
+    expect(await router.route(event)).toBe('duplicate');
+    expect(mailer.sent.map((m) => m.subject)).toEqual(['Phiên đăng nhập Tripflix của bạn đã bị đăng xuất']);
+  });
+
   it('access.password_reset_requested thì gửi email, sự kiện giao lại không gửi lần hai', async () => {
     const mailer = new MemoryMailer();
     const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
