@@ -1,4 +1,11 @@
-import { Controller, Get, Inject, Module, ServiceUnavailableException, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  Module,
+  ServiceUnavailableException,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import {
   Authenticated,
   AuthModule,
@@ -19,11 +26,21 @@ import { NotificationConsumer } from './consumers/notification-consumer.js';
 import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
+import { InboxController } from './inbox/inbox.controller.js';
+import { InboxRepository } from './inbox/inbox.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RealtimeService } from './realtime/realtime.service.js';
 import { isRealtimeRedisReady, type RealtimeRedis } from './realtime/redis-io.adapter.js';
-import { DB, ENV, MAILER, PROCESSED_EVENTS, REALTIME_REDIS, REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
+import {
+  DB,
+  ENV,
+  MAILER,
+  PROCESSED_EVENTS,
+  REALTIME_REDIS,
+  REDIS,
+  SID_BLOCKLIST_PROVIDER,
+} from './tokens.js';
 
 export { envSchema, type Env } from './env.js';
 export { ENV, MAILER, PROCESSED_EVENTS, REALTIME_REDIS, SID_BLOCKLIST_PROVIDER } from './tokens.js';
@@ -40,7 +57,10 @@ class HealthController {
   @Get()
   async check() {
     const db = await ping(this.db);
-    const redis = await this.redis.ping().then((r) => r === 'PONG').catch(() => false);
+    const redis = await this.redis
+      .ping()
+      .then((r) => r === 'PONG')
+      .catch(() => false);
     // Pub/sub của /ws mất kết nối thì replica này phát không tới socket ở replica khác mà không báo lỗi gì.
     const realtime = isRealtimeRedisReady(this.realtimeRedis);
     const ok = db && redis && realtime;
@@ -61,8 +81,8 @@ export class MeController {
 }
 
 /**
- * notification-service. Đã có: consumers/ (group "notification", email), realtime/ (WebSocket /ws, TF26A).
- * Sẽ làm (Dũng): inbox/, push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
+ * notification-service. Đã có: consumers/ (email), inbox/ (TF46), realtime/ (WebSocket /ws, TF26A).
+ * Sẽ làm (Dũng): push và hàng đợi BullMQ, preferences/, grouping/ — xem docs/architecture/10 §3.5.
  */
 @Module({
   providers: [
@@ -78,9 +98,21 @@ export class MeController {
       inject: [ENV],
       useFactory: (env: Env) => new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 }),
     },
-    { provide: SID_BLOCKLIST_PROVIDER, inject: [REDIS], useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis) },
-    { provide: MAILER, inject: [ENV], useFactory: (env: Env): Mailer => new SmtpMailer(env.SMTP_URL, env.MAIL_FROM) },
-    { provide: PROCESSED_EVENTS, inject: [REDIS], useFactory: (redis: Redis): ProcessedEvents => new RedisProcessedEvents(redis) },
+    {
+      provide: SID_BLOCKLIST_PROVIDER,
+      inject: [REDIS],
+      useFactory: (redis: Redis): SidBlocklist => new RedisSidBlocklist(redis),
+    },
+    {
+      provide: MAILER,
+      inject: [ENV],
+      useFactory: (env: Env): Mailer => new SmtpMailer(env.SMTP_URL, env.MAIL_FROM),
+    },
+    {
+      provide: PROCESSED_EVENTS,
+      inject: [REDIS],
+      useFactory: (redis: Redis): ProcessedEvents => new RedisProcessedEvents(redis),
+    },
     // Chỉ mở kết nối khi main.ts gắn Redis adapter (lazyConnect lấy theo REDIS).
     {
       provide: REALTIME_REDIS,
@@ -113,8 +145,8 @@ export class InfraModule {}
       }),
     }),
   ],
-  controllers: [HealthController, MeController],
-  providers: [NotificationConsumer, DeadLetterReplayJob, RealtimeService, RealtimeGateway],
+  controllers: [HealthController, MeController, InboxController],
+  providers: [NotificationConsumer, DeadLetterReplayJob, RealtimeService, RealtimeGateway, InboxRepository],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(

@@ -18,6 +18,16 @@ export const envSchema = baseEnvSchema
     MAIL_FROM: z.string().default('Tripflix <no-reply@tripflix.local>'),
     // Trang web mở từ nút trong email chào mừng.
     WEB_APP_URL: z.url().default('http://localhost:3100'),
+    // Web, admin gọi /notifications từ trình duyệt qua gateway (khác origin): danh sách origin được phép, cách nhau dấu phẩy.
+    WEB_ORIGINS: z
+      .string()
+      .default('http://localhost:3100,http://localhost:3200')
+      .transform((v) =>
+        v
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean),
+      ),
     // Tắt khi chạy test không có Redis; mỗi replica một tên để Redis chia việc (mặc định hostname).
     NOTIFICATION_CONSUMER_ENABLED: z
       .enum(['true', 'false'])

@@ -1,7 +1,15 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
+import { InboxRepository } from '../inbox/inbox.repository.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { DeadLetterReplayer } from './dead-letter-replay.js';
 import { EventRouter, type ProcessedEvents } from './event-router.js';
@@ -17,6 +25,8 @@ export class DeadLetterReplayJob implements OnApplicationBootstrap, OnApplicatio
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(MAILER) private readonly mailer: Mailer,
     @Inject(PROCESSED_EVENTS) private readonly processed: ProcessedEvents,
+    @Inject(InboxRepository) private readonly inbox: InboxRepository,
+    @Inject(RealtimeService) private readonly realtime: RealtimeService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -27,9 +37,12 @@ export class DeadLetterReplayJob implements OnApplicationBootstrap, OnApplicatio
       (message, event) =>
         this.logger.log({ eventId: event.eventId, type: event.type, producer: event.producer }, message),
       { webAppUrl: this.env.WEB_APP_URL },
+      this.inbox,
+      this.realtime,
     );
     const replayer = new DeadLetterReplayer(this.redis, router, Date.now, {
-      onError: (err, event) => this.logger.error({ err, eventId: event.eventId }, 'Gửi lại sự kiện lỗi, sẽ thử lại'),
+      onError: (err, event) =>
+        this.logger.error({ err, eventId: event.eventId }, 'Gửi lại sự kiện lỗi, sẽ thử lại'),
     });
     this.timer = setInterval(() => {
       // SMTP chậm không được tạo thêm lượt gửi chồng lên nhau.

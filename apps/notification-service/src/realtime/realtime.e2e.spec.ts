@@ -6,6 +6,7 @@ import { MemorySidBlocklist } from '@tripflix/auth';
 import { generateKeyPair } from 'jose';
 import type { Socket as ClientSocket } from 'socket.io-client';
 import { AppModule, ENV, RealtimeService, SID_BLOCKLIST_PROVIDER } from '../app.module.js';
+import { InboxRepository } from '../inbox/inbox.repository.js';
 import { AUTH_EXPIRED_EVENT, WS_ERROR } from './realtime.constants.js';
 import {
   expectNoEvent,
@@ -45,6 +46,8 @@ describe('WebSocket /ws (TF26A)', () => {
       .useValue(testEnv(jwks.url))
       .overrideProvider(SID_BLOCKLIST_PROVIDER)
       .useValue(blocklist)
+      .overrideProvider(InboxRepository)
+      .useValue({})
       .compile();
     app = moduleRef.createNestApplication({ logger: false });
     await app.listen(0, '127.0.0.1');
