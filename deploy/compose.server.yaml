@@ -162,9 +162,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # ViSoBERT INT8 chạy cạnh OpenAI moderation, cần AI_TAG từ sha-eadf699. Bận hoặc quá 1,5 giây thì dùng riêng kết quả OpenAI.
+      IS_VISOBERT_ENABLED: ${IS_VISOBERT_ENABLED:-false}
       LOG_LEVEL: INFO
     cpus: 0.5
-    mem_limit: 384m
+    # Bản thử của TF32: đỉnh khoảng 290 MiB khi gọi API, 640 MiB khi suy luận văn bản dài. 1g để có chỗ dư.
+    mem_limit: 1g
     healthcheck:
       test: ['CMD', '/app/.venv/bin/python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 10s
