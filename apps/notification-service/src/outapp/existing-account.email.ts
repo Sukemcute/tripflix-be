@@ -1,5 +1,5 @@
 import type { AccessRegistrationAttemptedExistingV1 } from '@tripflix/contracts';
-import { escapeHtml } from './html.js';
+import { emailButton, escapeHtml, renderEmailShell } from './html.js';
 import type { EmailMessage } from './mailer.js';
 
 /** Đường dẫn trên web (tripflix-fe/apps/web/src/app): trang đăng nhập và quên mật khẩu. */
@@ -22,7 +22,20 @@ export function buildExistingAccountEmail(payload: AccessRegistrationAttemptedEx
   const loginUrl = `${base}${LOGIN_PATH}`;
   const forgotUrl = `${base}${FORGOT_PASSWORD_PATH}`;
   const signIn = describeSignIn(payload);
+  const actionLabel = payload.hasPassword ? 'Đặt lại mật khẩu' : 'Tạo mật khẩu';
   const warning = 'Nếu không phải bạn vừa đăng ký, hãy bỏ qua email này. Tài khoản của bạn không thay đổi gì.';
+
+  const content = [
+    `<p style="margin:0 0 16px;font-size:15px">Chào <strong>${escapeHtml(payload.displayName)}</strong>,</p>`,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">Có người vừa nhập email <strong>${escapeHtml(payload.email)}</strong> để đăng ký tài khoản Tripflix. Do email này đã được sử dụng cho một tài khoản hiện có, chúng tôi không gửi mã đăng ký mới.</p>`,
+    emailButton(loginUrl, 'Đăng nhập ngay'),
+    '<div style="margin:20px 0;padding:16px 20px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px">',
+    `  <p style="margin:0 0 6px;font-size:14px;color:#334155">${escapeHtml(signIn)}</p>`,
+    `  <p style="margin:0"><a href="${escapeHtml(forgotUrl)}" style="color:#BC331E;font-weight:700;font-size:14px;text-decoration:underline">${actionLabel}</a></p>`,
+    '</div>',
+    `<p style="margin:0 0 12px;color:#64748B;font-size:13px;line-height:1.6">${warning}</p>`,
+  ].join('\n');
+
   return {
     to: payload.email,
     subject: 'Email này đã có tài khoản Tripflix',
@@ -38,16 +51,12 @@ export function buildExistingAccountEmail(payload: AccessRegistrationAttemptedEx
       '',
       'Tripflix · Chạm cảm hứng, trọn hành trình.',
     ].join('\n'),
-    html: [
-      '<div style="font-family:\'Be Vietnam Pro\',Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#18242B;line-height:1.7">',
-      '<p style="font-size:22px;font-weight:700;margin:0 0 16px">Bạn đã có tài khoản Tripflix</p>',
-      `<p>Chào ${escapeHtml(payload.displayName)},</p>`,
-      `<p>Có người vừa đăng ký Tripflix bằng ${escapeHtml(payload.email)}, nhưng email này đã có tài khoản nên chúng tôi không gửi mã đăng ký.</p>`,
-      `<p style="margin:24px 0"><a href="${escapeHtml(loginUrl)}" style="display:inline-block;background:#BC331E;color:#FFFFFF;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:12px">Đăng nhập</a></p>`,
-      `<p>${escapeHtml(signIn)} <a href="${escapeHtml(forgotUrl)}">${payload.hasPassword ? 'Đặt lại mật khẩu' : 'Tạo mật khẩu'}</a></p>`,
-      `<p style="color:#64748B;font-size:13px">${warning}</p>`,
-      '<p style="color:#94A3B8;font-size:12px">Tripflix · Chạm cảm hứng, trọn hành trình.</p>',
-      '</div>',
-    ].join('\n'),
+    html: renderEmailShell({
+      title: 'Bạn đã có tài khoản Tripflix',
+      badge: { text: 'THÔNG BÁO TÀI KHOẢN', bg: '#D9F4F1', color: '#006C63' },
+      heading: 'Bạn đã có tài khoản Tripflix',
+      content,
+      footerNote: 'Email bảo mật gửi đến địa chỉ đã đăng ký tại Tripflix.',
+    }),
   };
 }
