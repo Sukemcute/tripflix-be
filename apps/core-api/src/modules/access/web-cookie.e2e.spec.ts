@@ -37,6 +37,8 @@ const env = {
 })
 class FakePlatformModule {}
 
+import { createTestBrowserProof } from './auth/infra/test-browser-proof.js';
+
 const PASSWORD = 'mat-khau-an-toan';
 const WEB = { 'X-Tripflix-Client': 'web', Origin: WEB_ORIGIN };
 
@@ -88,8 +90,10 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
   }
 
   async function webLogin(email: string) {
-    const res = await http().post('/api/auth/login').set(WEB).send({ email, password: PASSWORD }).expect(200);
-    return { res, cookie: readSetCookie(res)! };
+    const proof = await createTestBrowserProof();
+    const res = await http().post('/api/auth/login').set(WEB)
+      .set(await proof('login', WEB_ORIGIN)).send({ email, password: PASSWORD }).expect(200);
+    return { res, cookie: readSetCookie(res)!, proof };
   }
 
   it('đăng nhập web: cookie HttpOnly, SameSite=Lax, Path=/api/auth, 30 ngày; body không có refreshToken', async () => {
@@ -161,28 +165,39 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
     expect(store.sessionRows.size).toBe(before);
   });
 
-  it('làm mới bằng cookie (body trống): nhận cookie mới, body không có refreshToken; admin cũng dùng được', async () => {
+  it('làm mới bằng cookie cần đúng khóa, chống gửi lại chữ ký và tách cookie admin', async () => {
     await register('web-refresh@example.com');
-    const { cookie } = await webLogin('web-refresh@example.com');
+    const { cookie, proof } = await webLogin('web-refresh@example.com');
 
-    const res = await http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`).expect(200);
+    const signed = await proof('refresh', WEB_ORIGIN);
+    const copied = await createTestBrowserProof();
+    const refresh = () => http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`);
+    await refresh().expect(401);
+    await refresh().set(await copied('refresh', WEB_ORIGIN)).expect(401);
+    await http().post('/api/auth/refresh').send({ refreshToken: cookie.value }).expect(401);
+    const res = await refresh().set(signed).expect(200);
+    await refresh().set(signed).expect(401);
     const next = readSetCookie(res)!;
     expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
     expect(res.headers['cache-control']).toBe('no-store');
     expect(next.value).not.toBe(cookie.value);
 
-    // Admin cũng là origin tin cậy; chỉ có cookie, không gửi header web vẫn được coi là chế độ web.
-    const admin = await http()
-      .post('/api/auth/refresh')
-      .set({ Origin: ADMIN_ORIGIN, Cookie: `tripflix_refresh=${next.value}` })
-      .expect(200);
-    expect(admin.body).not.toHaveProperty('refreshToken');
-    expect(readSetCookie(admin)).toBeDefined();
+    await http().post('/api/auth/refresh').set(WEB)
+      .set(await proof('refresh', WEB_ORIGIN)).set('Cookie', `tripflix_refresh=${next.value}`).expect(200);
+
+    const adminProof = await createTestBrowserProof();
+    const adminLogin = await http().post('/api/auth/login').set({ ...WEB, Origin: ADMIN_ORIGIN })
+      .set(await adminProof('login', ADMIN_ORIGIN))
+      .send({ email: 'web-refresh@example.com', password: PASSWORD }).expect(200);
+    const adminCookie = ([] as string[]).concat(adminLogin.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    expect(adminCookie).toMatch(/^tripflix_refresh_[a-f0-9]+=w1\./);
+    await http().post('/api/auth/refresh').set({ ...WEB, Origin: ADMIN_ORIGIN, Cookie: adminCookie })
+      .set(await adminProof('refresh', ADMIN_ORIGIN)).expect(200);
   });
 
   it('CSRF: trang lạ khiến trình duyệt gửi cookie thì nhận 403, cookie vẫn dùng được từ web thật', async () => {
     await register('web-csrf@example.com');
-    const { cookie } = await webLogin('web-csrf@example.com');
+    const { cookie, proof } = await webLogin('web-csrf@example.com');
 
     const evil = await http()
       .post('/api/auth/refresh')
@@ -191,7 +206,8 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
     expect(readSetCookie(evil)).toBeUndefined();
     await http().post('/api/auth/refresh').set({ Cookie: `tripflix_refresh=${cookie.value}` }).expect(403);
 
-    await http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`).expect(200);
+    await http().post('/api/auth/refresh').set(WEB).set(await proof('refresh', WEB_ORIGIN))
+      .set('Cookie', `tripflix_refresh=${cookie.value}`).expect(200);
   });
 
   it('làm mới web lỗi (không có cookie, cookie hỏng): 401 và xoá cookie', async () => {

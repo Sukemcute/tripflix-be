@@ -243,7 +243,10 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
 
   it('chế độ web: cookie HttpOnly, body không có refreshToken; Origin lạ 403', async () => {
     const token = await googleToken({ sub: 'sub-web', email: 'web-google@gmail.com' });
-    const res = await google(token, { 'X-Tripflix-Client': 'web', Origin: 'http://localhost:3100' }).expect(200);
+    const { createTestBrowserProof } = await import('./auth/infra/test-browser-proof.js');
+    const proof = await createTestBrowserProof();
+    const origin = 'http://localhost:3100';
+    const res = await google(token, { 'X-Tripflix-Client': 'web', Origin: origin, ...await proof('google', origin) }).expect(200);
     expect(res.body).not.toHaveProperty('refreshToken');
     expect(String(res.headers['set-cookie'])).toMatch(/tripflix_refresh=.+HttpOnly/);
     await google(token, { 'X-Tripflix-Client': 'web', Origin: 'https://evil.example' }).expect(403);

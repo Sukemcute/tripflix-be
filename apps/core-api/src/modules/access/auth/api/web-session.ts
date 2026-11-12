@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DEFAULT_WEB_ORIGINS, type CoreEnv } from '../../../../platform/env.js';
@@ -45,15 +46,17 @@ export function isWebClient(req: Request): boolean {
 export class WebSession {
   private readonly trustedOrigins: ReadonlySet<string>;
   private readonly isSecure: boolean;
+  private readonly primaryOrigin: string | undefined;
 
   constructor(@Inject(CORE_ENV) env: CoreEnv) {
     // E2E cũ dựng env tay có thể thiếu biến này: dùng mặc định như khi parse env.
     this.trustedOrigins = new Set((env.AUTH_WEB_ORIGINS as string[] | undefined) ?? DEFAULT_WEB_ORIGINS);
+    this.primaryOrigin = this.trustedOrigins.values().next().value;
     this.isSecure = env.NODE_ENV === 'production';
   }
 
   readRefreshToken(req: Request): string | undefined {
-    return readCookie(req.get('cookie'), REFRESH_COOKIE_NAME) || undefined;
+    return readCookie(req.get('cookie'), this.cookieName(req)) || undefined;
   }
 
   hasRefreshCookie(req: Request): boolean {
@@ -66,8 +69,8 @@ export class WebSession {
     if (!origin || !this.trustedOrigins.has(origin)) throw new ForbiddenException(UNTRUSTED_ORIGIN_MESSAGE);
   }
 
-  setRefreshCookie(res: Response, refreshToken: string): void {
-    res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+  setRefreshCookie(res: Response, refreshToken: string, req?: Request): void {
+    res.cookie(this.cookieName(req), refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: this.isSecure,
@@ -76,7 +79,13 @@ export class WebSession {
     });
   }
 
-  clearRefreshCookie(res: Response): void {
-    res.clearCookie(REFRESH_COOKIE_NAME, { httpOnly: true, sameSite: 'lax', secure: this.isSecure, path: REFRESH_COOKIE_PATH });
+  clearRefreshCookie(res: Response, req: Request): void {
+    res.clearCookie(this.cookieName(req), { httpOnly: true, sameSite: 'lax', secure: this.isSecure, path: REFRESH_COOKIE_PATH });
+  }
+
+  private cookieName(req?: Request): string {
+    const origin = req?.get('origin');
+    if (!origin || origin === this.primaryOrigin || !this.trustedOrigins.has(origin)) return REFRESH_COOKIE_NAME;
+    return `${REFRESH_COOKIE_NAME}_${createHash('sha256').update(origin).digest('hex').slice(0, 24)}`;
   }
 }
