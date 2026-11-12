@@ -18,6 +18,7 @@ import {
   type OrderStatus,
   type GuestInput,
 } from '../domain/order-rules.js';
+import { CellGate } from './cell-gate.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore } from './ports.js';
 
 export interface CheckoutItemInput {
@@ -133,6 +134,13 @@ export interface PricedItem extends NewOrderItem {
 /** Transaction chờ khoá vẫn giữ một kết nối: chờ quá lâu thì nhiều người tranh một phòng sẽ làm hết pool của commerce. */
 const HOLD_LOCK_WAIT_MS = 2_000;
 
+/**
+ * Số lượt giữ chỗ cùng một phòng, cùng ngày nhận được chạy cùng lúc trên một tiến trình (pool commerce có 10 kết nối).
+ * Lượt dư xếp hàng trong bộ nhớ tối đa bằng thời gian chờ khoá, quá thì 409 LOCK_BUSY; quá 200 lượt chờ thì 409 ngay.
+ */
+const MAX_CONCURRENT_HOLDS_PER_CELL = 3;
+const MAX_WAITING_HOLDS = 200;
+
 const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date: string; nights: number; qty: number }): InventoryCell[] =>
   Array.from({ length: item.nights }, (_, i) => ({ productType: item.productType, productId: item.productId, date: addDays(item.date, i), qty: item.qty }));
 
@@ -155,11 +163,19 @@ export class CheckoutUseCases {
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
   ) {}
 
+  private readonly holdGate = new CellGate({ maxPerKey: MAX_CONCURRENT_HOLDS_PER_CELL, maxWaiting: MAX_WAITING_HOLDS, waitMs: HOLD_LOCK_WAIT_MS });
+
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutView> {
-    const orderId = await this.holdAndCreateOrder(userId, input).catch((error: unknown) => {
-      if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
-      throw error;
-    });
+    const cells = [...new Set(input.items.map((i) => `${i.productId}|${i.checkIn}`))];
+    if (!(await this.holdGate.acquire(cells))) {
+      throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
+    }
+    const orderId = await this.holdAndCreateOrder(userId, input)
+      .catch((error: unknown) => {
+        if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
+        throw error;
+      })
+      .finally(() => this.holdGate.release(cells));
     // Đơn vừa tạo chưa có hoàn tiền, chưa có khách: bỏ 2 truy vấn chắc chắn trả rỗng.
     return this.getCheckout(userId, orderId, { isNewOrder: true });
   }

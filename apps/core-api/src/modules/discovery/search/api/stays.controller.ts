@@ -1,6 +1,7 @@
-import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, HttpException, HttpStatus, Inject, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CommerceError } from '../../../commerce/index.js';
+import { CommerceError, DATABASE_UNAVAILABLE_MESSAGE, RETRY_AFTER_SECONDS, isDatabaseUnavailable } from '../../../commerce/index.js';
 import { StaysUseCases } from '../application/stays.use-cases.js';
 import { STAY_SORTS } from '../domain/stays.js';
 import { ListStaysQuerySchema, StayPageDto } from './dto.js';
@@ -40,7 +41,7 @@ export class StaysController {
   @ApiQuery({ name: 'cursor', required: false, description: '`nextCursor` của trang trước' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: '1–50, mặc định 20' })
   @ApiOkResponse({ type: StayPageDto })
-  async listStays(@Query() query: Record<string, unknown>): Promise<StayPageDto> {
+  async listStays(@Query() query: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StayPageDto> {
     const parsed = ListStaysQuerySchema.safeParse(query);
     if (!parsed.success) throw invalid(parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })));
     try {
@@ -49,6 +50,11 @@ export class StaysController {
       return page;
     } catch (err) {
       if (err instanceof CommerceError && err.code === 'invalid_query') throw invalid([{ field: err.field ?? '', message: err.message }]);
+      // Database tắt hoặc hết kết nối: lỗi tạm, báo 503 kèm Retry-After để web, app hiện "hệ thống đang bận" (đo sự cố TF29).
+      if (isDatabaseUnavailable(err)) {
+        res.setHeader('Retry-After', String(RETRY_AFTER_SECONDS));
+        throw new HttpException({ statusCode: HttpStatus.SERVICE_UNAVAILABLE, message: DATABASE_UNAVAILABLE_MESSAGE, reason: 'SERVICE_UNAVAILABLE', error: 'Service Unavailable' }, HttpStatus.SERVICE_UNAVAILABLE);
+      }
       throw err;
     }
   }
