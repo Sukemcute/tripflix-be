@@ -80,9 +80,10 @@ describe('InboxRepository trên Postgres thật', () => {
         'idx_inbox_user_id_unread',
       ]),
     );
+    expect(indexNames).toContain('uq_inbox_group_key');
     expect(indexNames).not.toContain('uq_inbox_source_event_id');
     const migrations = await pool.query<{ version: number }>('SELECT version FROM __migrations ORDER BY version');
-    expect(migrations.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(migrations.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
   });
 
   it('giữ thông báo đã đọc và chống ghi lại sự kiện đã xử lý trước khi migrate', async () => {
