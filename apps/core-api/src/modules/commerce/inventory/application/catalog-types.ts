@@ -54,6 +54,8 @@ export interface CatalogHotel {
   /** Thêm 06/11 (TF11, discovery cần cho tìm theo tên đường và gần tôi). Null khi chưa có dữ liệu. */
   address: string | null;
   location: { lat: number; lng: number } | null;
+  /** Điểm đánh giá của khách (trung bình 1–5, số đánh giá); null khi chưa có. Optional như slug để test của module khác không phải đổi. */
+  rating?: { average: number; count: number } | null;
 }
 
 export interface CatalogFlight {

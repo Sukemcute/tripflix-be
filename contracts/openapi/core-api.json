@@ -7361,6 +7361,25 @@
           "name"
         ]
       },
+      "StayRatingDto": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number",
+            "example": 4.5,
+            "description": "Điểm trung bình, thang 1–5"
+          },
+          "count": {
+            "type": "number",
+            "example": 77,
+            "description": "Số đánh giá"
+          }
+        },
+        "required": [
+          "average",
+          "count"
+        ]
+      },
       "StayDto": {
         "type": "object",
         "properties": {
@@ -7400,6 +7419,16 @@
             "type": "number",
             "example": 2400000,
             "description": "Tổng tiền cả kỳ ở, mọi phòng (VND)"
+          },
+          "rating": {
+            "nullable": true,
+            "description": "Điểm đánh giá của khách; null khi khách sạn chưa có đánh giá",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StayRatingDto"
+              }
+            ]
           }
         },
         "required": [
@@ -7409,7 +7438,8 @@
           "thumbnail",
           "province",
           "unitPrice",
-          "totalPrice"
+          "totalPrice",
+          "rating"
         ]
       },
       "StayPageDto": {

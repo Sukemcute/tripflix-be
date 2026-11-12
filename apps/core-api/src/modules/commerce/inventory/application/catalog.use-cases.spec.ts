@@ -12,7 +12,7 @@ const plans = [
 async function setup() {
   const store = new MemoryCommerceStore();
   for (const [id, province] of [['H1', 'da-nang'], ['H2', 'da-nang'], ['H3', 'phu-quoc']] as const) {
-    store.properties.push({ id, slug: `khach-san-${id.toLowerCase()}`, name: `Khách sạn ${id}`, provinceSlug: province, provinceName: province, city: null, stars: 4, brand: null, style: null, thumbnail: `/img/${id}.jpg`, images: [`/img/${id}.jpg`], ...(id === 'H1' ? { address: '1 Bạch Đằng, Đà Nẵng', lat: 16.07, lng: 108.22 } : {}) });
+    store.properties.push({ id, slug: `khach-san-${id.toLowerCase()}`, name: `Khách sạn ${id}`, provinceSlug: province, provinceName: province, city: null, stars: 4, brand: null, style: null, thumbnail: `/img/${id}.jpg`, images: [`/img/${id}.jpg`], ...(id === 'H1' ? { address: '1 Bạch Đằng, Đà Nẵng', lat: 16.07, lng: 108.22, ratingAvg: 4.5, reviewCount: 77 } : {}) });
   }
   store.roomTypes.push(
     { id: 'H1--STD', propertyId: 'H1', name: 'Tiêu chuẩn', maxGuests: 2, defaultTotal: 3, defaultPrice: 1_000_000, ratePlans: plans },
@@ -55,8 +55,8 @@ describe('CatalogUseCases.listCatalog', () => {
     const page = await catalog.listCatalog({ provinceSlug: 'da-nang' });
     expect(page.items.map((i) => i.id)).toEqual(['H1', 'H2']);
     const h1 = page.items[0]!;
-    expect(h1).toMatchObject({ type: 'hotel', province: { slug: 'da-nang' }, thumbnail: '/img/H1.jpg', isAvailable: true, address: '1 Bạch Đằng, Đà Nẵng', location: { lat: 16.07, lng: 108.22 } });
-    expect(page.items[1]).toMatchObject({ id: 'H2', address: null, location: null });
+    expect(h1).toMatchObject({ type: 'hotel', province: { slug: 'da-nang' }, thumbnail: '/img/H1.jpg', isAvailable: true, address: '1 Bạch Đằng, Đà Nẵng', location: { lat: 16.07, lng: 108.22 }, rating: { average: 4.5, count: 77 } });
+    expect(page.items[1]).toMatchObject({ id: 'H2', address: null, location: null, rating: null });
     expect(h1.options.map((o) => o.productId)).toEqual(['H1--STD', 'H1--FAM']);
     expect(h1.priceFrom).toBe(h1.options[0]!.priceFrom);
     expect(h1.options[0]!.availableDays).toBe(30);

@@ -11,6 +11,8 @@ export interface StayResult {
   unitPrice: number;
   /** Cả kỳ ở, mọi phòng. */
   totalPrice: number;
+  /** Điểm đánh giá của khách (trung bình 1–5, số đánh giá); null khi chưa có. */
+  rating: { average: number; count: number } | null;
 }
 
 export type StaySort = 'price' | 'price_desc' | 'stars';

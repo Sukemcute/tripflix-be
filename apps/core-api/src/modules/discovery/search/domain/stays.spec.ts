@@ -7,6 +7,7 @@ const stay = (hotelId: string, unitPrice: number, stars: number | null): StayRes
   stars,
   thumbnail: null,
   province: { slug: 'da-nang', name: 'Đà Nẵng' },
+  rating: null,
   unitPrice,
   totalPrice: unitPrice * 2,
 });
