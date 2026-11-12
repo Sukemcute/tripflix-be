@@ -1,5 +1,16 @@
 import 'reflect-metadata';
-import { ForbiddenException, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Module,
+  UnauthorizedException,
+  type ExecutionContext,
+  type INestApplication,
+} from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import { AuthModule } from './auth.module.js';
 import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { Reflector } from '@nestjs/core';
 import {
@@ -8,6 +19,8 @@ import {
   EMAIL_UNVERIFIED_CODE,
   EMAIL_UNVERIFIED_MESSAGE,
   OptionalAuthGuard,
+  OptionalAuthenticated,
+  OptionalCurrentUser,
   REVOCATION_CHECK_TIMEOUT_MS,
   RequireVerifiedEmail,
   Roles,
@@ -207,5 +220,53 @@ describe('OptionalAuthGuard', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('OptionalAuthenticated, OptionalCurrentUser qua AuthModule', () => {
+  let app: INestApplication;
+
+  @Controller('feed')
+  class FeedController {
+    @Get()
+    @OptionalAuthenticated()
+    list(@OptionalCurrentUser() user: AuthUser | undefined) {
+      return { userId: user?.userId ?? null };
+    }
+  }
+
+  beforeAll(async () => {
+    @Module({
+      imports: [
+        AuthModule.forRootAsync({
+          useFactory: () => ({
+            verifier: async (token: string) => {
+              if (token === 'good') return member;
+              throw new InvalidAccessTokenError();
+            },
+            blocklist: new MemorySidBlocklist(),
+          }),
+        }),
+      ],
+      controllers: [FeedController],
+    })
+    class TestModule {}
+
+    const moduleRef = await Test.createTestingModule({ imports: [TestModule] }).compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('khách và token sai nhận 200, người dùng là undefined', async () => {
+    await request(app.getHttpServer()).get('/feed').expect(200, { userId: null });
+    await request(app.getHttpServer()).get('/feed').set('Authorization', 'Bearer bad').expect(200, { userId: null });
+  });
+
+  it('token hợp lệ: controller nhận đúng người dùng', async () => {
+    await request(app.getHttpServer()).get('/feed').set('Authorization', 'Bearer good').expect(200, { userId: 'u-1' });
   });
 });
