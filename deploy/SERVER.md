@@ -141,7 +141,7 @@ Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, 
 
 ## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt, TF31 trợ lý Tripi)
 
-Hai service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-service` nhận `POST /moderate` từ core-api và `POST /chat` từ app.
+Ba service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-label-worker` gắn nhãn bình luận, `ai-service` nhận `POST /moderate` từ core-api và `POST /chat` từ app.
 
 ### Tóm tắt bình luận
 
@@ -165,6 +165,18 @@ dc --profile ai logs -f ai-summary-worker
 ```
 
 Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` rồi chạy lại lệnh `up`. Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
+
+### Gắn nhãn bình luận (TF44)
+
+`ai-label-worker` đọc `stream:core.content` bằng group `ai-labels`, ghi `ai:labels:*` và `ai:safety:*` vào Redis (TTL 30 ngày). Không gọi core-api, không gọi LLM, không cần secret; vẫn phải có `LLM_PROVIDER` để khởi động. Cần `AI_TAG` từ `sha-e630bc9`. Staging dùng ~290 MB RAM, giới hạn 1 nhân và 1 GB.
+
+```bash
+dc --profile ai up -d ai-label-worker
+dc --profile ai logs -f ai-label-worker   # cần dòng "listening on stream:core.content"
+dc exec redis redis-cli XINFO GROUPS stream:core.content   # ai-labels: lag 0, pending 0 là đạt
+```
+
+Sự cố model: đặt `CLASSIFIER_ENABLED=false` (tắt bộ phân loại ở cả hai worker) hoặc `dc stop ai-label-worker`, rồi chạy lại `up`. Lần chạy đầu worker đọc lại cả sự kiện cũ trong stream.
 
 ### Kiểm duyệt (`ai-service`)
 
@@ -231,7 +243,7 @@ App gọi `https://<API_HOST>/ai/chat`. Gateway chỉ nhận đúng `POST` vào 
 cd ~/tripflix-be
 sed -i 's/^AI_TAG=.*/AI_TAG=sha-164c7db/' deploy/.env.server
 grep -q '^CHAT_LLM_ENABLED=' deploy/.env.server || echo 'CHAT_LLM_ENABLED=false' >> deploy/.env.server
-dc --profile ai up -d --wait ai-service ai-summary-worker
+dc --profile ai up -d --wait ai-service ai-summary-worker ai-label-worker
 dc --profile gateway up -d --wait traefik
 ```
 
