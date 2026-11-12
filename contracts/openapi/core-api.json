@@ -873,6 +873,45 @@
         ]
       }
     },
+    "/api/v1/users/search": {
+      "get": {
+        "operationId": "UserSearchController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "1–50 ký tự",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "20 người mỗi trang",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/posts": {
       "post": {
         "operationId": "PostsController_createDraft",
@@ -4854,6 +4893,45 @@
         },
         "required": [
           "userId"
+        ]
+      },
+      "UserSearchItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Bảo Lê"
+          }
+        },
+        "required": [
+          "id",
+          "displayName"
+        ]
+      },
+      "UserSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSearchItemDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "hasMore"
         ]
       },
       "TripItineraryItemDto": {
