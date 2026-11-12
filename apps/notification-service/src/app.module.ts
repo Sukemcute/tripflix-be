@@ -29,6 +29,7 @@ import { envSchema, type Env } from './env.js';
 import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
 import { InboxController } from './inbox/inbox.controller.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
+import { PostNotificationRepository } from './inbox/post-notification.repository.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
 import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
@@ -156,6 +157,7 @@ export class InfraModule {}
     RealtimeGateway,
     InboxRepository,
     CommentNotificationRepository,
+    PostNotificationRepository,
     ReactionNotificationRepository,
     DirectoryRepository,
   ],
