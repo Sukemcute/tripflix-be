@@ -1,15 +1,19 @@
 import { Module } from '@nestjs/common';
 import { createDb } from '@tripflix/db';
-import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
+import type { Redis } from 'ioredis';
+import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
 import { ContentFacade, ContentModule } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
+import { PostRecommendationsController } from './recommend/api/post-recommendations.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
-import { RECOMMEND_CATALOG, RECOMMEND_STORE, type RecommendCatalog } from './recommend/application/ports.js';
+import { RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
+import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
+import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
@@ -59,6 +63,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     const items = page.items.filter((item): item is CatalogHotel => item.type === 'hotel').map((h) => ({ id: h.id, provinceSlug: h.province.slug }));
     return { items, nextCursor: page.nextCursor };
   },
+  getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
 });
 
 /**
@@ -67,7 +72,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
  */
 @Module({
   imports: [CommerceModule, ContentModule],
-  controllers: [SuggestController, StaysController, ExploreController, HomeRecommendationsController],
+  controllers: [SuggestController, StaysController, ExploreController, HomeRecommendationsController, PostRecommendationsController],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
@@ -82,7 +87,9 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
     { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: recommendCatalog },
     RecommendIngestUseCases,
+    { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
     BuildFeaturesUseCases,
+    PostRecommendationUseCases,
     BuildFeaturesJob,
     DiscoveryEventsConsumer,
   ],

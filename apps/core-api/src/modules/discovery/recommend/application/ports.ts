@@ -25,6 +25,26 @@ export interface RecommendCatalog {
   listPosts(cursor: string | null): Promise<Page<RecommendSourcePost>>;
   /** Khách sạn → tỉnh (province.slug). Thật: CommerceFacade.listCatalog. */
   listHotelProvinces(cursor: string | null): Promise<Page<{ id: string; provinceSlug: string }>>;
+  /** Trong postIds, bài còn hiện công khai kèm nội dung thẻ. Thật: ContentFacade.getVisiblePosts. */
+  getVisiblePosts(postIds: string[]): Promise<RecommendCardPost[]>;
+}
+
+export interface RecommendCardPost {
+  id: string;
+  postType: string;
+  title: string;
+  hashtags: string[];
+  coverMediaId: string | null;
+  authorId: string;
+  reactionTotal: number;
+}
+
+export const SERVED_STORE = Symbol('SERVED_STORE');
+
+/** Bài đã phục vụ cho mỗi người (chống lặp giữa các trang, 48 giờ, ≤ 100 id). Thật: Redis. */
+export interface ServedStore {
+  list(userId: string): Promise<string[]>;
+  add(userId: string, postIds: string[]): Promise<void>;
 }
 
 export interface RecommendPostRow extends PostMeta {

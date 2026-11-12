@@ -27,6 +27,7 @@ describe('BuildFeaturesUseCases', () => {
           nextCursor: null,
         }),
       listHotelProvinces: () => Promise.resolve({ items: [], nextCursor: null }),
+      getVisiblePosts: () => Promise.resolve([]),
     };
     return { store, useCases: new BuildFeaturesUseCases(store as unknown as RecommendStore, catalog) };
   };

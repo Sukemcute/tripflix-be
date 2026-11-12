@@ -35,6 +35,7 @@ describe('BuildFeaturesUseCases trên Postgres thật', () => {
     // Lật 2 trang để kiểm đọc hết.
     listPosts: (cursor) => Promise.resolve(cursor ? { items: posts.slice(1), nextCursor: null } : { items: posts.slice(0, 1), nextCursor: posts.length > 1 ? 'p2' : null }),
     listHotelProvinces: () => Promise.resolve({ items: [{ id: 'H-DL', provinceSlug: 'lam-dong' }], nextCursor: null }),
+    getVisiblePosts: () => Promise.resolve([]),
   };
 
   beforeAll(async () => {
