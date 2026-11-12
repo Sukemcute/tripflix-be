@@ -200,9 +200,31 @@ services:
       # true = không gọi DeepSeek (tắt khẩn cấp, ví dụ khi tốn tiền bất thường).
       SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
       CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
+      # false = chỉ tóm tắt bằng luật, không chạy bộ phân loại (tắt khi model có vấn đề).
+      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
       LOG_LEVEL: INFO
     cpus: ${AI_WORKER_CPUS:-1}
     mem_limit: 1536m
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # Worker gắn nhãn bình luận (TF44): group ai-labels trên stream:core.content, ghi ai:labels:*, ai:safety:* vào Redis (TTL 30 ngày).
+  # Không gọi core-api, không gọi LLM, nhưng thiếu LLM_PROVIDER thì không khởi động được. Staging dùng ~290 MB.
+  # Lần đầu chạy đọc lại cả sự kiện cũ trong stream. Sự cố model: CLASSIFIER_ENABLED=false hoặc dừng service này.
+  ai-label-worker:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.label_worker']
+    environment:
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
+      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
+      LOG_LEVEL: INFO
+    cpus: ${AI_WORKER_CPUS:-1}
+    mem_limit: 1g
     depends_on:
       redis: { condition: service_healthy }
 
