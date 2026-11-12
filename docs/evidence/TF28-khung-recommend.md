@@ -14,6 +14,7 @@
 - Sửa theo review D4: `occurred_at <= now`, lọc `post_type` trên `recommend_post_scores`, `replacePosts` 0 bài thì không xoá và bỏ lượt.
 - Sửa lỗi tìm thấy khi demo: kho khám phá rỗng làm trang thiếu một bài và mất cursor trang sau. Có test tái hiện.
 - Sửa lỗi tìm thấy khi nối thử web: chặn cứng bài đã gợi ý làm web nhận trang rỗng sau khi thả tim (tải lại feed). Nay bài đã gợi ý ở phiên trước (hơn 30 phút) chỉ bị đẩy xuống cuối, phân trang bằng offset cho mọi người. Kiểm lại trên stack: like một bài rồi tải lại 2 trang, không rỗng, chỉ bài vừa like rời danh sách.
+- Gu trong phiên (Duy yêu cầu sau khi thử web): bài vừa tương tác vào Redis (≤ 20 bài, 2 giờ), lần gọi gợi ý sau cộng thêm vào gu với trọng số giảm nửa mỗi 30 phút. Phản hồi ngay mà không đọc bảng thô, không đổi bảng gu, không thiên lệch lâu.
 
 ## Đối chiếu "Xong khi"
 
@@ -26,6 +27,7 @@
 | Đổi `for_you.ranker='popular_v0'` có hiệu lực ≤ 1 phút | Có | Demo: đổi sau 54 giây |
 | Bộ ba sai bị từ chối, có log | Có | Log `recommend_algos có bộ ba không hợp lệ, dùng trending` (`user_builder không có: khong_co@v9`) |
 | Giao lại sự kiện không ghi đôi | Có | `discovery-events.consumer.int.spec.ts` |
+| Thả tim xong gọi lại thấy bài cùng gu lên ngay | Có | Stack local: thích 1 bài Sài Gòn, vào Redis sau 396 ms, bài Sài Gòn khác từ hạng 9 lên 3, một bài mới vào top 20 ("Vì bạn quan tâm Sài Gòn"); bỏ tim thì xoá khỏi Redis. Test `gu trong phiên: …` (4 test) |
 
 ## Kết quả kiểm tra
 
