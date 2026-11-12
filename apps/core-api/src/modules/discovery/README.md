@@ -2,12 +2,12 @@
 
 - Chủ: Duy (backup Dũng)
 - Database: `core`, schema `discovery`, user Postgres `tf_discovery`
-- Bảng chính dự kiến: `search_documents`, `interaction_signals`, `recommendation_cache`
+- Bảng chính: `search_entities`, `search_documents`, `search_counts` (tìm kiếm); `recommend_*` (gợi ý bài, TF28)
 
 ## Phần con
 
 - search: bài đăng, khách sạn, vé (tsvector, unaccent, pg_trgm, pgvector)
-- recommend: gợi ý khách sạn trang chủ web (đã có), gợi ý bài, gợi ý mục còn thiếu ở bước xác nhận
+- recommend: gợi ý khách sạn trang chủ web (đã có), gợi ý bài (TF28, xem mục "Gợi ý bài viết"), gợi ý mục còn thiếu ở bước xác nhận
 
 ## Khuôn thư mục
 
@@ -36,6 +36,9 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | `POST /api/search` | `search/api/explore.controller.ts` | Tìm khám phá của app: một ô tìm, kết quả chia vùng (Ở đâu, Lộ trình, Bài viết, Video). Xem mục 6 (TF11) |
 | Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút |
 | Gỡ bài ẩn khỏi chỉ mục + nạp tương tác cho gợi ý | `consumers/discovery-events.consumer.ts` | Consumer **duy nhất** của group `core-discovery` trên `stream:core.{content,commerce,access,discovery}`: mỗi sự kiện qua search (bài bị ẩn/xoá rời `search_documents` trong vài giây, TF33) rồi recommend (dòng thô `recommend_interactions`, TF28) |
+| `GET /api/recommendations/posts` | `recommend/api/post-recommendations.controller.ts` | Gợi ý bài `for_you`/`trending`, đăng nhập tuỳ chọn (TF28) |
+| Bảng `recommend_*` | `db/schema/recommend.ts` | Bảng thô `recommend_interactions`, metadata bài, điểm bài, đặc trưng người, `recommend_algos`, `recommend_job_state` |
+| Job đặc trưng gợi ý | `recommend/jobs/build-features.job.ts` | Lúc khởi động và mỗi 10 phút; dọn hạn lưu bảng thô mỗi 24 giờ (`purge-interactions.job.ts`) |
 
 ## Giao tiếp
 
@@ -113,3 +116,21 @@ Chọn địa điểm thì web gọi `/stays?placeId=<refId>`. Chọn khách s�
 | Từ điển | `search/domain/explore/lexicon-rows.ts`. Thêm cách viết mới = thêm dòng; chỉ mục dựng lại ở chu kỳ job kế tiếp |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate discovery`. Không sửa migration đã merge.
+
+## Gợi ý bài viết (TF28)
+
+Thiết kế: root `docs/proposals/recommend-offline-architecture.md`. Ba phần, nối bằng bảng:
+
+1. **Nạp** (`consumers/discovery-events.consumer.ts` → `recommend/domain/ingest/to-raw-rows.ts`): sự kiện → 0..n dòng `recommend_interactions`. `ref_id` quyết định ghi đè (cảm xúc theo bài) hay thêm mới (`eventId`, như chia sẻ, tìm kiếm). Upsert chỉ ghi đè khi `occurred_at` mới hơn: giao lại không ghi đôi, sự kiện cũ không đè. Không lưu nội dung bình luận, câu tìm, tên, liên hệ.
+2. **Tính đặc trưng** (`recommend/application/build-features.use-cases.ts`, mỗi 10 phút, advisory lock): đồng bộ `recommend_posts` từ `content.listPosts` (`placeId` = tỉnh khách sạn gắn bài, không thì nơi trong `destinationName` + tiêu đề), chạy mọi post builder trên **một lô gồm mọi bài**, user builder theo lô 200. Builder lỗi giữ dữ liệu cũ, ghi `recommend_job_state.last_error`.
+3. **Phục vụ** (`recommend/application/post-recommendations.use-cases.ts`): bộ ba thuật toán từ `recommend_algos` (cache 60 giây) → ứng viên `hot` ≤ 150 + `fresh` (48 giờ) ≤ 50 + ~5% `explore` → bỏ bài đã tương tác, đã phục vụ (Redis 48 giờ, ≤ 100 id) → ranker → `getVisiblePosts`. Không đọc bảng thô, không ghi Postgres. Redis lỗi vẫn trả.
+
+**Cắm thuật toán:** hàm thuần trong `recommend/domain/` theo `contracts.ts` (JSON camelCase), đăng ký ở `registry.ts`. Builder v0: `hot@v0`, `tag_affinity@v0`, `none@v0`; ranker `tag_affinity_v0`, `popular_v0`. Đổi thuật toán không cần deploy:
+
+```sql
+UPDATE discovery.recommend_algos SET ranker = 'popular_v0', updated_at = now() WHERE name = 'for_you';
+```
+
+Bộ ba mà ranker không khai báo đọc được (`ranker.accepts`) bị từ chối: endpoint log `error` và dùng `trending`.
+
+**Theo dõi:** `recommend_job_state` (`last_run_at`, `last_error` theo từng builder), log `recommend.served` (`mode, algo, source, postId`), `XINFO GROUPS stream:core.content` (lag, pending của `core-discovery`).
