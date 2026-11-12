@@ -109,7 +109,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     await migrateModule({ url, module: 'commerce', migrationsFolder: fileURLToPath(new URL('./db/migrations', import.meta.url)) });
     pool = createPool({ url, max: 20, applicationName: 'commerce-checkout-int' });
     db = createDb(pool);
-    await seedCatalog(db, fileURLToPath(new URL('./db/seed/catalog.json', import.meta.url)));
+    // Chỉ 220 khách sạn gốc: đủ cho test, không nạp 1.980 khách sạn OSM và đánh giá của chúng (quá giờ chuẩn bị).
+    await seedCatalog(db, fileURLToPath(new URL('./db/seed/catalog.json', import.meta.url)), undefined, { shouldIncludeHotel: (id) => !id.startsWith('P-osm-') });
     await new CalendarUseCases(new DrizzleCommerceStore({ tx: db }), () => TODAY_DATE).openCalendarWindow(40);
     // Bỏ ngẫu nhiên của bộ sinh lịch: mọi ngày mở bán bình thường, đủ chỗ.
     await pool.query('update commerce.room_inventory set stop_sell = false, cta = false, ctd = false, min_los = 1, total = 10');
