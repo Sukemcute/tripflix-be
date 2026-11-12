@@ -44,16 +44,14 @@ export class PostNotificationRepository {
         [postId, occurredAt, isHidden],
       );
 
-      const invalidated = isHidden
-        ? await client.query<{ user_id: string }>(
-          `UPDATE inbox SET deleted_at = $2
-           WHERE deleted_at IS NULL AND data->>'postId' = $1
+      const invalidated = await client.query<{ user_id: string }>(
+          `UPDATE inbox SET deleted_at = COALESCE(deleted_at, $2), is_post_interaction_suppressed = true
+           WHERE NOT is_post_interaction_suppressed AND data->>'postId' = $1
              AND (type LIKE 'comment.%' OR type LIKE 'reaction.%')
              AND ($3 OR COALESCE(interaction_occurred_at, created_at) <= $4)
            RETURNING user_id`,
-          [postId, occurredAt, state!.is_current, state!.changed_at],
-        )
-        : null;
+          [postId, occurredAt, isHidden && state!.is_current, state!.changed_at],
+      );
       const notice = state!.is_current
         ? await client.query<InboxRow>(
           `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id)
@@ -65,7 +63,7 @@ export class PostNotificationRepository {
       await client.query('COMMIT');
       return {
         row: notice?.rows[0] ?? null,
-        invalidatedUsers: [...new Set(invalidated?.rows.map((row) => row.user_id))],
+        invalidatedUsers: [...new Set(invalidated.rows.map((row) => row.user_id))],
       };
     } catch (error) {
       await client.query('ROLLBACK');

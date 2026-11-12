@@ -1,7 +1,9 @@
 import { BadRequestException, Controller, Get, HttpException, HttpStatus, Inject, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { CommerceError, DATABASE_UNAVAILABLE_MESSAGE, RETRY_AFTER_SECONDS, isDatabaseUnavailable } from '../../../commerce/index.js';
+import { SearchEventsPublisher } from '../application/search-events.publisher.js';
 import { StaysUseCases } from '../application/stays.use-cases.js';
 import { STAY_SORTS } from '../domain/stays.js';
 import { ListStaysQuerySchema, StayPageDto } from './dto.js';
@@ -12,9 +14,14 @@ const invalid = (errors: { field: string; message: string }[]) => new BadRequest
 @ApiTags('discovery')
 @Controller('stays')
 export class StaysController {
-  constructor(@Inject(StaysUseCases) private readonly stays: StaysUseCases) {}
+  constructor(
+    @Inject(StaysUseCases) private readonly stays: StaysUseCases,
+    @Inject(SearchEventsPublisher) private readonly searchEvents: SearchEventsPublisher,
+  ) {}
 
   @Get()
+  @OptionalAuthenticated()
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Khách sạn còn phòng ở một nơi cho ngày đã chọn (trang kết quả web OTA)',
     description: [
@@ -41,12 +48,30 @@ export class StaysController {
   @ApiQuery({ name: 'cursor', required: false, description: '`nextCursor` của trang trước' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: '1–50, mặc định 20' })
   @ApiOkResponse({ type: StayPageDto })
-  async listStays(@Query() query: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StayPageDto> {
+  async listStays(
+    @Query() query: Record<string, unknown>,
+    @Res({ passthrough: true }) res: Response,
+    @OptionalCurrentUser() user?: AuthUser,
+  ): Promise<StayPageDto> {
     const parsed = ListStaysQuerySchema.safeParse(query);
     if (!parsed.success) throw invalid(parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })));
     try {
       const page = await this.stays.listStays(parsed.data);
       if (!page) throw invalid([{ field: 'placeId', message: 'Không có địa điểm này' }]);
+      // Đăng nhập thì phát discovery.stays.searched cho gợi ý (trang đầu, không await).
+      if (user && !parsed.data.cursor) {
+        const q = parsed.data;
+        this.searchEvents.staysSearched(user.userId, {
+          placeId: q.placeId,
+          checkIn: q.checkIn,
+          checkOut: q.checkOut,
+          adults: q.adults,
+          rooms: q.rooms ?? null,
+          minStars: q.minStars ?? null,
+          priceMax: q.priceMax ?? null,
+          resultCount: page.total,
+        });
+      }
       return page;
     } catch (err) {
       if (err instanceof CommerceError && err.code === 'invalid_query') throw invalid([{ field: err.field ?? '', message: err.message }]);

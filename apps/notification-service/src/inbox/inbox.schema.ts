@@ -83,10 +83,26 @@ const COMMENT_NOTIFICATIONS_SCHEMA = `
   CREATE TABLE deleted_notification_comments (comment_id uuid PRIMARY KEY, deleted_at timestamptz NOT NULL);
 `;
 
+const REACTION_NOTIFICATIONS_SCHEMA = `
+  CREATE UNIQUE INDEX uq_inbox_group_key ON inbox (group_key COLLATE "C") WHERE group_key IS NOT NULL;
+  CREATE TABLE reaction_notification_actors (
+    user_id uuid NOT NULL,
+    type text NOT NULL,
+    target_id uuid NOT NULL,
+    actor_id uuid NOT NULL,
+    inbox_id uuid REFERENCES inbox (id),
+    is_active boolean NOT NULL,
+    occurred_at timestamptz NOT NULL,
+    event_id text NOT NULL,
+    PRIMARY KEY (user_id, type, target_id, actor_id)
+  );
+`;
+
 const POST_MODERATION_NOTIFICATIONS_SCHEMA = `
-  ALTER TABLE inbox ADD COLUMN interaction_occurred_at timestamptz;
-  CREATE INDEX idx_inbox_active_interaction_post ON inbox ((data->>'postId'))
-    WHERE deleted_at IS NULL AND (type LIKE 'comment.%' OR type LIKE 'reaction.%');
+  ALTER TABLE inbox ADD COLUMN interaction_occurred_at timestamptz,
+    ADD COLUMN is_post_interaction_suppressed boolean NOT NULL DEFAULT false;
+  CREATE INDEX idx_inbox_unsuppressed_interaction_post ON inbox ((data->>'postId'))
+    WHERE NOT is_post_interaction_suppressed AND (type LIKE 'comment.%' OR type LIKE 'reaction.%');
   CREATE TABLE post_notification_moderation (
     post_id uuid PRIMARY KEY,
     changed_at timestamptz NOT NULL,
@@ -98,5 +114,6 @@ const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
   [3, COMMENT_NOTIFICATIONS_SCHEMA],
+  [4, REACTION_NOTIFICATIONS_SCHEMA],
   [5, POST_MODERATION_NOTIFICATIONS_SCHEMA],
 ] as const;

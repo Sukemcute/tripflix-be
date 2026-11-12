@@ -1,3 +1,5 @@
+import { normalizeText } from './normalize-text.js';
+
 /**
  * Cây địa điểm v1: 34 tỉnh, thành sau sáp nhập 2025 và các điểm đến mà danh mục commerce dùng làm provinceSlug.
  * id trùng provinceSlug của commerce, nên khách sạn gắn thẳng vào nút này.
@@ -73,3 +75,8 @@ export const PLACES: readonly PlaceSeed[] = [
   destination('ha-long', 'Hạ Long', 'quang-ninh', ['halong']),
   destination('quy-nhon', 'Quy Nhơn', 'gia-lai', ['quynhon']),
 ];
+
+const PLACE_ID_BY_NAME = new Map(PLACES.flatMap((p) => [p.name, ...p.aliases].map((n) => [normalizeText(n), p.id] as const)));
+
+/** Tên hoặc bí danh nơi (vd 'Đà Lạt' của lexicon tìm khám phá) → id trong PLACES; không có thì null. */
+export const placeIdOfName = (name: string): string | null => PLACE_ID_BY_NAME.get(normalizeText(name)) ?? null;

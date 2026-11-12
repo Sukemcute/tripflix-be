@@ -442,6 +442,7 @@ describe('Social Application Use Cases', () => {
           payload: expect.objectContaining({
             postId,
             userId: otherUserId,
+            postAuthorId: authorId,
             reactionTotal: 1,
           }),
         }),

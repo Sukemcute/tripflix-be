@@ -4,6 +4,7 @@ import type { EventEnvelope } from '@tripflix/contracts';
 import { startPostgres, type PostgresFixture } from '@tripflix/testing';
 import pg from 'pg';
 import { EventRouter, MemoryProcessedEvents } from '../consumers/event-router.js';
+import { ReactionNotificationRepository } from '../grouping/reaction-notification.repository.js';
 import { MemoryMailer } from '../outapp/mailer.js';
 import { CommentNotificationRepository } from './comment-notification.repository.js';
 import { InboxRepository } from './inbox.repository.js';
@@ -50,7 +51,8 @@ describe('Thông báo kiểm duyệt bài và video trên PostgreSQL', () => {
     await inbox.onModuleInit();
     router = new EventRouter(
       new MemoryMailer(), new MemoryProcessedEvents(), () => undefined, undefined,
-      inbox, { emitToUser }, undefined, new CommentNotificationRepository(pool), new PostNotificationRepository(pool),
+      inbox, { emitToUser }, undefined, new CommentNotificationRepository(pool),
+      new ReactionNotificationRepository(pool), new PostNotificationRepository(pool),
     );
   });
 
@@ -99,6 +101,26 @@ describe('Thông báo kiểm duyệt bài và video trên PostgreSQL', () => {
     await router.route(moderation(postId, 'hidden', 1));
     expect((await inbox.listForUser(recipient, { limit: 20 })).items).toEqual([
       expect.objectContaining({ source_event_id: newest.eventId }),
+    ]);
+  });
+
+  it('ẩn nhóm cảm xúc đã có và giữ ẩn khi người cũ thích lại sau khôi phục', async () => {
+    const postId = randomUUID();
+    const actor = randomUUID();
+    const reaction = (userId: string, type: string | null, minute: number) => event('content.reaction.updated', {
+      postId, postAuthorId: authorId, userId, type, reactionTotal: type ? 1 : 0, reactionCounts: {},
+    }, minute);
+    await router.route(reaction(actor, 'like', 0));
+    await router.route(reaction(actor, null, 1));
+    await router.route(moderation(postId, 'hidden', 2));
+    await router.route(reaction(randomUUID(), 'like', 3));
+    await router.route(moderation(postId, 'published', 4));
+    await router.route(reaction(actor, 'like', 5));
+    const list = () => inbox.listForUser(authorId, { limit: 20, tab: 'interactions' });
+    expect((await list()).items.filter((row) => row.data.postId === postId)).toEqual([]);
+    await router.route(reaction(randomUUID(), 'like', 6));
+    expect((await list()).items.filter((row) => row.data.postId === postId)).toEqual([
+      expect.objectContaining({ type: 'reaction.post', data: { postId, actorCount: 1 } }),
     ]);
   });
 
