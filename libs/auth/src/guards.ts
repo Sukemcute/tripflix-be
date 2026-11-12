@@ -41,6 +41,19 @@ function extractBearerToken(req: AuthRequest): string | undefined {
   return match?.[1];
 }
 
+/** Hỏi blocklist, quá REVOCATION_CHECK_TIMEOUT_MS thì ném lỗi; bên gọi tự quyết xử lý lỗi. */
+async function isBlockedWithinTimeout(blocklist: SidBlocklist, sid: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`quá ${REVOCATION_CHECK_TIMEOUT_MS} ms`)), REVOCATION_CHECK_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([blocklist.isBlocked(sid), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Kiểm access token (chữ ký, iss, aud, exp) và sid chưa bị chặn; gắn req.user. */
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
@@ -78,18 +91,43 @@ export class AccessTokenGuard implements CanActivate {
 
   /** Redis lỗi hoặc chậm thì coi như chưa thu hồi: token vẫn được kiểm chữ ký và hạn dùng. */
   private async isRevokedWithinTimeout(sid: string): Promise<boolean> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`quá ${REVOCATION_CHECK_TIMEOUT_MS} ms`)), REVOCATION_CHECK_TIMEOUT_MS);
-    });
     try {
-      return await Promise.race([this.blocklist.isBlocked(sid), timeout]);
+      return await isBlockedWithinTimeout(this.blocklist, sid);
     } catch (err) {
       this.logger.warn(`Không kiểm được phiên thu hồi, cho đi tiếp: ${(err as Error).message}`);
       return false;
-    } finally {
-      clearTimeout(timer);
     }
+  }
+}
+
+/**
+ * Đăng nhập tuỳ chọn cho route công khai có cá nhân hoá: không bao giờ ném 401.
+ * Không token, token sai hoặc hết hạn, sid bị chặn → khách (req.user không gán). Token hợp lệ → gán req.user.
+ * Blocklist lỗi hoặc quá REVOCATION_CHECK_TIMEOUT_MS cũng coi như khách: route vẫn chạy được khi Redis sập,
+ * và không tin một token có thể đã thu hồi.
+ */
+@Injectable()
+export class OptionalAuthGuard implements CanActivate {
+  private readonly logger = new Logger(OptionalAuthGuard.name);
+
+  constructor(
+    @Inject(AUTH_VERIFIER) private readonly verify: AccessTokenVerifier,
+    @Inject(SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<AuthRequest>();
+    const token = extractBearerToken(req);
+    if (!token) return true;
+    try {
+      const user = await this.verify(token);
+      if (!(await isBlockedWithinTimeout(this.blocklist, user.sid))) req.user = user;
+    } catch (err) {
+      if (!(err instanceof InvalidAccessTokenError)) {
+        this.logger.warn(`Không kiểm được token tuỳ chọn, coi như khách: ${(err as Error).message}`);
+      }
+    }
+    return true;
   }
 }
 
@@ -131,6 +169,9 @@ export class VerifiedEmailGuard implements CanActivate {
 /** Bắt buộc đăng nhập. */
 export const Authenticated = () => UseGuards(AccessTokenGuard);
 
+/** Đăng nhập tuỳ chọn: khách vẫn qua, lấy người dùng bằng @OptionalCurrentUser. */
+export const OptionalAuthenticated = () => UseGuards(OptionalAuthGuard);
+
 /** Bắt buộc đăng nhập và có một trong các vai trò. Dùng cho controller hoặc từng handler. */
 export const Roles = (...roles: Role[]) =>
   applyDecorators(SetMetadata(ROLES_KEY, roles), UseGuards(AccessTokenGuard, RolesGuard));
@@ -153,3 +194,9 @@ export const CurrentUser = createParamDecorator((_data: unknown, context: Execut
   if (!user) throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
   return user;
 });
+
+/** Người dùng đã kiểm nếu có, undefined nếu là khách (dùng sau @OptionalAuthenticated). */
+export const OptionalCurrentUser = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): AuthUser | undefined =>
+    context.switchToHttp().getRequest<AuthRequest>().user,
+);

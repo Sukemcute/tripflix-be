@@ -1,5 +1,16 @@
 import 'reflect-metadata';
-import { ForbiddenException, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Module,
+  UnauthorizedException,
+  type ExecutionContext,
+  type INestApplication,
+} from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import { AuthModule } from './auth.module.js';
 import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { Reflector } from '@nestjs/core';
 import {
@@ -7,6 +18,9 @@ import {
   AllowWhenRevocationUnavailable,
   EMAIL_UNVERIFIED_CODE,
   EMAIL_UNVERIFIED_MESSAGE,
+  OptionalAuthGuard,
+  OptionalAuthenticated,
+  OptionalCurrentUser,
   REVOCATION_CHECK_TIMEOUT_MS,
   RequireVerifiedEmail,
   Roles,
@@ -150,5 +164,109 @@ describe('TF05D: VerifiedEmailGuard, RequireVerifiedEmail', () => {
     }
     const guards = Reflect.getMetadata(GUARDS_METADATA, Ctrl.prototype.createPost) as unknown[];
     expect(guards).toEqual([AccessTokenGuard, VerifiedEmailGuard]);
+  });
+});
+
+describe('OptionalAuthGuard', () => {
+  const verify = async (token: string) => {
+    if (token === 'good') return member;
+    throw new InvalidAccessTokenError();
+  };
+  const req = (authorization?: string) =>
+    ({ headers: authorization ? { authorization } : {} }) as Record<string, unknown>;
+
+  it('không token: cho qua như khách', async () => {
+    const r = req();
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('token hợp lệ: gắn req.user', async () => {
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toEqual(member);
+  });
+
+  it('token sai: cho qua như khách, không 401', async () => {
+    const r = req('Bearer bad');
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('sid bị chặn: cho qua như khách', async () => {
+    const blocklist = new MemorySidBlocklist();
+    await blocklist.block('s-1', 900);
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, blocklist).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('blocklist lỗi: cho qua như khách', async () => {
+    const broken = { block: async () => undefined, isBlocked: async () => Promise.reject(new Error('redis down')) };
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, broken).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('blocklist treo: cho qua như khách sau thời gian chờ', async () => {
+    vi.useFakeTimers();
+    try {
+      const slow = { block: async () => undefined, isBlocked: () => new Promise<boolean>(() => undefined) };
+      const r = req('Bearer good');
+      const passed = new OptionalAuthGuard(verify, slow).canActivate(context(r));
+      await vi.advanceTimersByTimeAsync(REVOCATION_CHECK_TIMEOUT_MS);
+      await expect(passed).resolves.toBe(true);
+      expect(r.user).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('OptionalAuthenticated, OptionalCurrentUser qua AuthModule', () => {
+  let app: INestApplication;
+
+  @Controller('feed')
+  class FeedController {
+    @Get()
+    @OptionalAuthenticated()
+    list(@OptionalCurrentUser() user: AuthUser | undefined) {
+      return { userId: user?.userId ?? null };
+    }
+  }
+
+  beforeAll(async () => {
+    @Module({
+      imports: [
+        AuthModule.forRootAsync({
+          useFactory: () => ({
+            verifier: async (token: string) => {
+              if (token === 'good') return member;
+              throw new InvalidAccessTokenError();
+            },
+            blocklist: new MemorySidBlocklist(),
+          }),
+        }),
+      ],
+      controllers: [FeedController],
+    })
+    class TestModule {}
+
+    const moduleRef = await Test.createTestingModule({ imports: [TestModule] }).compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('khách và token sai nhận 200, người dùng là undefined', async () => {
+    await request(app.getHttpServer()).get('/feed').expect(200, { userId: null });
+    await request(app.getHttpServer()).get('/feed').set('Authorization', 'Bearer bad').expect(200, { userId: null });
+  });
+
+  it('token hợp lệ: controller nhận đúng người dùng', async () => {
+    await request(app.getHttpServer()).get('/feed').set('Authorization', 'Bearer good').expect(200, { userId: 'u-1' });
   });
 });

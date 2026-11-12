@@ -1,5 +1,5 @@
 import { type DynamicModule, Global, Module, type ModuleMetadata } from '@nestjs/common';
-import { AUTH_VERIFIER, AccessTokenGuard, RolesGuard, SID_BLOCKLIST } from './guards.js';
+import { AUTH_VERIFIER, AccessTokenGuard, OptionalAuthGuard, RolesGuard, SID_BLOCKLIST } from './guards.js';
 import type { SidBlocklist } from './revocation.js';
 import { SERVICE_VERIFIER, ServiceTokenGuard, type ServiceTokenVerifier } from './service-token.js';
 import type { AccessTokenVerifier } from './verifier.js';
@@ -18,7 +18,7 @@ export interface AuthModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> 
 
 const OPTIONS = Symbol('AUTH_MODULE_OPTIONS');
 
-/** Cấp AccessTokenGuard, RolesGuard, ServiceTokenGuard cho cả app. Mỗi app gọi forRootAsync một lần. */
+/** Cấp AccessTokenGuard, OptionalAuthGuard, RolesGuard, ServiceTokenGuard cho cả app. Mỗi app gọi forRootAsync một lần. */
 @Global()
 @Module({})
 export class AuthModule {
@@ -32,10 +32,11 @@ export class AuthModule {
         { provide: SID_BLOCKLIST, inject: [OPTIONS], useFactory: (o: AuthModuleOptions) => o.blocklist },
         { provide: SERVICE_VERIFIER, inject: [OPTIONS], useFactory: (o: AuthModuleOptions) => o.serviceVerifier ?? null },
         AccessTokenGuard,
+        OptionalAuthGuard,
         RolesGuard,
         ServiceTokenGuard,
       ],
-      exports: [AUTH_VERIFIER, SID_BLOCKLIST, SERVICE_VERIFIER, AccessTokenGuard, RolesGuard, ServiceTokenGuard],
+      exports: [AUTH_VERIFIER, SID_BLOCKLIST, SERVICE_VERIFIER, AccessTokenGuard, OptionalAuthGuard, RolesGuard, ServiceTokenGuard],
     };
   }
 }
