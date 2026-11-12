@@ -1,7 +1,8 @@
 import type { EventEnvelope } from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
 import type { CoreEnv } from '../../../../platform/env.js';
-import { ExploreContentConsumer } from '../consumers/explore-content.consumer.js';
+import { DiscoveryEventsConsumer } from '../../consumers/discovery-events.consumer.js';
+import type { RecommendIngestUseCases } from '../../recommend/application/ingest.use-cases.js';
 import { buildIndex } from '../domain/explore/build.js';
 import { RebuildExploreIndexJob } from '../jobs/rebuild-explore-index.job.js';
 import { MemoryExploreSource } from '../domain/explore/memory-source.js';
@@ -176,7 +177,8 @@ describe('ExploreUseCases', () => {
         const hidden: string[] = [];
         const { explore } = setup([], plans, hidden);
         const job = new RebuildExploreIndexJob({ APP_ROLE: 'worker' } as CoreEnv, explore);
-        const consumer = new ExploreContentConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore);
+        const recommend = { ingest: () => Promise.resolve() } as unknown as RecommendIngestUseCases;
+        const consumer = new DiscoveryEventsConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore, recommend);
         const moderated = (action: string) =>
           consumer.route({ eventId: action, type: 'content.post.moderated', payload: { postId: 'P2', action } } as unknown as EventEnvelope);
         const minute = 60_000;

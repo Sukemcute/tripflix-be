@@ -3,8 +3,12 @@ import { createDb } from '@tripflix/db';
 import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
 import { ContentFacade, ContentModule } from '../content/index.js';
+import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
+import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
+import { RECOMMEND_STORE } from './recommend/application/ports.js';
+import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -19,7 +23,6 @@ import {
 } from './search/application/ports.js';
 import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
-import { ExploreContentConsumer } from './search/consumers/explore-content.consumer.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
@@ -64,7 +67,9 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
     ExploreUseCases,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
-    ExploreContentConsumer,
+    { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
+    RecommendIngestUseCases,
+    DiscoveryEventsConsumer,
   ],
 })
 export class DiscoveryModule {}
