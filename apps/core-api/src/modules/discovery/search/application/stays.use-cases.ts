@@ -65,7 +65,9 @@ export class StaysUseCases {
     const available = hotels.flatMap((h): StayResult[] => {
       const a = byId.get(h.id);
       if (!a?.isAvailable || a.unitPrice === null || a.totalPrice === null) return [];
-      return [{ hotelId: h.id, name: h.name, stars: h.stars, thumbnail: h.thumbnail, province: h.province, unitPrice: a.unitPrice, totalPrice: a.totalPrice }];
+      return [
+        { hotelId: h.id, name: h.name, stars: h.stars, thumbnail: h.thumbnail, province: h.province, unitPrice: a.unitPrice, totalPrice: a.totalPrice, rating: h.rating ?? null },
+      ];
     });
     const ranked = filterAndSortStays(available, query, query.sort);
     return { ...paginate(ranked, query.cursor, query.limit), total: ranked.length };

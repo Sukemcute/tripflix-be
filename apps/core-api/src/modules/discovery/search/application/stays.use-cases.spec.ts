@@ -80,6 +80,18 @@ describe('StaysUseCases.listStays', () => {
     );
   });
 
+  it('trả điểm đánh giá của khách từ commerce; khách sạn chưa có đánh giá thì null', async () => {
+    const rated = { ...hotel('dl1', 'da-lat', 2), rating: { average: 4.5, count: 77 } };
+    const { commerce } = fakeCommerce({ 'lam-dong': [hotel('ld1', 'lam-dong', 3)], 'da-lat': [rated] }, { ld1: 900_000, dl1: 600_000 });
+
+    const page = await new StaysUseCases(commerce).listStays(query());
+
+    expect(page?.items.map((s) => [s.hotelId, s.rating])).toEqual([
+      ['dl1', { average: 4.5, count: 77 }],
+      ['ld1', null],
+    ]);
+  });
+
   it('hỏi còn phòng theo lô tối đa 100 mã', async () => {
     const many = Array.from({ length: 150 }, (_, i) => hotel(`h${i}`, 'da-lat', 3));
     const { commerce, checkAvailability } = fakeCommerce({ 'da-lat': many }, {}, 40);
