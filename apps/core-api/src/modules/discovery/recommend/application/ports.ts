@@ -3,6 +3,29 @@ import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 import type { AlgoRow } from '../domain/registry.js';
 
 export const RECOMMEND_STORE = Symbol('RECOMMEND_STORE');
+export const RECOMMEND_CATALOG = Symbol('RECOMMEND_CATALOG');
+
+/** Bài đang hiện công khai cho gợi ý. Thật: ContentFacade.listPosts (VisiblePostSummary). */
+export interface RecommendSourcePost {
+  id: string;
+  authorId: string;
+  postType: string;
+  title: string;
+  hashtags: string[];
+  isVerified: boolean;
+  tripAttachment: { hotelId?: string; destinationName?: string } | null;
+  /** listPosts không có publishedAt: dùng createdAt. */
+  createdAt: Date;
+}
+
+type Page<T> = { items: T[]; nextCursor: string | null };
+
+/** Nguồn dữ liệu module khác cho bộ điều phối gợi ý, đọc theo trang. */
+export interface RecommendCatalog {
+  listPosts(cursor: string | null): Promise<Page<RecommendSourcePost>>;
+  /** Khách sạn → tỉnh (province.slug). Thật: CommerceFacade.listCatalog. */
+  listHotelProvinces(cursor: string | null): Promise<Page<{ id: string; provinceSlug: string }>>;
+}
 
 export interface RecommendPostRow extends PostMeta {
   isVerified: boolean;

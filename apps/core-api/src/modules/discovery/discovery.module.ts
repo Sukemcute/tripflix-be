@@ -6,9 +6,11 @@ import { ContentFacade, ContentModule } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
+import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
-import { RECOMMEND_STORE } from './recommend/application/ports.js';
+import { RECOMMEND_CATALOG, RECOMMEND_STORE, type RecommendCatalog } from './recommend/application/ports.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
+import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -49,6 +51,16 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
   findVisiblePostIds: async (postIds) => new Set((await content.getVisiblePosts(postIds)).map((p) => p.id)),
 });
 
+/** Bài + khách sạn → tỉnh cho bộ điều phối gợi ý. days: 1 vì chỉ cần tỉnh, không cần giá. */
+const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): RecommendCatalog => ({
+  listPosts: (cursor) => content.listPosts({ cursor, limit: 100 }),
+  listHotelProvinces: async (cursor) => {
+    const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 1 });
+    const items = page.items.filter((item): item is CatalogHotel => item.type === 'hotel').map((h) => ({ id: h.id, provinceSlug: h.province.slug }));
+    return { items, nextCursor: page.nextCursor };
+  },
+});
+
 /**
  * Module discovery. Chủ: Duy (backup Dũng). Xem README.md cùng thư mục.
  * Module khác chỉ dùng những gì được export trong index.ts. Gọi commerce, content qua facade (một chiều, trong tiến trình).
@@ -68,7 +80,10 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): Explo
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
+    { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: recommendCatalog },
     RecommendIngestUseCases,
+    BuildFeaturesUseCases,
+    BuildFeaturesJob,
     DiscoveryEventsConsumer,
   ],
 })
