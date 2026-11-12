@@ -28,6 +28,7 @@ import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-ro
 import { envSchema, type Env } from './env.js';
 import { InboxController } from './inbox/inbox.controller.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
+import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RealtimeService } from './realtime/realtime.service.js';
@@ -146,7 +147,14 @@ export class InfraModule {}
     }),
   ],
   controllers: [HealthController, MeController, InboxController],
-  providers: [NotificationConsumer, DeadLetterReplayJob, RealtimeService, RealtimeGateway, InboxRepository],
+  providers: [
+    NotificationConsumer,
+    DeadLetterReplayJob,
+    RealtimeService,
+    RealtimeGateway,
+    InboxRepository,
+    DirectoryRepository,
+  ],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(

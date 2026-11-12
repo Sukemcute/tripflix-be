@@ -16,6 +16,7 @@ import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
+import { DirectoryRepository } from '../directory/directory.repository.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { EventRouter, type ProcessedEvents } from './event-router.js';
@@ -58,6 +59,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     @Inject(PROCESSED_EVENTS) private readonly processed: ProcessedEvents,
     @Inject(RealtimeService) private readonly realtime: RealtimeService,
     @Inject(InboxRepository) private readonly inbox: InboxRepository,
+    @Inject(DirectoryRepository) private readonly directory: DirectoryRepository,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -70,6 +72,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       { webAppUrl: this.env.WEB_APP_URL },
       this.inbox,
       this.realtime,
+      this.directory,
     );
     // XREADGROUP BLOCK giữ kết nối, nên dùng kết nối riêng.
     this.connection = this.redis.duplicate();
