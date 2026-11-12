@@ -1,7 +1,6 @@
 import type { AccessUserWelcomeEmailRequestedV1 } from '@tripflix/contracts';
-import { escapeHtml } from './html.js';
+import { emailButton, escapeHtml, renderEmailShell } from './html.js';
 import type { EmailMessage } from './mailer.js';
-
 
 /** Lợi ích liệt kê trong email chào mừng và email xác thực lúc đăng ký. */
 export const BENEFITS = [
@@ -18,13 +17,31 @@ function describeSignIn(payload: AccessUserWelcomeEmailRequestedV1): string {
 }
 
 /**
- * Email chào mừng khi tạo tài khoản, tiếng Việt. Style viết thẳng trong thẻ (inline) vì nhiều trình đọc email
- * bỏ qua thẻ <style>.
+ * Email chào mừng khi tạo tài khoản, tiếng Việt.
  */
 export function buildWelcomeEmail(payload: AccessUserWelcomeEmailRequestedV1, webAppUrl: string): EmailMessage {
   const name = escapeHtml(payload.displayName);
-  const url = escapeHtml(webAppUrl);
   const via = payload.provider === 'google' ? ' bằng Google' : '';
+
+  const benefitsListHtml = BENEFITS.map(
+    (b) =>
+      `<tr><td style="padding:6px 0;font-size:14px;color:#334155"><span style="color:#006C63;font-weight:700;margin-right:8px">✓</span>${escapeHtml(b)}</td></tr>`,
+  ).join('');
+
+  const content = [
+    `<p style="margin:0 0 16px;font-size:15px">Chào <strong>${name}</strong>,</p>`,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">Cảm ơn bạn đã tạo tài khoản Tripflix${via}. Từ giờ bạn có thể trải nghiệm đầy đủ các tính năng hấp dẫn:</p>`,
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 20px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px 16px">`,
+    benefitsListHtml,
+    '</table>',
+    emailButton(webAppUrl, 'Khám phá ngay'),
+    '<div style="margin:20px 0 12px;padding:14px 18px;background:#FFF0EB;border-left:4px solid #FF5A3C;border-radius:0 8px 8px 0">',
+    `  <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#BC331E">Thông tin đăng nhập</p>`,
+    `  <p style="margin:0;font-size:13px;color:#475569;line-height:1.5">${escapeHtml(describeSignIn(payload))}</p>`,
+    '</div>',
+    '<p style="margin:0 0 12px;color:#64748B;font-size:13px">Nếu không phải bạn tạo tài khoản này, hãy bỏ qua email này.</p>',
+  ].join('\n');
+
   return {
     to: payload.email,
     subject: 'Chào mừng bạn đến với Tripflix',
@@ -41,16 +58,12 @@ export function buildWelcomeEmail(payload: AccessUserWelcomeEmailRequestedV1, we
       '',
       'Tripflix · Chạm cảm hứng, trọn hành trình.',
     ].join('\n'),
-    html: [
-      '<div style="font-family:\'Be Vietnam Pro\',Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#18242B;line-height:1.7">',
-      '<p style="font-size:22px;font-weight:700;margin:0 0 16px">Chào mừng bạn đến với Tripflix 👋</p>',
-      `<p>Chào ${name},</p>`,
-      `<p>Cảm ơn bạn đã tạo tài khoản Tripflix${via}. Từ giờ bạn có thể:</p>`,
-      `<ul>${BENEFITS.map((benefit) => `<li>${benefit}</li>`).join('')}</ul>`,
-      `<p style="margin:24px 0"><a href="${url}" style="display:inline-block;background:#BC331E;color:#FFFFFF;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:12px">Khám phá ngay</a></p>`,
-      `<p style="color:#64748B;font-size:13px">${escapeHtml(describeSignIn(payload))}<br>Nếu không phải bạn tạo tài khoản này, hãy bỏ qua email này.</p>`,
-      '<p style="color:#94A3B8;font-size:12px">Tripflix · Chạm cảm hứng, trọn hành trình.</p>',
-      '</div>',
-    ].join('\n'),
+    html: renderEmailShell({
+      title: 'Chào mừng bạn đến với Tripflix',
+      badge: { text: 'CHÀO MỪNG BẠN', bg: '#D9F4F1', color: '#006C63' },
+      heading: 'Chào mừng bạn đến với Tripflix 👋',
+      content,
+      footerNote: 'Email này được gửi tự động khi tài khoản Tripflix của bạn được kích hoạt thành công.',
+    }),
   };
 }
