@@ -338,7 +338,28 @@ Image trên GHCR là private, nên `<user>` phải `docker login ghcr.io` bằng
 Quay về bản cũ: chạy workflow `deploy-web` trên GitHub với commit muốn dùng, hoặc trên server chạy `/opt/tripflix/deploy.sh sha-xxxxxxx`.
 
 - Kiểm tra tự động chỉ phát hiện web không trả 200, không phát hiện lỗi giao diện hay nghiệp vụ.
-- Phần này chỉ áp dụng cho web. Backend xem mục dưới.
+- Phần này áp dụng cho web và Back Office (mục dưới). Backend xem mục Deploy backend tự động.
+
+## Back Office
+
+Back Office (`tripflix-fe/apps/admin`) chạy ở `https://<ADMIN_HOST>`, mặc định `admin.<WEB_HOST>`, hiện là `https://admin.tripflix.io.vn`. CI gắn địa chỉ API và web vào bundle lúc build; web được build với `NEXT_PUBLIC_ADMIN_URL` trỏ về địa chỉ này cho nút "Trang quản trị".
+
+Deploy giống web: merge vào `develop` có thay đổi admin thì workflow gửi `admin sha-xxxxxxx` tới cùng script. Tag nằm trong `deploy/.env.web` (`ADMIN_IMAGE`, `ADMIN_TAG`), cạnh tag của web. Service `admin` ở profile `admin`, nên `dc --profile gateway up -d` không tự bật; script tự bật profile này.
+
+Cài một lần, theo thứ tự:
+
+1. Ở Tenten, thêm bản ghi A `admin` trỏ về IP của server.
+2. Trên server, trong `.env.server`, thêm origin của Back Office vào `AUTH_WEB_ORIGINS`, ví dụ `https://tripflix.io.vn,https://admin.tripflix.io.vn`. Thiếu thì API chặn đăng nhập trên Back Office (CORS, chống CSRF). Đặt `ADMIN_HOST` nếu không dùng `admin.<WEB_HOST>`.
+3. Chép `deploy/` mới lên server, cài lại script (bản cũ chỉ hiểu tag của web) và áp dụng cấu hình:
+
+   ```bash
+   sudo install -m 755 -o root -g root ~/tripflix-be/deploy/deploy-web.sh /opt/tripflix/deploy.sh
+   dc --profile api --profile gateway up -d core-api traefik   # core-api nhận AUTH_WEB_ORIGINS mới, Traefik nhận router admin
+   ```
+
+4. Deploy lần đầu: chạy workflow `deploy-web` trên GitHub, chọn `admin` và commit có image admin, hoặc trên server chạy `/opt/tripflix/deploy.sh admin sha-xxxxxxx`. Lần đầu không đạt thì script dừng container admin, vì không có bản trước để quay về.
+
+Xong khi `https://admin.tripflix.io.vn/healthz` trả 200 với chứng chỉ hợp lệ và đăng nhập được bằng tài khoản moderator hay superadmin.
 
 ## Deploy backend tự động
 
