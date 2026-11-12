@@ -57,6 +57,7 @@ Dựng lần đầu, hoặc sau khi pull code có migration mới:
 ```sh
 pnpm stack:infra                     # Postgres, Redis, Mailpit
 cp apps/core-api/.env.example apps/core-api/.env
+cp apps/notification-service/.env.example apps/notification-service/.env
 pnpm build && pnpm db:migrate && pnpm db:seed
 ```
 

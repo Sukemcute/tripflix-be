@@ -77,7 +77,7 @@ export class InboxRepository implements OnModuleInit {
       `
       INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id)
       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
-      ON CONFLICT (source_event_id) DO NOTHING RETURNING *
+      ON CONFLICT DO NOTHING RETURNING *
     `,
       [
         item.userId,
