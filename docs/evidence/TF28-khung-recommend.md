@@ -13,6 +13,7 @@
 - Search phát `discovery.search.performed` / `discovery.stays.searched` khi đã đăng nhập và ở trang đầu (không chờ, lỗi không ảnh hưởng search).
 - Sửa theo review D4: `occurred_at <= now`, lọc `post_type` trên `recommend_post_scores`, `replacePosts` 0 bài thì không xoá và bỏ lượt.
 - Sửa lỗi tìm thấy khi demo: kho khám phá rỗng làm trang thiếu một bài và mất cursor trang sau. Có test tái hiện.
+- Sửa lỗi tìm thấy khi nối thử web: chặn cứng bài đã gợi ý làm web nhận trang rỗng sau khi thả tim (tải lại feed). Nay bài đã gợi ý ở phiên trước (hơn 30 phút) chỉ bị đẩy xuống cuối, phân trang bằng offset cho mọi người. Kiểm lại trên stack: like một bài rồi tải lại 2 trang, không rỗng, chỉ bài vừa like rời danh sách.
 
 ## Đối chiếu "Xong khi"
 
