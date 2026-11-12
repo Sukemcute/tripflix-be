@@ -260,6 +260,8 @@ services:
     environment:
       API_HOST: ${API_HOST:?}
       WEB_HOST: ${WEB_HOST:?}
+      # Back Office. Chưa đặt thì dùng admin.<WEB_HOST>; DNS của tên này phải trỏ về máy này.
+      ADMIN_HOST: ${ADMIN_HOST:-admin.${WEB_HOST}}
     ports:
       - '${HTTP_PORT:-80}:80'
       - '${HTTPS_PORT:-443}:443'
@@ -287,6 +289,20 @@ services:
     logging: *logging
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Back Office (tripflix-fe/apps/admin). Chỉ chạy image từ GHCR: CI gắn địa chỉ API và web vào bundle lúc build.
+  # Profile riêng để `--profile gateway up` không bật admin khi chưa deploy; deploy-web.sh tự bật profile này.
+  admin:
+    profiles: [admin]
+    image: ${ADMIN_IMAGE:-ghcr.io/sukemcute/tripflix-fe/admin}:${ADMIN_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3200/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 12
