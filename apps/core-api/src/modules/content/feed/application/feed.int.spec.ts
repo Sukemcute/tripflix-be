@@ -66,12 +66,18 @@ describe('Feed trên Postgres thật', () => {
 
   async function insertPost(
     mediaIds: string[],
-    options: { status?: string; visibility?: string; createdAt?: string; deleted?: boolean } = {},
+    options: {
+      status?: string;
+      visibility?: string;
+      createdAt?: string;
+      deleted?: boolean;
+      postType?: 'video' | 'vlog';
+    } = {},
   ) {
     const id = randomUUID();
     await pool.query(
       `insert into content.posts (id, author_id, post_type, title, status, visibility, media_ids, created_at, deleted_at)
-       values ($1, $2, 'video', 'Bài', $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz)`,
+       values ($1, $2, $8, 'Bài', $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz)`,
       [
         id,
         OWNER_ID,
@@ -80,6 +86,7 @@ describe('Feed trên Postgres thật', () => {
         JSON.stringify(mediaIds),
         options.createdAt ?? new Date().toISOString(),
         options.deleted ? new Date().toISOString() : null,
+        options.postType ?? 'video',
       ],
     );
     return id;
@@ -369,5 +376,45 @@ describe('Feed trên Postgres thật', () => {
       { liked: false, saved: false },
     ]);
     expect(guestPage.items.map((item) => item.viewerState)).toEqual([null, null]);
+  });
+
+  it('bài viết (vlog) cũ lỡ kèm video phát được vẫn không lọt vào feed Reels, cả for_you lẫn hot', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const reel = await insertPost([asset]);
+    await insertPost([asset], { postType: 'vlog' });
+
+    const forYou = await feed.getPage({ limit: 20, after: null, viewerId: null });
+    const hot = await feed.getPage({ tab: 'hot', limit: 20, after: null, viewerId: null });
+
+    expect(forYou.items.map((item) => item.postId)).toEqual([reel]);
+    expect(hot.items.map((item) => item.postId)).toEqual([reel]);
+  });
+
+  it('saved chỉ trả Reels phát được mà đúng người xem đã lưu, sang trang không lặp', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const savedIds: string[] = [];
+    for (const day of ['01', '02', '03']) {
+      const id = await insertPost([asset], { createdAt: `2026-11-${day}T00:00:00Z` });
+      await pool.query('insert into content.bookmarks (post_id, user_id) values ($1, $2)', [id, VIEWER_ID]);
+      savedIds.unshift(id);
+    }
+    const notSaved = await insertPost([asset]);
+    const savedByOther = await insertPost([asset]);
+    await pool.query('insert into content.bookmarks (post_id, user_id) values ($1, $2)', [savedByOther, OWNER_ID]);
+    const savedVlog = await insertPost([], { postType: 'vlog' });
+    await pool.query('insert into content.bookmarks (post_id, user_id) values ($1, $2)', [savedVlog, VIEWER_ID]);
+
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const after = cursor ? decodeFeedCursor(cursor) : null;
+      const page = await feed.getPage({ limit: 2, after, viewerId: VIEWER_ID, isSavedOnly: true });
+      expect(page.items.every((item) => item.viewerState?.saved === true)).toBe(true);
+      ids.push(...page.items.map((item) => item.postId));
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    expect(ids).toEqual(savedIds);
+    expect(ids).not.toContain(notSaved);
   });
 });

@@ -49,6 +49,7 @@ export function testEnv(jwksUrl: string, redisUrl = 'redis://127.0.0.1:6379'): E
     SMTP_URL: 'smtp://127.0.0.1:1025',
     MAIL_FROM: 'Tripflix <no-reply@tripflix.local>',
     WEB_APP_URL: 'http://localhost:3100',
+    WEB_ORIGINS: ['http://localhost:3100'],
     // Test /ws không cần consumer.
     NOTIFICATION_CONSUMER_ENABLED: false,
     NOTIFICATION_CONSUMER_NAME: undefined,

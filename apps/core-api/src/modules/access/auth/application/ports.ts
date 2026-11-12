@@ -26,6 +26,8 @@ export type ProfilePatch = Partial<Pick<UserRecord, 'displayName'> & PersonalInf
 export interface SessionRecord extends RefreshState {
   id: string;
   userId: string;
+  deviceName: string | null;
+  createdAt: Date;
 }
 
 /** Phiên hiện ở màn "thiết bị đã đăng nhập"; không có bản băm token. */

@@ -14,9 +14,28 @@ Consumer group `notification` đọc `stream:core.access`, `stream:core.content`
 | `access.user.welcome_email_requested` v1 | Email "Chào mừng bạn đến với Tripflix", nút "Khám phá ngay" mở `WEB_APP_URL`; tài khoản tạo bằng Google có thêm cách tạo mật khẩu |
 | `access.registration_code_requested` v1 | Email "Mã xác thực đăng ký Tripflix". Mã gồm 8 chữ số, hiệu lực 10 phút |
 | `access.registration_attempted_existing` v1 | Email "Email này đã có tài khoản Tripflix", nút "Đăng nhập" mở `WEB_APP_URL/login`, kèm link `WEB_APP_URL/forgot-password` (đặt lại hoặc tạo mật khẩu cho tài khoản Google) |
+| `access.session_reuse_detected` v1 | Email "Phiên đăng nhập Tripflix của bạn đã bị đăng xuất" (nêu tên thiết bị nếu có), nút "Đăng nhập lại" mở `WEB_APP_URL/login`, kèm link `WEB_APP_URL/forgot-password` |
 | `access.email_verification_requested` v1 (TF05D) | Email chứa link xác thực 24 giờ cho tài khoản cũ. Vẫn nhận sự kiện `reason: "signup"` còn tồn từ bản trước |
 | `access.user.locked` v1, `access.user.role_changed` v1 (TF26A) | Ngắt mọi kết nối `/ws` của người đó ở mọi replica (access đã thu hồi mọi phiên) |
+| `commerce.order.paid` v1 (TF46) | Giữ email xác nhận khi có email liên hệ; lưu inbox `booking.paid`, phát `notification.created` |
+| `commerce.order.cancelled` v1 (TF46) | Lưu inbox `booking.cancelled`, kèm tiền hoàn khi có; phát `notification.created`, không gửi email |
 | Sự kiện khác | Ghi log "Đã nhận sự kiện" |
+
+## Hộp thư `/notifications` (TF46)
+
+Mọi route yêu cầu access token như `/notifications/me`, chỉ truy cập thông báo của người gọi.
+
+| Route | Kết quả |
+|---|---|
+| `GET /notifications?cursor=&limit=` | `{ items, unreadCount, nextCursor }`, mới nhất trước; `limit` 1–50, mặc định 20. Bỏ `cursor` ở trang đầu, dùng `nextCursor` cho trang sau; `null` là hết trang. Query sai trả 400, header `Cache-Control: no-store` |
+| `POST /notifications/:id/read` | `{ unreadCount }`; 404 nếu không có thông báo thuộc người gọi, UUID sai trả 400; gọi lại không đổi thời điểm đã đọc |
+| `POST /notifications/read-all` | Đánh dấu mọi thông báo của người gọi đã đọc, trả `{ unreadCount: 0 }` |
+
+`items` gồm `id`, `type`, `title`, `body`, `link`, `data`, `createdAt`, `readAt` (ISO hoặc null). Thông báo đặt chỗ có `link: "/bookings"`, `data: { orderId }`.
+Cursor là chuỗi base64url của JSON `[createdAt ISO, id]`, phân trang theo `(created_at, id)` giảm dần, giữ độ chính xác microsecond của Postgres.
+
+Repository dùng pool `DB` hiện có trong database notification; `OnModuleInit` tạo bảng `inbox` và index bằng DDL idempotent, không cần migration tool. Ghi inbox trước khi đánh dấu sự kiện đã xử lý; `source_event_id` duy nhất ngăn tạo thông báo trùng khi giao lại. Email paid giữ hành vi giao lại hiện có.
+Realtime `notification.created` mang `{ item, unreadCount }`; chỉ phát khi vừa thêm dòng mới. Lỗi realtime được ghi log và không khiến sự kiện thất bại. Client kết nối lại cần tải hộp thư qua HTTP.
 
 ## WebSocket `/ws` (TF26A)
 
@@ -59,4 +78,4 @@ socket.on('connect', () => {
 | `NOTIFICATION_CONSUMER_ENABLED` | `true` | Tắt khi chạy test không có Redis |
 | `NOTIFICATION_CONSUMER_NAME` | hostname | Mỗi replica một tên |
 
-Chưa có: hộp thư in-app (`inbox`, `/notifications`), push qua Expo, gom thông báo, tuỳ chọn người dùng.
+Chưa có: push qua Expo, gom thông báo, tuỳ chọn người dùng.

@@ -2,6 +2,7 @@ import { SocialErrorFilter } from './social-error.filter.js';
 import { UseFilters, Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import { SetReactionDto } from './dto/reaction.dto.js';
 import { PostReactionDto, PostStatsDto, UpdatedPostReactionDto } from './dto/response.dto.js';
 import { GetMyReactionUseCase, GetPostStatsUseCase, SetReactionUseCase } from '../application/index.js';
@@ -46,9 +47,11 @@ export class ReactionsController {
   }
 
   @Get('stats')
+  @OptionalAuthenticated()
   @ApiOperation({ summary: 'Lấy tổng số cảm xúc, bình luận, chia sẻ, lưu (FR10)' })
   @ApiResponse({ status: 200, description: 'Thống kê tương tác thời gian thực', type: PostStatsDto })
-  async getStats(@Param('id') postId: string) {
-    return this.getPostStatsUseCase.execute({ postId });
+  async getStats(@Param('id') postId: string, @OptionalCurrentUser() user?: AuthUser) {
+    const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
+    return this.getPostStatsUseCase.execute({ postId, viewerId: user?.userId, isStaff });
   }
 }

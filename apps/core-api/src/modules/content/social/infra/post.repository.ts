@@ -31,6 +31,7 @@ export interface FindUserPostsOptions {
   cursorCreatedAt?: Date;
   cursorId?: string;
   status?: PostStatus | 'all';
+  postType?: PostType;
 }
 
 export interface FindAdminPostsOptions {
@@ -150,6 +151,9 @@ export class PostRepository {
       conditions.push(eq(posts.status, options.status));
     } else {
       conditions.push(sql`${posts.status} != 'deleted'`);
+    }
+    if (options.postType) {
+      conditions.push(eq(posts.postType, options.postType));
     }
 
     if (options.cursorCreatedAt && options.cursorId) {

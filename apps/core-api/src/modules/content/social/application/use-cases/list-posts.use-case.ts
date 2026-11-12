@@ -1,4 +1,5 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
+import { Post } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { ReactionRepository } from '../../infra/reaction.repository.js';
 import type { BookmarkRepository } from '../../infra/bookmark.repository.js';
@@ -84,16 +85,20 @@ export class ListPostsUseCase {
       bookmarkedSet = bookmarksResult;
     }
 
-    const enrichedItems: EnrichedPostItem[] = items.map((post) => ({
-      ...post,
-      authorName: authorNames.get(post.authorId) ?? null,
-      viewerContext: query.viewerId
-        ? {
-            myReaction: reactionsMap.get(post.id) ?? null,
-            isBookmarked: bookmarkedSet.has(post.id),
-          }
-        : null,
-    }));
+    const enrichedItems: EnrichedPostItem[] = items.map((post) => {
+      const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+      return {
+        ...post,
+        tripAttachment: domainPost.getMaskedTripAttachment(),
+        authorName: authorNames.get(post.authorId) ?? null,
+        viewerContext: query.viewerId
+          ? {
+              myReaction: reactionsMap.get(post.id) ?? null,
+              isBookmarked: bookmarkedSet.has(post.id),
+            }
+          : null,
+      };
+    });
 
     return {
       items: enrichedItems,

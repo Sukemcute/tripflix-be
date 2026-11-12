@@ -168,7 +168,7 @@ Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPU
 
 ### Kiểm duyệt (`ai-service`)
 
-core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway chỉ mở `/ai/chat` (mục Trợ lý Tripi), nên `/moderate` chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 384 MB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
+core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway chỉ mở `/ai/chat` (mục Trợ lý Tripi), nên `/moderate` chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 1 GB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
 
 1. Nhập key OpenAI thẳng vào `.env.server`, không gửi qua chat, không in ra màn hình:
 
@@ -206,6 +206,18 @@ dc --profile api exec -T core-api node -e "console.log(process.env.AI_SERVICE_UR
 ```
 
 Ra `http://ai-service:8000` và một số lớn hơn 0 là đạt. Bỏ kiểm duyệt bằng AI: xoá `AI_SERVICE_URL` trong `.env.server` rồi chạy lại lệnh `up` ở trên, core quay về lọc bằng regex.
+
+5. Bật ViSoBERT INT8 (cần `AI_TAG` từ `sha-eadf699`). Model chạy cạnh OpenAI. Khi model bận, lỗi hoặc quá 1,5 giây, ai-service chỉ dùng kết quả OpenAI và ghi log `moderation.visobert unavailable`. Nội dung chỉ ViSoBERT gắn cờ sẽ vào hàng chờ duyệt, không tự bị ẩn.
+
+```bash
+cd ~/tripflix-be
+grep -q '^IS_VISOBERT_ENABLED=' deploy/.env.server && sed -i 's/^IS_VISOBERT_ENABLED=.*/IS_VISOBERT_ENABLED=true/' deploy/.env.server \
+  || echo 'IS_VISOBERT_ENABLED=true' >> deploy/.env.server
+dc --profile ai up -d --no-deps --wait ai-service
+dc --profile ai exec -T ai-service printenv IS_VISOBERT_ENABLED   # true là đạt
+```
+
+Gọi thử `/moderate` có token: trường `model` có `+visobert-vihsd@` và `scores` có `visobert/toxic` là model đang chạy. Tắt: đặt `IS_VISOBERT_ENABLED=false` rồi chạy lại lệnh `up`.
 
 ### Trợ lý Tripi (`POST /ai/chat`)
 

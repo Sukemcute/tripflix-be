@@ -4,6 +4,13 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_GRACE_MS = 10_000;
 /** Refresh token sống 30 ngày, tính lại mỗi lần xoay vòng. */
 export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Phiên sống tối đa 180 ngày kể từ lúc đăng nhập, dù vẫn refresh đều: token bị trộm không giữ phiên mãi được. */
+export const SESSION_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
+
+/** Hạn mới khi xoay vòng: thêm 30 ngày nhưng không quá tuổi tối đa của phiên. */
+export function nextRefreshExpiry(sessionCreatedAt: Date, now: Date): Date {
+  return new Date(Math.min(now.getTime() + REFRESH_TTL_MS, sessionCreatedAt.getTime() + SESSION_MAX_AGE_MS));
+}
 
 export interface RefreshState {
   refreshTokenHash: string;

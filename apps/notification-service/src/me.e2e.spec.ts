@@ -7,6 +7,7 @@ import { MemorySidBlocklist } from '@tripflix/auth';
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey, type JWK } from 'jose';
 import request from 'supertest';
 import { AppModule, ENV, SID_BLOCKLIST_PROVIDER, type Env } from './app.module.js';
+import { InboxRepository } from './inbox/inbox.repository.js';
 
 // Chứng minh service khác kiểm được access token chỉ bằng JWKS qua HTTP, như khi gọi core-api thật.
 async function keyPair(kid: string) {
@@ -53,6 +54,7 @@ describe('notification-service kiểm access token qua JWKS', () => {
       SMTP_URL: 'smtp://127.0.0.1:1025',
       MAIL_FROM: 'Tripflix <no-reply@tripflix.local>',
       WEB_APP_URL: 'http://localhost:3100',
+      WEB_ORIGINS: ['http://localhost:3100'],
       // Test này chỉ kiểm JWKS, không có Redis nên tắt consumer.
       NOTIFICATION_CONSUMER_ENABLED: false,
       NOTIFICATION_CONSUMER_NAME: undefined,
@@ -63,6 +65,8 @@ describe('notification-service kiểm access token qua JWKS', () => {
       .useValue(env)
       .overrideProvider(SID_BLOCKLIST_PROVIDER)
       .useValue(blocklist)
+      .overrideProvider(InboxRepository)
+      .useValue({})
       .compile();
     app = moduleRef.createNestApplication({ logger: false });
     app.setGlobalPrefix('notifications', { exclude: ['health'] });

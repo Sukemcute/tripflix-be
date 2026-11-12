@@ -6,6 +6,7 @@ import { MemorySidBlocklist } from '@tripflix/auth';
 import { startRedis, type RedisFixture } from '@tripflix/testing';
 import type { Socket as ClientSocket } from 'socket.io-client';
 import { AppModule, ENV, REALTIME_REDIS, RealtimeService, SID_BLOCKLIST_PROVIDER } from '../app.module.js';
+import { InboxRepository } from '../inbox/inbox.repository.js';
 import { isRealtimeRedisReady, useRedisRealtime, type RealtimeRedis } from './redis-io.adapter.js';
 import {
   openSocket,
@@ -31,6 +32,8 @@ describe('/ws chạy nhiều replica qua Redis adapter', () => {
       .useValue(testEnv(jwks.url, redisUrl))
       .overrideProvider(SID_BLOCKLIST_PROVIDER)
       .useValue(new MemorySidBlocklist())
+      .overrideProvider(InboxRepository)
+      .useValue({})
       .compile();
     const app = moduleRef.createNestApplication({ logger: false });
     await useRedisRealtime(app);

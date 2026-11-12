@@ -34,6 +34,12 @@ export class PostPublishValidationException extends DomainException {
   }
 }
 
+export class PostMediaNotAllowedException extends DomainException {
+  constructor() {
+    super('Bài viết (vlog) không được kèm video. Muốn đăng video hãy tạo bài dạng Reels');
+  }
+}
+
 export class CommentNotFoundException extends DomainException {
   constructor(commentId: string) {
     super(`Không tìm thấy bình luận với ID: ${commentId}`);

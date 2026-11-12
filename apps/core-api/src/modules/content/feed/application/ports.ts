@@ -1,3 +1,4 @@
+import type { TripAttachmentData } from '../../db/schema/posts.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
 
 export const FEED_STORE = Symbol('FEED_STORE');
@@ -10,6 +11,7 @@ export interface FeedPostRow {
   body: string;
   hashtags: string[];
   mediaIds: string[];
+  tripAttachment: TripAttachmentData | null;
   reactionTotal: number;
   commentCount: number;
   bookmarkCount: number;
@@ -22,6 +24,8 @@ export interface FeedStore {
   listPlayablePosts(query: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài trong HOT_WINDOW_DAYS ngày gần đây, xếp theo điểm hot giảm dần rồi mới nhất trước. */
   listHotPosts(query: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
+  /** Cùng điều kiện lọc và thứ tự với listPlayablePosts nhưng chỉ bài người dùng đã lưu. */
+  listSavedPlayablePosts(query: { userId: string; limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]>;
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]>;
   findSavedPostIds(userId: string, postIds: string[]): Promise<string[]>;
 }

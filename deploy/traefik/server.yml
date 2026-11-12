@@ -1,5 +1,5 @@
 # Gateway trên server: chỉ đi HTTPS, chỉ nhận đúng API_HOST. Máy dev dùng dynamic.yml.
-# Thêm service nào thì thêm router của service đó khi nó đã chạy (notification).
+# Thêm service nào thì thêm router của service đó khi nó đã chạy.
 # AI chỉ mở đúng POST /ai/chat cho trợ lý Tripi (TF31); /moderate và /health vẫn chỉ trong mạng nội bộ.
 http:
   middlewares:
@@ -54,6 +54,15 @@ http:
       tls:
         certResolver: letsencrypt
 
+    # Hộp thông báo (TF46) và WebSocket /ws (TF26A) của notification-service.
+    notification:
+      rule: Host(`{{ env "API_HOST" }}`) && (PathPrefix(`/notifications`) || PathPrefix(`/ws`))
+      service: notification-service
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+
     web:
       rule: Host(`{{ env "WEB_HOST" }}`)
       service: web
@@ -81,6 +90,10 @@ http:
       loadBalancer:
         servers:
           - url: http://core-api:3000
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: http://notification-service:3001
     ai-service:
       loadBalancer:
         servers:

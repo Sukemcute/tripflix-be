@@ -1,5 +1,6 @@
 import {
   InvalidPostStatusTransitionException,
+  PostMediaNotAllowedException,
   PostPublishValidationException,
   UnauthorizedPostActionException,
 } from './errors.js';
@@ -7,6 +8,16 @@ import {
 export type PostType = 'video' | 'vlog';
 export type PostStatus = 'draft' | 'published' | 'hidden' | 'removed' | 'deleted';
 export type PostVisibility = 'public' | 'private';
+
+/**
+ * media_assets chỉ chứa video, nên bài viết (vlog) có media nghĩa là kèm video
+ * và sẽ lọt vào luồng Reels. Bài viết và Reels phải tách bạch.
+ */
+export function assertMediaAllowedForPostType(postType: PostType, mediaIds: readonly string[]): void {
+  if (postType === 'vlog' && mediaIds.length > 0) {
+    throw new PostMediaNotAllowedException();
+  }
+}
 
 export interface TripItineraryItem {
   day: number;
@@ -139,7 +150,10 @@ export class Post {
     if (data.body !== undefined) this.props.body = data.body;
     if (data.hashtags !== undefined) this.props.hashtags = data.hashtags;
     if (data.visibility !== undefined) this.props.visibility = data.visibility;
-    if (data.mediaIds !== undefined) this.props.mediaIds = data.mediaIds;
+    if (data.mediaIds !== undefined) {
+      assertMediaAllowedForPostType(this.props.postType, data.mediaIds);
+      this.props.mediaIds = data.mediaIds;
+    }
     if (data.coverMediaId !== undefined) this.props.coverMediaId = data.coverMediaId;
     if (data.tripAttachment !== undefined) {
       this.props.tripAttachment = data.tripAttachment;
@@ -160,6 +174,11 @@ export class Post {
     }
     if (this.props.mediaIds.length === 0 && !this.props.body.trim()) {
       throw new PostPublishValidationException('Bài đăng phải có ít nhất 1 ảnh/video hoặc nội dung chữ');
+    }
+    // Chặn cả bản nháp cũ đã lỡ gắn video trước khi có quy tắc tách bạch.
+    assertMediaAllowedForPostType(this.props.postType, this.props.mediaIds);
+    if (this.props.postType === 'video' && this.props.mediaIds.length === 0) {
+      throw new PostPublishValidationException('Reels phải có video');
     }
 
     this.props.status = 'published';
