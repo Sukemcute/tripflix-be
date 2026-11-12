@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type pg from 'pg';
 import type { InboxRow } from '../inbox/inbox.repository.js';
+import { canCreatePostInteraction, lockPostNotifications } from '../inbox/post-notification.repository.js';
 import { DB } from '../tokens.js';
 
 const WINDOW_MS = 120_000;
@@ -44,10 +45,10 @@ export class ReactionNotificationRepository {
     const targetId = commentId ?? postId;
     const type = commentId ? 'reaction.comment' : 'reaction.post';
     // Cùng khóa với luồng xóa bình luận để lượt thích đến muộn không làm hiện lại thông báo.
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
-      commentId ? 'notification.comment' : 'notification.post-reaction', targetId,
-    ]);
+    await lockPostNotifications(client, postId);
+    if (!(await canCreatePostInteraction(client, postId, occurredAt))) return null;
     if (commentId) {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('notification.comment'), hashtext($1))", [commentId]);
       const deleted = await client.query('SELECT 1 FROM deleted_notification_comments WHERE comment_id = $1', [commentId]);
       if (deleted.rowCount) return null;
     }
@@ -88,12 +89,12 @@ export class ReactionNotificationRepository {
       )).rows[0]?.id;
       if (!inboxId) {
         const inserted = await client.query<{ id: string }>(
-          `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id, comment_id, group_key)
-           VALUES ($1, $2, $3, '', $4, $5::jsonb, $6, $7, $8)
+          `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id, comment_id, group_key, interaction_occurred_at)
+           VALUES ($1, $2, $3, '', $4, $5::jsonb, $6, $7, $8, $9)
            ON CONFLICT (group_key) WHERE group_key IS NOT NULL DO NOTHING RETURNING id`,
           [ownerId, type, commentId ? 'Có lượt thích bình luận' : 'Có cảm xúc mới',
             `/trips/${postId}`, JSON.stringify({ postId, ...(commentId ? { commentId } : {}), actorCount: 0 }),
-            eventId, commentId ?? null, key + eventId],
+            eventId, commentId ?? null, key + eventId, occurredAt],
         );
         inboxId = inserted.rows[0]?.id;
         if (!inboxId) return null;
@@ -115,9 +116,9 @@ export class ReactionNotificationRepository {
          body = totals.actor_count || $3::text,
          deleted_at = CASE WHEN totals.actor_count = 0 THEN now() ELSE NULL END,
          read_at = CASE WHEN totals.actor_count = 0 THEN COALESCE(read_at, now()) ELSE read_at END
-       FROM totals WHERE id = $1 RETURNING inbox.*`,
+       FROM totals WHERE id = $1 AND NOT is_post_interaction_suppressed RETURNING inbox.*`,
       [inboxId, isActive ? 1 : -1, commentId ? ' người đã thích bình luận của bạn.' : ' người đã thả cảm xúc vào bài của bạn.'],
     );
-    return { row: rows[0]!, isNew };
+    return rows[0] ? { row: rows[0], isNew } : null;
   }
 }
