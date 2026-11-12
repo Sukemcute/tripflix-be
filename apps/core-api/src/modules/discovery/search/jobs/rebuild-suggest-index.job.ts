@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
 import { SuggestUseCases } from '../application/suggest.use-cases.js';
+import { IndexHealth } from './index-health.js';
 
 /**
  * Dựng lại chỉ mục gợi ý mỗi lần worker khởi động (vài trăm dòng, dưới một giây).
@@ -15,15 +16,19 @@ export class RebuildSuggestIndexJob implements OnApplicationBootstrap {
   constructor(
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(SuggestUseCases) private readonly suggestions: SuggestUseCases,
+    @Inject(IndexHealth) private readonly health: IndexHealth,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     if (this.env.APP_ROLE === 'api') return;
     const startedAt = Date.now();
     try {
+      this.health.start('suggest', startedAt);
       const count = await this.suggestions.rebuildIndex();
+      this.health.finish('suggest', startedAt, 'succeeded', count);
       this.logger.log(`Đã dựng chỉ mục gợi ý: ${count} dòng trong ${Date.now() - startedAt} ms`);
     } catch (error) {
+      this.health.finish('suggest', startedAt, 'failed', undefined, error);
       // Không chặn khởi động: /suggest vẫn chạy trên chỉ mục cũ.
       this.logger.error(`Dựng chỉ mục gợi ý lỗi: ${(error as Error).message}`);
     }

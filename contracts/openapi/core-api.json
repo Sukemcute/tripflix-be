@@ -3143,6 +3143,32 @@
         ]
       }
     },
+    "/api/v1/admin/search/index-health": {
+      "get": {
+        "operationId": "AdminIndexHealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Index Health"
+        ]
+      }
+    },
     "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
@@ -7983,6 +8009,179 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "IndexJobLogDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "message": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "succeeded",
+              "failed",
+              "skipped"
+            ]
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "count": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "message",
+          "outcome",
+          "durationMs",
+          "count"
+        ]
+      },
+      "IndexJobHealthDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "stuck",
+              "overdue",
+              "succeeded",
+              "failed",
+              "skipped",
+              "unknown"
+            ]
+          },
+          "startedAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastSuccessAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "count": {
+            "type": "number",
+            "nullable": true
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexJobLogDto"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "lastSuccessAt",
+          "count",
+          "logs"
+        ]
+      },
+      "IndexHealthPointDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "attention",
+              "offline",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "at",
+          "status"
+        ]
+      },
+      "IndexWorkerHealthDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "attention",
+              "offline",
+              "unknown"
+            ]
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexJobHealthDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexHealthPointDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "lastSeenAt",
+          "status",
+          "jobs",
+          "history"
+        ]
+      },
+      "IndexHealthDto": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "number"
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexWorkerHealthDto"
+            }
+          }
+        },
+        "required": [
+          "checkedAt",
+          "workers"
         ]
       },
       "ProvinceDto": {
