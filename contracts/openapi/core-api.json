@@ -2377,6 +2377,15 @@
             }
           },
           {
+            "name": "author_id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -2419,7 +2428,7 @@
             }
           },
           "400": {
-            "description": "tab, limit, cursor hoặc saved không hợp lệ"
+            "description": "tab, limit, cursor, author_id hoặc saved không hợp lệ"
           },
           "401": {
             "description": "saved=true khi chưa đăng nhập"

@@ -67,6 +67,7 @@ describe('Feed trên Postgres thật', () => {
   async function insertPost(
     mediaIds: string[],
     options: {
+      authorId?: string;
       status?: string;
       visibility?: string;
       createdAt?: string;
@@ -80,7 +81,7 @@ describe('Feed trên Postgres thật', () => {
        values ($1, $2, $8, 'Bài', $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz)`,
       [
         id,
-        OWNER_ID,
+        options.authorId ?? OWNER_ID,
         options.status ?? 'published',
         options.visibility ?? 'public',
         JSON.stringify(mediaIds),
@@ -92,12 +93,12 @@ describe('Feed trên Postgres thật', () => {
     return id;
   }
 
-  async function readAllPages(limit: number, viewerId: string | null = null) {
+  async function readAllPages(limit: number, viewerId: string | null = null, authorId?: string) {
     const ids: string[] = [];
     let cursor: string | null = null;
     do {
       const after = cursor ? decodeFeedCursor(cursor) : null;
-      const page = await feed.getPage({ limit, after, viewerId });
+      const page = await feed.getPage({ limit, after, viewerId, authorId });
       ids.push(...page.items.map((item) => item.postId));
       cursor = page.nextCursor;
     } while (cursor);
@@ -154,6 +155,17 @@ describe('Feed trên Postgres thật', () => {
     await moduleRef?.close();
     await pool?.end();
     await postgres?.stop();
+  });
+
+  it('lọc Reels công khai theo tác giả trước khi phân trang', async () => {
+    const asset = await insertAsset('ready', [360]);
+    const newest = await insertPost([asset], { createdAt: '2026-11-05T10:00:03Z' });
+    await insertPost([asset], { authorId: VIEWER_ID, createdAt: '2026-11-05T10:00:02Z' });
+    const oldest = await insertPost([asset], { createdAt: '2026-11-05T10:00:01Z' });
+    await insertPost([asset], { visibility: 'private' });
+    await insertPost([asset], { postType: 'vlog' });
+
+    expect(await readAllPages(1, null, OWNER_ID)).toEqual([newest, oldest]);
   });
 
   it('chỉ trả bài công khai đã đăng có video phát được', async () => {

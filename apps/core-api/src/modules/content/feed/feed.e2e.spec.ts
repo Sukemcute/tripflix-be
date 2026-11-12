@@ -61,9 +61,10 @@ class FakeFeedStore implements FeedStore {
   rows: FeedPostRow[] = [];
   liked: { userId: string; postId: string }[] = [];
 
-  listPlayablePosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
-    const start = after ? this.rows.findIndex((row) => row.id === after.id) + 1 : 0;
-    return Promise.resolve(this.rows.slice(start, start + limit));
+  listPlayablePosts({ limit, after, authorId }: { limit: number; after: FeedCursor | null; authorId?: string }): Promise<FeedPostRow[]> {
+    const rows = authorId ? this.rows.filter((row) => row.authorId === authorId) : this.rows;
+    const start = after ? rows.findIndex((row) => row.id === after.id) + 1 : 0;
+    return Promise.resolve(rows.slice(start, start + limit));
   }
 
   listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
@@ -184,6 +185,13 @@ describe('GET /api/v1/feed E2E', () => {
       viewerState: null,
       reason: null,
     });
+  });
+
+  it('lọc theo mã tác giả và trả 400 nếu mã không hợp lệ', async () => {
+    feedStore.rows[1] = { ...buildRow(2), authorId: userId };
+    const response = await http().get('/api/v1/feed').query({ author_id: userId }).expect(200);
+    expect((response.body as FeedPageBody).items.map((item) => item.postId)).toEqual([buildPostId(2)]);
+    await http().get('/api/v1/feed').query({ author_id: 'not-a-uuid' }).expect(400);
   });
 
   it('có token thì trả trạng thái thích của đúng người xem', async () => {

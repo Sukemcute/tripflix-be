@@ -57,15 +57,16 @@ export class FeedUseCases {
     limit: number;
     after: FeedCursor | null;
     viewerId: string | null;
+    authorId?: string;
     /** Chỉ Reels người xem đã lưu, mới nhất trước; bỏ qua tab và không dùng cache vì là dữ liệu riêng. */
     isSavedOnly?: boolean;
   }): Promise<FeedPage> {
     if (query.isSavedOnly && !query.viewerId) throw new Error('Feed đã lưu cần người xem đăng nhập');
     const tab = query.tab === 'hot' ? 'hot' : 'for_you';
     const shared = query.isSavedOnly
-      ? await this.loadSharedPage('for_you', query.limit, query.after, query.viewerId)
-      : query.after
-        ? await this.loadSharedPage(tab, query.limit, query.after)
+      ? await this.loadSharedPage('for_you', query.limit, query.after, query.viewerId, query.authorId)
+      : query.after || query.authorId
+        ? await this.loadSharedPage(tab, query.limit, query.after, null, query.authorId)
         : await this.loadFirstPage(tab, query.limit);
     if (!query.viewerId) return shared;
 
@@ -118,9 +119,10 @@ export class FeedUseCases {
     limit: number,
     after: FeedCursor | null,
     savedByUserId: string | null = null,
+    authorId?: string,
   ): Promise<SharedFeedPage<FeedCard>> {
     const isHot = tab === 'hot' && !savedByUserId;
-    const listQuery = { limit: limit + 1, after };
+    const listQuery = { limit: limit + 1, after, ...(authorId ? { authorId } : {}) };
     const rows = await (savedByUserId
       ? this.store.listSavedPlayablePosts({ ...listQuery, userId: savedByUserId })
       : isHot
