@@ -881,6 +881,7 @@
             "name": "page",
             "required": false,
             "in": "query",
+            "description": "1–5",
             "schema": {
               "type": "number"
             }
@@ -889,7 +890,7 @@
             "name": "q",
             "required": true,
             "in": "query",
-            "description": "1–50 ký tự",
+            "description": "2–50 ký tự sau khi bỏ khoảng trắng thừa",
             "schema": {
               "type": "string"
             }
@@ -905,6 +906,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Bạn tìm kiếm quá nhanh, vui lòng thử lại sau ít phút"
           }
         },
         "tags": [
@@ -4970,7 +4974,8 @@
             "type": "number"
           },
           "hasMore": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "false ở trang 5 dù còn người khớp"
           }
         },
         "required": [
