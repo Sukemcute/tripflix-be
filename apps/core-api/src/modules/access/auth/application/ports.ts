@@ -114,6 +114,15 @@ export type NewUser = Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' 
   terms?: { version: string; acceptedAt: Date };
 };
 
+export interface PublicUserSearchOptions {
+  /** Từ khoá đã chuẩn hoá và bỏ dấu (foldVietnamese). */
+  query: string;
+  /** Ngày sinh muộn nhất còn được hiện (YYYY-MM-DD); chưa khai ngày sinh thì vẫn hiện. */
+  bornOnOrBefore: string;
+  limit: number;
+  offset: number;
+}
+
 export interface UserRepository {
   /** Khóa bản ghi người dùng đến cuối transaction. */
   lockById(id: string): Promise<UserRecord | null>;
@@ -126,8 +135,11 @@ export interface UserRepository {
   listStaff(): Promise<UserRecord[]>;
   /** Tìm theo email hoặc tên hiển thị (không phân biệt hoa thường), mới nhất trước. */
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
-  /** Tìm công khai: chỉ tài khoản active, chỉ theo tên hiển thị, không phân biệt hoa thường và dấu tiếng Việt; `query` đã bỏ dấu. */
-  searchPublic(options: { query: string; limit: number; offset: number }): Promise<UserRecord[]>;
+  /**
+   * Tìm công khai theo tên hiển thị (không phân biệt hoa thường, dấu tiếng Việt). Chỉ thành viên (không nhân viên) đang active,
+   * đã xác thực email, không phải trẻ em đã biết ngày sinh (sinh sau `bornOnOrBefore`).
+   */
+  searchPublic(options: PublicUserSearchOptions): Promise<UserRecord[]>;
   updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
   updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
   updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;

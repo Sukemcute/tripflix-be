@@ -9,6 +9,7 @@ import type {
   OneTimeTokenRepository,
   RegistrationChallenge,
   ProfilePatch,
+  PublicUserSearchOptions,
   SessionRecord,
   ServiceClientRecord,
   SessionRotation,
@@ -57,9 +58,16 @@ export class MemoryAccessStore implements AccessStore {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       return { items: matched.slice(offset, offset + limit), total: matched.length };
     },
-    searchPublic: async ({ query, limit, offset }: { query: string; limit: number; offset: number }) =>
+    searchPublic: async ({ query, bornOnOrBefore, limit, offset }: PublicUserSearchOptions) =>
       [...this.userRows.values()]
-        .filter((u) => u.status === 'active' && foldVietnamese(u.displayName).includes(query))
+        .filter(
+          (u) =>
+            u.status === 'active' &&
+            u.role === 'member' &&
+            u.emailVerifiedAt !== null &&
+            (u.personal.dateOfBirth === null || u.personal.dateOfBirth <= bornOnOrBefore) &&
+            foldVietnamese(u.displayName).includes(query),
+        )
         .sort((a, b) => (a.displayName < b.displayName ? -1 : a.displayName > b.displayName ? 1 : a.id.localeCompare(b.id)))
         .slice(offset, offset + limit),
     updateRole: async (id: string, role: UserRecord['role']) => this.patchUser(id, { role }),
