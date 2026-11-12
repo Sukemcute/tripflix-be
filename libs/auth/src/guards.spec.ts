@@ -7,6 +7,7 @@ import {
   AllowWhenRevocationUnavailable,
   EMAIL_UNVERIFIED_CODE,
   EMAIL_UNVERIFIED_MESSAGE,
+  OptionalAuthGuard,
   REVOCATION_CHECK_TIMEOUT_MS,
   RequireVerifiedEmail,
   Roles,
@@ -150,5 +151,61 @@ describe('TF05D: VerifiedEmailGuard, RequireVerifiedEmail', () => {
     }
     const guards = Reflect.getMetadata(GUARDS_METADATA, Ctrl.prototype.createPost) as unknown[];
     expect(guards).toEqual([AccessTokenGuard, VerifiedEmailGuard]);
+  });
+});
+
+describe('OptionalAuthGuard', () => {
+  const verify = async (token: string) => {
+    if (token === 'good') return member;
+    throw new InvalidAccessTokenError();
+  };
+  const req = (authorization?: string) =>
+    ({ headers: authorization ? { authorization } : {} }) as Record<string, unknown>;
+
+  it('không token: cho qua như khách', async () => {
+    const r = req();
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('token hợp lệ: gắn req.user', async () => {
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toEqual(member);
+  });
+
+  it('token sai: cho qua như khách, không 401', async () => {
+    const r = req('Bearer bad');
+    await expect(new OptionalAuthGuard(verify, new MemorySidBlocklist()).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('sid bị chặn: cho qua như khách', async () => {
+    const blocklist = new MemorySidBlocklist();
+    await blocklist.block('s-1', 900);
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, blocklist).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('blocklist lỗi: cho qua như khách', async () => {
+    const broken = { block: async () => undefined, isBlocked: async () => Promise.reject(new Error('redis down')) };
+    const r = req('Bearer good');
+    await expect(new OptionalAuthGuard(verify, broken).canActivate(context(r))).resolves.toBe(true);
+    expect(r.user).toBeUndefined();
+  });
+
+  it('blocklist treo: cho qua như khách sau thời gian chờ', async () => {
+    vi.useFakeTimers();
+    try {
+      const slow = { block: async () => undefined, isBlocked: () => new Promise<boolean>(() => undefined) };
+      const r = req('Bearer good');
+      const passed = new OptionalAuthGuard(verify, slow).canActivate(context(r));
+      await vi.advanceTimersByTimeAsync(REVOCATION_CHECK_TIMEOUT_MS);
+      await expect(passed).resolves.toBe(true);
+      expect(r.user).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
