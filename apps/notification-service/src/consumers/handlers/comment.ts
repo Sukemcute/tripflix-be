@@ -35,6 +35,7 @@ export function createCommentHandlers(options: {
         postId: comment.postId,
         authorId: comment.authorId,
         eventId: event.eventId,
+        occurredAt: event.occurredAt,
         recipients: Array.from(recipients, ([userId, isReplyRecipient]) => ({ userId, isReplyRecipient })),
       });
       await Promise.all(rows.map((row) => emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })));

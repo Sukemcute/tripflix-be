@@ -83,8 +83,20 @@ const COMMENT_NOTIFICATIONS_SCHEMA = `
   CREATE TABLE deleted_notification_comments (comment_id uuid PRIMARY KEY, deleted_at timestamptz NOT NULL);
 `;
 
+const POST_MODERATION_NOTIFICATIONS_SCHEMA = `
+  ALTER TABLE inbox ADD COLUMN interaction_occurred_at timestamptz;
+  CREATE INDEX idx_inbox_active_interaction_post ON inbox ((data->>'postId'))
+    WHERE deleted_at IS NULL AND (type LIKE 'comment.%' OR type LIKE 'reaction.%');
+  CREATE TABLE post_notification_moderation (
+    post_id uuid PRIMARY KEY,
+    changed_at timestamptz NOT NULL,
+    is_hidden boolean NOT NULL
+  );
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
   [3, COMMENT_NOTIFICATIONS_SCHEMA],
+  [5, POST_MODERATION_NOTIFICATIONS_SCHEMA],
 ] as const;
