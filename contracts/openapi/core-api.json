@@ -2547,6 +2547,20 @@
             }
           },
           {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
             "name": "targetType",
             "required": false,
             "in": "query",
