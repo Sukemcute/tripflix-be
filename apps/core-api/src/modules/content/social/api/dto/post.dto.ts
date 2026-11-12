@@ -107,7 +107,11 @@ export class ListPostsQueryDto {
   @ApiPropertyOptional({ description: 'Lọc theo tác giả' })
   author_id?: string;
 
-  @ApiPropertyOptional({ enum: ['video', 'vlog'], description: 'Lọc theo loại bài' })
+  @ApiPropertyOptional({
+    enum: ['vlog'],
+    description:
+      'Lọc theo loại bài. Không truyền thì trả mọi loại (AI service đang dùng). Reels lấy qua /v1/feed; giá trị video vẫn được chấp nhận để client cũ không lỗi nhưng không còn trong hợp đồng',
+  })
   post_type?: PostType;
 
   @ApiPropertyOptional({ description: 'Lọc theo hashtag' })

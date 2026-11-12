@@ -947,11 +947,10 @@
             "name": "post_type",
             "required": false,
             "in": "query",
-            "description": "Lọc theo loại bài",
+            "description": "Lọc theo loại bài. Không truyền thì trả mọi loại (AI service đang dùng). Reels lấy qua /v1/feed; giá trị video vẫn được chấp nhận để client cũ không lỗi nhưng không còn trong hợp đồng",
             "schema": {
               "type": "string",
               "enum": [
-                "video",
                 "vlog"
               ]
             }
@@ -1779,6 +1778,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "post_type",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo loại bài. Không truyền thì trả mọi loại. Reels đã lưu lấy qua /v1/feed",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "vlog"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1791,6 +1802,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "post_type không hợp lệ"
           }
         },
         "security": [

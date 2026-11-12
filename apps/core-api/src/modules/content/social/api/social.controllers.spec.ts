@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { AuthUser } from '@tripflix/auth';
 import { PostNotFoundException } from '../domain/errors.js';
 import {
@@ -244,6 +244,21 @@ describe('Social API Controllers', () => {
         limit: 20,
         cursor: undefined,
       });
+    });
+
+    it('listMyBookmarks truyền post_type=vlog xuống use case', async () => {
+      await controller.listMyBookmarks(mockUser, { post_type: 'vlog' });
+      expect(mockListBookmarks.execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ userId: mockUser.userId, postType: 'vlog' }),
+      );
+    });
+
+    it('listMyBookmarks từ chối post_type ngoài vlog bằng 400', async () => {
+      mockListBookmarks.execute.mockClear();
+      await expect(controller.listMyBookmarks(mockUser, { post_type: 'video' as never })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockListBookmarks.execute).not.toHaveBeenCalled();
     });
   });
 

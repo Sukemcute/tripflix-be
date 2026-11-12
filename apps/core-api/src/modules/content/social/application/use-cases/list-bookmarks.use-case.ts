@@ -1,13 +1,14 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord } from '../../../db/schema/index.js';
+import type { PostRecord, PostType } from '../../../db/schema/index.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListBookmarksQuery {
   userId: string;
   limit?: number;
   cursor?: string;
+  postType?: PostType;
 }
 
 export type EnrichedBookmarkPostItem = PostRecord & {
@@ -36,6 +37,7 @@ export class ListBookmarksUseCase {
       limit: limit + 1,
       cursorCreatedAt: decoded?.createdAt,
       cursorId: decoded?.id,
+      postType: query.postType,
     });
 
     const hasMore = bookmarkRecords.length > limit;
