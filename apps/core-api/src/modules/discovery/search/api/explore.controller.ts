@@ -1,6 +1,8 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
+import { SearchEventsPublisher } from '../application/search-events.publisher.js';
 import {
   ExploreRequestDto,
   ExploreRequestSchema,
@@ -17,11 +19,19 @@ function invalidBody(issues: ReadonlyArray<{ path: PropertyKey[]; message: strin
   });
 }
 
-/** Tìm khám phá của app (kiểu TikTok/Netflix): một ô tìm, kết quả chia theo vùng. Công khai. */
+/**
+ * Tìm khám phá của app (kiểu TikTok/Netflix): một ô tìm, kết quả chia theo vùng. Công khai.
+ * Đăng nhập tuỳ chọn: có người dùng thì phát discovery.search.performed cho gợi ý (trang đầu, không await).
+ */
 @ApiTags('discovery')
 @Controller('search')
+@OptionalAuthenticated()
+@ApiBearerAuth()
 export class ExploreController {
-  constructor(@Inject(ExploreUseCases) private readonly explore: ExploreUseCases) {}
+  constructor(
+    @Inject(ExploreUseCases) private readonly explore: ExploreUseCases,
+    @Inject(SearchEventsPublisher) private readonly searchEvents: SearchEventsPublisher,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -39,10 +49,15 @@ export class ExploreController {
   @ApiBody({ type: ExploreRequestDto })
   @ApiOkResponse({ type: ExploreResponseDto })
   @ApiBadRequestResponse({ description: '`q` rỗng hoặc dài hơn 200 ký tự, `loc` sai' })
-  async search(@Body() body: unknown): Promise<ExploreResponseDto> {
+  async search(@Body() body: unknown, @OptionalCurrentUser() user: AuthUser | undefined): Promise<ExploreResponseDto> {
     const parsed = ExploreRequestSchema.safeParse(body);
     if (!parsed.success) throw invalidBody(parsed.error.issues);
-    return this.explore.search(parsed.data);
+    const page = await this.explore.search(parsed.data);
+    if (user) {
+      const resultCount = page.sections.reduce((sum, s) => sum + s.total, 0);
+      this.searchEvents.searchPerformed(user.userId, { surface: 'explore', understood: page.understood, postType: null, resultCount });
+    }
+    return page;
   }
 
   @Post('posts')
@@ -61,9 +76,15 @@ export class ExploreController {
   @ApiBody({ type: SearchPostsRequestDto })
   @ApiOkResponse({ type: SearchPostsResponseDto })
   @ApiBadRequestResponse({ description: '`q` rỗng hoặc dài hơn 200 ký tự, `postType`, `cursor`, `limit` sai' })
-  async searchPosts(@Body() body: unknown): Promise<SearchPostsResponseDto> {
+  async searchPosts(@Body() body: unknown, @OptionalCurrentUser() user: AuthUser | undefined): Promise<SearchPostsResponseDto> {
     const parsed = SearchPostsRequestSchema.safeParse(body);
     if (!parsed.success) throw invalidBody(parsed.error.issues);
-    return this.explore.searchPosts(parsed.data);
+    const page = await this.explore.searchPosts(parsed.data);
+    // Chỉ trang đầu: lật trang không phải một lượt tìm mới.
+    if (user && !parsed.data.cursor) {
+      const postType = parsed.data.postType === 'all' ? null : parsed.data.postType;
+      this.searchEvents.searchPerformed(user.userId, { surface: 'posts', understood: page.understood, postType, resultCount: page.total });
+    }
+    return page;
   }
 }

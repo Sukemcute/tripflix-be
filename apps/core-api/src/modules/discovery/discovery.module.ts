@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { createDb } from '@tripflix/db';
+import { RedisStreamsEventBus } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
@@ -27,6 +28,7 @@ import {
   type ExploreCatalog,
   type HotelCatalog,
 } from './search/application/ports.js';
+import { SEARCH_EVENT_BUS, SearchEventsPublisher } from './search/application/search-events.publisher.js';
 import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
@@ -78,6 +80,8 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
     { provide: EXPLORE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleExploreStore(createDb(pools.discovery)) },
     { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: exploreCatalog },
+    { provide: SEARCH_EVENT_BUS, inject: [REDIS], useFactory: (redis: Redis) => new RedisStreamsEventBus(redis) },
+    SearchEventsPublisher,
     SuggestUseCases,
     StaysUseCases,
     HomeRecommendationUseCases,

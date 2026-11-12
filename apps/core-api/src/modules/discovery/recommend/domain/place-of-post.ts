@@ -1,9 +1,5 @@
 import { destOf } from '../../search/domain/explore/text.js';
-import { normalizeText } from '../../search/domain/normalize-text.js';
-import { PLACES } from '../../search/domain/places.js';
-
-/** Tên/bí danh đã chuẩn hoá → id PLACES (trùng provinceSlug của commerce, placeId của /api/stays). */
-const PLACE_ID_BY_NAME = new Map(PLACES.flatMap((p) => [p.name, ...p.aliases].map((n) => [normalizeText(n), p.id] as const)));
+import { placeIdOfName } from '../../search/domain/places.js';
 
 export interface PostPlaceInput {
   hotelId: string | null;
@@ -20,5 +16,5 @@ export function placeIdOfPost(post: PostPlaceInput, hotelProvinces: ReadonlyMap<
   const fromHotel = post.hotelId ? hotelProvinces.get(post.hotelId) : undefined;
   if (fromHotel) return fromHotel;
   const name = destOf(`${post.destinationName ?? ''} ${post.title}`);
-  return name ? (PLACE_ID_BY_NAME.get(normalizeText(name)) ?? null) : null;
+  return name ? placeIdOfName(name) : null;
 }
