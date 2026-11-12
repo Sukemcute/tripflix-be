@@ -1,7 +1,12 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { Test } from '@nestjs/testing';
+import { AuthModule, InvalidAccessTokenError, MemorySidBlocklist } from '@tripflix/auth';
 import { startPostgres, type PostgresFixture } from '@tripflix/testing';
 import pg from 'pg';
+import request from 'supertest';
+import { RealtimeService } from '../realtime/realtime.service.js';
+import { InboxController } from './inbox.controller.js';
 import { decodeInboxCursor, InboxRepository, type InboxInsert, type InboxRow } from './inbox.repository.js';
 import { ensureInboxSchema } from './inbox.schema.js';
 
@@ -205,5 +210,71 @@ describe('InboxRepository trên Postgres thật', () => {
     expect(await repository.countUnread(otherUserId)).toBe(1);
     expect(await repository.markAllRead(userId)).toBe(0);
     expect(await repository.markAllRead(randomUUID())).toBe(0);
+  });
+
+  it('API lọc tab, bảo vệ dữ liệu hai tài khoản và giữ thông báo đến sau mốc đọc', async () => {
+    const userId = randomUUID();
+    const otherUserId = randomUUID();
+    const realtime = { emitToUser: vi.fn() };
+    const module = await Test.createTestingModule({
+      imports: [AuthModule.forRootAsync({
+        useFactory: () => ({
+          verifier: async (token: string) => {
+            if (token !== 'first' && token !== 'second') throw new InvalidAccessTokenError();
+            return {
+              userId: token === 'first' ? userId : otherUserId,
+              role: 'member' as const,
+              sid: token,
+              exp: 2_000_000_000,
+            };
+          },
+          blocklist: new MemorySidBlocklist(),
+        }),
+      })],
+      controllers: [InboxController],
+      providers: [
+        { provide: InboxRepository, useValue: repository },
+        { provide: RealtimeService, useValue: realtime },
+      ],
+    }).compile();
+    const app = module.createNestApplication();
+    app.setGlobalPrefix('notifications');
+    try {
+      await app.init();
+      const http = request(app.getHttpServer());
+      const auth = { Authorization: 'Bearer first' };
+      const second = { Authorization: 'Bearer second' };
+      const booking = await insert(userId);
+      const interaction = await repository.insert({ ...input(userId), type: 'comment.created' });
+      const foreign = await insert(otherUserId);
+      if (!interaction) throw new Error('Không tạo được thông báo tương tác');
+      const setTime = (id: string, time: string) => pool.query('UPDATE inbox SET created_at = $1 WHERE id = $2', [time, id]);
+      await setTime(booking.id, '2026-11-12T09:00:00.000001Z');
+      await setTime(interaction.id, '2026-11-12T09:00:00.000002Z');
+
+      await http.get('/notifications/unread-count').expect(401);
+      const orders = await http.get('/notifications?tab=orders').set(auth).expect(200);
+      expect(orders.body.items.map((item: { id: string }) => item.id)).toEqual([booking.id]);
+      expect(orders.body.unreadCount).toBe(2);
+      const interactions = await http.get('/notifications?tab=interactions').set(auth).expect(200);
+      expect(interactions.body.items.map((item: { id: string }) => item.id)).toEqual([interaction.id]);
+      await http.get('/notifications?tab=invalid').set(auth).expect(400);
+      await http.get('/notifications/unread-count').set(auth).expect('Cache-Control', 'no-store').expect(200, { unreadCount: 2 });
+      await http.post(`/notifications/${foreign.id}/read`).set(auth).expect(404);
+      await http.post('/notifications/read-all').set(auth).send({ throughId: foreign.id }).expect(404);
+      await http.post('/notifications/read-all').set(auth).send({ throughId: 'invalid' }).expect(400);
+      expect(realtime.emitToUser).not.toHaveBeenCalled();
+
+      const arrival = await insert(userId);
+      await setTime(arrival.id, '2026-11-12T09:00:00.000003Z');
+      await http.post('/notifications/read-all').set(auth).send({ throughId: interaction.id }).expect(201, { unreadCount: 1 });
+      expect(realtime.emitToUser).toHaveBeenCalledWith(userId, 'notification.read', { throughId: interaction.id, unreadCount: 1 });
+      await http.get('/notifications/unread-count').set(second).expect(200, { unreadCount: 1 });
+      await http.post(`/notifications/${arrival.id}/read`).set(auth).expect(201, { unreadCount: 0 });
+      expect(realtime.emitToUser).toHaveBeenLastCalledWith(userId, 'notification.read', { id: arrival.id, unreadCount: 0 });
+      await http.post('/notifications/read-all').set(second).expect(201, { unreadCount: 0 });
+    } finally {
+      await app.close();
+    }
   });
 });
