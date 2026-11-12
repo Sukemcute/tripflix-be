@@ -10,6 +10,7 @@ import { CheckoutUseCases } from './booking/application/checkout.use-cases.js';
 import { ExpireHoldsUseCases } from './booking/application/expire-holds.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/ports.js';
 import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
+import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
 import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
@@ -134,6 +135,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     ExpireHoldsUseCases,
     OpenCalendarJob,
     ExpireHoldsJob,
+    CommerceCleanupJob,
     PaymentJobs,
     CommerceFacade,
   ],
