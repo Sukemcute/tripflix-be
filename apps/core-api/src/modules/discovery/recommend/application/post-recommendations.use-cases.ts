@@ -107,8 +107,9 @@ export class PostRecommendationUseCases {
 
     const slots = exploreSlots(q.limit);
     const ranked = algo.ranker.rank({ candidates, userFeatures, now });
-    const rankedTake = ranked.slice(offset, offset + q.limit - slots);
     const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, q.userId ? 0 : page * slots);
+    // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
+    const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
     const pageItems = interleave(rankedTake, explore, q.limit);
 
     const items = await this.hydrate(pageItems);
@@ -123,7 +124,7 @@ export class PostRecommendationUseCases {
     return {
       items,
       algo: algo.name,
-      nextCursor: pageItems.length === q.limit && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset }) : null,
+      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset }) : null,
     };
   }
 

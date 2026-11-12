@@ -101,6 +101,17 @@ describe('PostRecommendationUseCases', () => {
     expect(ids(second).filter((id) => ids(first).includes(id))).toEqual([]);
   });
 
+  it('kho explore rỗng: trang vẫn đủ limit bằng bài xếp hạng và còn trang sau', async () => {
+    const { useCases, store } = setup();
+    store.listExplorePool.mockResolvedValue([]);
+    const first = await useCases.recommend(query());
+    expect(first.items).toHaveLength(10);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await useCases.recommend(query({ cursor: first.nextCursor }));
+    expect(second.items).toHaveLength(10);
+    expect(ids(second).filter((id) => ids(first).includes(id))).toEqual([]);
+  });
+
   it('Redis lỗi: vẫn trả kết quả, chỉ mất chống lặp', async () => {
     const down = () => Promise.reject(new Error('ECONNREFUSED'));
     const { useCases } = setup({ served: { list: down, add: down } });
