@@ -62,6 +62,15 @@ export interface RecommendPostRow extends PostMeta {
   publishedAt: Date;
 }
 
+/** Số liệu cho trang admin theo dõi job gợi ý. */
+export interface RecommendAdminStats {
+  interactionsLast10m: number;
+  interactionsLast24h: number;
+  posts: number;
+  usersWithFeatures: number;
+  jobStates: Array<{ name: string; lastRunAt: Date | null; lastError: string | null }>;
+}
+
 export type InteractionCounts = Map<string, { d30: Partial<Record<Kind, number>>; h24: Partial<Record<Kind, number>> }>;
 
 export interface CandidateQuery {
@@ -113,6 +122,10 @@ export interface RecommendStore {
   listFreshCandidates(q: CandidateQuery & { hours: number }): Promise<Candidate[]>;
   /** Pool explore: bài trong `days` ngày, mới nhất trước. */
   listExplorePool(q: CandidateQuery & { days: number }): Promise<Candidate[]>;
+
+  // Admin
+  /** Đếm trên bảng của discovery: dòng thô nạp gần đây, bài, người có gu; mốc chạy từng builder. */
+  getAdminStats(now: Date): Promise<RecommendAdminStats>;
 
   // Dọn hạn lưu
   /** Xoá một lô dòng hết hạn, trả số dòng đã xoá. */

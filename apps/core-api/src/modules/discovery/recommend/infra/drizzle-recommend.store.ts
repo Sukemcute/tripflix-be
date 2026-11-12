@@ -8,7 +8,7 @@ import {
   recommendPosts,
   recommendUserFeatures,
 } from '../../db/schema/index.js';
-import type { CandidateQuery, InteractionCounts, RecommendPostRow, RecommendStore } from '../application/ports.js';
+import type { CandidateQuery, InteractionCounts, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
 import { splitKey, type Candidate, type CandidateSource, type Kind, type PostMeta, type RawRow } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 
@@ -214,6 +214,33 @@ export class DrizzleRecommendStore implements RecommendStore {
       .insert(recommendJobState)
       .values({ name, ...state })
       .onConflictDoUpdate({ target: recommendJobState.name, set: state });
+  }
+
+  async getAdminStats(now: Date): Promise<RecommendAdminStats> {
+    const since10m = new Date(now.getTime() - 10 * 60_000);
+    const since24h = new Date(now.getTime() - DAY_MS);
+    const [[interactions], [posts], [users], jobStates] = await Promise.all([
+      this.db
+        .select({
+          last10m: sql<number>`(count(*) filter (where ${recommendInteractions.ingestedAt} > ${since10m}))::int`,
+          last24h: sql<number>`count(*)::int`,
+        })
+        .from(recommendInteractions)
+        .where(gt(recommendInteractions.ingestedAt, since24h)),
+      this.db.select({ n: sql<number>`count(*)::int` }).from(recommendPosts),
+      this.db.select({ n: sql<number>`count(distinct ${recommendUserFeatures.userId})::int` }).from(recommendUserFeatures),
+      this.db
+        .select({ name: recommendJobState.name, lastRunAt: recommendJobState.lastRunAt, lastError: recommendJobState.lastError })
+        .from(recommendJobState)
+        .orderBy(recommendJobState.name),
+    ]);
+    return {
+      interactionsLast10m: interactions?.last10m ?? 0,
+      interactionsLast24h: interactions?.last24h ?? 0,
+      posts: posts?.n ?? 0,
+      usersWithFeatures: users?.n ?? 0,
+      jobStates,
+    };
   }
 
   async listActiveAlgos() {

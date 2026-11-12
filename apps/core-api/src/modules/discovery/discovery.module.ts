@@ -19,6 +19,8 @@ import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
+import { AdminDiscoveryJobsController } from './jobs/admin-discovery-jobs.controller.js';
+import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -85,6 +87,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     HomeRecommendationsController,
     PostRecommendationsController,
     AdminIndexHealthController,
+    AdminDiscoveryJobsController,
   ],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
@@ -98,6 +101,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     HomeRecommendationUseCases,
     ExploreUseCases,
     IndexHealth,
+    JobRuns,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
