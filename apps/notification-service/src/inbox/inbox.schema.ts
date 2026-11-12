@@ -110,10 +110,23 @@ const POST_MODERATION_NOTIFICATIONS_SCHEMA = `
   );
 `;
 
+const FOLLOWER_POST_JOBS_SCHEMA = `
+  CREATE TABLE follower_post_jobs (
+    post_id uuid PRIMARY KEY,
+    author_id uuid NOT NULL,
+    cursor uuid,
+    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'done', 'failed', 'cancelled')),
+    attempts integer NOT NULL DEFAULT 0,
+    available_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX idx_follower_post_jobs_available ON follower_post_jobs (available_at, post_id) WHERE state = 'pending';
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
   [3, COMMENT_NOTIFICATIONS_SCHEMA],
   [4, REACTION_NOTIFICATIONS_SCHEMA],
   [5, POST_MODERATION_NOTIFICATIONS_SCHEMA],
+  [6, FOLLOWER_POST_JOBS_SCHEMA],
 ] as const;

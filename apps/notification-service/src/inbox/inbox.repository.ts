@@ -51,6 +51,15 @@ export function toInboxItemDto(row: InboxRow): InboxItemDto {
   };
 }
 
+// A cancelled fan-out hides every notification immediately without a mass UPDATE.
+const FOLLOWER_POST_VISIBLE = `(
+  type <> 'follow.post.published' OR NOT EXISTS (
+    SELECT 1 FROM follower_post_jobs AS job
+    WHERE job.post_id = (CASE WHEN inbox.type = 'follow.post.published' THEN inbox.data->>'postId' END)::uuid
+      AND job.state = 'cancelled'
+  )
+)`;
+
 const InboxCursorSchema = z.tuple([z.iso.datetime(), z.uuid()]);
 
 export type InboxTab = 'all' | 'orders' | 'interactions';
@@ -105,10 +114,10 @@ export class InboxRepository implements OnModuleInit {
     const result = await this.pool.query<InboxRow & { cursor_created_at: string }>(
       `
       SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-      FROM inbox WHERE user_id = $1 AND deleted_at IS NULL
+      FROM inbox WHERE user_id = $1 AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
         AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
         AND ($5 = 'all' OR ($5 = 'orders' AND type LIKE 'booking.%')
-          OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%')))
+          OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%' OR type = 'follow.post.published')))
       ORDER BY created_at DESC, id DESC LIMIT $4
     `,
       [userId, cursor?.[0] ?? null, cursor?.[1] ?? null, options.limit + 1, options.tab ?? 'all'],
@@ -126,7 +135,7 @@ export class InboxRepository implements OnModuleInit {
 
   async countUnread(userId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
-      'SELECT count(*) AS count FROM inbox WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL',
+       `SELECT count(*) AS count FROM inbox WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
       [userId],
     );
     return Number(result.rows[0]?.count ?? 0);
@@ -134,7 +143,7 @@ export class InboxRepository implements OnModuleInit {
 
   async markRead(userId: string, id: string): Promise<boolean> {
     const result = await this.pool.query(
-      'UPDATE inbox SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL',
+       `UPDATE inbox SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
       [userId, id],
     );
     return (result.rowCount ?? 0) > 0;
@@ -142,7 +151,7 @@ export class InboxRepository implements OnModuleInit {
 
   async markAllRead(userId: string): Promise<number> {
     const result = await this.pool.query(
-      'UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL',
+       `UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
       [userId],
     );
     return result.rowCount ?? 0;
@@ -155,7 +164,7 @@ export class InboxRepository implements OnModuleInit {
        ), updated AS (
          UPDATE inbox SET read_at = now()
          FROM boundary
-         WHERE inbox.user_id = $1 AND inbox.read_at IS NULL AND inbox.deleted_at IS NULL
+         WHERE inbox.user_id = $1 AND inbox.read_at IS NULL AND inbox.deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
            AND (inbox.created_at, inbox.id) <= (boundary.created_at, boundary.id)
        )
        SELECT EXISTS (SELECT 1 FROM boundary) AS found`,

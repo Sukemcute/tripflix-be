@@ -27,6 +27,7 @@ import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
 import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
+import { FollowerPostWorker } from './inbox/follower-post.worker.js';
 import { InboxController } from './inbox/inbox.controller.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
 import { PostNotificationRepository } from './inbox/post-notification.repository.js';
@@ -156,6 +157,7 @@ export class InfraModule {}
     RealtimeService,
     RealtimeGateway,
     InboxRepository,
+    FollowerPostWorker,
     CommentNotificationRepository,
     PostNotificationRepository,
     ReactionNotificationRepository,

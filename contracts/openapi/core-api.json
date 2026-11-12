@@ -1887,6 +1887,151 @@
         ]
       }
     },
+    "/api/v1/users/{authorId}/follow": {
+      "get": {
+        "operationId": "FollowsController_getStatus",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      },
+      "put": {
+        "operationId": "FollowsController_follow",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      },
+      "delete": {
+        "operationId": "FollowsController_unfollow",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      }
+    },
+    "/api/v1/internal/posts/{postId}/follower-recipients": {
+      "get": {
+        "operationId": "FollowsController_listPostRecipients",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostFollowerPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      }
+    },
     "/api/v1/admin/posts": {
       "get": {
         "operationId": "AdminPostsController_listAdminPosts",
@@ -6121,6 +6266,42 @@
           "postId",
           "isBookmarked",
           "bookmarkCount"
+        ]
+      },
+      "FollowStatusDto": {
+        "type": "object",
+        "properties": {
+          "isFollowing": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isFollowing"
+        ]
+      },
+      "PostFollowerPageDto": {
+        "type": "object",
+        "properties": {
+          "isEligible": {
+            "type": "boolean"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "isEligible",
+          "recipients",
+          "nextCursor"
         ]
       },
       "SocialAuthorDto": {
