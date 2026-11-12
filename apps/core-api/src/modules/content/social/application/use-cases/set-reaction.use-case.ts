@@ -1,5 +1,5 @@
 import { Transactional } from '@tripflix/db';
-import { PostNotFoundException } from '../../domain/index.js';
+import { InvalidReactionTypeException, Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { ReactionRepository } from '../../infra/reaction.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
@@ -33,6 +33,16 @@ export class SetReactionUseCase {
       : await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted') {
       throw new PostNotFoundException(command.postId);
+    }
+
+    const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+    if (!domainPost.canBeViewedBy(command.userId)) {
+      throw new PostNotFoundException(command.postId);
+    }
+
+    // Repository ghi thẳng type xuống DB nên phải chặn loại lạ ở đây.
+    if (command.type !== null && !['like', 'love', 'helpful'].includes(command.type)) {
+      throw new InvalidReactionTypeException(command.type);
     }
 
     if (command.type !== null) {

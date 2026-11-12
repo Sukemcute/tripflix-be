@@ -1,4 +1,5 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
+import { Post } from '../../domain/index.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { PostRecord, PostType } from '../../../db/schema/index.js';
@@ -51,7 +52,7 @@ export class ListBookmarksUseCase {
     const items: PostRecord[] = [];
     for (const id of postIds) {
       const p = postMap.get(id);
-      if (p && p.status === 'published') {
+      if (p && p.status === 'published' && (p.visibility === 'public' || p.authorId === query.userId)) {
         items.push(p);
       }
     }
@@ -65,10 +66,14 @@ export class ListBookmarksUseCase {
       }
     }
 
-    const enrichedItems: EnrichedBookmarkPostItem[] = items.map((post) => ({
-      ...post,
-      authorName: authorNames.get(post.authorId) ?? null,
-    }));
+    const enrichedItems: EnrichedBookmarkPostItem[] = items.map((post) => {
+      const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+      return {
+        ...post,
+        tripAttachment: domainPost.getMaskedTripAttachment(),
+        authorName: authorNames.get(post.authorId) ?? null,
+      };
+    });
 
     const lastBookmark = pageRecords[pageRecords.length - 1];
     const nextCursor =

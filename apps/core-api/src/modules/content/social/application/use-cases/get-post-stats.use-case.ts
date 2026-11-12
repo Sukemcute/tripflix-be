@@ -1,8 +1,10 @@
-import { PostNotFoundException } from '../../domain/index.js';
+import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 
 export interface GetPostStatsQuery {
   postId: string;
+  viewerId?: string | null;
+  isStaff?: boolean;
 }
 
 export interface PostStatsResult {
@@ -20,6 +22,11 @@ export class GetPostStatsUseCase {
   async execute(query: GetPostStatsQuery): Promise<PostStatsResult> {
     const post = await this.postRepository.findById(query.postId);
     if (!post || post.status === 'deleted') {
+      throw new PostNotFoundException(query.postId);
+    }
+
+    const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+    if (!domainPost.canBeViewedBy(query.viewerId ?? undefined, query.isStaff)) {
       throw new PostNotFoundException(query.postId);
     }
 

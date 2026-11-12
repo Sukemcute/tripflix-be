@@ -152,7 +152,7 @@ describe('Social API Controllers', () => {
 
     it('getStats nên gọi getPostStatsUseCase', async () => {
       const res = await controller.getStats('p1');
-      expect(mockGetStats.execute).toHaveBeenCalledWith({ postId: 'p1' });
+      expect(mockGetStats.execute).toHaveBeenCalledWith({ postId: 'p1', viewerId: undefined, isStaff: false });
       expect(res).toEqual({ reaction_total: 10 });
     });
 

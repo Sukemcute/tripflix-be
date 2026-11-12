@@ -1,5 +1,5 @@
 import { Transactional } from '@tripflix/db';
-import { Post, PostNotFoundException } from '../../domain/index.js';
+import { InvalidPostStatusTransitionException, Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
@@ -46,6 +46,14 @@ export class PublishPostUseCase {
     userId: string,
     isVerified: boolean,
   ): Promise<PublishPostResult> {
+    const current = this.postRepository.findByIdForUpdate
+      ? await this.postRepository.findByIdForUpdate(record.id)
+      : await this.postRepository.findById(record.id);
+    if (!current) throw new PostNotFoundException(record.id);
+    if (current.status !== 'draft') {
+      throw new InvalidPostStatusTransitionException(current.status, 'published');
+    }
+
     const domainPost = new Post({
       id: record.id,
       authorId: record.authorId,
