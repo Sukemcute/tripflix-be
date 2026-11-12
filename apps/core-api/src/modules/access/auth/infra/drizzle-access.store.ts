@@ -37,6 +37,7 @@ import type {
   UserRecord,
   UserRepository,
 } from '../application/ports.js';
+import { VIETNAMESE_TRANSLATE_FROM, VIETNAMESE_TRANSLATE_TO } from '../../account/domain/name-search.js';
 
 const mapUserRow = (row: UserRow): UserRecord => ({
   id: row.id,
@@ -113,6 +114,20 @@ class DrizzleUserRepository implements UserRepository {
       this.db.select({ total: count() }).from(users).where(where),
     ]);
     return { items: rows.map(mapUserRow), total: counted?.total ?? 0 };
+  }
+
+  async searchPublic({ query, limit, offset }: { query: string; limit: number; offset: number }) {
+    // shortcut: quét tuần tự bảng users (đủ cho pilot vài nghìn tài khoản); lớn hơn thì thêm cột tên đã bỏ dấu + index trigram.
+    const pattern = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const foldedName = sql`translate(lower(${users.displayName}), ${VIETNAMESE_TRANSLATE_FROM}, ${VIETNAMESE_TRANSLATE_TO})`;
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(and(eq(users.status, 'active'), sql`${foldedName} like ${pattern}`))
+      .orderBy(asc(users.displayName), asc(users.id))
+      .limit(limit)
+      .offset(offset);
+    return rows.map(mapUserRow);
   }
 
   async updateRole(id: string, role: UserRecord['role']) {

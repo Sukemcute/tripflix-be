@@ -126,6 +126,8 @@ export interface UserRepository {
   listStaff(): Promise<UserRecord[]>;
   /** Tìm theo email hoặc tên hiển thị (không phân biệt hoa thường), mới nhất trước. */
   search(options: { query?: string | undefined; limit: number; offset: number }): Promise<{ items: UserRecord[]; total: number }>;
+  /** Tìm công khai: chỉ tài khoản active, chỉ theo tên hiển thị, không phân biệt hoa thường và dấu tiếng Việt; `query` đã bỏ dấu. */
+  searchPublic(options: { query: string; limit: number; offset: number }): Promise<UserRecord[]>;
   updateRole(id: string, role: UserRecord['role']): Promise<UserRecord | null>;
   updateStatus(id: string, status: UserRecord['status']): Promise<UserRecord | null>;
   updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;

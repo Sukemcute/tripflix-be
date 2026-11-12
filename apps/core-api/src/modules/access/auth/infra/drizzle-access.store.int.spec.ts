@@ -106,6 +106,16 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(percent.items.map((u) => u.email)).toEqual(['search-b@example.com']);
   });
 
+  it('searchPublic khớp tên không dấu, bỏ email và tài khoản khoá', async () => {
+    const active = await store.users.insert({ email: 'pub-bao@example.com', passwordHash: 'x', displayName: 'Lê ĐỨC Bảo', role: 'member' });
+    const locked = await store.users.insert({ email: 'pub-locked@example.com', passwordHash: 'x', displayName: 'Bảo Khoá', role: 'member' });
+    await store.users.updateStatus(locked!.id, 'locked');
+    const names = async (query: string) => (await store.users.searchPublic({ query, limit: 10, offset: 0 })).map((u) => u.id);
+    expect(await names('duc bao')).toEqual([active!.id]);
+    expect(await names('bao')).toEqual([active!.id]);
+    expect(await names('pub-')).toEqual([]);
+  });
+
   it('updateRole, updateStatus đổi đúng dòng; deleteByUser xoá mọi phiên và trả sid', async () => {
     const { session } = await createSession('staff@example.com');
     const second = await store.sessions.insert({

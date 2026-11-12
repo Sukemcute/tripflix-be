@@ -15,6 +15,7 @@ import type {
   SessionSummary,
   UserRecord,
 } from '../../application/ports.js';
+import { foldVietnamese } from '../../../account/domain/name-search.js';
 
 /** Bản lưu trong bộ nhớ của AccessStore, dùng cho E2E (CI không có Postgres). Không có rollback. */
 export class MemoryAccessStore implements AccessStore {
@@ -56,6 +57,11 @@ export class MemoryAccessStore implements AccessStore {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       return { items: matched.slice(offset, offset + limit), total: matched.length };
     },
+    searchPublic: async ({ query, limit, offset }: { query: string; limit: number; offset: number }) =>
+      [...this.userRows.values()]
+        .filter((u) => u.status === 'active' && foldVietnamese(u.displayName).includes(query))
+        .sort((a, b) => (a.displayName < b.displayName ? -1 : a.displayName > b.displayName ? 1 : a.id.localeCompare(b.id)))
+        .slice(offset, offset + limit),
     updateRole: async (id: string, role: UserRecord['role']) => this.patchUser(id, { role }),
     updateStatus: async (id: string, status: UserRecord['status']) => this.patchUser(id, { status }),
     updateProfile: async (id: string, { displayName, ...personal }: ProfilePatch) => {

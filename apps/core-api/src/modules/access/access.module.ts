@@ -14,6 +14,8 @@ import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, REDIS } from '../../platform/tokens.js';
 import { AccountController } from './account/api/account.controller.js';
 import { PasswordResetController } from './account/api/password-reset.controller.js';
+import { UserSearchController } from './account/api/user-search.controller.js';
+import { UserSearchUseCases } from './account/application/user-search.use-cases.js';
 import { AccountUseCases } from './account/application/account.use-cases.js';
 import { EmailVerificationController } from './account/api/email-verification.controller.js';
 import { EmailVerificationUseCases } from './account/application/email-verification.use-cases.js';
@@ -163,6 +165,7 @@ export class AccessInfraModule {}
     ServiceTokenController,
     JwksController,
     AdminController,
+    UserSearchController,
   ],
   providers: [
     AuthUseCases,
@@ -170,6 +173,7 @@ export class AccessInfraModule {}
     PasswordResetUseCases,
     EmailVerificationUseCases,
     StaffUseCases,
+    UserSearchUseCases,
     ServiceTokenUseCases,
     PasswordEncryption,
     PasswordDecryptionInterceptor,
