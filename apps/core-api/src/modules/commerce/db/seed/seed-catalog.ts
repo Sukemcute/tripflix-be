@@ -83,8 +83,11 @@ export async function seedCatalog(
   file = CATALOG_SEED_FILE,
   // Ảnh lưu khoá đầy đủ trên kho media (thêm tiền tố môi trường, như S3ObjectStorage.resolveKey); mặc định giữ khoá tương đối.
   resolveImageKey: (relativeKey: string) => string = (relativeKey) => relativeKey,
+  // Test tích hợp chỉ cần một phần danh mục: nạp đủ 2.200 khách sạn và 254.000 đánh giá thì quá giờ chuẩn bị.
+  options: { shouldIncludeHotel?: (hotelId: string) => boolean } = {},
 ): Promise<{ hotels: number; roomTypes: number; flights: number; reviews: number }> {
   const seed = JSON.parse(readFileSync(file, 'utf8')) as CatalogSeed;
+  if (options.shouldIncludeHotel) seed.hotels = seed.hotels.filter((h) => options.shouldIncludeHotel!(h.id));
   const toImageKey = (sourcePath: string) => {
     const key = toHotelImageKey(sourcePath);
     return /^https?:\/\//.test(key) ? key : resolveImageKey(key);

@@ -16,7 +16,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "format": "prettier --write .",
     "contracts:build": "turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/contracts export-schemas && pnpm --filter @tripflix/core-api export-openapi",
-    "db:migrate": "pnpm --filter @tripflix/core-api db:migrate",
+    "db:migrate": "pnpm --filter @tripflix/core-api db:migrate && pnpm --filter @tripflix/notification-service db:migrate",
     "db:seed": "pnpm --filter @tripflix/core-api db:seed",
     "stack:infra": "docker compose -f deploy/compose.yaml up -d",
     "stack:up": "docker compose -f deploy/compose.yaml --profile be --profile fe --profile gateway up -d --build",

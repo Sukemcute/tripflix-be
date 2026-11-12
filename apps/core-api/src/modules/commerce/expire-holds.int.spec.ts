@@ -127,7 +127,8 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
     await migrateModule({ url, module: 'commerce', migrationsFolder: fileURLToPath(new URL('./db/migrations', import.meta.url)) });
     pool = createPool({ url, max: 20, applicationName: 'commerce-expire-holds-int' });
     db = createDb(pool);
-    await seedCatalog(db, fileURLToPath(new URL('./db/seed/catalog.json', import.meta.url)));
+    // Chỉ 220 khách sạn gốc: đủ cho test, không nạp 1.980 khách sạn OSM và đánh giá của chúng (quá giờ chuẩn bị).
+    await seedCatalog(db, fileURLToPath(new URL('./db/seed/catalog.json', import.meta.url)), undefined, { shouldIncludeHotel: (id) => !id.startsWith('P-osm-') });
     await new CalendarUseCases(new DrizzleCommerceStore({ tx: db }), () => TODAY_DATE).openCalendarWindow(55);
     await pool.query('update commerce.room_inventory set stop_sell = false, cta = false, ctd = false, min_los = 1, total = 10');
     await pool.query('update commerce.flight_inventory set stop_sell = false, total = 10');

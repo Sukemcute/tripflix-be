@@ -329,6 +329,41 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect((await pool.query('select status from content.posts where id=$1', [postId])).rows[0].status).toBe('published');
   });
 
+  it('đổi tab theo trạng thái hiện tại, vẫn đọc được bình luận đã ẩn và gỡ cùng nhật ký', async () => {
+    const comment = await add();
+    const report = await cases.report.execute({
+      targetType: 'comment', targetId: comment.id, reporterId: AUTHOR, reasonCode: 'OTHER',
+    });
+    const actor = { actorId: AUTHOR, reasonCode: 'OTHER' };
+    const queue = (view: 'pending' | 'reviewed' | 'hidden' | 'removed') =>
+      cases.repository.queue({ view, targetType: 'comment', limit: 20, offset: 0 });
+
+    expect((await queue('pending')).total).toBe(1);
+    await cases.decide.execute(report.caseId!, { ...actor, action: 'hide' });
+    expect(await count()).toBe(0);
+    expect((await queue('pending')).total).toBe(0);
+    const hidden = await queue('hidden');
+    expect(hidden.total).toBe(1);
+    expect(hidden.items[0]?.id).toBe(report.caseId);
+    expect((await cases.repository.detail(hidden.items[0]!)).target?.text).toBeTruthy();
+
+    await hide(comment.id, 'restore');
+    expect(await count()).toBe(1);
+    expect((await queue('hidden')).total).toBe(0);
+    expect((await queue('reviewed')).total).toBe(1);
+
+    await hide(comment.id, 'remove');
+    expect(await count()).toBe(0);
+    expect((await queue('reviewed')).total).toBe(0);
+    const removed = await queue('removed');
+    expect(removed.total).toBe(1);
+    const detail = await cases.repository.detail(removed.items[0]!);
+    expect(detail.target).toMatchObject({ status: 'removed', deleted: true });
+    expect(detail.actions.map(({ action }) => action)).toEqual(
+      expect.arrayContaining(['hide', 'restore', 'remove']),
+    );
+  });
+
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
     const root = await add(); const snapshot = await cases.repository.loadTarget('comment', root.id);
     await cases.screen.execute(randomUUID(), snapshot!, { id: `comment:${root.id}`, flagged: true, categories: { 'self-harm/intent': true }, scores: { 'self-harm/intent': 0.99 }, model: 'omni-test' });

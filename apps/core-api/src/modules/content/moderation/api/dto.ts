@@ -18,6 +18,7 @@ export class DecisionDto extends ReportDto {
 }
 export const QueueQuerySchema = z.object({
   status: z.enum(['pending', 'resolved']).optional(),
+  view: z.enum(['pending', 'reviewed', 'hidden', 'removed']).optional(),
   targetType: z.enum(['post', 'comment']).optional(),
   source: z.enum(['rule', 'ai', 'report', 'new_content']).optional(),
   reasonCode: z.enum(REASON_CODES).optional(),
@@ -26,6 +27,8 @@ export const QueueQuerySchema = z.object({
 });
 export class QueueQueryDto {
   @ApiPropertyOptional({ enum: ['pending', 'resolved'] }) status?: 'pending' | 'resolved';
+  @ApiPropertyOptional({ enum: ['pending', 'reviewed', 'hidden', 'removed'] })
+  view?: 'pending' | 'reviewed' | 'hidden' | 'removed';
   @ApiPropertyOptional({ enum: ['post', 'comment'] }) targetType?: 'post' | 'comment';
   @ApiPropertyOptional({ enum: ['rule', 'ai', 'report', 'new_content'] }) source?: string;
   @ApiPropertyOptional({ enum: REASON_CODES }) reasonCode?: string;

@@ -79,6 +79,13 @@ export class StayDto {
   @ApiProperty({ example: 1_200_000, description: 'Giá thật một đêm một phòng (VND), gói giá mặc định, cho đúng ngày đã chọn' })
   unitPrice!: number;
   @ApiProperty({ example: 2_400_000, description: 'Tổng tiền cả kỳ ở, mọi phòng (VND)' }) totalPrice!: number;
+  @ApiProperty({ type: () => StayRatingDto, nullable: true, description: 'Điểm đánh giá của khách; null khi khách sạn chưa có đánh giá' })
+  rating!: StayRatingDto | null;
+}
+
+class StayRatingDto {
+  @ApiProperty({ example: 4.5, description: 'Điểm trung bình, thang 1–5' }) average!: number;
+  @ApiProperty({ example: 77, description: 'Số đánh giá' }) count!: number;
 }
 
 export class StayPageDto {

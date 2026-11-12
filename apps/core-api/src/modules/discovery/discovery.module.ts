@@ -17,6 +17,7 @@ import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
+import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
@@ -34,6 +35,7 @@ import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
+import { IndexHealth } from './search/jobs/index-health.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from './search/jobs/rebuild-suggest-index.job.js';
 
@@ -75,7 +77,14 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
  */
 @Module({
   imports: [CommerceModule, ContentModule],
-  controllers: [SuggestController, StaysController, ExploreController, HomeRecommendationsController, PostRecommendationsController],
+  controllers: [
+    SuggestController,
+    StaysController,
+    ExploreController,
+    HomeRecommendationsController,
+    PostRecommendationsController,
+    AdminIndexHealthController,
+  ],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
@@ -87,6 +96,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     StaysUseCases,
     HomeRecommendationUseCases,
     ExploreUseCases,
+    IndexHealth,
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },

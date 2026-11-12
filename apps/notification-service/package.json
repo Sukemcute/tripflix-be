@@ -8,6 +8,7 @@
     "build": "nest build",
     "dev": "nest start --watch --preserveWatchOutput",
     "start": "node dist/main.js",
+    "db:migrate": "node dist/cli/migrate.js",
     "lint": "oxlint --type-aware src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",

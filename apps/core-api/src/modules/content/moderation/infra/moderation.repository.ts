@@ -163,13 +163,38 @@ export class ModerationRepository {
   }
   async queue(options: {
     status?: 'pending' | 'resolved';
+    view?: 'pending' | 'reviewed' | 'hidden' | 'removed';
     targetType?: ModerationTarget;
     reasonCode?: string;
     source?: string;
     limit: number;
     offset: number;
   }) {
-    const conditions = [eq(moderationCases.status, options.status ?? 'pending')];
+    const postJoin = and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId));
+    const commentJoin = and(eq(moderationCases.targetType, 'comment'), eq(comments.id, moderationCases.targetId));
+    const visibility = sql`coalesce(${posts.status}, ${comments.status}, '')`;
+    const conditions = [];
+    if (options.view) {
+      if (options.view !== 'pending') {
+        conditions.push(sql`${moderationCases.id} IN (
+          SELECT DISTINCT ON (${moderationCases.targetType}, ${moderationCases.targetId}) ${moderationCases.id}
+          FROM ${moderationCases}
+          ORDER BY ${moderationCases.targetType}, ${moderationCases.targetId},
+            ${moderationCases.createdAt} DESC, ${moderationCases.id} DESC
+        )`);
+      }
+      if (options.view === 'pending') {
+        conditions.push(eq(moderationCases.status, 'pending'), sql`${visibility} IN ('published', 'visible', 'hidden')`);
+      } else if (options.view === 'reviewed') {
+        conditions.push(eq(moderationCases.status, 'resolved'), sql`${visibility} IN ('published', 'visible', 'draft')`);
+      } else if (options.view === 'hidden') {
+        conditions.push(sql`${visibility} = 'hidden'`);
+      } else {
+        conditions.push(sql`${visibility} = 'removed'`);
+      }
+    } else {
+      conditions.push(eq(moderationCases.status, options.status ?? 'pending'));
+    }
     if (options.targetType) conditions.push(eq(moderationCases.targetType, options.targetType));
     if (options.source)
       conditions.push(sql`${moderationCases.sources} @> ${JSON.stringify([options.source])}::jsonb`);
@@ -190,8 +215,8 @@ export class ModerationRepository {
           ), 160)`,
         })
         .from(moderationCases)
-        .leftJoin(posts, and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId)))
-        .leftJoin(comments, and(eq(moderationCases.targetType, 'comment'), eq(comments.id, moderationCases.targetId)))
+        .leftJoin(posts, postJoin)
+        .leftJoin(comments, commentJoin)
         .where(and(...conditions))
         .orderBy(desc(moderationCases.severity), asc(moderationCases.createdAt), asc(moderationCases.id))
         .limit(options.limit)
@@ -199,6 +224,8 @@ export class ModerationRepository {
       this.db
         .select({ total: sql<number>`count(*)::int` })
         .from(moderationCases)
+        .leftJoin(posts, postJoin)
+        .leftJoin(comments, commentJoin)
         .where(and(...conditions)),
     ]);
     return { items, total: count[0]?.total ?? 0 };

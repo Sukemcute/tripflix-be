@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { AuthUser } from '@tripflix/auth';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { InboxController, InboxQuerySchema } from './inbox.controller.js';
 import { decodeInboxCursor, encodeInboxCursor, InboxRepository, type InboxRow } from './inbox.repository.js';
 
@@ -58,7 +59,9 @@ describe('InboxController', () => {
     const count = vi.spyOn(inbox, 'countUnread').mockResolvedValue(2);
     const read = vi.spyOn(inbox, 'markRead').mockResolvedValue(true);
     const readAll = vi.spyOn(inbox, 'markAllRead').mockResolvedValue(2);
-    return { controller: new InboxController(inbox), list, count, read, readAll };
+    const realtime = new RealtimeService();
+    const emit = vi.spyOn(realtime, 'emitToUser').mockReturnValue(true);
+    return { controller: new InboxController(inbox, realtime), list, count, read, readAll, emit };
   }
 
   it('trả DTO camelCase và ISO, dùng userId từ token', async () => {
@@ -104,17 +107,19 @@ describe('InboxController', () => {
   });
 
   it('đọc chỉ hàng của người gọi, trả 404 khi không thuộc người gọi', async () => {
-    const { controller, read } = setup();
+    const { controller, read, emit } = setup();
     const id = randomUUID();
     expect(await controller.markRead(user, id)).toEqual({ unreadCount: 2 });
     expect(read).toHaveBeenCalledWith(user.userId, id);
+    expect(emit).toHaveBeenCalledWith(user.userId, 'notification.read', { id, unreadCount: 2 });
     read.mockResolvedValue(false);
     await expect(controller.markRead(user, id)).rejects.toBeInstanceOf(NotFoundException);
     await expect(controller.markRead(user, 'sai')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('đọc tất cả theo người gọi và trả không còn chưa đọc', async () => {
-    const { controller, readAll } = setup();
+    const { controller, count, readAll } = setup();
+    count.mockResolvedValue(0);
     expect(await controller.markAllRead(user)).toEqual({ unreadCount: 0 });
     expect(readAll).toHaveBeenCalledWith(user.userId);
   });

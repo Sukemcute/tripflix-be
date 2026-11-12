@@ -8,7 +8,9 @@ import {
 import type { Redis } from 'ioredis';
 import type { Env } from '../env.js';
 import type { Mailer } from '../outapp/mailer.js';
+import { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
+import { DirectoryRepository } from '../directory/directory.repository.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { DeadLetterReplayer } from './dead-letter-replay.js';
@@ -27,6 +29,8 @@ export class DeadLetterReplayJob implements OnApplicationBootstrap, OnApplicatio
     @Inject(PROCESSED_EVENTS) private readonly processed: ProcessedEvents,
     @Inject(InboxRepository) private readonly inbox: InboxRepository,
     @Inject(RealtimeService) private readonly realtime: RealtimeService,
+    @Inject(DirectoryRepository) private readonly directory: DirectoryRepository,
+    @Inject(CommentNotificationRepository) private readonly comments: CommentNotificationRepository,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -39,6 +43,8 @@ export class DeadLetterReplayJob implements OnApplicationBootstrap, OnApplicatio
       { webAppUrl: this.env.WEB_APP_URL },
       this.inbox,
       this.realtime,
+      this.directory,
+      this.comments,
     );
     const replayer = new DeadLetterReplayer(this.redis, router, Date.now, {
       onError: (err, event) =>

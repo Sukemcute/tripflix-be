@@ -5,6 +5,7 @@ import { DiscoveryEventsConsumer } from '../../consumers/discovery-events.consum
 import type { RecommendIngestUseCases } from '../../recommend/application/ingest.use-cases.js';
 import { buildIndex } from '../domain/explore/build.js';
 import { RebuildExploreIndexJob } from '../jobs/rebuild-explore-index.job.js';
+import { IndexHealth } from '../jobs/index-health.js';
 import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
 import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-cases.js';
@@ -176,7 +177,10 @@ describe('ExploreUseCases', () => {
       try {
         const hidden: string[] = [];
         const { explore } = setup([], plans, hidden);
-        const job = new RebuildExploreIndexJob({ APP_ROLE: 'worker' } as CoreEnv, explore);
+        const env = { APP_ROLE: 'worker', NODE_ENV: 'test' } as CoreEnv;
+        const job = new RebuildExploreIndexJob(
+          { APP_ROLE: 'worker' } as CoreEnv, explore, new IndexHealth(env, {} as Redis),
+        );
         const recommend = { ingest: () => Promise.resolve() } as unknown as RecommendIngestUseCases;
         const consumer = new DiscoveryEventsConsumer({ APP_ROLE: 'api' } as CoreEnv, {} as Redis, explore, recommend);
         const moderated = (action: string) =>

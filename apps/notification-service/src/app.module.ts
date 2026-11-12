@@ -27,7 +27,9 @@ import { DeadLetterReplayJob } from './consumers/dead-letter-replay.job.js';
 import { RedisProcessedEvents, type ProcessedEvents } from './consumers/event-router.js';
 import { envSchema, type Env } from './env.js';
 import { InboxController } from './inbox/inbox.controller.js';
+import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
+import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RealtimeService } from './realtime/realtime.service.js';
@@ -146,7 +148,15 @@ export class InfraModule {}
     }),
   ],
   controllers: [HealthController, MeController, InboxController],
-  providers: [NotificationConsumer, DeadLetterReplayJob, RealtimeService, RealtimeGateway, InboxRepository],
+  providers: [
+    NotificationConsumer,
+    DeadLetterReplayJob,
+    RealtimeService,
+    RealtimeGateway,
+    InboxRepository,
+    CommentNotificationRepository,
+    DirectoryRepository,
+  ],
 })
 export class AppModule implements OnApplicationShutdown {
   constructor(

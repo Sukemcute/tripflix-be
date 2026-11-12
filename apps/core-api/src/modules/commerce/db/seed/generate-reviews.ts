@@ -24,6 +24,7 @@ export interface CatalogHotelForReviews {
   style: string | null;
   stars: number | null;
   ratingAvg?: number | string | null;
+  ratingSource?: string | null;
   roomTypes?: { id: string; name: string }[];
   details?: {
     amenities?: { name: string }[];
@@ -166,7 +167,7 @@ function complaintKey(p: HotelProfile, rng: Rng): ComplaintKey {
   return pick(keys, rng);
 }
 function bodyFor(h: CatalogHotelForReviews, p: HotelProfile, rating: number, travelerType: TravelerType, room: { id: string; name: string } | null, rng: Rng) {
-  const intro = `${pick(INTRO[travelerType], rng)}${room ? `, ở phòng ${room.name}` : ''}${chance(0.3, rng) ? ` tại ${h.name}` : ''}.`;
+  const intro = `${pick(INTRO[travelerType], rng)}${room ? `, ở phòng ${room.name.replace(/^Phòng /i, '')}` : ''}${chance(0.3, rng) ? ` tại ${h.name}` : ''}.`;
   const notes: string[] = [];
   if (rating >= 4) {
     notes.push(pick(['Phòng sạch sẽ, nghỉ ngơi khá thoải mái.', 'Cảm giác chung là dễ chịu và xứng với số tiền bỏ ra.', 'Mọi thứ nhìn chung gọn gàng, phục vụ cũng thân thiện.'], rng));
@@ -231,17 +232,25 @@ function summaryFor(p: HotelProfile, reviews: GeneratedReview[], complaints: Map
   return issues.length ? `${praise} Một số khách góp ý về ${issues.join(' và ')}.` : praise;
 }
 
+// Khách sạn có điểm từ nguồn ngoài (ratingSource) nhiều đánh giá hơn; khách sạn lấy từ OSM ít hơn, sát thực tế khách sạn nhỏ.
+export function reviewRange(h: CatalogHotelForReviews): [number, number] {
+  if (h.ratingSource == null) return h.style === 'homestay' ? [30, 80] : h.stars === 5 ? [120, 220] : h.stars === 4 ? [80, 180] : [50, 140];
+  return h.style === 'homestay' ? [100, 180] : h.stars === 5 ? [250, 400] : h.stars === 4 ? [180, 320] : h.stars === 3 ? [130, 250] : [100, 180];
+}
+
 function generateHotel(h: CatalogHotelForReviews, photos: PhotoGroups) {
   // Nội dung không trùng trong cùng một khách sạn.
   const globalBodies = new Set<string>();
   const rng = mulberry32(hashId(String(h.id)));
   const p = profile(h);
-  const n = h.style === 'homestay' ? integer(100, 180, rng) : h.stars === 5 ? integer(250, 400, rng) : h.stars === 4 ? integer(180, 320, rng) : h.stars === 3 ? integer(130, 250, rng) : integer(100, 180, rng);
+  const [nMin, nMax] = reviewRange(h);
+  const n = integer(nMin, nMax, rng);
   const avg = h.ratingAvg == null ? 4.2 : Number(h.ratingAvg);
   const ratings = ratingList(n, avg, rng);
   const featured = chooseDistinct(p.candidates, Math.min(3, p.candidates.length), rng);
   const complaints = new Map<ComplaintKey, number>((Object.keys(COMPLAINTS) as ComplaintKey[]).map(k => [k, 0]));
   const reviews: GeneratedReview[] = [];
+  const usedPhotos = new Set<string>();
   for (let i = 0; i < n; i++) {
     const room = h.roomTypes?.length && chance(0.85, rng) ? pick(h.roomTypes, rng) : null;
     const travelerType = pick<TravelerType>(['family', 'couple', 'solo', 'business', 'friends'], rng);
@@ -254,7 +263,10 @@ function generateHotel(h: CatalogHotelForReviews, photos: PhotoGroups) {
     globalBodies.add(generated.body);
     if (generated.complaint) complaints.set(generated.complaint, complaints.get(generated.complaint)! + 1);
     const photoPool = reviewPhotoPool(h, p, travelerType, photos);
-    const images = photoPool.length && chance(0.30, rng) ? chooseDistinct(photoPool, integer(1, Math.min(3, photoPool.length), rng), rng) : [];
+    // Một ảnh không xuất hiện hai lần trong cùng khách sạn.
+    const freePhotos = photoPool.filter((photo) => !usedPhotos.has(photo));
+    const images = freePhotos.length && chance(0.30, rng) ? chooseDistinct(freePhotos, integer(1, Math.min(3, freePhotos.length), rng), rng) : [];
+    for (const image of images) usedPhotos.add(image);
     reviews.push({
       id: `RV-${h.id}-${String(i + 1).padStart(3, '0')}`,
       propertyId: h.id,
@@ -281,7 +293,8 @@ function validate(hotels: CatalogHotelForReviews[], reviews: GeneratedReview[], 
     const group: GeneratedReview[] = [];
     bodies.clear();
     while (offset < reviews.length && reviews[offset]!.propertyId === h.id) group.push(reviews[offset++]!);
-    const [min, max] = h.style === 'homestay' ? [100, 180] : h.stars === 5 ? [250, 400] : h.stars === 4 ? [180, 320] : h.stars === 3 ? [130, 250] : [100, 180];
+    const [min, max] = reviewRange(h);
+    const hotelPhotos = new Set<string>();
     const fail = (why: string): never => { throw new Error(`${h.id}: ${why}`); };
     if (group.length < min || group.length > max) fail(`số review ${group.length} ngoài ${min}-${max}`);
     const deviation = Math.abs(group.reduce((sum, r) => sum + r.rating, 0) / group.length - (h.ratingAvg == null ? 4.2 : Number(h.ratingAvg)));
@@ -295,6 +308,10 @@ function validate(hotels: CatalogHotelForReviews[], reviews: GeneratedReview[], 
       if (r.roomTypeId !== null && !roomIds.has(r.roomTypeId)) fail(`roomTypeId sai ${r.id}`);
       if (r.images.some(image => !imagePaths.has(image))) fail(`images sai ${r.id}`);
       if (r.tags.some(tag => !tags.has(tag))) fail(`tags sai ${r.id}`);
+      if (r.images.some(image => hotelPhotos.has(image))) fail(`ảnh đánh giá lặp trong khách sạn ${r.id}`);
+      r.images.forEach(image => hotelPhotos.add(image));
+      if (r.rating <= 2 && r.tags.length) fail(`đánh giá thấp mà có tag khen ${r.id}`);
+      if (r.stayMonth && r.stayMonth > r.createdAt.slice(0, 10)) fail(`ngày ở sau ngày viết ${r.id}`);
       if (r.createdAt > '2026-11-04T23:59:59.999Z') fail(`createdAt quá hạn ${r.id}`);
       ids.add(r.id); bodies.add(r.body);
     }
@@ -315,16 +332,17 @@ function reviewPhotoPool(h: CatalogHotelForReviews, p: HotelProfile, travelerTyp
   return [...new Set(cats)].flatMap(c => photos[c] || []);
 }
 
-export function generateReviews(hotels: CatalogHotelForReviews[], photoList: ReviewPhoto[]): { reviews: GeneratedReview[]; summaries: Record<string, string> } {
+export function generateReviews(hotels: CatalogHotelForReviews[], photoList: ReviewPhoto[]): { reviews: GeneratedReview[]; summaries: Record<string, string>; stats: Record<string, { count: number; avg: number }> } {
   const photos: PhotoGroups = {};
   for (const photo of photoList) (photos[photo.category] ??= []).push('/images/reviews/' + photo.file);
-  const reviews: GeneratedReview[] = [], summaries: Record<string, string> = {};
+  const reviews: GeneratedReview[] = [], summaries: Record<string, string> = {}, stats: Record<string, { count: number; avg: number }> = {};
   for (const hotel of hotels) {
     const result = generateHotel(hotel, photos);
     reviews.push(...result.reviews);
     summaries[hotel.id] = result.summary;
+    stats[hotel.id] = { count: result.reviews.length, avg: Math.round(result.reviews.reduce((sum, r) => sum + r.rating, 0) / result.reviews.length * 10) / 10 };
   }
   validate(hotels, reviews, photos);
-  return { reviews, summaries };
+  return { reviews, summaries, stats };
 }
 

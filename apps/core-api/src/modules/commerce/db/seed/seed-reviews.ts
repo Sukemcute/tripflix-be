@@ -50,9 +50,17 @@ export async function seedReviews(
       });
   }
   for (const [propertyId, summary] of Object.entries(generated.summaries)) {
+    // Điểm và số đánh giá ở đầu trang lấy đúng theo đánh giá trong hệ thống, để khớp với phần đánh giá bên dưới.
+    // Điểm TripAdvisor/Google trong catalog chỉ dùng làm mức điểm mục tiêu khi sinh, nên bỏ nguồn ngoài.
+    const stat = generated.stats[propertyId]!;
     await tx
       .update(properties)
-      .set({ details: sql`${properties.details} || ${JSON.stringify({ reviewSummary: summary })}::jsonb` })
+      .set({
+        details: sql`${properties.details} || ${JSON.stringify({ reviewSummary: summary })}::jsonb`,
+        reviewCount: stat.count,
+        ratingAvg: stat.avg,
+        ratingSource: null,
+      })
       .where(eq(properties.id, propertyId));
   }
   return rows.length;

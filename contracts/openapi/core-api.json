@@ -2547,6 +2547,20 @@
             }
           },
           {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
             "name": "targetType",
             "required": false,
             "in": "query",
@@ -3212,6 +3226,32 @@
         "summary": "Gợi ý bài viết cho bạn hoặc đang thịnh hành",
         "tags": [
           "discovery"
+        ]
+      }
+    },
+    "/api/v1/admin/search/index-health": {
+      "get": {
+        "operationId": "AdminIndexHealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Index Health"
         ]
       }
     },
@@ -7433,6 +7473,25 @@
           "name"
         ]
       },
+      "StayRatingDto": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number",
+            "example": 4.5,
+            "description": "Điểm trung bình, thang 1–5"
+          },
+          "count": {
+            "type": "number",
+            "example": 77,
+            "description": "Số đánh giá"
+          }
+        },
+        "required": [
+          "average",
+          "count"
+        ]
+      },
       "StayDto": {
         "type": "object",
         "properties": {
@@ -7472,6 +7531,16 @@
             "type": "number",
             "example": 2400000,
             "description": "Tổng tiền cả kỳ ở, mọi phòng (VND)"
+          },
+          "rating": {
+            "nullable": true,
+            "description": "Điểm đánh giá của khách; null khi khách sạn chưa có đánh giá",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StayRatingDto"
+              }
+            ]
           }
         },
         "required": [
@@ -7481,7 +7550,8 @@
           "thumbnail",
           "province",
           "unitPrice",
-          "totalPrice"
+          "totalPrice",
+          "rating"
         ]
       },
       "StayPageDto": {
@@ -8180,6 +8250,179 @@
           "items",
           "algo",
           "nextCursor"
+        ]
+      },
+      "IndexJobLogDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "message": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "succeeded",
+              "failed",
+              "skipped"
+            ]
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "count": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "message",
+          "outcome",
+          "durationMs",
+          "count"
+        ]
+      },
+      "IndexJobHealthDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "stuck",
+              "overdue",
+              "succeeded",
+              "failed",
+              "skipped",
+              "unknown"
+            ]
+          },
+          "startedAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastSuccessAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "count": {
+            "type": "number",
+            "nullable": true
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexJobLogDto"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "lastSuccessAt",
+          "count",
+          "logs"
+        ]
+      },
+      "IndexHealthPointDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "attention",
+              "offline",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "at",
+          "status"
+        ]
+      },
+      "IndexWorkerHealthDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "attention",
+              "offline",
+              "unknown"
+            ]
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexJobHealthDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexHealthPointDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "lastSeenAt",
+          "status",
+          "jobs",
+          "history"
+        ]
+      },
+      "IndexHealthDto": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "number"
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexWorkerHealthDto"
+            }
+          }
+        },
+        "required": [
+          "checkedAt",
+          "workers"
         ]
       },
       "ProvinceDto": {
