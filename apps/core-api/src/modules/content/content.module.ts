@@ -313,14 +313,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListAdminPostsUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new ListAdminPostsUseCase(postRepo),
+      inject: [PostRepository, USER_DIRECTORY_PORT],
+      useFactory: (postRepo: PostRepository, userDirectory: UserDirectoryPort) =>
+        new ListAdminPostsUseCase(postRepo, userDirectory),
     },
     {
       provide: GetAdminPostDetailUseCase,
-      inject: [PostRepository, ModerationActionRepository],
-      useFactory: (postRepo: PostRepository, modRepo: ModerationActionRepository) =>
-        new GetAdminPostDetailUseCase(postRepo, modRepo),
+      inject: [PostRepository, ModerationActionRepository, USER_DIRECTORY_PORT],
+      useFactory: (
+        postRepo: PostRepository,
+        modRepo: ModerationActionRepository,
+        userDirectory: UserDirectoryPort,
+      ) => new GetAdminPostDetailUseCase(postRepo, modRepo, userDirectory),
     },
     {
       provide: SavePostSummaryUseCase,

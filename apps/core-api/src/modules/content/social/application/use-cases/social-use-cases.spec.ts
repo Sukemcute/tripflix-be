@@ -919,6 +919,41 @@ describe('Social Application Use Cases', () => {
         expect.objectContaining({ limit: 11, status: 'published' }),
       );
     });
+
+    it('hiện tên thật của tác giả, tra tên một lần cho mỗi tác giả', async () => {
+      mockPostRepo.findAdminPosts.mockResolvedValue([
+        samplePostRecord({ id: 'p1', authorId, status: 'published' }),
+        samplePostRecord({ id: 'p2', authorId, status: 'published' }),
+        samplePostRecord({ id: 'p3', authorId: otherUserId, status: 'published' }),
+      ]);
+      mockPostRepo.countAdminPosts.mockResolvedValue(3);
+      const mockUserDir = {
+        getDisplayNames: vi.fn().mockResolvedValue(new Map([[authorId, 'Thành Lê']])),
+      };
+
+      const useCase = new ListAdminPostsUseCase(mockPostRepo, mockUserDir);
+      const res = await useCase.execute({ limit: 10 });
+
+      expect(mockUserDir.getDisplayNames).toHaveBeenCalledWith([authorId, otherUserId]);
+      expect(res.items.map((i) => i.author.display_name)).toEqual([
+        'Thành Lê',
+        'Thành Lê',
+        `User ${otherUserId.slice(0, 8)}`,
+      ]);
+    });
+
+    it('vẫn trả danh sách với tên dự phòng khi tra tên bị lỗi', async () => {
+      mockPostRepo.findAdminPosts.mockResolvedValue([samplePostRecord({ status: 'published' })]);
+      mockPostRepo.countAdminPosts.mockResolvedValue(1);
+      const mockUserDir = {
+        getDisplayNames: vi.fn().mockRejectedValue(new Error('access down')),
+      };
+
+      const useCase = new ListAdminPostsUseCase(mockPostRepo, mockUserDir);
+      const res = await useCase.execute({ limit: 10 });
+
+      expect(res.items[0]!.author.display_name).toBe(`User ${authorId.slice(0, 8)}`);
+    });
   });
 
   describe('GetAdminPostDetailUseCase', () => {
@@ -944,6 +979,31 @@ describe('Social Application Use Cases', () => {
       expect(res.id).toBe(postId);
       expect(res.moderation_history.length).toBe(1);
       expect(res.moderation_history[0]!.action).toBe('hide');
+    });
+
+    it('hiện tên thật của tác giả trong chi tiết bài', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+      mockModerationRepo.findByPostId.mockResolvedValue([]);
+      const mockUserDir = {
+        getDisplayNames: vi.fn().mockResolvedValue(new Map([[authorId, 'Thành Lê']])),
+      };
+
+      const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo, mockUserDir);
+      const res = await useCase.execute({ postId });
+
+      expect(mockUserDir.getDisplayNames).toHaveBeenCalledWith([authorId]);
+      expect(res.author).toEqual({ id: authorId, display_name: 'Thành Lê' });
+    });
+
+    it('dùng tên dự phòng khi không tìm thấy tên tác giả', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+      mockModerationRepo.findByPostId.mockResolvedValue([]);
+      const mockUserDir = { getDisplayNames: vi.fn().mockResolvedValue(new Map()) };
+
+      const useCase = new GetAdminPostDetailUseCase(mockPostRepo, mockModerationRepo, mockUserDir);
+      const res = await useCase.execute({ postId });
+
+      expect(res.author.display_name).toBe(`User ${authorId.slice(0, 8)}`);
     });
 
     it('ném lỗi PostNotFoundException khi không tìm thấy bài viết', async () => {
