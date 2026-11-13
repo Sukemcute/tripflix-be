@@ -7,23 +7,48 @@ export interface RuleHit {
 // Chạy trên chuỗi đã bỏ dấu, nên "óc chó" thành "oc cho". Chỉ nhận cụm đủ rõ nghĩa:
 // không đưa từ đơn dễ trùng nghĩa vô hại khi bỏ dấu ("deo" = đeo, "ngu" = ngủ, "lon" = lon bia).
 // vcl/vkl/vcc/clgt cũng dùng để cảm thán; chỉ bắt công kích qua các cụm rõ nghĩa còn lại.
+// Luật này tự ẩn (TF88), nên "con chó"/"óc chó" chỉ bắt khi nhắm vào người, không bắt
+// con vật hay món ăn ("nhà có con chó", "hạt óc chó").
 const PROFANITY_PATTERN = new RegExp(
   '\\b(?:' +
     [
       'do ngu',
-      'con cho',
       'thang ngu',
+      '(?:may|mi) (?:la )?(?:con|thang|do) cho',
+      'do (?:con|thang) cho',
       'thang cho',
       'ngu dot',
       'ngu nhu (?:bo|cho|lon|heo|trau|con)',
       '(?:may|mi) ngu',
-      'oc cho',
+      '(?<!(?:hat|sua|banh|qua|nhan|keo|dau) )oc cho',
       'dit me',
       'dit con me',
       'dit bo',
+      'dit cu',
+      'deo me',
       'mat (?:nhu )?lon',
       'du ma',
+      'du me',
+      'me kiep (?:may|mi|nha may)',
       'dm|dmm|dcm|dkm|cmm',
+    ].join('|') +
+    ')\\b',
+);
+// Nội dung chống phá nhà nước, ly khai, xuyên tạc chủ quyền. Chỉ bắt cụm kêu gọi hoặc
+// xúc phạm rõ nghĩa; câu nhắc tới địa danh, lãnh tụ, lịch sử một cách bình thường không khớp.
+const EXTREMISM_PATTERN = new RegExp(
+  '\\b(?:' +
+    [
+      'lat do (?:chinh quyen|che do|dang|nha nuoc|chinh phu|cong san)',
+      'da dao (?:dang|cong san|chinh quyen|che do|nha nuoc|chinh phu|viet cong)',
+      'giai the dang cong san',
+      '(?:ung ho|tham gia|gia nhap|theo) viet tan',
+      'nha nuoc de ?ga',
+      '(?:doi )?doc lap (?:tay nguyen|tay bac|nam bo)',
+      '(?:hoang sa|truong sa)(?: va (?:hoang sa|truong sa))? (?:la cua|thuoc ve|thuoc) trung quoc',
+      '(?:chinh quyen|che do|nha nuoc|dang) (?:cong san )?(?:an cuop|cuop ngay|doc tai|thoi nat|khon nan|chet tiet)',
+      '(?:cong san|viet cong) (?:khon nan|chet tiet|mat day|ac on|sat nhan)',
+      'ho tac',
     ].join('|') +
     ')\\b',
 );
@@ -51,7 +76,7 @@ export function normalizeText(text: string): string {
     .trim();
 }
 
-/** Luật chỉ tạo tín hiệu; SĐT/link đơn lẻ không đủ để tự ẩn. */
+/** Luật tạo tín hiệu; luật nào đủ để tự ẩn do severity.ts quyết định. */
 export function evaluateRules(text: string, allowedDomains: string[] = []): RuleHit[] {
   const normalized = normalizeText(text);
   const hits: RuleHit[] = [];
@@ -107,5 +132,8 @@ export function evaluateRules(text: string, allowedDomains: string[] = []): Rule
   if (profanity) hits.push({ code: 'PROFANITY', category: 'HARASSMENT', match: profanity[0], weight: 45 });
   const threat = THREAT_PATTERN.exec(normalized);
   if (threat) hits.push({ code: 'THREAT', category: 'VIOLENCE', match: threat[0], weight: 70 });
+  const extremism = EXTREMISM_PATTERN.exec(normalized);
+  if (extremism)
+    hits.push({ code: 'EXTREMISM', category: 'EXTREMISM', match: extremism[0], weight: 80 });
   return hits;
 }
