@@ -32,6 +32,7 @@ import {
   PostMediaNotAllowedException,
   PostNotFoundException,
 } from '../../domain/index.js';
+import { PostShareLinks } from '../post-share-links.js';
 
 describe('Social Application Use Cases', () => {
   beforeAll(async () => {
@@ -189,12 +190,14 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.update.mockResolvedValue({ ...post, status: 'published', isVerified: true });
       (mockCommerceService.verifyCompletedBooking as any).mockResolvedValue(true);
 
-      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
+      const shareLinks = new PostShareLinks('https://tripflix.io.vn');
+      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService, shareLinks);
       const result = await useCase.execute({ postId, userId: authorId });
 
       expect(result.status).toBe('published');
       expect(result.isVerified).toBe(true);
-      expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
+      // Bài mẫu là Reel (video): link mở trình xem Reels trên web theo WEB_APP_URL.
+      expect(result.shareUrl).toBe(`https://tripflix.io.vn/inspiration?open=${postId}&kind=reel`);
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.published',
@@ -820,11 +823,11 @@ describe('Social Application Use Cases', () => {
       const post = samplePostRecord({ status: 'published', shareCount: 10 });
       mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, shareCount: 11 });
 
-      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox);
+      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox, new PostShareLinks('https://tripflix.io.vn'));
       const result = await useCase.execute({ postId, userId: otherUserId });
 
       expect(result.shareCount).toBe(11);
-      expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
+      expect(result.shareUrl).toBe(`https://tripflix.io.vn/inspiration?open=${postId}&kind=reel`);
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'shareCount', 1);
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({

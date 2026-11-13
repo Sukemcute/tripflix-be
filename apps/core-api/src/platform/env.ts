@@ -13,6 +13,9 @@ export const DEFAULT_EMAIL_VERIFY_URL = 'http://localhost:3100/xac-thuc-email';
 /** Khoá công khai của Google để kiểm ID token (POST /auth/google). */
 export const DEFAULT_GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
+/** Web khi dev (deploy/compose.yaml: web 3100); trùng mặc định WEB_APP_URL của notification-service. */
+export const DEFAULT_WEB_APP_URL = 'http://localhost:3100';
+
 /** Origin của web và admin khi dev (deploy/compose.yaml: web 3100, admin 3200). */
 export const DEFAULT_WEB_ORIGINS = ['http://localhost:3100', 'http://localhost:3200'];
 
@@ -97,6 +100,8 @@ export const coreEnvSchema = baseEnvSchema
     AUTH_WEB_ORIGINS: WebOriginsSchema,
     AUTH_PASSWORD_RESET_URL: z.url().default(DEFAULT_PASSWORD_RESET_URL),
     AUTH_EMAIL_VERIFY_URL: z.url().default(DEFAULT_EMAIL_VERIFY_URL),
+    // Địa chỉ web người dùng mở (không có / cuối); dùng cho link chia sẻ bài. Cùng tên với notification-service.
+    WEB_APP_URL: z.url().default(DEFAULT_WEB_APP_URL),
     // Số tài khoản đăng ký bằng mật khẩu mỗi IP mỗi giờ (TF05D). Máy dev, CI chạy e2e đăng ký nhiều lần thì đặt cao hơn.
     AUTH_REGISTER_MAX_PER_IP_HOUR: z.coerce.number().int().positive().default(5),
     // Khoá X25519 để client mã hoá mật khẩu trước khi gửi (TF056): "<keyId>:<khoá>,<keyId cũ>:<khoá cũ>", khoá đầu đang dùng.
