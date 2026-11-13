@@ -17,7 +17,7 @@ const PostDeletedSchema = z.object({ postId: z.uuid(), authorId: z.uuid(), delet
 
 export function createDirectoryHandlers(
   directory: Pick<DirectoryRepository, 'upsertUser' | 'upsertPost'>,
-  followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel'>,
+  followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel' | 'applyFollow'>,
 ): Record<string, EventHandler> {
   return {
     'access.user.registered.v1': async (event) => {
@@ -26,6 +26,12 @@ export function createDirectoryHandlers(
     },
     'access.user.profile_updated.v1': async (event) => {
       await directory.upsertUser(AccessUserProfileUpdatedV1Schema.parse(event.payload), event.occurredAt);
+      return true;
+    },
+    'content.follow.changed.v1': async (event) => {
+      if (!followerPosts) return false;
+      const change = z.object({ followerId: z.uuid(), authorId: z.uuid(), followedAt: z.iso.datetime().nullable() }).parse(event.payload);
+      await followerPosts.applyFollow({ ...change, changedAt: event.occurredAt });
       return true;
     },
     'content.post.published.v1': async (event) => {

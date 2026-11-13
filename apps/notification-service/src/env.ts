@@ -8,6 +8,7 @@ export const envSchema = baseEnvSchema
     PORT: z.coerce.number().int().positive().default(3001),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     DATABASE_URL_NOTIFICATION: z.string(),
+    FOLLOWER_SHARED_THRESHOLD: z.coerce.number().int().min(0).max(100_000).optional(),
     FOLLOWER_CORE_URL: z.url().optional(),
     FOLLOWER_NOTIFICATION_SECRET: z.string().min(1).optional(),
     // Khoá công khai của module access; service tự kiểm chữ ký access token.

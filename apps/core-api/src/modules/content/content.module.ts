@@ -97,7 +97,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       useFactory: (pools: DbPools): Db => createDb(pools.content),
     },
 
-    { provide: FollowRepository, inject: [CONTENT_DB], useFactory: (db: Db) => new FollowRepository(db) },
+    {
+      provide: FollowRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (host: ModuleTransactionHost) => new FollowRepository(() => host.tx),
+    },
 
     // 2. Infra Repositories (sử dụng txHost.tx để tự động tham gia @Transactional('content'))
     {

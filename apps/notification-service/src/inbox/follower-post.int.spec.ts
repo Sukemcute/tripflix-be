@@ -74,6 +74,61 @@ describe('Gửi inbox bài mới theo từng lô', () => {
     }
   });
 
+  it('hiện một thông báo dùng chung, giữ trạng thái đọc riêng và ẩn khi bỏ theo dõi', async () => {
+    const postId = randomUUID();
+    const authorId = randomUUID();
+    const first = randomUUID();
+    const second = randomUUID();
+    const stranger = randomUUID();
+    const late = randomUUID();
+    const env = envSchema.parse({
+      DATABASE_URL_NOTIFICATION: fixture.buildModuleUrl('notification'),
+      FOLLOWER_NOTIFICATION_SECRET: 'test-only',
+      FOLLOWER_CORE_URL: 'http://localhost:3000',
+      FOLLOWER_SHARED_THRESHOLD: 10000,
+    });
+    const worker = new FollowerPostWorker(pool, env);
+    const followedAt = '2026-11-12T08:00:00Z';
+    for (const followerId of [first, second]) {
+      await worker.applyFollow({ followerId, authorId, followedAt, changedAt: followedAt });
+    }
+    await worker.applyFollow({ followerId: late, authorId, followedAt: '2026-11-12T10:00:00Z', changedAt: '2026-11-12T10:00:00Z' });
+    const stub = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('service-token')) return Response.json({ accessToken: 'fixture', expiresIn: 300 });
+      expect(url.searchParams.get('sharedThreshold')).toBe('10000');
+      return Response.json({ isEligible: true, recipients: [], nextCursor: null, sharedPublishedAt: '2026-11-12T09:00:00Z' });
+    });
+    try {
+      await worker.enqueue(postId, authorId);
+      worker.onApplicationBootstrap();
+      await vi.waitFor(async () => expect(await inbox.countUnread(first)).toBe(1), { timeout: 5000 });
+      expect(await inbox.countUnread(stranger)).toBe(0);
+      expect(await inbox.countUnread(late)).toBe(0);
+      const personal = await inbox.insert({ userId: first, type: 'comment.created', title: 'Bình luận', body: '', link: null, data: {}, sourceEventId: randomUUID() });
+      const firstPage = await inbox.listForUser(first, { limit: 1 });
+      expect(firstPage.items[0]?.id).toBe(personal?.id);
+      const secondPage = await inbox.listForUser(first, { limit: 1, cursor: firstPage.nextCursor! });
+      expect(secondPage.items[0]?.id).toBe(postId);
+      expect(await inbox.markRead(stranger, postId)).toBe(false);
+      expect(await inbox.markAllReadThrough(first, postId)).toBe(true);
+      expect(await inbox.countUnread(first)).toBe(1);
+      expect(await inbox.countUnread(second)).toBe(1);
+      expect(await inbox.markRead(second, postId)).toBe(true);
+      expect(await inbox.markAllRead(first)).toBe(1);
+      expect(await inbox.markAllRead(second)).toBe(0);
+      expect((await pool.query('SELECT id FROM inbox WHERE source_event_id = $1', ['follower-post:' + postId])).rowCount).toBe(0);
+      await worker.applyFollow({ followerId: first, authorId, followedAt: null, changedAt: '2026-11-12T11:00:00Z' });
+      await worker.applyFollow({ followerId: first, authorId, followedAt, changedAt: followedAt });
+      expect((await inbox.listForUser(first, { limit: 20 })).items.map((item) => item.id)).toEqual([personal?.id]);
+      await worker.cancel(postId, authorId);
+      expect((await inbox.listForUser(second, { limit: 20 })).items).toEqual([]);
+    } finally {
+      await worker.onModuleDestroy();
+      stub.mockRestore();
+    }
+  });
+
   it('ghi đủ hai lô dù enqueue trùng, rồi ẩn cả hai khi bài bị hủy', async () => {
     const postId = randomUUID();
     const authorId = randomUUID();
