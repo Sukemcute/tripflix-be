@@ -2,6 +2,7 @@ import { Post, PostNotFoundException } from '../../domain/index.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { ReactionRepository } from '../../infra/reaction.repository.js';
+import { PostShareLinks } from '../post-share-links.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type {
   PostRecord,
@@ -33,6 +34,7 @@ export class GetPostDetailUseCase {
     private readonly reactionRepository: ReactionRepository,
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly userDirectory?: UserDirectoryPort,
+    private readonly shareLinks: PostShareLinks = new PostShareLinks(),
   ) {}
 
   async execute(query: GetPostDetailQuery): Promise<PostDetailResult> {
@@ -103,7 +105,7 @@ export class GetPostDetailUseCase {
         myReaction,
         isBookmarked,
       },
-      shareUrl: `https://tripflix.vn/posts/${query.postId}`,
+      shareUrl: this.shareLinks.buildUrl(record.id, record.postType),
     };
   }
 }

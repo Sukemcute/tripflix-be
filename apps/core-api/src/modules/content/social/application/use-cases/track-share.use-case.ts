@@ -1,6 +1,7 @@
 import { Transactional } from '@tripflix/db';
 import { PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { PostShareLinks } from '../post-share-links.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 
 export interface TrackShareCommand {
@@ -18,6 +19,7 @@ export class TrackShareUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly outbox: ContentOutbox,
+    private readonly shareLinks: PostShareLinks = new PostShareLinks(),
   ) {}
 
   @Transactional('content')
@@ -29,7 +31,7 @@ export class TrackShareUseCase {
 
     await this.postRepository.incrementCounter(command.postId, 'shareCount', 1);
 
-    const shareUrl = `https://tripflix.vn/posts/${command.postId}`;
+    const shareUrl = this.shareLinks.buildUrl(post.id, post.postType);
 
     // Ghi sự kiện outbox content.post.shared trong cùng transaction DB
     await this.outbox.add({
