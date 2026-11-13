@@ -67,6 +67,13 @@ class FakeFeedStore implements FeedStore {
     return Promise.resolve(rows.slice(start, start + limit));
   }
 
+  /** Giữ thứ tự của rows; điểm giảm dần theo vị trí để cursor có rank như bản thật. */
+  listForYouPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+    const ranked = this.rows.map((row, i) => ({ ...row, rank: 1 / (i + 1) }));
+    const start = after ? ranked.findIndex((row) => row.id === after.id) + 1 : 0;
+    return Promise.resolve(ranked.slice(start, start + limit));
+  }
+
   listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
     const sorted = [...this.rows].sort((a, b) => calculateHotScore(b) - calculateHotScore(a));
     const start = after ? sorted.findIndex((row) => row.id === after.id) + 1 : 0;
@@ -256,11 +263,20 @@ describe('GET /api/v1/feed E2E', () => {
 
   const plainCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1) });
   const hotCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 7 });
+  const rankedCursor = encodeFeedCursor({
+    at: '2026-11-05T10:00:01.000000Z',
+    id: buildPostId(1),
+    score: 7,
+    rank: 0.5,
+    seed: 1,
+    asOf: '2026-11-13T00:00:00.000Z',
+  });
 
   it.each([
     ['tab chưa có', 'tab=following'],
     ['cursor của for_you dùng cho hot', `tab=hot&cursor=${plainCursor}`],
     ['cursor của hot dùng cho for_you', `tab=for_you&cursor=${hotCursor}`],
+    ['cursor có rank của for_you dùng cho hot', `tab=hot&cursor=${rankedCursor}`],
     ['limit vượt 20', 'limit=21'],
     ['limit bằng 0', 'limit=0'],
     ['limit không phải số', 'limit=abc'],

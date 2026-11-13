@@ -9,6 +9,7 @@ import {
   type EventEnvelope,
 } from '@tripflix/contracts';
 import { toInboxItemDto, type InboxRepository, type InboxRow } from '../../inbox/inbox.repository.js';
+import type { FollowerPostWorker } from '../../inbox/follower-post.worker.js';
 import type { PostNotificationRepository } from '../../inbox/post-notification.repository.js';
 import type { RealtimeService } from '../../realtime/realtime.service.js';
 import type { EventHandler } from './event-handler.js';
@@ -26,6 +27,7 @@ const REASONS = new Map([
 export function createContentStatusHandlers(options: {
   inbox: Pick<InboxRepository, 'insert' | 'countUnread'>;
   posts?: Pick<PostNotificationRepository, 'moderate'>;
+  followerPosts?: Pick<FollowerPostWorker, 'cancel'>;
   realtime?: Pick<RealtimeService, 'emitToUser'>;
   log: (message: string, event: EventEnvelope) => void;
 }): Record<string, EventHandler> {
@@ -57,6 +59,7 @@ export function createContentStatusHandlers(options: {
           ? 'Bài viết đã bị gỡ'
           : 'Bài viết đã bị ẩn';
     const reason = REASONS.get(reasonCode);
+    if (isHidden) await options.followerPosts?.cancel(postId, authorId);
     const { row, invalidatedUsers } = await posts.moderate({
       postId,
       occurredAt: hiddenAt,

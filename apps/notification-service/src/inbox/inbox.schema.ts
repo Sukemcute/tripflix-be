@@ -110,10 +110,44 @@ const POST_MODERATION_NOTIFICATIONS_SCHEMA = `
   );
 `;
 
+const FOLLOWER_POST_JOBS_SCHEMA = `
+  CREATE TABLE follower_post_jobs (
+    post_id uuid PRIMARY KEY,
+    author_id uuid NOT NULL,
+    cursor uuid,
+    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'done', 'failed', 'cancelled')),
+    attempts integer NOT NULL DEFAULT 0,
+    available_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX idx_follower_post_jobs_available ON follower_post_jobs (available_at, post_id) WHERE state = 'pending';
+`;
+
+const SHARED_FOLLOWER_POSTS_SCHEMA = `
+  CREATE TABLE notification_follows (
+    follower_id uuid NOT NULL,
+    author_id uuid NOT NULL,
+    followed_at timestamptz,
+    changed_at timestamptz NOT NULL,
+    PRIMARY KEY (follower_id, author_id)
+  );
+  ALTER TABLE follower_post_jobs ADD COLUMN shared_published_at timestamptz;
+  ALTER TABLE follower_post_jobs ADD COLUMN shared_created_at timestamptz;
+  CREATE INDEX idx_follower_posts_shared_author ON follower_post_jobs (author_id, shared_created_at DESC, post_id)
+    WHERE state = 'done' AND shared_created_at IS NOT NULL;
+  CREATE TABLE shared_follower_post_reads (
+    user_id uuid NOT NULL,
+    post_id uuid NOT NULL REFERENCES follower_post_jobs(post_id),
+    read_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, post_id)
+  );
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
   [3, COMMENT_NOTIFICATIONS_SCHEMA],
   [4, REACTION_NOTIFICATIONS_SCHEMA],
   [5, POST_MODERATION_NOTIFICATIONS_SCHEMA],
+  [6, FOLLOWER_POST_JOBS_SCHEMA],
+  [7, SHARED_FOLLOWER_POSTS_SCHEMA],
 ] as const;

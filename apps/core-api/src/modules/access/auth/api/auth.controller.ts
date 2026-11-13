@@ -28,6 +28,7 @@ import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
+import { BROWSER_PROOF_HEADER } from '../application/browser-session-proof.js';
 import { PasswordEncryption } from '../application/password-encryption.js';
 import { EncryptedPasswords } from './encrypted-passwords.js';
 
@@ -113,6 +114,7 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
   @ApiHeader(WEB_CLIENT_API_HEADER)
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: false, description: 'Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: TokenPairDto })
   @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
@@ -123,8 +125,8 @@ export class AuthController {
   ) {
     const isWeb = isWebClient(req);
     if (isWeb) this.web.assertTrustedOrigin(req);
-    const pair = await this.auth.login(body, readRequestMeta(req));
-    return isWeb ? this.toWebResponse(res, pair) : pair;
+    const pair = await this.auth.login(body, readRequestMeta(req), isWeb ? this.readBrowserProof(req) : undefined);
+    return isWeb ? this.toWebResponse(req, res, pair) : pair;
   }
 
   /**
@@ -135,6 +137,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: false, description: 'Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin' })
   @ApiBody({ type: GoogleLoginDto })
   @ApiOkResponse({ type: TokenPairDto })
   @ApiUnauthorizedResponse({ description: GOOGLE_LOGIN_FAILED_MESSAGE })
@@ -147,8 +150,8 @@ export class AuthController {
   ) {
     const isWeb = isWebClient(req);
     if (isWeb) this.web.assertTrustedOrigin(req);
-    const pair = await this.auth.loginWithGoogle(body, readRequestMeta(req));
-    return isWeb ? this.toWebResponse(res, pair) : pair;
+    const pair = await this.auth.loginWithGoogle(body, readRequestMeta(req), isWeb ? this.readBrowserProof(req) : undefined);
+    return isWeb ? this.toWebResponse(req, res, pair) : pair;
   }
 
   /**
@@ -159,6 +162,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: false, description: 'Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin' })
   @ApiBody({ type: RefreshDto, required: false })
   @ApiOkResponse({ type: TokenPairDto })
   @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
@@ -174,11 +178,11 @@ export class AuthController {
 
     const refreshToken = body.refreshToken ?? cookieToken;
     try {
-      if (!refreshToken) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
-      const pair = await this.auth.refresh(refreshToken, readRequestMeta(req));
-      return isWeb ? this.toWebResponse(res, pair) : pair;
+      if (!refreshToken || (isWeb && !isFromCookie)) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+      const pair = await this.auth.refresh(refreshToken, readRequestMeta(req), isFromCookie ? this.readBrowserProof(req) : undefined);
+      return isWeb ? this.toWebResponse(req, res, pair) : pair;
     } catch (err) {
-      if (isWeb && err instanceof AccessError) this.web.clearRefreshCookie(res);
+      if (isWeb && err instanceof AccessError) this.web.clearRefreshCookie(res, req);
       throw err;
     }
   }
@@ -194,7 +198,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     await this.auth.logout(user, readRequestMeta(req));
-    if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res);
+    if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res, req);
   }
 
   @Get('me')
@@ -206,8 +210,12 @@ export class AuthController {
     return this.auth.getMe(user.userId);
   }
 
-  private toWebResponse(res: Response, pair: TokenPair): Omit<TokenPair, 'refreshToken'> {
-    this.web.setRefreshCookie(res, pair.refreshToken);
+  private readBrowserProof(req: Request) {
+    return { value: req.get(BROWSER_PROOF_HEADER), origin: req.get('origin') };
+  }
+
+  private toWebResponse(req: Request, res: Response, pair: TokenPair): Omit<TokenPair, 'refreshToken'> {
+    this.web.setRefreshCookie(res, pair.refreshToken, req);
     return { accessToken: pair.accessToken, tokenType: pair.tokenType, expiresIn: pair.expiresIn };
   }
 }

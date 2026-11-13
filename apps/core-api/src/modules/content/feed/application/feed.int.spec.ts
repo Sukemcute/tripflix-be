@@ -33,6 +33,7 @@ import { FeedUseCases } from './feed.use-cases.js';
 
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
 const VIEWER_ID = '22222222-2222-4222-8222-222222222222';
+const UNSCORED_ID = '33333333-3333-4333-8333-333333333333';
 
 /** Câu truy vấn của feed trên Postgres thật, gồm cả điều kiện lọc jsonb và so sánh cursor. */
 describe('Feed trên Postgres thật', () => {
@@ -42,6 +43,9 @@ describe('Feed trên Postgres thật', () => {
   let moduleRef: TestingModule;
   let visibility: ChangeVisibilityUseCase;
   let deleteComment: DeleteCommentUseCase;
+  /** Số FeedUseCases dùng để chọn seed ở trang đầu (seed = floor(số × 16)). */
+  let nextRandom = 0;
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
   async function insertAsset(status: string, levels: number[] = []): Promise<string> {
     const id = randomUUID();
@@ -65,7 +69,8 @@ describe('Feed trên Postgres thật', () => {
   }
 
   async function insertPost(
-    mediaIds: string[],
+    // unknown để dựng được cả dữ liệu sai (ví dụ chuỗi thay vì mảng) như đã gặp trên staging.
+    mediaIds: unknown,
     options: {
       authorId?: string;
       status?: string;
@@ -73,9 +78,10 @@ describe('Feed trên Postgres thật', () => {
       createdAt?: string;
       deleted?: boolean;
       postType?: 'video' | 'vlog';
+      id?: string;
     } = {},
   ) {
-    const id = randomUUID();
+    const id = options.id ?? randomUUID();
     await pool.query(
       `insert into content.posts (id, author_id, post_type, title, status, visibility, media_ids, created_at, deleted_at)
        values ($1, $2, $8, 'Bài', $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz)`,
@@ -93,12 +99,17 @@ describe('Feed trên Postgres thật', () => {
     return id;
   }
 
-  async function readAllPages(limit: number, viewerId: string | null = null, authorId?: string) {
+  async function readAllPages(
+    limit: number,
+    viewerId: string | null = null,
+    authorId?: string,
+    tab: 'for_you' | 'hot' = 'for_you',
+  ) {
     const ids: string[] = [];
     let cursor: string | null = null;
     do {
       const after = cursor ? decodeFeedCursor(cursor) : null;
-      const page = await feed.getPage({ limit, after, viewerId, authorId });
+      const page = await feed.getPage({ tab, limit, after, viewerId, authorId });
       ids.push(...page.items.map((item) => item.postId));
       cursor = page.nextCursor;
     } while (cursor);
@@ -144,12 +155,26 @@ describe('Feed trên Postgres thật', () => {
         new DrizzleMediaAssetStore(() => db),
         new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' }),
       ),
+      undefined,
+      undefined,
+      () => nextRandom,
     );
   }, 120_000);
 
   beforeEach(async () => {
+    nextRandom = 0;
     await pool.query('truncate content.posts, content.media_assets cascade');
   });
+
+  async function setCounts(
+    postId: string,
+    counts: { likes?: number; comments?: number; saves?: number; shares?: number },
+  ) {
+    await pool.query(
+      'update content.posts set reaction_total = $2, comment_count = $3, bookmark_count = $4, share_count = $5 where id = $1',
+      [postId, counts.likes ?? 0, counts.comments ?? 0, counts.saves ?? 0, counts.shares ?? 0],
+    );
+  }
 
   afterAll(async () => {
     await moduleRef?.close();
@@ -189,6 +214,22 @@ describe('Feed trên Postgres thật', () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  it('bài lưu media_ids sai dạng (chuỗi, số, object, null) bị bỏ qua, không làm lỗi cả feed', async () => {
+    const playable = await insertAsset('ready', [360]);
+    const expected = await insertPost([playable]);
+    // Staging 13/11: một bài lưu "uuid" thay vì ["uuid"] làm /api/v1/feed trả 500 cho mọi người suốt 10 giờ.
+    await insertPost(playable);
+    await insertPost(42);
+    await insertPost({ id: playable });
+    await insertPost(null);
+
+    const page = await feed.getPage({ limit: 20, after: null, viewerId: null });
+
+    expect(page.items.map((item) => item.postId)).toEqual([expected]);
+    const hot = await feed.getPage({ limit: 20, after: null, viewerId: null, tab: 'hot' });
+    expect(hot.items.map((item) => item.postId)).toEqual([expected]);
+  });
+
   it('bài nhiều media thì lấy video đầu tiên phát được', async () => {
     const processing = await insertAsset('processing');
     const playable = await insertAsset('ready', [360, 540]);
@@ -200,25 +241,56 @@ describe('Feed trên Postgres thật', () => {
     expect(items[0]?.video.levels).toEqual([360, 540]);
   });
 
-  it('xếp mới nhất trước', async () => {
-    const asset = await insertAsset('ready', [360]);
-    const oldest = await insertPost([asset], { createdAt: '2026-11-01T00:00:00Z' });
-    const newest = await insertPost([asset], { createdAt: '2026-11-03T00:00:00Z' });
-    const middle = await insertPost([asset], { createdAt: '2026-11-02T00:00:00Z' });
+  describe('tab Dành cho bạn', () => {
+    it('bài có tương tác xếp theo điểm có bán rã: cùng tương tác thì bài mới hơn đứng trên, bài cũ bị bài nhiều tương tác hơn vượt', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const freshFive = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      const oldFive = await insertPost([asset], { createdAt: daysAgo(3) });
+      const freshOne = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      await setCounts(freshFive, { likes: 5 });
+      await setCounts(oldFive, { likes: 5 });
+      await setCounts(freshOne, { likes: 1 });
 
-    await expect(readAllPages(20)).resolves.toEqual([newest, middle, oldest]);
+      await expect(readAllPages(1)).resolves.toEqual([freshFive, freshOne, oldFive]);
+    });
+
+    it('bài mới có tương tác đứng trên bài chưa có tương tác; bài chưa có tương tác chen trên bài cũ ít tương tác', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const freshLiked = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      // Id cố định để điểm ngẫu nhiên với seed 0 biết trước: md5("0:<id>") cho điểm 0,0069, trên bài 1 thích 10 ngày tuổi (0,00096).
+      const unscored = await insertPost([asset], { createdAt: daysAgo(10), id: UNSCORED_ID });
+      const oldLiked = await insertPost([asset], { createdAt: daysAgo(10) });
+      await setCounts(freshLiked, { likes: 1 });
+      await setCounts(oldLiked, { likes: 1 });
+
+      await expect(readAllPages(20)).resolves.toEqual([freshLiked, unscored, oldLiked]);
+    });
+
+    it('bài chưa có tương tác xếp ngẫu nhiên theo seed: cùng seed thì cùng thứ tự, sang trang không lặp không rớt; seed khác thì thứ tự khác', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const ids = await Promise.all(Array.from({ length: 12 }, () => insertPost([asset])));
+
+      nextRandom = 0;
+      const seedZero = await readAllPages(5);
+      const seedZeroAgain = await readAllPages(20);
+      nextRandom = 0.5;
+      const seedEight = await readAllPages(5);
+
+      expect([...seedZero].sort()).toEqual([...ids].sort());
+      expect(seedZeroAgain).toEqual(seedZero);
+      expect([...seedEight].sort()).toEqual([...ids].sort());
+      expect(seedEight).not.toEqual(seedZero);
+    });
   });
 
   describe('tab hot', () => {
-    // Tab hot chỉ xếp hạng bài trong HOT_WINDOW_DAYS ngày gần đây, nên ngày tạo bài tính lùi từ hôm nay.
-    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
-
     it('hai bài cùng điểm: ẩn bình luận làm đổi thứ tự hot; xoá bình luận hidden không đổi bộ đếm', async () => {
       const asset = await insertAsset('ready', [360]);
       const first = await insertPost([asset], { createdAt: daysAgo(1) });
       const second = await insertPost([asset], { createdAt: daysAgo(2) });
-      await setCounts(first, { comments: 1 });
-      await setCounts(second, { comments: 1 });
+      // first: 1 thích + 1 bình luận = 3 điểm; second: 2 thích = 2 điểm. Ẩn bình luận làm first còn 1 điểm.
+      await setCounts(first, { likes: 1, comments: 1 });
+      await setCounts(second, { likes: 2 });
       const commentId = randomUUID();
       await pool.query(
         "insert into content.comments (id, post_id, author_id, body) values ($1,$2,$3,'Bình luận')",
@@ -265,29 +337,9 @@ describe('Feed trên Postgres thật', () => {
           ),
         ).not.toContain(postId);
     });
-    async function setCounts(
-      postId: string,
-      counts: { likes?: number; comments?: number; saves?: number; shares?: number },
-    ) {
-      await pool.query(
-        'update content.posts set reaction_total = $2, comment_count = $3, bookmark_count = $4, share_count = $5 where id = $1',
-        [postId, counts.likes ?? 0, counts.comments ?? 0, counts.saves ?? 0, counts.shares ?? 0],
-      );
-    }
+    const readHotPages = (limit: number) => readAllPages(limit, null, undefined, 'hot');
 
-    async function readHotPages(limit: number) {
-      const ids: string[] = [];
-      let cursor: string | null = null;
-      do {
-        const after = cursor ? decodeFeedCursor(cursor) : null;
-        const page = await feed.getPage({ tab: 'hot', limit, after, viewerId: null });
-        ids.push(...page.items.map((item) => item.postId));
-        cursor = page.nextCursor;
-      } while (cursor);
-      return ids;
-    }
-
-    it('xếp theo trọng số thích 1, bình luận 2, lưu 3, chia sẻ 4; bằng điểm thì mới nhất trước', async () => {
+    it('xếp theo trọng số thích 1, bình luận 2, lưu 3, chia sẻ 4', async () => {
       const asset = await insertAsset('ready', [360]);
       const noEngagement = await insertPost([asset], { createdAt: daysAgo(1) });
       const threeLikes = await insertPost([asset], { createdAt: daysAgo(5) });
@@ -299,13 +351,28 @@ describe('Feed trên Postgres thật', () => {
       await setCounts(oneSave, { saves: 1 });
       await setCounts(oneComment, { comments: 1 });
 
-      await expect(readHotPages(20)).resolves.toEqual([
-        oneShare,
-        oneSave,
-        threeLikes,
-        oneComment,
-        noEngagement,
-      ]);
+      const ids = await readHotPages(20);
+      expect(ids[0]).toBe(oneShare);
+      // Một lưu và ba thích cùng 3 điểm: thứ tự giữa hai bài là ngẫu nhiên theo seed.
+      expect(ids.slice(1, 3).sort()).toEqual([oneSave, threeLikes].sort());
+      expect(ids.slice(3)).toEqual([oneComment, noEngagement]);
+    });
+
+    it('bằng điểm (kể cả 0 điểm) thì ngẫu nhiên theo seed, không còn mới nhất trước', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const unscored = await Promise.all(
+        Array.from({ length: 12 }, (_, i) => insertPost([asset], { createdAt: daysAgo(i / 10) })),
+      );
+
+      nextRandom = 0;
+      const seedZero = await readHotPages(5);
+      nextRandom = 0.5;
+      const seedEight = await readHotPages(5);
+
+      expect([...seedZero].sort()).toEqual([...unscored].sort());
+      expect([...seedEight].sort()).toEqual([...unscored].sort());
+      expect(seedEight).not.toEqual(seedZero);
+      expect(seedZero).not.toEqual(unscored);
     });
 
     it('sang trang không lặp, không rớt bài khi nhiều bài trùng điểm và trùng thời điểm', async () => {
@@ -358,7 +425,8 @@ describe('Feed trên Postgres thật', () => {
     // Cùng mili-giây nhưng khác micro-giây: cursor chỉ giữ mili-giây sẽ làm rớt bài này.
     const sameMillisecond = await insertPost([asset], { createdAt: '2026-11-05T10:00:00.123001Z' });
 
-    const ids = await readAllPages(1);
+    // Trang tác giả vẫn mới nhất trước, nên thử con trỏ thời gian ở đó.
+    const ids = await readAllPages(1, null, OWNER_ID);
 
     expect(ids.slice(0, 3).sort()).toEqual([...sameTime].sort());
     expect(ids[3]).toBe(sameMillisecond);
@@ -379,14 +447,15 @@ describe('Feed trên Postgres thật', () => {
     const otherPage = await feed.getPage({ limit: 20, after: null, viewerId: OWNER_ID });
     const guestPage = await feed.getPage({ limit: 20, after: null, viewerId: null });
 
-    expect(viewerPage.items.map((item) => item.viewerState)).toEqual([
-      { liked: true, saved: false },
-      { liked: false, saved: true },
-    ]);
-    expect(otherPage.items.map((item) => item.viewerState)).toEqual([
-      { liked: false, saved: false },
-      { liked: false, saved: false },
-    ]);
+    const stateOf = (page: typeof viewerPage) => Object.fromEntries(page.items.map((item) => [item.postId, item.viewerState]));
+    expect(stateOf(viewerPage)).toEqual({
+      [liked]: { liked: true, saved: false },
+      [saved]: { liked: false, saved: true },
+    });
+    expect(stateOf(otherPage)).toEqual({
+      [liked]: { liked: false, saved: false },
+      [saved]: { liked: false, saved: false },
+    });
     expect(guestPage.items.map((item) => item.viewerState)).toEqual([null, null]);
   });
 

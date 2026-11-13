@@ -71,6 +71,8 @@ export class SocialCommentDto {
   @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
   authorName?: string | null;
   @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của người được trả lời' })
+  replyToName?: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() isEdited!: boolean;
   @ApiProperty({ example: 0, description: 'Số lượt thích bình luận' }) likeCount!: number;

@@ -6,6 +6,8 @@ import { OutboxWriter } from '@tripflix/outbox';
 import { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
+import { FollowsController } from './social/api/follows.controller.js';
+import { FollowRepository } from './social/infra/follow.repository.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
 import { FeedModule } from './feed/feed.module.js';
@@ -82,6 +84,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     ReactionsController,
     CommentsController,
     BookmarksController,
+    FollowsController,
     AdminPostsController,
     PostSummaryController,
     AiSummaryInternalController,
@@ -92,6 +95,12 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       provide: CONTENT_DB,
       inject: [DB_POOLS],
       useFactory: (pools: DbPools): Db => createDb(pools.content),
+    },
+
+    {
+      provide: FollowRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (host: ModuleTransactionHost) => new FollowRepository(() => host.tx),
     },
 
     // 2. Infra Repositories (sử dụng txHost.tx để tự động tham gia @Transactional('content'))

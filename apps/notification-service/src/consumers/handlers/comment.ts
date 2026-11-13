@@ -41,8 +41,9 @@ export function createCommentHandlers(options: {
     'content.comment.created.v1': async (event) => {
       const comment = ContentCommentCreatedV1Schema.parse(event.payload);
       const recipients = new Map([[comment.postAuthorId, false]]);
-      if (comment.parentCommentId && comment.parentCommentAuthorId) {
-        recipients.set(comment.parentCommentAuthorId, true);
+      const replyRecipient = comment.replyToAuthorId ?? comment.parentCommentAuthorId;
+      if (comment.parentCommentId && replyRecipient) {
+        recipients.set(replyRecipient, true);
       }
       recipients.delete(comment.authorId);
       if (!recipients.size) return true;

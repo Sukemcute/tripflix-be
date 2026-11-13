@@ -106,6 +106,15 @@
         "operationId": "AuthController_login",
         "parameters": [
           {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Tripflix-Client",
             "in": "header",
             "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
@@ -152,6 +161,15 @@
       "post": {
         "operationId": "AuthController_loginWithGoogle",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
@@ -205,6 +223,15 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
@@ -1884,6 +1911,159 @@
         "summary": "Lấy danh sách bài viết đã lưu của tôi",
         "tags": [
           "Social - Bookmarks"
+        ]
+      }
+    },
+    "/api/v1/users/{authorId}/follow": {
+      "get": {
+        "operationId": "FollowsController_getStatus",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      },
+      "put": {
+        "operationId": "FollowsController_follow",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      },
+      "delete": {
+        "operationId": "FollowsController_unfollow",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      }
+    },
+    "/api/v1/internal/posts/{postId}/follower-recipients": {
+      "get": {
+        "operationId": "FollowsController_listPostRecipients",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sharedThreshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostFollowerPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
         ]
       }
     },
@@ -6552,6 +6732,11 @@
             "type": "string",
             "nullable": true
           },
+          "replyToName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên hiển thị của người được trả lời"
+          },
           "body": {
             "type": "string"
           },
@@ -6817,6 +7002,46 @@
           "postId",
           "isBookmarked",
           "bookmarkCount"
+        ]
+      },
+      "FollowStatusDto": {
+        "type": "object",
+        "properties": {
+          "isFollowing": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isFollowing"
+        ]
+      },
+      "PostFollowerPageDto": {
+        "type": "object",
+        "properties": {
+          "isEligible": {
+            "type": "boolean"
+          },
+          "sharedPublishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "isEligible",
+          "recipients",
+          "nextCursor"
         ]
       },
       "SocialAuthorDto": {

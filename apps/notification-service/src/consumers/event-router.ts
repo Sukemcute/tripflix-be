@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import type { DirectoryRepository } from '../directory/directory.repository.js';
 import type { ReactionNotificationRepository } from '../grouping/reaction-notification.repository.js';
 import type { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
+import type { FollowerPostWorker } from '../inbox/follower-post.worker.js';
 import type { PostNotificationRepository } from '../inbox/post-notification.repository.js';
 import type { InboxRepository } from '../inbox/inbox.repository.js';
 import type { Mailer } from '../outapp/mailer.js';
@@ -70,13 +71,14 @@ export class EventRouter {
     comments?: Pick<CommentNotificationRepository, 'create' | 'hide'>,
     reactions?: Pick<ReactionNotificationRepository, 'apply'>,
     posts?: Pick<PostNotificationRepository, 'moderate'>,
+    followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel' | 'applyFollow'>,
   ) {
     this.handlers = {
       ...createAccountEmailHandlers(mailer, links.webAppUrl),
       ...createBookingHandlers({ mailer, webAppUrl: links.webAppUrl, log, inbox, realtime }),
-      ...(directory ? createDirectoryHandlers(directory) : {}),
+      ...(directory ? createDirectoryHandlers(directory, followerPosts) : {}),
       ...(comments ? createCommentHandlers({ comments, inbox, realtime, log }) : {}),
-      ...(inbox ? createContentStatusHandlers({ inbox, posts, realtime, log }) : {}),
+      ...(inbox ? createContentStatusHandlers({ inbox, posts, followerPosts, realtime, log }) : {}),
       ...(reactions ? createReactionHandlers({ reactions, inbox, realtime, log }) : {}),
     };
   }

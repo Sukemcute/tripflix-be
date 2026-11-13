@@ -103,6 +103,6 @@ export class AccountController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     await this.account.logoutAll(user, readRequestMeta(req));
-    if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res);
+    if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res, req);
   }
 }

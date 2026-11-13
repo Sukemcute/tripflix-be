@@ -8,6 +8,9 @@ export const envSchema = baseEnvSchema
     PORT: z.coerce.number().int().positive().default(3001),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     DATABASE_URL_NOTIFICATION: z.string(),
+    FOLLOWER_SHARED_THRESHOLD: z.coerce.number().int().min(0).max(100_000).optional(),
+    FOLLOWER_CORE_URL: z.url().optional(),
+    FOLLOWER_NOTIFICATION_SECRET: z.string().min(1).optional(),
     // Khoá công khai của module access; service tự kiểm chữ ký access token.
     JWKS_URL: z.url().default('http://localhost:3000/.well-known/jwks.json'),
     AUTH_JWT_ISSUER: z.string().default('tripflix-core'),
@@ -38,6 +41,9 @@ export const envSchema = baseEnvSchema
     NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
   })
   .superRefine((env, ctx) => {
+    if (env.FOLLOWER_NOTIFICATION_SECRET && !env.FOLLOWER_CORE_URL) {
+      ctx.addIssue({ code: 'custom', path: ['FOLLOWER_CORE_URL'], message: 'bắt buộc khi bật fan-out follower' });
+    }
     // Production mà vẫn gửi tới Mailpit thì email xác thực, đặt lại mật khẩu không tới người dùng: dừng ngay lúc khởi động.
     if (env.NODE_ENV === 'production' && env.SMTP_URL === DEV_SMTP_URL) {
       ctx.addIssue({
