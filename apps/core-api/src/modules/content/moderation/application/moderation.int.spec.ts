@@ -237,7 +237,12 @@ describe('TF32 moderation: transaction Postgres thật', () => {
 
   it('ẩn gốc cascade, hidden riêng không được restore theo gốc; outbox mỗi dòng đổi', async () => {
     const root = await add();
-    const child = await add(root.id);
+    const child = await cases.add.execute({
+      postId,
+      authorId: randomUUID(),
+      body: 'Phản hồi được khôi phục cùng bình luận gốc',
+      parentCommentId: root.id,
+    });
     const separatelyHidden = await add(root.id);
     await hide(separatelyHidden.id);
     expect(await count()).toBe(2);
@@ -253,6 +258,21 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       "select payload from content.outbox_events where type='content.comment.hidden'",
     );
     expect(events.rowCount).toBe(3);
+    const restored = await pool.query(
+      "select payload from content.outbox_events where type='content.comment.restored' order by payload->>'commentId'",
+    );
+    expect(restored.rows.map(({ payload }) => payload)).toEqual(
+      [root, child]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((comment) => ({
+          postId,
+          postAuthorId: AUTHOR,
+          commentId: comment.id,
+          authorId: comment.authorId,
+          parentCommentId: comment.parentCommentId,
+          body: comment.body,
+        })),
+    );
   });
   it('quyết định ẩn riêng sau cascade ngăn khôi phục phản hồi', async () => {
     const root = await add();
