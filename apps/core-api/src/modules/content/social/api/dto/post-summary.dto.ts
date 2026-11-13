@@ -51,6 +51,45 @@ export const SavePostSummaryRequestSchema = z
 
 export type SavePostSummaryRequest = z.infer<typeof SavePostSummaryRequestSchema>;
 
+export const MarkPostSummaryCheckedRequestSchema = z.object({
+  inputHash: z.string().trim().min(1).max(128),
+  checkedAt: z
+    .string()
+    .datetime()
+    .transform((value) => new Date(value)),
+  commentCount: z.number().int().min(0).max(1_000_000),
+});
+
+export type MarkPostSummaryCheckedRequest = z.infer<typeof MarkPostSummaryCheckedRequestSchema>;
+
+export class MarkPostSummaryCheckedDto {
+  @ApiProperty({
+    example: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    description: 'Hash đầu vào vừa tính; phải trùng inputHash của bản đang lưu thì mới cập nhật',
+  })
+  inputHash!: string;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    example: '2026-11-13T04:00:00.000Z',
+    description: 'Mốc lấy trước khi đọc dữ liệu (cùng quy ước với generatedAt); chỉ nhận mốc mới hơn mốc đã có',
+  })
+  checkedAt!: string;
+
+  @ApiProperty({ example: 26, description: 'Số bình luận đang hiện của cả bài lúc kiểm' })
+  commentCount!: number;
+}
+
+export class MarkPostSummaryCheckedResponseDto {
+  @ApiProperty({
+    example: true,
+    description:
+      'false: không có bản tóm tắt khớp inputHash hoặc đã có lần kiểm mới hơn; không cần thử lại',
+  })
+  updated!: boolean;
+}
+
 export class SavePostSummaryDto {
   @ApiPropertyOptional({
     type: [String],
@@ -230,11 +269,20 @@ export class PostSummaryResponseDto {
   })
   generatedAt?: string | null;
 
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    example: '2026-11-13T04:00:00.000Z',
+    description: 'Lần AI kiểm gần nhất thấy đầu vào không đổi; null khi chưa kiểm lại từ lúc lưu',
+  })
+  checkedAt?: string | null;
+
   @ApiProperty({
     type: Boolean,
     example: false,
     description:
-      'Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)',
+      'Bản tóm tắt đã cũ: số bình luận đổi, hoặc có bình luận mới/bị sửa sau max(generatedAt, checkedAt)',
   })
   isStale!: boolean;
 
