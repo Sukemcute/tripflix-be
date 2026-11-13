@@ -21,6 +21,11 @@ export const postSummaries = contentSchema.table(
     promptVersion: varchar('prompt_version', { length: 32 }),
     modelName: varchar('model_name', { length: 64 }),
     generatedAt: timestamp('generated_at', { withTimezone: true }),
+    /**
+     * Lần AI kiểm gần nhất thấy đầu vào không đổi (cùng inputHash) nên không lưu lại.
+     * isStale tính thay đổi của thảo luận từ max(generatedAt, checkedAt). Lưu bản tóm tắt mới thì đặt lại null.
+     */
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

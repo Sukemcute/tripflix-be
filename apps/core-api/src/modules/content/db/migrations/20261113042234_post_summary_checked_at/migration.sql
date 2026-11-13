@@ -1,0 +1,1 @@
+ALTER TABLE "content"."post_summaries" ADD COLUMN "checked_at" timestamp with time zone;
