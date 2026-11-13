@@ -42,6 +42,7 @@ import {
   GetPostDetailUseCase,
   GetPostStatsUseCase,
   GetPostSummaryUseCase,
+  MarkPostSummaryCheckedUseCase,
   ListAdminPostsUseCase,
   ListBookmarksUseCase,
   ListCommentsUseCase,
@@ -326,6 +327,12 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       inject: [PostRepository, PostSummaryRepository],
       useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
         new SavePostSummaryUseCase(postRepo, postSummaryRepo),
+    },
+    {
+      provide: MarkPostSummaryCheckedUseCase,
+      inject: [PostRepository, PostSummaryRepository],
+      useFactory: (postRepo: PostRepository, postSummaryRepo: PostSummaryRepository) =>
+        new MarkPostSummaryCheckedUseCase(postRepo, postSummaryRepo),
     },
     {
       provide: GetPostSummaryUseCase,
