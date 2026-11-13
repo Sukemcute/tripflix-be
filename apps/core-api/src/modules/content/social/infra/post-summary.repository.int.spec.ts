@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import type pg from 'pg';
-import { posts } from '../../db/schema/index.js';
+import { comments, posts } from '../../db/schema/index.js';
 import { PostSummaryRepository } from './post-summary.repository.js';
 
 describe('PostSummaryRepository.markChecked', () => {
@@ -111,5 +111,28 @@ describe('PostSummaryRepository.markChecked', () => {
       commentCount: 1,
     });
     expect(updated).toBe(false);
+  });
+
+  it('đối soát không lỗi khi sourceCommentIds có id không phải UUID (dữ liệu cũ), coi id đó là nguồn đã mất', async () => {
+    const postId = await createSummary('hash-held');
+    const cleanPostId = await createSummary('hash-clean');
+    const [visible] = await db
+      .insert(comments)
+      .values({ postId: cleanPostId, authorId: randomUUID(), body: 'Bình luận còn hiện' })
+      .returning();
+    // Ghi thẳng bằng SQL: API lưu tóm tắt đã kiểm UUID, chỉ dòng cũ mới có id lạ.
+    await pool.query('UPDATE content.post_summaries SET source_comment_ids = $2::jsonb WHERE post_id = $1', [
+      postId,
+      JSON.stringify(['khong-phai-uuid', visible!.id]),
+    ]);
+    await pool.query('UPDATE content.post_summaries SET source_comment_ids = $2::jsonb WHERE post_id = $1', [
+      cleanPostId,
+      JSON.stringify([visible!.id]),
+    ]);
+
+    const { postIds } = await repository.findHeldSummaryPostIds({ limit: 200 });
+
+    expect(postIds).toContain(postId);
+    expect(postIds).not.toContain(cleanPostId);
   });
 });

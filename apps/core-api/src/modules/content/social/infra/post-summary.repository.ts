@@ -36,8 +36,11 @@ export class PostSummaryRepository {
         SELECT 1
         FROM jsonb_array_elements_text(${postSummaries.sourceCommentIds}) AS src(id)
         LEFT JOIN content.comments c
-          ON src.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-         AND c.id = src.id::uuid
+          -- Postgres không đảm bảo thứ tự tính các vế của AND: ép ::uuid trong CASE để id lạ thành NULL
+          -- (không khớp dòng nào, nên bị coi là nguồn đã mất) thay vì làm cả câu lỗi.
+          ON c.id = CASE
+            WHEN src.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN src.id::uuid
+          END
         WHERE c.id IS NULL OR c.status != 'visible' OR c.deleted_at IS NOT NULL
       )`,
     ];
