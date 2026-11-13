@@ -232,6 +232,27 @@ describe('Feed trên Postgres thật', () => {
     expect(hot.items.map((item) => item.postId)).toEqual([expected]);
   });
 
+  it('lấy theo id: đúng thứ tự truyền vào, chỉ bài xem được trên feed', async () => {
+    const playable = await insertAsset('ready', [360]);
+    const older = await insertPost([playable], { createdAt: '2026-11-05T10:00:01Z' });
+    const newer = await insertPost([playable], { createdAt: '2026-11-05T10:00:02Z' });
+    const hidden = [
+      await insertPost([playable], { status: 'hidden' }),
+      await insertPost([playable], { visibility: 'private' }),
+      await insertPost([playable], { deleted: true }),
+      await insertPost([playable], { postType: 'vlog' }),
+      await insertPost([await insertAsset('processing')]),
+      await insertPost(playable),
+    ];
+
+    const page = await feed.getByIds([older, ...hidden, randomUUID(), newer], VIEWER_ID);
+
+    expect(page.items.map((item) => item.postId)).toEqual([older, newer]);
+    expect(page.items[0]?.video.hlsUrl).toBe(`https://cdn.test/dev/test/videos/${playable}/r1/master.m3u8`);
+    expect(page.items[0]?.viewerState).toEqual({ liked: false, saved: false });
+    expect(page.nextCursor).toBeNull();
+  });
+
   it('bài nhiều media thì lấy video đầu tiên phát được', async () => {
     const processing = await insertAsset('processing');
     const playable = await insertAsset('ready', [360, 540]);

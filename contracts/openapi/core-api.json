@@ -2614,6 +2614,15 @@
         "operationId": "FeedController_getFeed",
         "parameters": [
           {
+            "name": "post_ids",
+            "required": false,
+            "in": "query",
+            "description": "Lấy thẻ của đúng các bài này (uuid cách nhau bởi dấu phẩy, tối đa 20), theo đúng thứ tự truyền vào. Bài ẩn, riêng tư, đã xoá, không phải Reels hoặc video chưa xử lý xong thì bỏ qua. Bỏ qua tab và limit, nextCursor luôn null; không dùng chung với cursor, saved, author_id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "saved",
             "required": false,
             "in": "query",
@@ -2678,7 +2687,7 @@
             }
           },
           "400": {
-            "description": "tab, limit, cursor, author_id hoặc saved không hợp lệ"
+            "description": "tab, limit, cursor, author_id, saved hoặc post_ids không hợp lệ"
           },
           "401": {
             "description": "saved=true khi chưa đăng nhập"

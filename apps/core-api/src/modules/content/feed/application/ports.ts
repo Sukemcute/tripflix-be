@@ -46,6 +46,8 @@ export interface FeedStore {
   listHotPosts(query: RankedFeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc và thứ tự với listPlayablePosts nhưng chỉ bài người dùng đã lưu. */
   listSavedPlayablePosts(query: FeedListQuery & { userId: string }): Promise<FeedPostRow[]>;
+  /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ các bài trong `postIds`; không theo thứ tự nào, bài không xem được thì không có. */
+  findPlayablePostsByIds(postIds: string[]): Promise<FeedPostRow[]>;
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]>;
   findSavedPostIds(userId: string, postIds: string[]): Promise<string[]>;
 }

@@ -33,6 +33,7 @@ function setup(cache?: FeedPageCache) {
     listForYouPosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
     listHotPosts: vi.fn(() => Promise.resolve([row('p2'), row('p1')])),
     listSavedPlayablePosts: vi.fn(() => Promise.resolve([row('p2')])),
+    findPlayablePostsByIds: vi.fn((ids: string[]) => Promise.resolve(ids.filter((id) => id !== 'hidden').map(row))),
     findLikedPostIds: vi.fn((userId: string) => Promise.resolve(userId === 'u1' ? ['p1'] : [])),
     findSavedPostIds: vi.fn(() => Promise.resolve([])),
   } satisfies FeedStore;
@@ -179,5 +180,28 @@ describe('FeedUseCases Reels đã lưu', () => {
     const { store, feed } = setup();
     await expect(feed.getPage({ limit: 10, after: null, viewerId: null, isSavedOnly: true })).rejects.toThrow();
     expect(store.listSavedPlayablePosts).not.toHaveBeenCalled();
+  });
+});
+
+describe('FeedUseCases.getByIds', () => {
+  it('giữ thứ tự id, bỏ id trùng và bài không xem được, không dùng cache', async () => {
+    const cache = memoryCache();
+    const { store, feed } = setup(cache);
+
+    const page = await feed.getByIds(['p2', 'hidden', 'p1', 'p2'], 'u1');
+
+    expect(store.findPlayablePostsByIds).toHaveBeenCalledWith(['p2', 'hidden', 'p1']);
+    expect(page.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(page.items.map((item) => item.viewerState?.liked)).toEqual([false, true]);
+    expect(page.nextCursor).toBeNull();
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('khách xem thì viewerState là null', async () => {
+    const { feed } = setup();
+
+    const page = await feed.getByIds(['p1'], null);
+
+    expect(page.items[0]?.viewerState).toBeNull();
   });
 });
