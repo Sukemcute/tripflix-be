@@ -99,6 +99,15 @@ export class DrizzleFeedStore implements FeedStore {
     });
   }
 
+  async findPlayablePostsByIds(postIds: string[]): Promise<FeedPostRow[]> {
+    if (postIds.length === 0) return [];
+    return this.selectPlayablePosts({
+      limit: postIds.length,
+      cursorFilter: inArray(posts.id, postIds),
+      orderBy: [desc(posts.id)],
+    });
+  }
+
   private selectPlayablePosts({
     limit,
     authorId,
