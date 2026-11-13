@@ -21,9 +21,16 @@ import { Authenticated, CurrentUser, Roles, type AuthUser } from '@tripflix/auth
 import { Idempotent } from '@tripflix/idempotency';
 import { MediaFacade } from '../../media/media.facade.js';
 import { ZodBody } from '../../social/api/http.js';
-import { DecideCaseUseCase, SubmitReportUseCase } from '../application/moderation.use-cases.js';
+import {
+  DecideAppealUseCase,
+  DecideCaseUseCase,
+  SubmitAppealUseCase,
+  SubmitReportUseCase,
+} from '../application/moderation.use-cases.js';
+import { z } from 'zod';
 import { ChangeVisibilityUseCase } from '../application/change-visibility.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
+import { ClaimDeferredScansUseCase } from '../application/recover-screening.use-case.js';
 import {
   DecisionDto,
   DecisionSchema,
@@ -40,6 +47,15 @@ import {
   ModerationLogPageDto,
   ModerationQueuePageDto,
   ModerationReportDto,
+  SubmitAppealDto,
+  AppealOutcomeDto,
+  AppealDto,
+  AppealPageDto,
+  AppealQueuePageDto,
+  MyDecisionPageDto,
+  MyReportPageDto,
+  FailedScanPageDto,
+  ScanRetryDto,
 } from './dto.js';
 
 @ApiTags('Moderation - Reports')
@@ -47,7 +63,44 @@ import {
 @Controller('v1')
 @Authenticated()
 export class ReportsController {
-  constructor(@Inject(SubmitReportUseCase) private readonly submit: SubmitReportUseCase) {}
+  constructor(
+    @Inject(SubmitReportUseCase) private readonly submit: SubmitReportUseCase,
+    @Inject(ModerationRepository) private readonly repository: ModerationRepository,
+    @Inject(SubmitAppealUseCase) private readonly appeal: SubmitAppealUseCase,
+  ) {}
+  @Post('moderation/decisions/:id/appeals')
+  @ApiBody({ type: SubmitAppealDto })
+  @ApiCreatedResponse({ type: AppealDto })
+  @Idempotent()
+  submitAppeal(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(z.object({ reason: z.string().trim().min(1).max(1000) }))) body: { reason: string },
+  ) {
+    return this.appeal.execute(id, user.userId, body.reason.trim());
+  }
+  @Get('me/reports')
+  @ApiOkResponse({ type: MyReportPageDto })
+  @ApiOperation({ summary: 'Trạng thái các báo cáo của tôi' })
+  async myReports(@CurrentUser() user: AuthUser, @Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {
+    const { limit, cursor } = QueueQuerySchema.parse(raw);
+    const rows = await this.repository.reportsByUser(user.userId, limit, cursor);
+    return { items: rows.slice(0, limit), nextCursor: rows.length > limit ? String(cursor + limit) : null };
+  }
+  @Get('me/moderation/appeals')
+  @ApiOkResponse({ type: AppealPageDto })
+  async myAppeals(@CurrentUser() user: AuthUser, @Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {
+    const { limit, cursor } = QueueQuerySchema.parse(raw);
+    const rows = await this.repository.appealsByUser(user.userId, limit, cursor);
+    return { items: rows.slice(0, limit), nextCursor: rows.length > limit ? String(cursor + limit) : null };
+  }
+  @Get('me/moderation/decisions')
+  @ApiOkResponse({ type: MyDecisionPageDto })
+  async myDecisions(@CurrentUser() user: AuthUser, @Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {
+    const { limit, cursor } = QueueQuerySchema.parse(raw);
+    const rows = await this.repository.decisionsByUser(user.userId, limit, cursor);
+    return { items: rows.slice(0, limit), nextCursor: rows.length > limit ? String(cursor + limit) : null };
+  }
   @Post('posts/:id/reports')
   @ApiCreatedResponse({ type: ModerationReportDto })
   @Idempotent()
@@ -57,7 +110,12 @@ export class ReportsController {
     @CurrentUser() user: AuthUser,
     @Body(new ZodBody(ReportSchema)) body: ReportDto,
   ) {
-    return this.submit.execute({ ...ReportSchema.parse(body), targetType: 'post', targetId: id, reporterId: user.userId });
+    return this.submit.execute({
+      ...ReportSchema.parse(body),
+      targetType: 'post',
+      targetId: id,
+      reporterId: user.userId,
+    });
   }
   @Post('comments/:id/reports')
   @ApiCreatedResponse({ type: ModerationReportDto })
@@ -68,7 +126,12 @@ export class ReportsController {
     @CurrentUser() user: AuthUser,
     @Body(new ZodBody(ReportSchema)) body: ReportDto,
   ) {
-    return this.submit.execute({ ...ReportSchema.parse(body), targetType: 'comment', targetId: id, reporterId: user.userId });
+    return this.submit.execute({
+      ...ReportSchema.parse(body),
+      targetType: 'comment',
+      targetId: id,
+      reporterId: user.userId,
+    });
   }
 }
 
@@ -82,7 +145,41 @@ export class AdminModerationController {
     @Inject(DecideCaseUseCase) private readonly decide: DecideCaseUseCase,
     @Inject(ChangeVisibilityUseCase) private readonly visibility: ChangeVisibilityUseCase,
     @Inject(MediaFacade) private readonly media: MediaFacade,
+    @Inject(DecideAppealUseCase) private readonly decideAppeal: DecideAppealUseCase,
+    @Inject(ClaimDeferredScansUseCase) private readonly recovery: ClaimDeferredScansUseCase,
   ) {}
+  @Get('scans/failed')
+  @ApiOkResponse({ type: FailedScanPageDto })
+  async failedScans(@Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {
+    const { limit, cursor } = QueueQuerySchema.parse(raw);
+    const rows = await this.repository.failedScans(limit, cursor);
+    return { items: rows.slice(0, limit), nextCursor: rows.length > limit ? String(cursor + limit) : null };
+  }
+  @Post('scans/:id/retry')
+  @ApiCreatedResponse({ type: ScanRetryDto })
+  @Idempotent()
+  retryScan(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
+    return this.recovery.retry(id, user.userId);
+  }
+  @Get('appeals')
+  @ApiOkResponse({ type: AppealQueuePageDto })
+  async appeals(@Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {
+    const { limit, cursor } = QueueQuerySchema.parse(raw);
+    const rows = await this.repository.pendingAppeals(limit, cursor);
+    return { items: rows.slice(0, limit), nextCursor: rows.length > limit ? String(cursor + limit) : null };
+  }
+  @Post('appeals/:id/decisions')
+  @ApiBody({ type: AppealOutcomeDto })
+  @ApiCreatedResponse({ type: AppealDto })
+  @Idempotent()
+  appealDecision(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(z.object({ outcome: z.enum(['upheld', 'overturned']) })))
+    body: { outcome: 'upheld' | 'overturned' },
+  ) {
+    return this.decideAppeal.execute(id, user.userId, body.outcome);
+  }
   @Get('queue')
   @ApiOkResponse({ type: ModerationQueuePageDto })
   @ApiOperation({ summary: 'Hàng chờ kiểm duyệt theo mức ưu tiên' })
@@ -119,7 +216,11 @@ export class AdminModerationController {
     @CurrentUser() user: AuthUser,
     @Body(new ZodBody(DecisionSchema)) body: DecisionDto,
   ) {
-    return this.decide.execute(id, { ...DecisionSchema.parse(body), actorId: user.userId, actorIsSuperAdmin: user.role === 'superadmin' });
+    return this.decide.execute(id, {
+      ...DecisionSchema.parse(body),
+      actorId: user.userId,
+      actorIsSuperAdmin: user.role === 'superadmin',
+    });
   }
   @Post('comments/:id/actions')
   @ApiCreatedResponse({ type: ModerationDecisionResultDto })

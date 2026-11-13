@@ -28,7 +28,16 @@ import { GetPostSummaryUseCase } from '../../social/application/use-cases/get-po
 import { SavePostSummaryUseCase } from '../../social/application/use-cases/save-post-summary.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { ChangeVisibilityUseCase } from './change-visibility.use-case.js';
-import { DecideCaseUseCase, RecordScreeningUseCase, SubmitReportUseCase } from './moderation.use-cases.js';
+import { ClaimDeferredScansUseCase } from './recover-screening.use-case.js';
+import { ScreeningConsumer } from '../consumers/screening.consumer.js';
+import {
+  DecideAppealUseCase,
+  DecideCaseUseCase,
+  RecordScreeningUseCase,
+  ScreenContentUseCase,
+  SubmitAppealUseCase,
+  SubmitReportUseCase,
+} from './moderation.use-cases.js';
 
 const AUTHOR = '11111111-1111-4111-8111-111111111111';
 const CONFIG = { aiThreshold: 0.8, reportThreshold: 3, allowedDomains: ['tripflix.vn'] };
@@ -54,11 +63,14 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const visibility = new ChangeVisibilityUseCase(repository, posts, outbox, moderate);
     return {
       repository,
+      recovery: new ClaimDeferredScansUseCase(repository),
       comments,
       summaries,
       visibility,
       moderate,
       report: new SubmitReportUseCase(repository, visibility, outbox, CONFIG),
+      appeal: new SubmitAppealUseCase(repository),
+      decideAppeal: new DecideAppealUseCase(repository, visibility, outbox),
       decide: new DecideCaseUseCase(repository, visibility),
       screen: new RecordScreeningUseCase(repository, visibility, CONFIG),
       add: new AddCommentUseCase(posts, comments, outbox),
@@ -97,7 +109,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   beforeEach(async () => {
     failOutbox = false;
     await pool.query(
-      'truncate content.posts, content.moderation_cases, content.reports, content.outbox_events, content.moderation_processed_events cascade',
+      'truncate content.posts, content.moderation_cases, content.reports, content.outbox_events, content.moderation_processed_events, content.moderation_scans cascade',
     );
     postId = randomUUID();
     await pool.query(
@@ -125,6 +137,103 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     return (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
       .comment_count;
   }
+  it('recovery có lease, giới hạn retry và staff có thể lên lịch lại', async () => {
+    const eventId = randomUUID();
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    for (let i = 0; i < 8; i++) await cases.screen.execute(eventId, target, null);
+    expect((await cases.repository.scan(eventId))?.status).toBe('failed');
+    expect(await cases.recovery.execute()).toHaveLength(0);
+    await cases.recovery.retry(eventId, AUTHOR);
+    const batches = await Promise.all([cases.recovery.execute(), cases.recovery.execute()]);
+    expect(batches.flat().filter((row) => row.eventId === eventId)).toHaveLength(1);
+    await cases.screen.execute(eventId, target, {
+      id: eventId,
+      flagged: false,
+      model: 'test',
+      categories: {},
+      scores: {},
+    });
+    expect((await cases.repository.scan(eventId))?.status).toBe('passed');
+    await cases.screen.execute(eventId, target, null);
+    expect((await cases.repository.scan(eventId))?.status).toBe('passed');
+  });
+  it('worker phục hồi scan deferred từ database dù không còn lượt giao của stream', async () => {
+    const eventId = randomUUID();
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    await cases.screen.execute(eventId, target, null);
+    await pool.query('update content.moderation_scans set next_attempt_at=now() where event_id=$1', [
+      eventId,
+    ]);
+    const screen = new ScreenContentUseCase(
+      cases.repository,
+      {
+        moderate: async () => [
+          { id: eventId, flagged: false, model: 'recovered-provider', categories: {}, scores: {} },
+        ],
+      },
+      cases.screen,
+      { getPlayback: async () => ({}) } as never,
+    );
+    const worker = new ScreeningConsumer({ APP_ROLE: 'api' } as never, {} as never, screen, cases.recovery);
+    await worker.recover();
+    expect((await cases.repository.scan(eventId))?.status).toBe('passed');
+    expect((await cases.repository.scan(eventId))?.model).toBe('recovered-provider');
+  });
+  it('hết hạn appeal và evidence cũ được dọn mà không xóa audit quyết định', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    await pool.query(
+      "update content.moderation_actions set created_at=now()-interval '91 days' where id=$1",
+      [decision.actionId],
+    );
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow(/hết thời hạn/);
+    await cases.recovery.execute();
+    const row = (
+      await pool.query('select evidence_snapshot, action from content.moderation_actions where id=$1', [
+        decision.actionId,
+      ])
+    ).rows[0];
+    expect(row.evidence_snapshot).toBeNull();
+    expect(row.action).toBe('hide');
+  });
+  it('thay đổi counter không đổi phiên bản và snapshot quyết định vẫn giữ nội dung gốc', async () => {
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    const decision = await cases.moderate.execute({
+      postId,
+      moderatorId: randomUUID(),
+      action: 'hide',
+      reasonCode: 'OTHER',
+    });
+    await pool.query('update content.posts set share_count=share_count+1, updated_at=now() where id=$1', [
+      postId,
+    ]);
+    expect((await cases.repository.loadTarget('post', postId))?.version).toBe(target.version);
+    expect(
+      (await cases.repository.decisionsByUser(AUTHOR, 20, 0)).find((row) => row.id === decision.actionId)
+        ?.canAppeal,
+    ).toBe(true);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    expect((await cases.repository.pendingAppeals(20, 0))[0]?.decision.evidenceSnapshot?.text).toBe(
+      target.text,
+    );
+    await cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned');
+  });
+  it('report dedupe theo phiên bản và giới hạn 20 báo cáo mỗi giờ', async () => {
+    const command = {
+      targetType: 'post' as const,
+      targetId: postId,
+      reporterId: AUTHOR,
+      reasonCode: 'OTHER',
+    };
+    const first = await cases.report.execute(command);
+    expect((await cases.report.execute(command)).id).toBe(first.id);
+    for (let i = 1; i < 20; i++) {
+      await pool.query('update content.posts set body=$2 where id=$1', [postId, `Bản sửa ${i}`]);
+      expect((await cases.report.execute(command)).id).not.toBe(first.id);
+    }
+    await pool.query("update content.posts set body='Bản sửa tiếp theo' where id=$1", [postId]);
+    await expect(cases.report.execute(command)).rejects.toMatchObject({ status: 429 });
+  });
 
   it('ẩn gốc cascade, hidden riêng không được restore theo gốc; outbox mỗi dòng đổi', async () => {
     const root = await add();
@@ -169,6 +278,154 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await count()).toBe(0);
     expect(await cases.comments.countByPostId(postId, { flat: true })).toBe(0);
   });
+  it('khôi phục bình luận bị nền tảng gỡ nhưng không khôi phục nội dung tác giả đã xóa', async () => {
+    const root = await add();
+    const child = await add(root.id);
+    await hide(root.id, 'remove');
+    expect(await count()).toBe(0);
+    await hide(root.id, 'restore');
+    expect(await count()).toBe(2);
+    expect((await cases.comments.findById(child.id))?.status).toBe('visible');
+    await cases.delete.execute({ commentId: root.id, userId: AUTHOR });
+    await expect(hide(root.id, 'restore')).rejects.toThrow();
+  });
+  it('chỉ tác giả có thể khiếu nại và mỗi quyết định chỉ có một khiếu nại', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    await expect(cases.appeal.execute(decision.actionId, randomUUID(), 'Kiểm tra lại')).rejects.toThrow();
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Kiểm tra lại');
+    expect(appeal.status).toBe('pending');
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Lần hai')).rejects.toThrow(
+      /đã được khiếu nại/,
+    );
+    await expect(cases.decideAppeal.execute(appeal.id, AUTHOR, 'overturned')).rejects.toThrow(/tự duyệt/);
+    const outcome = await cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned');
+    expect(outcome.status).toBe('overturned');
+    expect((await cases.comments.findById(root.id))?.status).toBe('visible');
+    await expect(cases.decideAppeal.execute(appeal.id, randomUUID(), 'upheld')).rejects.toThrow(
+      /đã được xử lý/,
+    );
+  });
+  it('không khôi phục khi nội dung đã thay đổi sau quyết định', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Kiểm tra lại');
+    await pool.query(
+      "update content.comments set body='đã sửa', updated_at=updated_at + interval '1 second' where id=$1",
+      [root.id],
+    );
+    await expect(cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned')).rejects.toThrow(
+      /đã thay đổi/,
+    );
+    expect((await cases.comments.findById(root.id))?.status).toBe('hidden');
+  });
+  it('không nhận khiếu nại cho quyết định đã được khôi phục', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    await hide(root.id, 'restore');
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Kiểm tra lại')).rejects.toThrow(
+      /không còn hiệu lực/,
+    );
+  });
+  it('không nhận appeal hoặc khôi phục bình luận trong bài tác giả đã xóa', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    await pool.query("update content.posts set status='deleted', deleted_at=now() where id=$1", [postId]);
+    expect(
+      (await cases.repository.decisionsByUser(AUTHOR, 20, 0)).find((row) => row.id === decision.actionId)
+        ?.canAppeal,
+    ).toBe(false);
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow();
+    await expect(hide(root.id, 'restore')).rejects.toThrow();
+  });
+  it('đóng hồ sơ không làm mất quyền khiếu nại quyết định ẩn đang hiệu lực', async () => {
+    const report = await cases.report.execute({
+      targetType: 'post',
+      targetId: postId,
+      reporterId: AUTHOR,
+      reasonCode: 'OTHER',
+    });
+    const decision = await cases.visibility.execute({
+      targetType: 'post',
+      targetId: postId,
+      action: 'hide',
+      actorId: randomUUID(),
+      actorType: 'staff',
+      reasonCode: 'OTHER',
+      caseId: report.caseId!,
+    });
+    await cases.decide.execute(report.caseId!, {
+      actorId: randomUUID(),
+      action: 'dismiss',
+      reasonCode: 'OTHER',
+    });
+    expect(
+      (await cases.repository.decisionsByUser(AUTHOR, 20, 0)).find((row) => row.id === decision.actionId)
+        ?.canAppeal,
+    ).toBe(true);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    await cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned');
+    expect((await cases.repository.loadTarget('post', postId))?.status).toBe('published');
+  });
+  it('gỡ rồi khôi phục gốc không bỏ lệnh ẩn riêng của reply', async () => {
+    const root = await add();
+    const child = await add(root.id);
+    await hide(child.id);
+    await hide(root.id, 'remove');
+    await hide(root.id, 'restore');
+    expect((await cases.comments.findById(child.id))?.status).toBe('hidden');
+    expect(await count()).toBe(1);
+  });
+  it('hai reviewer xử lý đồng thời chỉ có một kết quả và một event appeal', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    const results = await Promise.allSettled([
+      cases.decideAppeal.execute(appeal.id, randomUUID(), 'upheld'),
+      cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned'),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(
+      (await pool.query("select * from content.outbox_events where type='content.appeal.decided'")).rowCount,
+    ).toBe(1);
+  });
+  it('lỗi outbox không đóng khiếu nại hoặc khôi phục nội dung', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    failOutbox = true;
+    await expect(cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned')).rejects.toThrow(
+      'outbox unavailable',
+    );
+    expect((await cases.comments.findById(root.id))?.status).toBe('hidden');
+    expect((await cases.repository.appealsByUser(AUTHOR, 20, 0))[0]?.status).toBe('pending');
+  });
+  it('quyết định bài trực tiếp có phiên bản và chỉ tác giả xem được', async () => {
+    const reviewer = randomUUID();
+    const decision = await cases.moderate.execute({
+      postId,
+      moderatorId: reviewer,
+      action: 'hide',
+      reasonCode: 'OTHER',
+    });
+    const decisions = await cases.repository.decisionsByUser(AUTHOR, 20, 0);
+    expect(decisions.map((row) => row.id)).toContain(decision.actionId);
+    expect(decisions.find((row) => row.id === decision.actionId)?.canAppeal).toBe(true);
+    expect(await cases.repository.decisionsByUser(randomUUID(), 20, 0)).toHaveLength(0);
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Kiểm tra');
+    expect(
+      (await cases.repository.pendingAppeals(20, 0)).some(
+        (row) => row.appeal.id === appeal.id && row.targetStatus === 'hidden',
+      ),
+    ).toBe(true);
+    expect(await cases.repository.appealsByUser(randomUUID(), 20, 0)).toHaveLength(0);
+    await cases.decideAppeal.execute(appeal.id, randomUUID(), 'overturned');
+    expect((await cases.repository.loadTarget('post', postId))?.status).toBe('published');
+    expect(
+      (await cases.repository.decisionsByUser(AUTHOR, 20, 0)).find((row) => row.id === decision.actionId)
+        ?.canAppeal,
+    ).toBe(false);
+  });
   it('outbox lỗi rollback status, counter và nhật ký kể cả transaction lồng', async () => {
     const root = await add();
     await add(root.id);
@@ -184,18 +441,22 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       'published',
     );
   });
-  it('báo cáo trùng không tăng số; người thứ ba tự ẩn; case đã đóng trả conflict', async () => {
+  it('báo cáo trùng không tăng số; ba báo cáo không tự ẩn; case đã đóng trả conflict', async () => {
     const command = { targetType: 'post' as const, targetId: postId, reporterId: AUTHOR, reasonCode: 'SCAM' };
     const first = await cases.report.execute(command);
     expect((await cases.report.execute(command)).id).toBe(first.id);
     await cases.report.execute({ ...command, reporterId: randomUUID() });
     await cases.report.execute({ ...command, reporterId: randomUUID() });
     expect((await pool.query('select status from content.posts where id=$1', [postId])).rows[0].status).toBe(
-      'hidden',
+      'published',
     );
     const item = await cases.repository.findCase(first.caseId!);
     expect(item?.reportCount).toBe(3);
-    await cases.decide.execute(item!.id, { actorId: AUTHOR, action: 'restore', reasonCode: 'OTHER' });
+    const ownReports = await cases.repository.reportsByUser(AUTHOR, 20, 0);
+    expect(ownReports).toHaveLength(1);
+    expect(ownReports[0]).toMatchObject({ id: first.id, caseStatus: 'pending' });
+    expect(await cases.repository.reportsByUser(randomUUID(), 20, 0)).toHaveLength(0);
+    await cases.decide.execute(item!.id, { actorId: AUTHOR, action: 'dismiss', reasonCode: 'OTHER' });
     await expect(
       cases.decide.execute(item!.id, { actorId: AUTHOR, action: 'hide', reasonCode: 'OTHER' }),
     ).rejects.toThrow(/đã được xử lý/);
@@ -219,6 +480,25 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(
       (await pool.query("select * from content.moderation_actions where actor_type='system'")).rowCount,
     ).toBe(1);
+    const hiddenSnapshot = await cases.repository.loadTarget('post', postId);
+    await cases.screen.execute(eventId, hiddenSnapshot!, {
+      id: `post:${postId}`,
+      model: 'test',
+      flagged: true,
+      categories: { 'self-harm/intent': true },
+      scores: { 'self-harm/intent': 0.9 },
+    });
+    const item = await cases.repository.pending(hiddenSnapshot!);
+    expect(item?.sources).toContain('ai');
+    expect(
+      (await pool.query("select * from content.moderation_actions where actor_type='system'")).rowCount,
+    ).toBe(1);
+    const scan = (
+      await pool.query('select status, attempts, model from content.moderation_scans where event_id=$1', [
+        eventId,
+      ])
+    ).rows[0];
+    expect(scan).toMatchObject({ status: 'flagged', attempts: 3, model: 'test' });
   });
   it('source roundtrip: ngoài nguồn bị ẩn vẫn trả; nguồn bị ẩn giữ văn bản nhưng giữ metadata; bản cũ PUT về muộn không lộ', async () => {
     const source = await add();
@@ -317,22 +597,37 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect((await pool.query('select * from content.moderation_cases')).rowCount).toBe(0);
   });
 
-  it('remove gốc xoá mềm cả phản hồi, chỉ trừ visible; dismiss đóng case và không đổi trạng thái', async () => {
-    const root = await add(); const child = await add(root.id);
+  it('remove gốc giữ lệnh ẩn riêng của phản hồi, chỉ trừ visible; dismiss không đổi trạng thái', async () => {
+    const root = await add();
+    const child = await add(root.id);
     await hide(child.id);
     const result = await hide(root.id, 'remove');
-    expect(result.changedCount).toBe(2); expect(await count()).toBe(0);
-    expect((await pool.query('select * from content.comments where deleted_at is not null')).rowCount).toBe(2);
-    const report = await cases.report.execute({ targetType: 'post', targetId: postId, reporterId: AUTHOR, reasonCode: 'OTHER' });
+    expect(result.changedCount).toBe(1);
+    expect(await count()).toBe(0);
+    expect(
+      (await pool.query("select * from content.comments where status='removed' and deleted_at is null"))
+        .rowCount,
+    ).toBe(1);
+    const report = await cases.report.execute({
+      targetType: 'post',
+      targetId: postId,
+      reporterId: AUTHOR,
+      reasonCode: 'OTHER',
+    });
     await cases.decide.execute(report.caseId!, { actorId: AUTHOR, action: 'dismiss', reasonCode: 'OTHER' });
     expect((await cases.repository.findCase(report.caseId!))?.status).toBe('resolved');
-    expect((await pool.query('select status from content.posts where id=$1', [postId])).rows[0].status).toBe('published');
+    expect((await pool.query('select status from content.posts where id=$1', [postId])).rows[0].status).toBe(
+      'published',
+    );
   });
 
   it('đổi tab theo trạng thái hiện tại, vẫn đọc được bình luận đã ẩn và gỡ cùng nhật ký', async () => {
     const comment = await add();
     const report = await cases.report.execute({
-      targetType: 'comment', targetId: comment.id, reporterId: AUTHOR, reasonCode: 'OTHER',
+      targetType: 'comment',
+      targetId: comment.id,
+      reporterId: AUTHOR,
+      reasonCode: 'OTHER',
     });
     const actor = { actorId: AUTHOR, reasonCode: 'OTHER' };
     const queue = (view: 'pending' | 'reviewed' | 'hidden' | 'removed') =>
@@ -358,20 +653,35 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const removed = await queue('removed');
     expect(removed.total).toBe(1);
     const detail = await cases.repository.detail(removed.items[0]!);
-    expect(detail.target).toMatchObject({ status: 'removed', deleted: true });
+    expect(detail.target).toMatchObject({ status: 'removed', deleted: false });
     expect(detail.actions.map(({ action }) => action)).toEqual(
       expect.arrayContaining(['hide', 'restore', 'remove']),
     );
   });
 
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
-    const root = await add(); const snapshot = await cases.repository.loadTarget('comment', root.id);
-    await cases.screen.execute(randomUUID(), snapshot!, { id: `comment:${root.id}`, flagged: true, categories: { 'self-harm/intent': true }, scores: { 'self-harm/intent': 0.99 }, model: 'omni-test' });
+    const root = await add();
+    const snapshot = await cases.repository.loadTarget('comment', root.id);
+    await cases.screen.execute(randomUUID(), snapshot!, {
+      id: `comment:${root.id}`,
+      flagged: true,
+      categories: { 'self-harm/intent': true },
+      scores: { 'self-harm/intent': 0.99 },
+      model: 'omni-test',
+    });
     expect(await count()).toBe(0);
-    const queue = await cases.repository.queue({ source: 'ai', targetType: 'comment', status: 'pending', limit: 20, offset: 0 });
-    expect(queue.total).toBe(1); expect(queue.items[0]?.isAutoHidden).toBe(true);
+    const queue = await cases.repository.queue({
+      source: 'ai',
+      targetType: 'comment',
+      status: 'pending',
+      limit: 20,
+      offset: 0,
+    });
+    expect(queue.total).toBe(1);
+    expect(queue.items[0]?.isAutoHidden).toBe(true);
     const detail = await cases.repository.detail(queue.items[0]!);
-    expect(detail.target?.status).toBe('hidden'); expect(detail.actions).toHaveLength(1);
+    expect(detail.target?.status).toBe('hidden');
+    expect(detail.actions).toHaveLength(1);
     expect(detail.flags).toMatchObject({ ai: { model: 'omni-test' } });
   });
 });

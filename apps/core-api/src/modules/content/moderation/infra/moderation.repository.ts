@@ -1,10 +1,18 @@
 import { and, asc, desc, eq, getTableColumns, gte, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
+  contentVersion,
+  postEvidence,
+  APPEAL_WINDOW_DAYS,
+  EVIDENCE_RETENTION_DAYS,
+} from '../domain/content-version.js';
+import {
   comments,
   moderationActions,
   moderationCases,
+  moderationAppeals,
   moderationProcessedEvents,
+  moderationScans,
   posts,
   reports,
   type ModerationCaseRecord,
@@ -20,12 +28,165 @@ export interface TargetSnapshot {
   status: string;
   version: string;
   coverMediaId: string | null;
+  mediaIds: string[];
   deleted: boolean;
 }
 export class ModerationRepository {
   constructor(private readonly getDb: () => Db) {}
   get db(): Db {
     return this.getDb();
+  }
+
+  async scan(eventId: string) {
+    const [scan] = await this.db.select().from(moderationScans).where(eq(moderationScans.eventId, eventId));
+    return scan;
+  }
+  async failedScans(limit: number, offset: number) {
+    return this.db
+      .select({
+        eventId: moderationScans.eventId,
+        targetType: moderationScans.targetType,
+        targetId: moderationScans.targetId,
+        status: moderationScans.status,
+        attempts: moderationScans.attempts,
+        updatedAt: moderationScans.updatedAt,
+      })
+      .from(moderationScans)
+      .where(eq(moderationScans.status, 'failed'))
+      .orderBy(asc(moderationScans.updatedAt), asc(moderationScans.eventId))
+      .limit(limit + 1)
+      .offset(offset);
+  }
+
+  async claimDeferredScans() {
+    // Giữ bằng chứng của case/appeal chưa xử lý; xóa payload hết hạn của các lượt đã đóng.
+    await this.db.execute(sql`UPDATE content.moderation_actions a SET evidence_snapshot = NULL
+      WHERE a.evidence_snapshot IS NOT NULL AND a.created_at < now() - ${EVIDENCE_RETENTION_DAYS} * interval '1 day'
+      AND NOT EXISTS (SELECT 1 FROM content.moderation_appeals p WHERE p.decision_id = a.id AND p.status = 'pending')
+      AND NOT EXISTS (SELECT 1 FROM content.moderation_cases c WHERE c.id = a.case_id AND c.status = 'pending')`);
+    await this.db.execute(sql`UPDATE content.moderation_scans SET evidence = NULL
+      WHERE evidence IS NOT NULL AND status IN ('passed', 'flagged', 'superseded')
+      AND updated_at < now() - ${EVIDENCE_RETENTION_DAYS} * interval '1 day'`);
+    const due = await this.db
+      .select()
+      .from(moderationScans)
+      .where(and(eq(moderationScans.status, 'deferred'), sql`${moderationScans.nextAttemptAt} <= now()`))
+      .orderBy(asc(moderationScans.nextAttemptAt))
+      .limit(20)
+      .for('update', { skipLocked: true });
+    for (const scan of due)
+      await this.db
+        .update(moderationScans)
+        .set({ nextAttemptAt: new Date(Date.now() + 300_000) })
+        .where(eq(moderationScans.eventId, scan.eventId));
+    return due;
+  }
+
+  async supersedeScan(eventId: string) {
+    await this.db
+      .update(moderationScans)
+      .set({ status: 'superseded', updatedAt: new Date() })
+      .where(and(eq(moderationScans.eventId, eventId), eq(moderationScans.status, 'deferred')));
+  }
+
+  async reportsByUser(reporterId: string, limit: number, offset: number) {
+    return this.db
+      .select({
+        id: reports.id,
+        targetType: reports.targetType,
+        targetId: reports.targetId,
+        reasonCode: reports.reasonCode,
+        createdAt: reports.createdAt,
+        caseStatus: moderationCases.status,
+      })
+      .from(reports)
+      .leftJoin(moderationCases, eq(reports.caseId, moderationCases.id))
+      .where(eq(reports.reporterId, reporterId))
+      .orderBy(desc(reports.createdAt), desc(reports.id))
+      .limit(limit + 1)
+      .offset(offset);
+  }
+
+  async pendingAppeals(limit: number, offset: number) {
+    return this.db
+      .select({
+        appeal: moderationAppeals,
+        decision: moderationActions,
+        targetText: sql<
+          string | null
+        >`case when ${moderationActions.targetType} = 'post' then concat_ws(E'\n', ${posts.title}, ${posts.body}) else ${comments.body} end`,
+        targetStatus: sql<string | null>`coalesce(${posts.status}, ${comments.status})`,
+      })
+      .from(moderationAppeals)
+      .innerJoin(moderationActions, eq(moderationAppeals.decisionId, moderationActions.id))
+      .leftJoin(posts, and(eq(moderationActions.targetType, 'post'), eq(moderationActions.postId, posts.id)))
+      .leftJoin(
+        comments,
+        and(eq(moderationActions.targetType, 'comment'), eq(moderationActions.commentId, comments.id)),
+      )
+      .where(eq(moderationAppeals.status, 'pending'))
+      .orderBy(asc(moderationAppeals.createdAt), asc(moderationAppeals.id))
+      .limit(limit + 1)
+      .offset(offset);
+  }
+
+  async appealsByUser(authorId: string, limit: number, offset: number) {
+    return this.db
+      .select()
+      .from(moderationAppeals)
+      .where(eq(moderationAppeals.authorId, authorId))
+      .orderBy(desc(moderationAppeals.createdAt), desc(moderationAppeals.id))
+      .limit(limit + 1)
+      .offset(offset);
+  }
+
+  async decisionsByUser(authorId: string, limit: number, offset: number) {
+    const rows = await this.db
+      .select({
+        id: moderationActions.id,
+        targetType: moderationActions.targetType,
+        postId: moderationActions.postId,
+        commentId: moderationActions.commentId,
+        action: moderationActions.action,
+        reasonCode: moderationActions.reasonCode,
+        targetPreview: sql<string | null>`${moderationActions.evidenceSnapshot}->>'text'`,
+        createdAt: moderationActions.createdAt,
+        appealStatus: moderationAppeals.status,
+        contentVersion: moderationActions.contentVersion,
+        canAppeal: sql<boolean>`${moderationActions.action} IN ('hide', 'auto_hide', 'remove')
+        AND ${moderationActions.createdAt} >= now() - ${APPEAL_WINDOW_DAYS} * interval '1 day'
+        AND ${moderationAppeals.id} IS NULL
+        AND coalesce(${posts.status}, ${comments.status}) IN ('hidden', 'removed')
+        AND coalesce(${posts.deletedAt}, ${comments.deletedAt}) IS NULL
+        AND NOT EXISTS (SELECT 1 FROM content.moderation_actions newer
+          WHERE newer.target_type = ${moderationActions.targetType}
+            AND newer.action <> 'dismiss'
+            AND coalesce(newer.comment_id, newer.post_id) = coalesce(${moderationActions.commentId}, ${moderationActions.postId})
+            AND (newer.created_at, newer.id) > (${moderationActions.createdAt}, ${moderationActions.id}))`,
+      })
+      .from(moderationActions)
+      .leftJoin(posts, and(eq(moderationActions.targetType, 'post'), eq(moderationActions.postId, posts.id)))
+      .leftJoin(
+        comments,
+        and(eq(moderationActions.targetType, 'comment'), eq(moderationActions.commentId, comments.id)),
+      )
+      .leftJoin(moderationAppeals, eq(moderationAppeals.decisionId, moderationActions.id))
+      .where(or(eq(posts.authorId, authorId), eq(comments.authorId, authorId)))
+      .orderBy(desc(moderationActions.createdAt), desc(moderationActions.id))
+      .limit(limit + 1)
+      .offset(offset);
+    return Promise.all(
+      rows.map(async ({ contentVersion: version, ...row }) => {
+        const id = row.targetType === 'post' ? row.postId : row.commentId;
+        const target = id && row.canAppeal ? await this.loadTarget(row.targetType, id) : null;
+        return {
+          ...row,
+          canAppeal: Boolean(
+            row.canAppeal && target && !target.deleted && (!version || version === target.version),
+          ),
+        };
+      }),
+    );
   }
 
   async hasStaffDecisionAfter(target: TargetSnapshot, occurredAt: string): Promise<boolean> {
@@ -67,13 +228,20 @@ export class ModerationRepository {
             authorId: post.authorId,
             text: [post.title, post.body, ...post.hashtags].join('\n'),
             status: post.status,
-            version: post.updatedAt.toISOString(),
+            version: contentVersion(postEvidence(post).text, post.coverMediaId, post.mediaIds),
             coverMediaId: post.coverMediaId,
+            mediaIds: post.mediaIds,
             deleted: Boolean(post.deletedAt),
           }
         : null;
     }
     const [comment] = await this.db.select().from(comments).where(eq(comments.id, targetId));
+    const [parentPost] = comment
+      ? await this.db
+          .select({ deletedAt: posts.deletedAt, status: posts.status })
+          .from(posts)
+          .where(eq(posts.id, comment.postId))
+      : [];
     return comment
       ? {
           targetType,
@@ -82,9 +250,12 @@ export class ModerationRepository {
           authorId: comment.authorId,
           text: comment.body,
           status: comment.status,
-          version: comment.updatedAt.toISOString(),
+          version: contentVersion(comment.body, null),
           coverMediaId: null,
-          deleted: Boolean(comment.deletedAt),
+          mediaIds: [],
+          deleted: Boolean(
+            comment.deletedAt || !parentPost || parentPost.deletedAt || parentPost.status === 'deleted',
+          ),
         }
       : null;
   }
@@ -156,6 +327,7 @@ export class ModerationRepository {
         and(
           eq(reports.targetType, target.targetType),
           eq(reports.targetId, target.targetId),
+          eq(reports.contentVersion, target.version),
           gte(reports.createdAt, new Date(Date.now() - 86_400_000)),
         ),
       );
@@ -171,7 +343,10 @@ export class ModerationRepository {
     offset: number;
   }) {
     const postJoin = and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId));
-    const commentJoin = and(eq(moderationCases.targetType, 'comment'), eq(comments.id, moderationCases.targetId));
+    const commentJoin = and(
+      eq(moderationCases.targetType, 'comment'),
+      eq(comments.id, moderationCases.targetId),
+    );
     const visibility = sql`coalesce(${posts.status}, ${comments.status}, '')`;
     const conditions = [];
     if (options.view) {
@@ -184,9 +359,15 @@ export class ModerationRepository {
         )`);
       }
       if (options.view === 'pending') {
-        conditions.push(eq(moderationCases.status, 'pending'), sql`${visibility} IN ('published', 'visible', 'hidden')`);
+        conditions.push(
+          eq(moderationCases.status, 'pending'),
+          sql`${visibility} IN ('published', 'visible', 'hidden')`,
+        );
       } else if (options.view === 'reviewed') {
-        conditions.push(eq(moderationCases.status, 'resolved'), sql`${visibility} IN ('published', 'visible', 'draft')`);
+        conditions.push(
+          eq(moderationCases.status, 'resolved'),
+          sql`${visibility} IN ('published', 'visible', 'draft')`,
+        );
       } else if (options.view === 'hidden') {
         conditions.push(sql`${visibility} = 'hidden'`);
       } else {
@@ -273,6 +454,7 @@ export class ModerationRepository {
         targetType: target.targetType,
         targetId: target.targetId,
         reporterId,
+        contentVersion: target.version,
         reasonCode,
         reasonDetail,
       })
@@ -289,6 +471,7 @@ export class ModerationRepository {
           eq(reports.targetType, target.targetType),
           eq(reports.targetId, target.targetId),
           isNull(reports.caseId),
+          eq(reports.contentVersion, target.version),
         ),
       );
   }

@@ -163,8 +163,13 @@ describe('Ngưỡng severity', () => {
       evaluateSeverity([], { ...ai, scores: { 'self-harm/intent': 0.79 } }, 0, config).shouldAutoHide,
     ).toBe(false);
   });
-  it('đủ 3 báo cáo mới tự ẩn', () => {
+  it('báo cáo tăng ưu tiên nhưng không tự ẩn nếu không có bằng chứng khác', () => {
     expect(evaluateSeverity([], null, 2, config).shouldAutoHide).toBe(false);
-    expect(evaluateSeverity([], null, 3, config).shouldAutoHide).toBe(true);
+    expect(evaluateSeverity([], null, 3, config)).toMatchObject({
+      suspicious: true,
+      severity: 45,
+      shouldAutoHide: false,
+    });
+    expect(evaluateSeverity([], null, 20, config).shouldAutoHide).toBe(false);
   });
 });

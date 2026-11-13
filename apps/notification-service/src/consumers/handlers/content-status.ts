@@ -1,6 +1,9 @@
 import {
   ContentMediaFailedV1Schema,
+  ContentAppealDecidedV1Schema,
+  ContentCommentModerationActionV1Schema,
   ContentMediaReadyV1Schema,
+  ContentModerationDecidedV1Schema,
   ContentPostHiddenV1Schema,
   ContentPostRestoredV1Schema,
   type EventEnvelope,
@@ -34,7 +37,8 @@ export function createContentStatusHandlers(options: {
     if (!realtime) return;
     try {
       const unreadCount = await inbox.countUnread(userId);
-      if (row) realtime.emitToUser(userId, 'notification.created', { item: toInboxItemDto(row), unreadCount });
+      if (row)
+        realtime.emitToUser(userId, 'notification.created', { item: toInboxItemDto(row), unreadCount });
       else realtime.emitToUser(userId, 'notification.read', { unreadCount });
     } catch {
       log('Không phát được cập nhật trạng thái nội dung', event);
@@ -48,8 +52,12 @@ export function createContentStatusHandlers(options: {
     const { postId, authorId, actionId, postStatus, reasonCode, hiddenAt } = schema.parse(event.payload);
     if (isHidden ? !['hidden', 'removed'].includes(postStatus) : postStatus !== 'published') return false;
     const status = isHidden ? postStatus : 'restored';
-    const title = status === 'restored' ? 'Bài viết đã được khôi phục'
-      : status === 'removed' ? 'Bài viết đã bị gỡ' : 'Bài viết đã bị ẩn';
+    const title =
+      status === 'restored'
+        ? 'Bài viết đã được khôi phục'
+        : status === 'removed'
+          ? 'Bài viết đã bị gỡ'
+          : 'Bài viết đã bị ẩn';
     const reason = REASONS.get(reasonCode);
     if (isHidden) await options.followerPosts?.cancel(postId, authorId);
     const { row, invalidatedUsers } = await posts.moderate({
@@ -60,9 +68,10 @@ export function createContentStatusHandlers(options: {
         userId: authorId,
         type: `moderation.post.${status}`,
         title,
-        body: isHidden ? `${title}. Lý do: ${reason ?? 'Vi phạm quy định cộng đồng'}.`
+        body: isHidden
+          ? `${title}. Lý do: ${reason ?? 'Vi phạm quy định cộng đồng'}.`
           : 'Bài viết của bạn đã hiển thị trở lại.',
-        link: isHidden ? null : `/trips/${postId}`,
+        link: isHidden ? '/account/moderation' : `/trips/${postId}`,
         data: { postId, ...(reason ? { reasonCode } : {}) },
         sourceEventId: `moderation:${actionId}`,
       },
@@ -91,9 +100,73 @@ export function createContentStatusHandlers(options: {
     return true;
   }
 
+  async function commentDecision(event: EventEnvelope): Promise<boolean> {
+    const decision = ContentModerationDecidedV1Schema.parse(event.payload);
+    if (decision.targetType !== 'comment' || decision.action === 'dismiss') return true;
+    const restored = decision.action === 'restore';
+    const title = restored
+      ? 'Bình luận đã được khôi phục'
+      : decision.action === 'remove'
+        ? 'Bình luận đã bị gỡ'
+        : 'Bình luận đã bị ẩn';
+    const reason = REASONS.get(decision.reasonCode) ?? 'Vi phạm quy định cộng đồng';
+    const row = await inbox.insert({
+      userId: decision.authorId,
+      type: `moderation.comment.${decision.action}`,
+      title,
+      body: restored ? 'Bình luận của bạn đã hiển thị trở lại.' : `${title}. Lý do: ${reason}.`,
+      link: restored ? `/trips/${decision.postId}` : '/account/moderation',
+      data: { postId: decision.postId, commentId: decision.targetId, caseId: decision.caseId },
+      sourceEventId: event.eventId,
+    });
+    if (row) await emit(event, decision.authorId, row);
+    return true;
+  }
+
+  async function directCommentDecision(event: EventEnvelope): Promise<boolean> {
+    const decision = ContentCommentModerationActionV1Schema.parse(event.payload);
+    const restored = decision.action === 'restore';
+    const title = restored
+      ? 'Bình luận đã được khôi phục'
+      : decision.action === 'remove'
+        ? 'Bình luận đã bị gỡ'
+        : 'Bình luận đã bị ẩn';
+    const reason = REASONS.get(decision.reasonCode) ?? 'Vi phạm quy định cộng đồng';
+    const row = await inbox.insert({
+      userId: decision.authorId,
+      type: `moderation.comment.${decision.action}`,
+      title,
+      body: restored ? 'Bình luận của bạn đã hiển thị trở lại.' : `${title}. Lý do: ${reason}.`,
+      link: restored ? `/trips/${decision.postId}` : '/account/moderation',
+      data: { postId: decision.postId, commentId: decision.commentId, decisionId: decision.actionId },
+      sourceEventId: event.eventId,
+    });
+    if (row) await emit(event, decision.authorId, row);
+    return true;
+  }
+
+  async function appealDecision(event: EventEnvelope): Promise<boolean> {
+    const result = ContentAppealDecidedV1Schema.parse(event.payload);
+    const accepted = result.outcome === 'overturned';
+    const row = await inbox.insert({
+      userId: result.authorId,
+      type: 'moderation.appeal.decided',
+      title: accepted ? 'Khiếu nại đã được chấp nhận' : 'Khiếu nại đã được xem xét',
+      body: accepted ? 'Nội dung đủ điều kiện đã được khôi phục.' : 'Quyết định kiểm duyệt được giữ nguyên.',
+      link: '/account/moderation',
+      data: { appealId: result.appealId, decisionId: result.decisionId },
+      sourceEventId: event.eventId,
+    });
+    if (row) await emit(event, result.authorId, row);
+    return true;
+  }
+
   return {
     'content.post.hidden.v1': moderate,
     'content.post.restored.v1': moderate,
+    'content.moderation.decided.v1': commentDecision,
+    'content.appeal.decided.v1': appealDecision,
+    'content.comment.moderation_action.v1': directCommentDecision,
     'content.media.ready.v1': video,
     'content.media.failed.v1': video,
   };

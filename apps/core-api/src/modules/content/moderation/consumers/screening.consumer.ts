@@ -13,6 +13,7 @@ import { z } from 'zod';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV, REDIS } from '../../../../platform/tokens.js';
 import { ScreenContentUseCase } from '../application/moderation.use-cases.js';
+import { ClaimDeferredScansUseCase } from '../application/recover-screening.use-case.js';
 
 @Injectable()
 export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -20,10 +21,13 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   private consumer?: RedisStreamsConsumer;
   private connection?: Redis;
   private stopping = false;
+  private recoveryTimer?: ReturnType<typeof setTimeout>;
+  private recovery?: Promise<void>;
   constructor(
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ScreenContentUseCase) private readonly screen: ScreenContentUseCase,
+    @Inject(ClaimDeferredScansUseCase) private readonly claim: ClaimDeferredScansUseCase,
   ) {}
   onApplicationBootstrap(): void {
     if (!['worker', 'all'].includes(this.env.APP_ROLE)) return;
@@ -37,6 +41,37 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
       onError: (_err, delivery) => this.logger.error({ ...delivery }, 'Kiểm duyệt lỗi, chờ giao lại sự kiện'),
     });
     void this.start();
+    this.scheduleRecovery();
+  }
+  private scheduleRecovery() {
+    this.recoveryTimer = setTimeout(() => {
+      this.recovery = this.recover().finally(() => {
+        if (!this.stopping) this.scheduleRecovery();
+      });
+    }, 30_000);
+  }
+  async recover() {
+    try {
+      const scans = await this.claim.execute();
+      for (const scan of scans) {
+        if (this.stopping) break;
+        try {
+          await this.screen.execute(
+            scan.eventId,
+            scan.targetType,
+            scan.targetId,
+            (scan.occurredAt ?? scan.updatedAt).toISOString(),
+          );
+        } catch {
+          this.logger.warn(
+            { eventId: scan.eventId, attempts: scan.attempts },
+            'AI chưa sẵn sàng, scan đã được lên lịch thử lại',
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error({ error }, 'Không lấy được scan cần phục hồi');
+    }
   }
   async route(event: EventEnvelope): Promise<void> {
     if (event.version !== 1) return;
@@ -69,6 +104,8 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   }
   async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
+    clearTimeout(this.recoveryTimer);
+    await this.recovery;
     await this.consumer?.stop();
     this.connection?.disconnect();
   }

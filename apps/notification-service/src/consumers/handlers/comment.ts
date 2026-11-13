@@ -1,4 +1,9 @@
-import { ContentCommentCreatedV1Schema, ContentCommentDeletedV1Schema, type EventEnvelope } from '@tripflix/contracts';
+import {
+  ContentCommentCreatedV1Schema,
+  ContentCommentDeletedV1Schema,
+  ContentCommentHiddenV1Schema,
+  type EventEnvelope,
+} from '@tripflix/contracts';
 import type { CommentNotificationRepository } from '../../inbox/comment-notification.repository.js';
 import { toInboxItemDto, type InboxRepository } from '../../inbox/inbox.repository.js';
 import type { RealtimeService } from '../../realtime/realtime.service.js';
@@ -10,7 +15,12 @@ export function createCommentHandlers(options: {
   realtime: Pick<RealtimeService, 'emitToUser'> | undefined;
   log: (message: string, event: EventEnvelope) => void;
 }): Record<string, EventHandler> {
-  async function emit(event: EventEnvelope, userId: string, name: string, data: Record<string, unknown>): Promise<void> {
+  async function emit(
+    event: EventEnvelope,
+    userId: string,
+    name: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
     const { inbox, realtime } = options;
     if (!inbox || !realtime) return;
     try {
@@ -22,6 +32,12 @@ export function createCommentHandlers(options: {
   }
 
   return {
+    'content.comment.hidden.v1': async (event) => {
+      const { commentId } = ContentCommentHiddenV1Schema.parse(event.payload);
+      const recipients = await options.comments.hide(commentId, event.occurredAt);
+      await Promise.all(recipients.map((userId) => emit(event, userId, 'notification.read', {})));
+      return true;
+    },
     'content.comment.created.v1': async (event) => {
       const comment = ContentCommentCreatedV1Schema.parse(event.payload);
       const recipients = new Map([[comment.postAuthorId, false]]);
@@ -41,7 +57,9 @@ export function createCommentHandlers(options: {
         occurredAt: event.occurredAt,
         recipients: Array.from(recipients, ([userId, isReplyRecipient]) => ({ userId, isReplyRecipient })),
       });
-      await Promise.all(rows.map((row) => emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })));
+      await Promise.all(
+        rows.map((row) => emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })),
+      );
       return true;
     },
     'content.comment.deleted.v1': async (event) => {

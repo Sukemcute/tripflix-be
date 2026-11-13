@@ -25,6 +25,13 @@ export const moderationActions = contentSchema.table(
     postStatus: varchar('post_status', { length: 20 }).$type<PostStatus | 'visible'>().notNull(),
     reasonCode: varchar('reason_code', { length: 50 }).notNull(),
     reasonDetail: text('reason_detail'),
+    contentVersion: text('content_version'),
+    policyVersion: text('policy_version'),
+    evidenceSnapshot: jsonb('evidence_snapshot').$type<{
+      text: string;
+      coverMediaId: string | null;
+      mediaIds: string[];
+    }>(),
     reportIds: jsonb('report_ids').$type<string[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
