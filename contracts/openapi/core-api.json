@@ -2309,6 +2309,65 @@
         ]
       }
     },
+    "/api/v1/posts/{postId}/ai-summary/checked": {
+      "put": {
+        "description": "Worker chạy lại nhưng inputHash trùng bản đang lưu nên không gọi LLM, không lưu bản mới. Core ghi checkedAt và số bình luận hiện tại để isStale không bị kẹt. Chỉ cập nhật khi inputHash khớp và checkedAt mới hơn generatedAt lẫn checkedAt đang có; gửi lại nhiều lần không sao.",
+        "operationId": "PostSummaryController_markChecked",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkPostSummaryCheckedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đã xử lý",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkPostSummaryCheckedResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ hoặc postId sai định dạng UUID"
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "AI báo đã kiểm lại, đầu vào không đổi (Nội bộ)",
+        "tags": [
+          "Social - AI Summary"
+        ]
+      }
+    },
     "/api/v1/internal/ai-summary/reconciliation": {
       "get": {
         "description": "Chỉ dành cho ai-service. Quét danh sách bài tóm tắt bị held để worker AI chạy tóm tắt bù khi bị sót event.",
@@ -6733,6 +6792,45 @@
           }
         }
       },
+      "MarkPostSummaryCheckedDto": {
+        "type": "object",
+        "properties": {
+          "inputHash": {
+            "type": "string",
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Hash đầu vào vừa tính; phải trùng inputHash của bản đang lưu thì mới cập nhật"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-13T04:00:00.000Z",
+            "description": "Mốc lấy trước khi đọc dữ liệu (cùng quy ước với generatedAt); chỉ nhận mốc mới hơn mốc đã có"
+          },
+          "commentCount": {
+            "type": "number",
+            "example": 26,
+            "description": "Số bình luận đang hiện của cả bài lúc kiểm"
+          }
+        },
+        "required": [
+          "inputHash",
+          "checkedAt",
+          "commentCount"
+        ]
+      },
+      "MarkPostSummaryCheckedResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "example": true,
+            "description": "false: không có bản tóm tắt khớp inputHash hoặc đã có lần kiểm mới hơn; không cần thử lại"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
       "PostSummaryResponseDto": {
         "type": "object",
         "properties": {
@@ -6819,10 +6917,17 @@
             "example": "2026-11-05T14:00:00.000Z",
             "description": "Thời điểm sinh kết quả"
           },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-13T04:00:00.000Z",
+            "description": "Lần AI kiểm gần nhất thấy đầu vào không đổi; null khi chưa kiểm lại từ lúc lưu"
+          },
           "isStale": {
             "type": "boolean",
             "example": false,
-            "description": "Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)"
+            "description": "Bản tóm tắt đã cũ: số bình luận đổi, hoặc có bình luận mới/bị sửa sau max(generatedAt, checkedAt)"
           },
           "createdAt": {
             "type": "string",
