@@ -2449,7 +2449,7 @@
             }
           },
           "422": {
-            "description": "MEDIA_TOO_LARGE",
+            "description": "MEDIA_TOO_LARGE (video quá 5 phút hoặc 1 GB, ảnh quá 10 MB)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2590,6 +2590,16 @@
           },
           "410": {
             "description": "MEDIA_UPLOAD_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MEDIA_INVALID_IMAGE: file không phải ảnh đúng loại đã khai",
             "content": {
               "application/json": {
                 "schema": {
@@ -6341,6 +6351,33 @@
           "title"
         ]
       },
+      "PostImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "description": "Link CDN của ảnh gốc"
+          },
+          "widthPx": {
+            "type": "number",
+            "nullable": true
+          },
+          "heightPx": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "widthPx",
+          "heightPx"
+        ]
+      },
       "PostViewerContextDto": {
         "type": "object",
         "properties": {
@@ -6424,6 +6461,13 @@
           "coverMediaId": {
             "type": "string",
             "nullable": true
+          },
+          "images": {
+            "description": "Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostImageDto"
+            }
           },
           "tripAttachment": {
             "nullable": true,
@@ -7692,7 +7736,10 @@
             "type": "string",
             "enum": [
               "video/mp4",
-              "video/quicktime"
+              "video/quicktime",
+              "image/jpeg",
+              "image/png",
+              "image/webp"
             ]
           },
           "fileSizeBytes": {
@@ -7702,13 +7749,22 @@
           "durationSec": {
             "type": "number",
             "example": 42.5,
-            "description": "Làm tròn lên số nguyên. Tối đa 5 phút."
+            "description": "Bắt buộc với video, làm tròn lên số nguyên, tối đa 5 phút. Ảnh thì không gửi."
+          },
+          "widthPx": {
+            "type": "number",
+            "example": 1080,
+            "description": "Chỉ cho ảnh: chiều rộng đọc từ file, để dàn trang."
+          },
+          "heightPx": {
+            "type": "number",
+            "example": 1350,
+            "description": "Chỉ cho ảnh: chiều cao đọc từ file."
           }
         },
         "required": [
           "mimeType",
-          "fileSizeBytes",
-          "durationSec"
+          "fileSizeBytes"
         ]
       },
       "SignedPartDto": {
@@ -7853,7 +7909,7 @@
               "processing",
               "ready"
             ],
-            "description": "ready khi gọi lại lúc video đã chuyển mã xong."
+            "description": "Video: processing (đang chuyển mã), ready khi gọi lại lúc đã xong. Ảnh: ready ngay."
           }
         },
         "required": [

@@ -11,6 +11,7 @@ import { FollowRepository } from './social/infra/follow.repository.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
 import { FeedModule } from './feed/feed.module.js';
+import { MediaFacade } from './media/media.facade.js';
 import { MediaModule } from './media/media.module.js';
 import { ModerationModule } from './moderation/moderation.module.js';
 import {
@@ -30,6 +31,9 @@ import {
   COMMERCE_SERVICE_PORT,
   USER_DIRECTORY_PORT,
   type UserDirectoryPort,
+  POST_MEDIA_PORT,
+  type PostMediaPort,
+  PostImagesResolver,
   CONTENT_OUTBOX,
   CreateDraftUseCase,
   DeleteCommentUseCase,
@@ -181,21 +185,40 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
 
     // 5. Application Use Cases
     {
+      provide: POST_MEDIA_PORT,
+      inject: [MediaFacade],
+      useFactory: (media: MediaFacade): PostMediaPort => ({
+        findMediaInfo: async (mediaIds) =>
+          new Map((await media.getKinds(mediaIds)).map(({ id, ...info }) => [id, info])),
+        getImages: async (mediaIds) =>
+          new Map(Object.entries(await media.getImages(mediaIds)).map(([id, image]) => [id, { id, ...image }])),
+      }),
+    },
+    {
+      provide: PostImagesResolver,
+      inject: [POST_MEDIA_PORT],
+      useFactory: (postMedia: PostMediaPort) => new PostImagesResolver(postMedia),
+    },
+    {
       provide: CreateDraftUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new CreateDraftUseCase(postRepo),
+      inject: [PostRepository, POST_MEDIA_PORT],
+      useFactory: (postRepo: PostRepository, postMedia: PostMediaPort) => new CreateDraftUseCase(postRepo, postMedia),
     },
     {
       provide: UpdatePostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
-        new UpdatePostUseCase(postRepo, outbox),
+      inject: [PostRepository, CONTENT_OUTBOX, POST_MEDIA_PORT],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, postMedia: PostMediaPort) =>
+        new UpdatePostUseCase(postRepo, outbox, postMedia),
     },
     {
       provide: PublishPostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, commerceService: CommerceServicePort) =>
-        new PublishPostUseCase(postRepo, outbox, commerceService),
+      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT, POST_MEDIA_PORT],
+      useFactory: (
+        postRepo: PostRepository,
+        outbox: ContentOutbox,
+        commerceService: CommerceServicePort,
+        postMedia: PostMediaPort,
+      ) => new PublishPostUseCase(postRepo, outbox, commerceService, postMedia),
     },
     {
       provide: DeletePostUseCase,

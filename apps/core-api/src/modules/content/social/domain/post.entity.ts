@@ -9,13 +9,53 @@ export type PostType = 'video' | 'vlog';
 export type PostStatus = 'draft' | 'published' | 'hidden' | 'removed' | 'deleted';
 export type PostVisibility = 'public' | 'private';
 
+/** Bài viết kèm tối đa chừng này ảnh (như Instagram). */
+export const MAX_VLOG_IMAGES = 10;
+
+/** Thông tin một media lấy từ module media, đủ để kiểm luật gắn vào bài. */
+export interface PostMediaInfo {
+  kind: 'video' | 'image';
+  ownerId: string;
+  status: 'uploading' | 'processing' | 'ready' | 'failed';
+}
+
 /**
- * media_assets chỉ chứa video, nên bài viết (vlog) có media nghĩa là kèm video
- * và sẽ lọt vào luồng Reels. Bài viết và Reels phải tách bạch.
+ * Kiểm phần không cần biết loại media: số lượng và trùng lặp. Loại media kiểm ở assertMediaKindsForPostType,
+ * gọi trong use case vì cần hỏi module media.
  */
 export function assertMediaAllowedForPostType(postType: PostType, mediaIds: readonly string[]): void {
-  if (postType === 'vlog' && mediaIds.length > 0) {
-    throw new PostMediaNotAllowedException();
+  if (new Set(mediaIds).size !== mediaIds.length) {
+    throw new PostMediaNotAllowedException('Một ảnh hay video chỉ được gắn một lần');
+  }
+  if (postType === 'vlog' && mediaIds.length > MAX_VLOG_IMAGES) {
+    throw new PostMediaNotAllowedException(`Bài viết kèm tối đa ${MAX_VLOG_IMAGES} ảnh`);
+  }
+}
+
+/**
+ * Bài viết (vlog) chỉ kèm ảnh của chính tác giả đã tải lên xong; video phải đăng dạng Reels để Reels và
+ * bài viết tách bạch. Reels không kèm ảnh. Id video không tìm thấy ở Reels vẫn cho qua như trước (video mẫu
+ * nạp tay, video đang xử lý).
+ */
+export function assertMediaKindsForPostType(
+  postType: PostType,
+  authorId: string,
+  mediaIds: readonly string[],
+  mediaInfo: ReadonlyMap<string, PostMediaInfo>,
+): void {
+  assertMediaAllowedForPostType(postType, mediaIds);
+  for (const mediaId of mediaIds) {
+    const info = mediaInfo.get(mediaId);
+    if (postType === 'video') {
+      if (info?.kind === 'image') throw new PostMediaNotAllowedException('Reels chỉ kèm video, không kèm ảnh');
+      continue;
+    }
+    if (info?.kind === 'video') {
+      throw new PostMediaNotAllowedException();
+    }
+    if (!info || info.ownerId !== authorId || info.status !== 'ready') {
+      throw new PostMediaNotAllowedException('Ảnh chưa tải lên xong hoặc không phải ảnh của bạn');
+    }
   }
 }
 

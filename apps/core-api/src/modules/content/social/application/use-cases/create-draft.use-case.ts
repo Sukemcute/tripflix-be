@@ -1,5 +1,6 @@
-import { assertMediaAllowedForPostType } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { assertPostMediaAllowed } from '../common/post-media.js';
+import type { PostMediaPort } from '../ports/post-media.port.js';
 import type {
   NewPostRecord,
   PostRecord,
@@ -21,14 +22,21 @@ export interface CreateDraftCommand {
 }
 
 export class CreateDraftUseCase {
-  constructor(private readonly postRepository: PostRepository) {}
+  constructor(
+    private readonly postRepository: PostRepository,
+    private readonly postMedia?: PostMediaPort,
+  ) {}
 
   async execute(command: CreateDraftCommand): Promise<PostRecord> {
     const title = command.title.trim();
     if (!title) {
       throw new Error('Tiêu đề bài đăng không được để trống');
     }
-    assertMediaAllowedForPostType(command.postType, command.mediaIds ?? []);
+    await assertPostMediaAllowed(this.postMedia, {
+      postType: command.postType,
+      authorId: command.authorId,
+      mediaIds: command.mediaIds ?? [],
+    });
 
     const newPost: NewPostRecord = {
       authorId: command.authorId,
