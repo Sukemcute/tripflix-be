@@ -106,9 +106,13 @@ export class DrizzleFeedStore implements FeedStore {
           // Lọc ngay trong câu truy vấn để một trang không bị thiếu bài vì video chưa phát được.
           // So theo uuid để tra khoá chính media_assets; so theo chuỗi (id::text) thì mỗi bài quét cả bảng.
           // Mã không đúng dạng uuid coi như không có video, thay vì làm cả câu lỗi khi ép kiểu.
+          // media_ids không phải mảng (13/11 staging có bài lưu chuỗi "uuid") cũng coi như không có video:
+          // jsonb_array_elements_text gặp chuỗi là lỗi cả câu, một bài sai làm hỏng feed của mọi người.
           sql`exists (
             select 1
-            from jsonb_array_elements_text(${posts.mediaIds}) as post_media(id)
+            from jsonb_array_elements_text(
+              case when jsonb_typeof(${posts.mediaIds}) = 'array' then ${posts.mediaIds} else '[]'::jsonb end
+            ) as post_media(id)
             join ${mediaAssets} on ${mediaAssets.id} = (
               case when post_media.id ~* ${UUID_PATTERN} then post_media.id::uuid end
             )

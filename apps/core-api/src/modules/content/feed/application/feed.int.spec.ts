@@ -65,7 +65,8 @@ describe('Feed trên Postgres thật', () => {
   }
 
   async function insertPost(
-    mediaIds: string[],
+    // unknown để dựng được cả dữ liệu sai (ví dụ chuỗi thay vì mảng) như đã gặp trên staging.
+    mediaIds: unknown,
     options: {
       authorId?: string;
       status?: string;
@@ -187,6 +188,22 @@ describe('Feed trên Postgres thật', () => {
     expect(page.items.map((item) => item.postId)).toEqual([expected]);
     expect(page.items[0]?.video.hlsUrl).toBe(`https://cdn.test/dev/test/videos/${playable}/r1/master.m3u8`);
     expect(page.nextCursor).toBeNull();
+  });
+
+  it('bài lưu media_ids sai dạng (chuỗi, số, object, null) bị bỏ qua, không làm lỗi cả feed', async () => {
+    const playable = await insertAsset('ready', [360]);
+    const expected = await insertPost([playable]);
+    // Staging 13/11: một bài lưu "uuid" thay vì ["uuid"] làm /api/v1/feed trả 500 cho mọi người suốt 10 giờ.
+    await insertPost(playable);
+    await insertPost(42);
+    await insertPost({ id: playable });
+    await insertPost(null);
+
+    const page = await feed.getPage({ limit: 20, after: null, viewerId: null });
+
+    expect(page.items.map((item) => item.postId)).toEqual([expected]);
+    const hot = await feed.getPage({ limit: 20, after: null, viewerId: null, tab: 'hot' });
+    expect(hot.items.map((item) => item.postId)).toEqual([expected]);
   });
 
   it('bài nhiều media thì lấy video đầu tiên phát được', async () => {
