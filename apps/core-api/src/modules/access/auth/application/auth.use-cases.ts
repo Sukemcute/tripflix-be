@@ -65,7 +65,8 @@ import {
   type UserRecord,
 } from './ports.js';
 import { mapMyProfile, mapPublicUser, type MyProfile, type PublicUser } from './public-user.js';
-import { createRefreshToken, hashRefreshToken } from './refresh-token.js';
+import { BROWSER_PROOF_TTL_SECONDS, verifyBrowserProof, type BrowserProof, type BrowserProofPurpose } from './browser-session-proof.js';
+import { createRefreshToken, getRefreshBrowserKey, hashRefreshToken } from './refresh-token.js';
 import type { Gender } from '../../account/domain/personal-info.js';
 
 /** Đăng ký bằng mật khẩu, đã qua RegisterRequestSchema (thông tin cá nhân bắt buộc, đã đồng ý điều khoản). */
@@ -191,6 +192,7 @@ export class AuthUseCases {
   async login(
     input: { email: string; password: string; deviceName?: string | undefined },
     meta: RequestMeta,
+    browserProof?: BrowserProof,
   ): Promise<TokenPair> {
     const email = normalizeEmail(input.email);
     const limit = await this.limiter.check(email, meta.ip);
@@ -215,7 +217,8 @@ export class AuthUseCases {
     }
 
     await this.limiter.reset(email);
-    const refreshToken = createRefreshToken();
+    const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'login') : undefined;
+    const refreshToken = createRefreshToken(browserKey);
     const session = await this.openSession(user, hashRefreshToken(refreshToken), input.deviceName ?? null, meta);
     return this.issueTokenPair(user, session.id, refreshToken);
   }
@@ -224,24 +227,45 @@ export class AuthUseCases {
    * Đăng nhập bằng Google ID token. Đã liên kết: vào đúng tài khoản đó. Chưa liên kết nhưng trùng email (Google đã
    * xác minh): liên kết vào tài khoản đó. Chưa có tài khoản: tạo member không có mật khẩu. Bị khoá: 401.
    */
-  async loginWithGoogle(input: { idToken: string; deviceName?: string | undefined }, meta: RequestMeta): Promise<TokenPair> {
+  async loginWithGoogle(input: { idToken: string; deviceName?: string | undefined }, meta: RequestMeta, browserProof?: BrowserProof): Promise<TokenPair> {
     const identity = await this.google.verify(input.idToken);
+    const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'google') : undefined;
     const { user, revokedSids } = await this.resolveGoogleUser(identity, meta);
     await Promise.all(revokedSids.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
     if (user.status !== 'active') {
       await this.store.audit.record({ action: 'auth.login_failed', actorUserId: user.id, ...meta, meta: { provider: 'google' } });
       throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
     }
-    const refreshToken = createRefreshToken();
+    const refreshToken = createRefreshToken(browserKey);
     const session = await this.openSession(user, hashRefreshToken(refreshToken), input.deviceName ?? null, meta, 'google');
     return this.issueTokenPair(user, session.id, refreshToken);
   }
 
-  async refresh(refreshToken: string, meta: RequestMeta): Promise<TokenPair> {
+  private async authenticateBrowser(proof: BrowserProof, purpose: BrowserProofPurpose, expectedKey?: string): Promise<string> {
+    const verified = await verifyBrowserProof(proof, purpose, this.now());
+    if (!verified || (expectedKey !== undefined && verified.thumbprint !== expectedKey)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const replay = await this.actionLimiter.consume(
+      `browser-proof:${verified.thumbprint}:${verified.nonce}`, 1, BROWSER_PROOF_TTL_SECONDS,
+    );
+    if (replay.isBlocked) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    return verified.thumbprint;
+  }
+
+  async refresh(refreshToken: string, meta: RequestMeta, browserProof?: BrowserProof): Promise<TokenPair> {
     const presented = hashRefreshToken(refreshToken);
     const session = await this.store.sessions.findByTokenHash(presented);
     if (!session) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
 
+    const browserKey = getRefreshBrowserKey(refreshToken);
+    if (browserKey) {
+      if (!browserProof) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+      await this.authenticateBrowser(browserProof, 'refresh', browserKey);
+    } else if (browserProof) {
+      // Phiên web cũ phải đăng nhập lại để đăng ký khóa.
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
     const now = this.now();
     const decision = decideRefresh(session, presented, now);
     if (decision === 'invalid') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
@@ -255,7 +279,7 @@ export class AuthUseCases {
     const user = await this.store.users.findById(session.userId);
     if (!user || user.status !== 'active') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
 
-    const next = createRefreshToken();
+    const next = createRefreshToken(browserKey);
     const hasRotated = await this.rotateSession(session, { presented, nextHash: hashRefreshToken(next), decision, now });
     if (!hasRotated) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
     return this.issueTokenPair(user, session.id, next);

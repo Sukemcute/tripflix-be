@@ -106,6 +106,15 @@
         "operationId": "AuthController_login",
         "parameters": [
           {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Tripflix-Client",
             "in": "header",
             "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
@@ -152,6 +161,15 @@
       "post": {
         "operationId": "AuthController_loginWithGoogle",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
@@ -205,6 +223,15 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
