@@ -52,6 +52,7 @@ export class ChangeVisibilityUseCase {
     const changes: {
       id: string;
       authorId: string;
+      body: string;
       parentCommentId: string | null;
       previousStatus: string;
       status: string;
@@ -136,7 +137,7 @@ export class ChangeVisibilityUseCase {
         }
         if ((record.status === 'removed' && command.action !== 'restore') || record.status === newStatus)
           continue;
-        const updated = await db
+        const [updated] = await db
           .update(comments)
           .set({
             status: newStatus as 'visible' | 'hidden' | 'removed',
@@ -149,13 +150,14 @@ export class ChangeVisibilityUseCase {
             and(eq(comments.id, record.id), eq(comments.status, record.status), isNull(comments.deletedAt)),
           )
           .returning();
-        if (updated.length)
+        if (updated)
           changes.push({
-            id: record.id,
-            authorId: record.authorId,
-            parentCommentId: record.parentCommentId,
+            id: updated.id,
+            authorId: updated.authorId,
+            body: updated.body,
+            parentCommentId: updated.parentCommentId,
             previousStatus: record.status,
-            status: newStatus,
+            status: updated.status,
           });
       }
       const delta = changes.reduce(
@@ -194,6 +196,7 @@ export class ChangeVisibilityUseCase {
         })
         .where(eq(moderationActions.id, actionId));
     for (const row of changes) {
+      const payload = { postId: target.postId, commentId: row.id, authorId: row.authorId };
       await this.outbox.add({
         type:
           row.status === 'visible'
@@ -203,17 +206,22 @@ export class ChangeVisibilityUseCase {
               : 'content.comment.hidden',
         userId: command.actorId,
         payload:
-          row.status === 'removed'
+          row.status === 'visible'
             ? {
-                postId: target.postId,
-                commentId: row.id,
-                authorId: row.authorId,
+                ...payload,
+                body: row.body,
                 parentCommentId: row.parentCommentId,
-                deletedBy: command.actorId,
-                isSuperAdmin: command.actorIsSuperAdmin ?? false,
-                deletedAt: new Date().toISOString(),
+                postAuthorId: parentPost?.authorId,
               }
-            : { postId: target.postId, commentId: row.id, authorId: row.authorId },
+            : row.status === 'removed'
+              ? {
+                  ...payload,
+                  parentCommentId: row.parentCommentId,
+                  deletedBy: command.actorId,
+                  isSuperAdmin: command.actorIsSuperAdmin ?? false,
+                  deletedAt: new Date().toISOString(),
+                }
+              : payload,
       });
     }
     if (command.caseId)
