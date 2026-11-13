@@ -1,10 +1,9 @@
 /**
  * Thứ tự hiển thị Reels ở hai tab (13/11, Phong chốt):
- * - Dành cho bạn: bài có tương tác xếp theo điểm có bán rã theo tuổi bài,
- *   ln(1 + điểm hot) / (giờ tuổi + 2)^1.2 (cùng dạng hot@v0 bên discovery), nhân hệ số ngẫu nhiên
- *   trong [FOR_YOU_JITTER_MIN, FOR_YOU_JITTER_MIN + FOR_YOU_JITTER_SPAN) để mỗi lần tải lại đầu trang đổi
- *   (13/11, Phong chốt: pilot bài nào cũng có chút tương tác nên trước đó 4 video đầu luôn y nguyên);
- *   bài chưa có tương tác (điểm 0) nhận điểm ngẫu nhiên trong [0, FOR_YOU_UNSCORED_CEILING) nên chen xen vào.
+ * - Dành cho bạn: ln(2 + điểm hot) / (giờ tuổi + 12)^0,4 × e^(FOR_YOU_SHUFFLE × (2u - 1)), u ∈ [0, 1) theo seed.
+ *   Bán rã nhẹ và hệ số ngẫu nhiên từ ×0,37 tới ×2,7 để mỗi lần tải lại xáo mạnh và bài cũ nhiều tương tác
+ *   vẫn hay lên đầu (pilot ít bài; trước đó bài 1–2 giờ tuổi chiếm đầu trang gần như mọi lần).
+ *   Bài chưa có tương tác dùng chung công thức (ln 2), nên vẫn chen xen vào theo seed.
  * - Đang hot: giữ điểm hot hiện tại; bằng điểm (gồm các bài 0 điểm) thì xếp ngẫu nhiên thay vì mới nhất trước.
  *
  * "Ngẫu nhiên" là băm cố định của (seed, id bài): cùng seed thì cùng thứ tự, nên sang trang không lặp, không rớt bài.
@@ -13,22 +12,16 @@
  */
 export const FEED_SEED_COUNT = 16;
 
-/** Cộng vào giờ tuổi để bài vừa đăng không chia cho 0 và không vọt quá cao. */
-export const FOR_YOU_AGE_OFFSET_HOURS = 2;
-/** Bài cũ đi thì điểm giảm theo luỹ thừa này của giờ tuổi; lớn hơn thì bài mới lên nhanh hơn. */
-export const FOR_YOU_GRAVITY = 1.2;
+/** Cộng vào giờ tuổi để bài vừa đăng không vọt quá cao so với bài một, hai ngày tuổi. */
+export const FOR_YOU_AGE_OFFSET_HOURS = 12;
+/** Bài cũ đi thì điểm giảm theo luỹ thừa này của giờ tuổi; lớn hơn thì bài mới lấn bài cũ mạnh hơn. */
+export const FOR_YOU_GRAVITY = 0.4;
 /**
- * Trần điểm ngẫu nhiên cho bài chưa có tương tác: ngang một bài 1 lượt thích đăng khoảng 6 giờ trước
- * (ln 2 / 8^1.2 ≈ 0,057). Bài có tương tác mới đăng vẫn đứng trên, bài cũ ít tương tác bị bài mới chen qua.
+ * Độ xáo: điểm nhân e^(±FOR_YOU_SHUFFLE). Với 1, bài hơn điểm quá e² ≈ 7,4 lần mới luôn đứng trên.
+ * Mô phỏng trên 15 bài staging ngày 13/11: không bài nào lên đầu quá ~28% số lần tải, bài ≥ 3 ngày tuổi
+ * lọt top 3 khoảng 96% số lần.
  */
-export const FOR_YOU_UNSCORED_CEILING = 0.05;
-
-/**
- * Hệ số ngẫu nhiên nhân vào điểm bài có tương tác. Bài hơn điểm quá 3 lần (1,5 / 0,5) thì luôn đứng trên;
- * các bài sát điểm nhau đổi chỗ theo seed.
- */
-export const FOR_YOU_JITTER_MIN = 0.5;
-export const FOR_YOU_JITTER_SPAN = 1;
+export const FOR_YOU_SHUFFLE = 1;
 
 export function pickFeedSeed(random: () => number = Math.random): number {
   return Math.min(FEED_SEED_COUNT - 1, Math.floor(random() * FEED_SEED_COUNT));

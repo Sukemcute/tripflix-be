@@ -2,13 +2,7 @@ import type { Db } from '@tripflix/db';
 import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { bookmarks, mediaAssets, posts, reactions, renditions } from '../../db/schema/index.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
-import {
-  FOR_YOU_AGE_OFFSET_HOURS,
-  FOR_YOU_GRAVITY,
-  FOR_YOU_JITTER_MIN,
-  FOR_YOU_JITTER_SPAN,
-  FOR_YOU_UNSCORED_CEILING,
-} from '../domain/feed-rank.js';
+import { FOR_YOU_AGE_OFFSET_HOURS, FOR_YOU_GRAVITY, FOR_YOU_SHUFFLE } from '../domain/feed-rank.js';
 import { HOT_SCORE_WEIGHTS, HOT_WINDOW_DAYS } from '../domain/hot-score.js';
 import type { FeedListQuery, FeedPostRow, FeedStore, RankedFeedListQuery } from '../application/ports.js';
 
@@ -72,14 +66,12 @@ export class DrizzleFeedStore implements FeedStore {
     const ageHours = sql`greatest(0, extract(epoch from (${asOf}::timestamptz - ${posts.createdAt})) / 3600)`;
     // ponytail: chấm điểm mọi bài phát được mỗi lần đọc; đủ cho pilot (vài nghìn bài).
     // Nhiều bài hơn thì chuyển sang điểm tính sẵn theo lô (giống recommend_post_scores) hoặc giới hạn cửa sổ ngày.
-    // Số ngẫu nhiên [0, 1) cố định theo (seed, id bài): bài chưa có tương tác lấy làm điểm, bài có tương tác lấy làm hệ số.
+    // Số ngẫu nhiên [0, 1) cố định theo (seed, id bài), nên sang trang vẫn ra đúng điểm trang trước đã dùng.
     const seededUnit = sql`(${seededTieBreak(seed, sql`${posts.id}`)} / 4294967296.0::float8)`;
-    const rank = sql<number>`(case
-      when ${hotScore} > 0
-        then ln(1 + ${hotScore}) / power(${ageHours} + ${FOR_YOU_AGE_OFFSET_HOURS}::float8, ${FOR_YOU_GRAVITY}::float8)
-          * (${FOR_YOU_JITTER_MIN}::float8 + ${seededUnit} * ${FOR_YOU_JITTER_SPAN}::float8)
-      else ${seededUnit} * ${FOR_YOU_UNSCORED_CEILING}::float8
-    end)::float8`;
+    const rank = sql<number>`(
+      ln(2 + ${hotScore}) / power(${ageHours} + ${FOR_YOU_AGE_OFFSET_HOURS}::float8, ${FOR_YOU_GRAVITY}::float8)
+        * exp(${FOR_YOU_SHUFFLE}::float8 * (2 * ${seededUnit} - 1))
+    )::float8`;
     return this.selectPlayablePosts({
       limit,
       authorId,
