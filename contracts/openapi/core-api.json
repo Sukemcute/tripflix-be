@@ -3988,7 +3988,7 @@
     },
     "/api/search": {
       "post": {
-        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Không có gì khớp thì vùng có `total: 0`, không đoán bừa.\n- Vùng câu muốn tìm rỗng: `suggest` là các gợi ý khác (bỏ các từ trong `dropped`).\n- `loc` chỉ dùng khi câu không nói nơi.",
+        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Gõ sai thì tìm cả câu gốc lẫn câu đã sửa rồi gộp kết quả.\n- `sections` chỉ gồm mục khớp đủ câu: đúng nơi, không vượt ngân sách, khớp từ. Vùng không có mục nào như vậy thì `total: 0`.\n- Vùng câu muốn tìm rỗng: `fallback` là kết quả thay thế sau khi nới điều kiện (`relaxed`: khác nơi, vượt ngân sách, bỏ từ). Không có gì liên quan thì `fallback: null`.\n- `loc` chỉ dùng khi câu không nói nơi.",
         "operationId": "ExploreController_search",
         "parameters": [],
         "requestBody": {
@@ -4029,7 +4029,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu nhưng hiểu được nơi hoặc ý muốn (vd \"mùa thu hà nội\"): `isFallback: true`, `items` là bài theo phần hiểu được, `dropped` là các từ không có trong dữ liệu.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -9275,6 +9275,147 @@
           "items"
         ]
       },
+      "ExploreFallbackItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "hotel:P-h-dl-01",
+            "description": "`<loại>:<mã gốc>`, duy nhất"
+          },
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)"
+          },
+          "refId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt",
+            "description": "Nơi của mục"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm",
+            "description": "Lý do hiện mục này"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "stay: giá từ / đêm · plan: chi phí ước tính / người (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ngày của lộ trình"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          },
+          "section": {
+            "type": "string",
+            "example": "Ở đâu",
+            "description": "Tên vùng của mục gợi ý"
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "refId",
+          "title",
+          "subtitle",
+          "thumbnail",
+          "reason",
+          "priceFrom",
+          "days",
+          "location",
+          "section",
+          "relaxed"
+        ]
+      },
+      "ExploreFallbackDto": {
+        "type": "object",
+        "properties": {
+          "forQuery": {
+            "type": "string",
+            "example": "resort phú quốc dưới 300k",
+            "description": "Câu người dùng gõ: FE hiện \"Kết quả thay thế cho “…”\""
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Gộp trên các mục. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          },
+          "dropped": {
+            "example": [
+              "dịp",
+              "lễ"
+            ],
+            "description": "Từ trong câu mà các mục thay thế không khớp (dạng người dùng gõ)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "description": "Mục gần nhất sau khi nới điều kiện, theo vùng câu muốn",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreFallbackItemDto"
+            }
+          }
+        },
+        "required": [
+          "forQuery",
+          "relaxed",
+          "dropped",
+          "items"
+        ]
+      },
       "ExploreSuggestItemDto": {
         "type": "object",
         "properties": {
@@ -9373,8 +9514,19 @@
               "$ref": "#/components/schemas/ExploreSectionDto"
             }
           },
+          "fallback": {
+            "nullable": true,
+            "description": "Kết quả thay thế: vùng câu muốn không có mục nào khớp đủ câu (đúng nơi, không vượt ngân sách, khớp từ) nên nới điều kiện. null nếu có kết quả chính hoặc không có gì liên quan",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreFallbackDto"
+              }
+            ]
+          },
           "suggest": {
-            "description": "Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.items` (cùng mục, không có `relaxed`)",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExploreSuggestItemDto"
@@ -9385,7 +9537,8 @@
               "dịp",
               "lễ"
             ],
-            "description": "Từ đã bỏ qua để ra gợi ý khác",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.dropped`",
             "type": "array",
             "items": {
               "type": "string"
@@ -9396,6 +9549,7 @@
           "understood",
           "nearUser",
           "sections",
+          "fallback",
           "suggest",
           "dropped"
         ]
@@ -9471,7 +9625,22 @@
           },
           "isFallback": {
             "type": "boolean",
-            "description": "true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo \"không thấy <dropped>, gợi ý theo ...\""
+            "description": "true: không bài nào khớp đủ câu nên `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). FE nên báo \"Kết quả thay thế cho “q”\""
+          },
+          "fallbackRelaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Chỉ có giá trị khi `isFallback = true`. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
           }
         },
         "required": [
@@ -9480,7 +9649,8 @@
           "total",
           "nextCursor",
           "dropped",
-          "isFallback"
+          "isFallback",
+          "fallbackRelaxed"
         ]
       },
       "HomeProvinceDto": {
