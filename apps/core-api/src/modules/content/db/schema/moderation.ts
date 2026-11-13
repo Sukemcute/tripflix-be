@@ -15,10 +15,62 @@ import {
 } from 'drizzle-orm/pg-core';
 import { contentSchema } from './content-schema.js';
 import { createIdempotencyKeysTable } from '@tripflix/idempotency';
+import { moderationActions } from './moderation-actions.js';
 
 export const contentIdempotencyKeys = createIdempotencyKeysTable(contentSchema);
 
 export type ModerationTarget = 'post' | 'comment';
+export const moderationAppeals = contentSchema.table(
+  'moderation_appeals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    decisionId: uuid('decision_id')
+      .notNull()
+      .references(() => moderationActions.id),
+    authorId: uuid('author_id').notNull(),
+    reason: text('reason').notNull(),
+    status: varchar('status', { length: 20 })
+      .$type<'pending' | 'upheld' | 'overturned'>()
+      .notNull()
+      .default('pending'),
+    reviewerId: uuid('reviewer_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('uq_moderation_appeal_decision').on(t.decisionId),
+    check('ck_moderation_appeal_status', sql`${t.status} IN ('pending', 'upheld', 'overturned')`),
+    index('idx_moderation_appeal_queue').on(t.status, t.createdAt),
+  ],
+);
+export const moderationScans = contentSchema.table(
+  'moderation_scans',
+  {
+    eventId: uuid('event_id').primaryKey(),
+    targetType: varchar('target_type', { length: 20 }).$type<ModerationTarget>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    contentVersion: text('content_version').notNull(),
+    status: varchar('status', { length: 20 })
+      .$type<'deferred' | 'passed' | 'flagged' | 'failed' | 'superseded'>()
+      .notNull(),
+    model: text('model'),
+    policyVersion: text('policy_version'),
+    evidence: jsonb('evidence').$type<Record<string, unknown>>(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+    retriedBy: uuid('retried_by'),
+    retriedAt: timestamp('retried_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(1),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    check(
+      'ck_moderation_scans_status',
+      sql`${t.status} IN ('deferred', 'passed', 'flagged', 'failed', 'superseded')`,
+    ),
+    index('idx_moderation_scans_status').on(t.status, t.updatedAt),
+  ],
+);
 export const moderationCases = contentSchema.table(
   'moderation_cases',
   {
@@ -56,6 +108,7 @@ export const reports = contentSchema.table(
     targetType: varchar('target_type', { length: 20 }).$type<ModerationTarget>().notNull(),
     targetId: uuid('target_id').notNull(),
     reporterId: uuid('reporter_id').notNull(),
+    contentVersion: text('content_version').notNull().default('legacy'),
     reasonCode: varchar('reason_code', { length: 50 }).notNull(),
     reasonDetail: text('reason_detail'),
     caseId: uuid('case_id'),
@@ -64,8 +117,9 @@ export const reports = contentSchema.table(
   (t) => [
     foreignKey({ name: 'fk_reports_case_id', columns: [t.caseId], foreignColumns: [moderationCases.id] }),
     check('ck_reports_target_type', sql`${t.targetType} IN ('post', 'comment')`),
-    uniqueIndex('uq_reports_target_reporter').on(t.targetType, t.targetId, t.reporterId),
+    uniqueIndex('uq_reports_target_reporter').on(t.targetType, t.targetId, t.contentVersion, t.reporterId),
     index('idx_reports_target_created').on(t.targetType, t.targetId, t.createdAt),
+    index('idx_reports_reporter_created').on(t.reporterId, t.createdAt),
   ],
 );
 export const moderationProcessedEvents = contentSchema.table(

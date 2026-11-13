@@ -1,0 +1,174 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "84185ad6-1cbc-4f1d-9e27-1c7b3c26529b",
+  "prevIds": [
+    "fdc4c541-eab3-40c6-a4c7-d4bd14cf7842"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "policy_version"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.policy_version",
+        "n|col|content.moderation_scans.policy_version",
+        "e|col|content.moderation_scans.policy_version"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "evidence"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.evidence",
+        "n|col|content.moderation_scans.evidence",
+        "e|col|content.moderation_scans.evidence"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "occurred_at"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.occurred_at",
+        "n|col|content.moderation_scans.occurred_at",
+        "e|col|content.moderation_scans.occurred_at"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "next_attempt_at"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.next_attempt_at",
+        "n|col|content.moderation_scans.next_attempt_at",
+        "e|col|content.moderation_scans.next_attempt_at"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_scans"
+      ],
+      "writes": [
+        "s|ck|content.moderation_scans.ck_moderation_scans_status"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content",
+        "n|col|content.moderation_scans.status",
+        "e|col|content.moderation_scans.status"
+      ],
+      "sqlHash": "293d83dac94f3aaf"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "policy_version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "evidence",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "next_attempt_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"content\",\"moderation_scans\",\"ck_moderation_scans_status\"]",
+      "set": {
+        "value": "\"status\" IN ('deferred', 'passed', 'flagged', 'failed', 'superseded')"
+      }
+    }
+  ]
+}
