@@ -17,10 +17,11 @@ function setup(publish: EventBus['publish'] = vi.fn().mockResolvedValue('1-0')) 
     understood: understood(),
     nearUser: false,
     sections: [{ kind: 'stay', label: 'Ở đâu', total: 3, items: [] }, { kind: 'post', label: 'Bài viết', total: 2, items: [] }],
+    fallback: null,
     suggest: [],
     dropped: [],
   };
-  const postsPage: PostSearchPage = { understood: understood(), items: [], total: 7, nextCursor: '20', dropped: [], isFallback: false };
+  const postsPage: PostSearchPage = { understood: understood(), items: [], total: 7, nextCursor: '20', dropped: [], isFallback: false, fallbackRelaxed: [] };
   const explore = { search: vi.fn().mockResolvedValue(explorePage), searchPosts: vi.fn().mockResolvedValue(postsPage) } as unknown as ExploreUseCases;
   return { bus, publish, controller: new ExploreController(explore, publisher), explorePage };
 }
