@@ -26,7 +26,7 @@ Bỏ `discussionChanged` (cách 1 Bảo đề xuất) không đủ: `comment_cou
 | Chỉ ai-service gọi được, body sai bị chặn | Có | `post-summary.e2e.spec.ts` › PUT /checked: 200, `updated: false` khi hash lệch, 403 với video-worker, 400 khi body sai |
 
 ## Kết quả kiểm tra
-- `pnpm turbo run lint typecheck test --affected`: 49/49 task; core-api 2327 test pass (1 skipped có sẵn); lint 0 lỗi, không có warning ở file đã sửa.
+- Sau khi merge `origin/develop` (2026-11-13): `pnpm turbo run lint typecheck test --affected`: 49/49 task; core-api 2331 test pass (1 skipped có sẵn); lint 0 lỗi, không có warning ở file đã sửa. `drizzle-kit check` và `pnpm db:generate content` báo không lệch schema.
 - `pnpm --filter @tripflix/core-api test:int src/modules/content/social/infra/post-summary.repository.int.spec.ts`: 6/6 pass (Testcontainers Postgres). Ca id lạ kiểm kết quả đúng sau khi sửa; lỗi gốc phụ thuộc thứ tự planner chọn nên không chắc tái hiện được trên bản cũ.
 
 ## Cách kiểm lại
