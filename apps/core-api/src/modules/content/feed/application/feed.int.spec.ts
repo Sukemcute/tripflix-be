@@ -27,13 +27,15 @@ import type pg from 'pg';
 import { DrizzleMediaAssetStore } from '../../media/infra/drizzle-media-asset.store.js';
 import { MediaFacade } from '../../media/media.facade.js';
 import { decodeFeedCursor } from '../domain/feed-cursor.js';
+import { FEED_SEED_COUNT } from '../domain/feed-rank.js';
 import { HOT_WINDOW_DAYS } from '../domain/hot-score.js';
 import { DrizzleFeedStore } from '../infra/drizzle-feed.store.js';
 import { FeedUseCases } from './feed.use-cases.js';
 
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
 const VIEWER_ID = '22222222-2222-4222-8222-222222222222';
-const UNSCORED_ID = '33333333-3333-4333-8333-333333333333';
+const FRESH_ID = '44444444-4444-4444-8444-444444444444';
+const OLD_ID = '55555555-5555-4555-8555-555555555555';
 
 /** Câu truy vấn của feed trên Postgres thật, gồm cả điều kiện lọc jsonb và so sánh cursor. */
 describe('Feed trên Postgres thật', () => {
@@ -242,19 +244,17 @@ describe('Feed trên Postgres thật', () => {
   });
 
   describe('tab Dành cho bạn', () => {
-    it('bài có tương tác xếp theo điểm có bán rã: cùng tương tác thì bài mới hơn đứng trên, bài cũ bị bài nhiều tương tác hơn vượt', async () => {
+    it('bài hơn điểm quá e² lần luôn đứng trên, seed nào cũng vậy: nhiều tương tác > mới chưa có tương tác > rất cũ chưa có tương tác', async () => {
       const asset = await insertAsset('ready', [360]);
-      // Các mức điểm cách nhau hơn 3 lần, nên hệ số ngẫu nhiên [0,5; 1,5) không đảo được, seed nào cũng vậy.
-      const freshMany = await insertPost([asset], { createdAt: daysAgo(0.05) });
-      const oldMany = await insertPost([asset], { createdAt: daysAgo(3) });
-      const freshOne = await insertPost([asset], { createdAt: daysAgo(0.05) });
-      await setCounts(freshMany, { likes: 20 });
-      await setCounts(oldMany, { likes: 20 });
-      await setCounts(freshOne, { likes: 1 });
+      // Điểm gốc ≈ 2,46 > 0,25 > 0,014: mỗi bậc cách nhau hơn 7,4 lần nên hệ số ×0,37–×2,7 không đảo được.
+      const popular = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      const freshQuiet = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      const ancientQuiet = await insertPost([asset], { createdAt: daysAgo(730) });
+      await setCounts(popular, { likes: 1000 });
 
       for (const random of [0, 0.3, 0.6, 0.9]) {
         nextRandom = random;
-        await expect(readAllPages(1)).resolves.toEqual([freshMany, freshOne, oldMany]);
+        await expect(readAllPages(1)).resolves.toEqual([popular, freshQuiet, ancientQuiet]);
       }
     });
 
@@ -275,16 +275,20 @@ describe('Feed trên Postgres thật', () => {
       expect(new Set([...orders.values()].map((order) => order[0])).size).toBeGreaterThan(1);
     });
 
-    it('bài mới có tương tác đứng trên bài chưa có tương tác; bài chưa có tương tác chen trên bài cũ ít tương tác', async () => {
+    it('bài cũ nhiều tương tác và bài mới ít tương tác thay nhau lên đầu theo seed', async () => {
       const asset = await insertAsset('ready', [360]);
-      const freshLiked = await insertPost([asset], { createdAt: daysAgo(0.05) });
-      // Id cố định để điểm ngẫu nhiên với seed 0 biết trước: md5("0:<id>") cho điểm 0,0069, trên bài 1 thích 10 ngày tuổi (0,00096).
-      const unscored = await insertPost([asset], { createdAt: daysAgo(10), id: UNSCORED_ID });
-      const oldLiked = await insertPost([asset], { createdAt: daysAgo(10) });
-      await setCounts(freshLiked, { likes: 1 });
-      await setCounts(oldLiked, { likes: 1 });
+      // Điểm gốc gần nhau (≈ 0,49 và 0,61), id cố định để kết quả theo từng seed không đổi giữa các lần chạy.
+      const fresh = await insertPost([asset], { createdAt: daysAgo(0.05), id: FRESH_ID });
+      const old = await insertPost([asset], { createdAt: daysAgo(9), id: OLD_ID });
+      await setCounts(fresh, { likes: 2 });
+      await setCounts(old, { likes: 200 });
 
-      await expect(readAllPages(20)).resolves.toEqual([freshLiked, unscored, oldLiked]);
+      const firsts = new Set<string | undefined>();
+      for (let seed = 0; seed < FEED_SEED_COUNT; seed++) {
+        nextRandom = seed / FEED_SEED_COUNT;
+        firsts.add((await readAllPages(1))[0]);
+      }
+      expect(firsts).toEqual(new Set([fresh, old]));
     });
 
     it('bài chưa có tương tác xếp ngẫu nhiên theo seed: cùng seed thì cùng thứ tự, sang trang không lặp không rớt; seed khác thì thứ tự khác', async () => {
