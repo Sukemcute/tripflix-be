@@ -13,6 +13,7 @@ Bỏ `discussionChanged` (cách 1 Bảo đề xuất) không đủ: `comment_cou
 - **Cập nhật có điều kiện** (`PostSummaryRepository.markChecked`): chỉ khi `input_hash` khớp bản đang lưu, `generated_at <= checkedAt` và `checked_at` hiện có cũ hơn. Lệnh đến trễ hay lệnh của bản cũ không làm gì; gửi lại nhiều lần không sao. Ghi `checked_at` và `comment_count_at_summary`, không đụng nội dung.
 - **Lưu bản tóm tắt mới** (`saveIfNewer`) đặt lại `checked_at = null`.
 - **`isStale`**: `discussionChanged` tính từ `max(generatedAt, checkedAt)`; vẫn giữ so sánh số bình luận (bắt bình luận bị sửa trong lúc AI còn chờ gom sự kiện).
+- **Đối soát an toàn với id lạ** (Bảo báo): câu `findHeldSummaryPostIds` ép `src.id::uuid` trong `ON ... AND ...`; Postgres không đảm bảo thứ tự tính các vế của `AND`, nên một id không phải UUID trong `source_comment_ids` (dòng cũ, trước khi API kiểm UUID) có thể làm cả câu lỗi. Đổi sang `c.id = CASE WHEN src.id ~* '<uuid>' THEN src.id::uuid END`: id lạ thành NULL, bị coi là nguồn đã mất.
 - **Hợp đồng**: thêm endpoint, `MarkPostSummaryCheckedDto`, `MarkPostSummaryCheckedResponseDto`, trường `checkedAt` trong `PostSummaryResponseDto` (chỉ thêm). `pnpm contracts:build`.
 
 ## Đối chiếu "Xong khi"
@@ -21,11 +22,12 @@ Bỏ `discussionChanged` (cách 1 Bảo đề xuất) không đủ: `comment_cou
 | AI kiểm lại thấy không đổi thì bản tóm tắt hết "cũ" | Có | `mark-post-summary-checked.spec.ts` › có lần kiểm mới hơn: tính thay đổi từ checkedAt nên hết cũ |
 | Không ghi đè bản tóm tắt mới hơn, không lùi mốc | Có | `post-summary.repository.int.spec.ts` (Postgres thật): hash lệch, mốc trễ, mốc trước generatedAt đều bỏ qua |
 | Bản tóm tắt mới không mang mốc kiểm của bản cũ | Có | `post-summary.repository.int.spec.ts` › lưu bản mới thì xoá mốc kiểm |
+| Đối soát không lỗi khi có id không phải UUID | Có | `post-summary.repository.int.spec.ts` › đối soát không lỗi khi sourceCommentIds có id không phải UUID |
 | Chỉ ai-service gọi được, body sai bị chặn | Có | `post-summary.e2e.spec.ts` › PUT /checked: 200, `updated: false` khi hash lệch, 403 với video-worker, 400 khi body sai |
 
 ## Kết quả kiểm tra
 - `pnpm turbo run lint typecheck test --affected`: 49/49 task; core-api 2327 test pass (1 skipped có sẵn); lint 0 lỗi, không có warning ở file đã sửa.
-- `pnpm --filter @tripflix/core-api test:int src/modules/content/social/infra/post-summary.repository.int.spec.ts`: 5/5 pass (Testcontainers Postgres).
+- `pnpm --filter @tripflix/core-api test:int src/modules/content/social/infra/post-summary.repository.int.spec.ts`: 6/6 pass (Testcontainers Postgres). Ca id lạ kiểm kết quả đúng sau khi sửa; lỗi gốc phụ thuộc thứ tự planner chọn nên không chắc tái hiện được trên bản cũ.
 
 ## Cách kiểm lại
 1. Chạy migration content, lưu một bản tóm tắt bằng `PUT /v1/posts/:id/ai-summary` (token ai-service) với `inputHash: h1`.
@@ -38,4 +40,6 @@ Bỏ `discussionChanged` (cách 1 Bảo đề xuất) không đủ: `comment_cou
 ## Ảnh hưởng tới phần của người khác
 - `content/db` (dùng chung Phong, Thành, Trang): thêm một cột nullable vào `post_summaries`, không đổi cột cũ.
 - `social/api/post-summary.e2e.spec.ts` (Trang viết): thêm `checkedAt: null` vào bản ghi giả và provider `MarkPostSummaryCheckedUseCase` để test chạy với constructor mới; thêm một ca e2e ở cuối.
+- Đã trả lời Bảo các câu hỏi về endpoint: đường dẫn có tiền tố `/api`; luôn 200 kèm `updated` (không có 409); `checkedAt` phải dạng `...Z` (`+00:00` bị 400). `posts.comment_count` chỉ đếm bình luận đang hiện, cùng định nghĩa với `visibleCommentCount`.
+- Sự kiện `content.comment.restored` thiếu `body` thuộc code moderation của Trang: chưa sửa, Bảo nhắn Trang.
 - `tripflix-ai` (Bảo): cần gọi endpoint mới trong nhánh `run.request is None` của `summary_worker.py` với `checkedAt = started`, rồi sinh lại `app/contracts`.
