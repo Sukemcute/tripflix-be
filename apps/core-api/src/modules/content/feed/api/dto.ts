@@ -37,7 +37,11 @@ export const FeedQuerySchema = z
       ctx.addIssue({ code: 'custom', path: ['saved'], message: 'saved chỉ dùng với tab for_you' });
     }
     // Cursor của tab này dùng ở tab kia sẽ cắt danh sách sai vị trí.
-    if (query.cursor && (query.tab === 'hot') !== (query.cursor.score !== undefined)) {
+    if (
+      query.cursor &&
+      ((query.tab === 'hot') !== (query.cursor.score !== undefined) ||
+        (query.tab === 'hot' && query.cursor.rank !== undefined))
+    ) {
       ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor không thuộc tab này' });
     }
   });

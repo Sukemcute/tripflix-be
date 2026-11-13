@@ -3,6 +3,8 @@ import type { FeedCursor } from '../domain/feed-cursor.js';
 
 export const FEED_STORE = Symbol('FEED_STORE');
 export const FEED_PAGE_CACHE = Symbol('FEED_PAGE_CACHE');
+/** Hàm trả số trong [0, 1) để chọn seed thứ tự feed; mặc định Math.random. */
+export const FEED_RANDOM = Symbol('FEED_RANDOM');
 
 export interface FeedPostRow {
   id: string;
@@ -17,6 +19,8 @@ export interface FeedPostRow {
   bookmarkCount: number;
   shareCount: number;
   cursorAt: string;
+  /** Điểm xếp hạng tab Dành cho bạn (feed-rank.ts); chỉ listForYouPosts trả. */
+  rank?: number;
 }
 
 export interface FeedListQuery {
@@ -25,11 +29,21 @@ export interface FeedListQuery {
   authorId?: string;
 }
 
+/** Truy vấn có thứ tự ngẫu nhiên theo seed (feed-rank.ts). */
+export interface RankedFeedListQuery extends FeedListQuery {
+  seed: number;
+}
+
 export interface FeedStore {
-  /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước. */
+  /**
+   * Tab Dành cho bạn: cùng điều kiện lọc với listPlayablePosts, xếp theo điểm có bán rã tính tới `asOf`;
+   * bài chưa có tương tác nhận điểm ngẫu nhiên theo seed. Trả kèm `rank` của từng bài cho cursor.
+   */
+  listForYouPosts(query: RankedFeedListQuery & { asOf: string }): Promise<FeedPostRow[]>;
+  /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước (trang tác giả, cursor cũ). */
   listPlayablePosts(query: FeedListQuery): Promise<FeedPostRow[]>;
-  /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài trong HOT_WINDOW_DAYS ngày gần đây, xếp theo điểm hot giảm dần rồi mới nhất trước. */
-  listHotPosts(query: FeedListQuery): Promise<FeedPostRow[]>;
+  /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài trong HOT_WINDOW_DAYS ngày gần đây, xếp theo điểm hot giảm dần; bằng điểm thì ngẫu nhiên theo seed. */
+  listHotPosts(query: RankedFeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc và thứ tự với listPlayablePosts nhưng chỉ bài người dùng đã lưu. */
   listSavedPlayablePosts(query: FeedListQuery & { userId: string }): Promise<FeedPostRow[]>;
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]>;
