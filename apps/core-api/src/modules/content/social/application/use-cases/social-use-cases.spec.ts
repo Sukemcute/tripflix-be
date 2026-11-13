@@ -570,7 +570,7 @@ describe('Social Application Use Cases', () => {
       expect(mockCommentRepo.create).toHaveBeenCalled();
     });
 
-    it('từ chối bình luận khi reply vào một reply khác (chặn reply cấp 2)', async () => {
+    it('lưu trả lời một reply cùng cấp và giữ đúng người được trả lời', async () => {
       const post = samplePostRecord({ status: 'published' });
       const parentReplyRecord: CommentRecord = {
         id: 'reply-1',
@@ -589,9 +589,13 @@ describe('Social Application Use Cases', () => {
       };
 
       mockPostRepo.findById.mockResolvedValue(post);
-      mockCommentRepo.findById.mockResolvedValue(parentReplyRecord);
+      const root = { ...parentReplyRecord, id: 'root-comment-id', authorId, parentCommentId: null };
+      mockCommentRepo.findById.mockResolvedValueOnce(parentReplyRecord).mockResolvedValueOnce(root);
+      mockCommentRepo.create.mockResolvedValue({ ...parentReplyRecord, id: 'new-reply', replyToName: 'Dũng' });
 
-      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
+        getDisplayNames: async () => new Map([[otherUserId, 'Dũng']]),
+      });
 
       await expect(
         useCase.execute({
@@ -600,7 +604,11 @@ describe('Social Application Use Cases', () => {
           body: 'Cố tình reply vào reply',
           parentCommentId: 'reply-1',
         }),
-      ).rejects.toThrow(/Chỉ hỗ trợ phản hồi bình luận 1 cấp/);
+      ).resolves.toMatchObject({ id: 'new-reply', parentCommentId: root.id });
+      expect(mockCommentRepo.create).toHaveBeenCalledWith(expect.objectContaining({ parentCommentId: root.id, replyToName: 'Dũng' }));
+      expect(mockOutbox.add).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({
+        commentId: 'new-reply', replyToCommentId: 'reply-1', replyToAuthorId: otherUserId, parentCommentAuthorId: authorId,
+      }) }));
     });
 
     it('sửa bình luận cập nhật nội dung và phát sự kiện outbox content.comment.updated', async () => {

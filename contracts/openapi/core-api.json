@@ -6001,6 +6001,11 @@
             "type": "string",
             "nullable": true
           },
+          "replyToName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên hiển thị của người được trả lời"
+          },
           "body": {
             "type": "string"
           },
