@@ -1,0 +1,1 @@
+ALTER TABLE "content"."comments" ADD COLUMN "reply_to_name" text;
