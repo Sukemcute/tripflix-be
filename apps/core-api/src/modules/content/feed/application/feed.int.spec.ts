@@ -244,14 +244,35 @@ describe('Feed trên Postgres thật', () => {
   describe('tab Dành cho bạn', () => {
     it('bài có tương tác xếp theo điểm có bán rã: cùng tương tác thì bài mới hơn đứng trên, bài cũ bị bài nhiều tương tác hơn vượt', async () => {
       const asset = await insertAsset('ready', [360]);
-      const freshFive = await insertPost([asset], { createdAt: daysAgo(0.05) });
-      const oldFive = await insertPost([asset], { createdAt: daysAgo(3) });
+      // Các mức điểm cách nhau hơn 3 lần, nên hệ số ngẫu nhiên [0,5; 1,5) không đảo được, seed nào cũng vậy.
+      const freshMany = await insertPost([asset], { createdAt: daysAgo(0.05) });
+      const oldMany = await insertPost([asset], { createdAt: daysAgo(3) });
       const freshOne = await insertPost([asset], { createdAt: daysAgo(0.05) });
-      await setCounts(freshFive, { likes: 5 });
-      await setCounts(oldFive, { likes: 5 });
+      await setCounts(freshMany, { likes: 20 });
+      await setCounts(oldMany, { likes: 20 });
       await setCounts(freshOne, { likes: 1 });
 
-      await expect(readAllPages(1)).resolves.toEqual([freshFive, freshOne, oldFive]);
+      for (const random of [0, 0.3, 0.6, 0.9]) {
+        nextRandom = random;
+        await expect(readAllPages(1)).resolves.toEqual([freshMany, freshOne, oldMany]);
+      }
+    });
+
+    it('bài có tương tác sát điểm nhau đổi chỗ theo seed: cùng seed thì cùng thứ tự qua các trang, seed khác thì đầu trang khác', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const createdAt = daysAgo(0.5);
+      const ids = await Promise.all(Array.from({ length: 8 }, () => insertPost([asset], { createdAt })));
+      for (const id of ids) await setCounts(id, { likes: 3 });
+
+      const orders = new Map<number, string[]>();
+      for (const random of [0, 0.25, 0.5, 0.75]) {
+        nextRandom = random;
+        const order = await readAllPages(3);
+        expect([...order].sort()).toEqual([...ids].sort());
+        await expect(readAllPages(20)).resolves.toEqual(order);
+        orders.set(random, order);
+      }
+      expect(new Set([...orders.values()].map((order) => order[0])).size).toBeGreaterThan(1);
     });
 
     it('bài mới có tương tác đứng trên bài chưa có tương tác; bài chưa có tương tác chen trên bài cũ ít tương tác', async () => {

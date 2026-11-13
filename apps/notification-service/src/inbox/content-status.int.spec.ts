@@ -72,7 +72,7 @@ describe('Thông báo kiểm duyệt bài và video trên PostgreSQL', () => {
 
     const items = (await inbox.listForUser(authorId, { limit: 20 })).items.filter((row) => row.data.postId === postId);
     expect(items).toEqual([expect.objectContaining({
-      type: 'moderation.post.hidden', body: 'Bài viết đã bị ẩn. Lý do: Lừa đảo.', link: null,
+      type: 'moderation.post.hidden', body: 'Bài viết đã bị ẩn. Lý do: Lừa đảo.', link: '/account/moderation',
     })]);
     expect(await inbox.countUnread(recipient)).toBe(1);
     expect(emitToUser).toHaveBeenCalledWith(recipient, 'notification.read', { unreadCount: 1 });

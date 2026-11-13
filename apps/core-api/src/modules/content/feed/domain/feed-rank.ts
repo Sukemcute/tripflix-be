@@ -1,7 +1,9 @@
 /**
  * Thứ tự hiển thị Reels ở hai tab (13/11, Phong chốt):
  * - Dành cho bạn: bài có tương tác xếp theo điểm có bán rã theo tuổi bài,
- *   ln(1 + điểm hot) / (giờ tuổi + 2)^1.2 (cùng dạng hot@v0 bên discovery);
+ *   ln(1 + điểm hot) / (giờ tuổi + 2)^1.2 (cùng dạng hot@v0 bên discovery), nhân hệ số ngẫu nhiên
+ *   trong [FOR_YOU_JITTER_MIN, FOR_YOU_JITTER_MIN + FOR_YOU_JITTER_SPAN) để mỗi lần tải lại đầu trang đổi
+ *   (13/11, Phong chốt: pilot bài nào cũng có chút tương tác nên trước đó 4 video đầu luôn y nguyên);
  *   bài chưa có tương tác (điểm 0) nhận điểm ngẫu nhiên trong [0, FOR_YOU_UNSCORED_CEILING) nên chen xen vào.
  * - Đang hot: giữ điểm hot hiện tại; bằng điểm (gồm các bài 0 điểm) thì xếp ngẫu nhiên thay vì mới nhất trước.
  *
@@ -20,6 +22,13 @@ export const FOR_YOU_GRAVITY = 1.2;
  * (ln 2 / 8^1.2 ≈ 0,057). Bài có tương tác mới đăng vẫn đứng trên, bài cũ ít tương tác bị bài mới chen qua.
  */
 export const FOR_YOU_UNSCORED_CEILING = 0.05;
+
+/**
+ * Hệ số ngẫu nhiên nhân vào điểm bài có tương tác. Bài hơn điểm quá 3 lần (1,5 / 0,5) thì luôn đứng trên;
+ * các bài sát điểm nhau đổi chỗ theo seed.
+ */
+export const FOR_YOU_JITTER_MIN = 0.5;
+export const FOR_YOU_JITTER_SPAN = 1;
 
 export function pickFeedSeed(random: () => number = Math.random): number {
   return Math.min(FEED_SEED_COUNT - 1, Math.floor(random() * FEED_SEED_COUNT));

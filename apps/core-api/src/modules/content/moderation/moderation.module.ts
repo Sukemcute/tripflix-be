@@ -18,9 +18,12 @@ import {
   RecordScreeningUseCase,
   ScreenContentUseCase,
   SubmitReportUseCase,
+  SubmitAppealUseCase,
+  DecideAppealUseCase,
   type ScreeningConfig,
 } from './application/moderation.use-cases.js';
 import { ScreeningConsumer } from './consumers/screening.consumer.js';
+import { ClaimDeferredScansUseCase } from './application/recover-screening.use-case.js';
 import { AiModerationClient } from './infra/ai-moderation.client.js';
 import { ModerationRepository } from './infra/moderation.repository.js';
 
@@ -126,12 +129,31 @@ const CONFIG = Symbol('MODERATION_CONFIG');
       ) => new SubmitReportUseCase(repository, visibility, outbox, config),
     },
     {
+      provide: DecideAppealUseCase,
+      inject: [ModerationRepository, ChangeVisibilityUseCase, OUTBOX],
+      useFactory: (
+        repository: ModerationRepository,
+        visibility: ChangeVisibilityUseCase,
+        outbox: ContentOutbox,
+      ) => new DecideAppealUseCase(repository, visibility, outbox),
+    },
+    {
+      provide: SubmitAppealUseCase,
+      inject: [ModerationRepository],
+      useFactory: (repository: ModerationRepository) => new SubmitAppealUseCase(repository),
+    },
+    {
       provide: DecideCaseUseCase,
       inject: [ModerationRepository, ChangeVisibilityUseCase],
       useFactory: (repository: ModerationRepository, visibility: ChangeVisibilityUseCase) =>
         new DecideCaseUseCase(repository, visibility),
     },
     ScreeningConsumer,
+    {
+      provide: ClaimDeferredScansUseCase,
+      inject: [ModerationRepository],
+      useFactory: (repository: ModerationRepository) => new ClaimDeferredScansUseCase(repository),
+    },
   ],
 })
 export class ModerationModule {}

@@ -1,0 +1,1 @@
+ALTER TABLE "content"."moderation_actions" ADD COLUMN "content_version" text;

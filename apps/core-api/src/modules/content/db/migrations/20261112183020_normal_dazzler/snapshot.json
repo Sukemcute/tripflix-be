@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f59cfa5e-89ea-49a3-b6fd-4dc5ffbf54b4",
+  "prevIds": [
+    "279f6c1c-a8ea-48fd-9136-8e9e371712d2"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_actions",
+        "content_version"
+      ],
+      "writes": [
+        "s|col|content.moderation_actions.content_version",
+        "n|col|content.moderation_actions.content_version",
+        "e|col|content.moderation_actions.content_version"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_actions",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_actions",
+        "name": "content_version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

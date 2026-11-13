@@ -331,6 +331,14 @@ export const ContentModerationDecidedV1Schema = z.object({
   reasonCode: z.string(),
   isAutomatic: z.boolean(),
 });
+export const ContentAppealDecidedV1Schema = z.object({
+  appealId: z.uuid(), authorId: z.uuid(), decisionId: z.uuid(),
+  outcome: z.enum(['upheld', 'overturned']),
+});
+export const ContentCommentModerationActionV1Schema = z.object({
+  actionId: z.uuid(), postId: z.uuid(), commentId: z.uuid(), authorId: z.uuid(),
+  action: z.enum(['hide', 'remove', 'restore']), reasonCode: z.string(),
+});
 export const ContentReportCreatedV1Schema = z.object({
   reportId: z.uuid(),
   caseId: z.uuid(),
@@ -383,6 +391,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.post.hidden.v1': ContentPostHiddenV1Schema,
   'content.post.restored.v1': ContentPostRestoredV1Schema,
   'content.moderation.decided.v1': ContentModerationDecidedV1Schema,
+  'content.appeal.decided.v1': ContentAppealDecidedV1Schema,
+  'content.comment.moderation_action.v1': ContentCommentModerationActionV1Schema,
   'content.report.created.v1': ContentReportCreatedV1Schema,
   'event-envelope.v1': eventEnvelopeSchema,
   'role.v1': roleSchema,

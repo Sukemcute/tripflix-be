@@ -7,6 +7,7 @@ import { PostRepository } from '../../social/infra/post.repository.js';
 import type { ContentOutbox } from '../../social/application/ports/content-outbox.port.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
+import { MODERATION_POLICY_VERSION } from '../domain/content-version.js';
 
 export interface ChangeVisibilityCommand {
   actorIsSuperAdmin?: boolean;
@@ -31,14 +32,20 @@ export class ChangeVisibilityUseCase {
   async execute(command: ChangeVisibilityCommand) {
     const initial = await this.repository.loadTarget(command.targetType, command.targetId);
     if (!initial) throw new NotFoundException('Không tìm thấy nội dung');
-    await this.repository.lockPost(initial.postId);
+    const parentPost = await this.repository.lockPost(initial.postId);
+    if (
+      command.targetType === 'comment' &&
+      command.action === 'restore' &&
+      parentPost?.status !== 'published'
+    )
+      throw new ConflictException('Bài viết chứa bình luận chưa hiển thị');
     const target = await this.repository.loadTarget(command.targetType, command.targetId);
     if (
       !target ||
       (command.action !== 'dismiss' &&
         (target.deleted ||
           target.status === 'deleted' ||
-          (target.targetType === 'comment' && target.status === 'removed')))
+          (target.targetType === 'comment' && target.status === 'removed' && command.action !== 'restore')))
     )
       throw new ConflictException('Nội dung đã bị xoá, không thể khôi phục hoặc kiểm duyệt lại');
     let actionId: string = randomUUID();
@@ -98,9 +105,17 @@ export class ChangeVisibilityUseCase {
         .for('update');
       for (const record of records) {
         const isChild = record.id !== root.id;
+        // Giữ quyết định riêng của reply khi gỡ cả luồng; restore gốc không được bỏ quyết định đó.
+        if (
+          isChild &&
+          command.action === 'remove' &&
+          record.status === 'hidden' &&
+          (record.cascadeRootCommentId !== root.id || record.hiddenByActionId !== root.hiddenByActionId)
+        )
+          continue;
         if (
           command.action === 'restore' &&
-          (record.status !== 'hidden' ||
+          (!['hidden', 'removed'].includes(record.status) ||
             (isChild &&
               (!root.hiddenByActionId ||
                 record.hiddenByActionId !== root.hiddenByActionId ||
@@ -119,15 +134,16 @@ export class ChangeVisibilityUseCase {
           }
           continue;
         }
-        if (record.status === 'removed' || record.status === newStatus) continue;
+        if ((record.status === 'removed' && command.action !== 'restore') || record.status === newStatus)
+          continue;
         const updated = await db
           .update(comments)
           .set({
             status: newStatus as 'visible' | 'hidden' | 'removed',
             updatedAt: new Date(),
-            deletedAt: command.action === 'remove' ? new Date() : null,
-            hiddenByActionId: command.action === 'hide' ? actionId : null,
-            cascadeRootCommentId: command.action === 'hide' && isChild ? root.id : null,
+            deletedAt: null,
+            hiddenByActionId: ['hide', 'remove'].includes(command.action) ? actionId : null,
+            cascadeRootCommentId: ['hide', 'remove'].includes(command.action) && isChild ? root.id : null,
           })
           .where(
             and(eq(comments.id, record.id), eq(comments.status, record.status), isNull(comments.deletedAt)),
@@ -163,6 +179,20 @@ export class ChangeVisibilityUseCase {
         reasonCode: command.reasonCode,
         reasonDetail: command.reasonDetail,
       });
+    const decidedTarget = await this.repository.loadTarget(command.targetType, command.targetId);
+    if (decidedTarget)
+      await this.repository.db
+        .update(moderationActions)
+        .set({
+          contentVersion: decidedTarget.version,
+          policyVersion: MODERATION_POLICY_VERSION,
+          evidenceSnapshot: {
+            text: decidedTarget.text,
+            coverMediaId: decidedTarget.coverMediaId,
+            mediaIds: decidedTarget.mediaIds,
+          },
+        })
+        .where(eq(moderationActions.id, actionId));
     for (const row of changes) {
       await this.outbox.add({
         type:
@@ -199,6 +229,24 @@ export class ChangeVisibilityUseCase {
           action: command.action,
           reasonCode: command.reasonCode,
           isAutomatic: command.actorType === 'system',
+        },
+      });
+    if (
+      !command.caseId &&
+      target.targetType === 'comment' &&
+      command.action !== 'dismiss' &&
+      changes.some((row) => row.id === target.targetId)
+    )
+      await this.outbox.add({
+        type: 'content.comment.moderation_action',
+        userId: command.actorId,
+        payload: {
+          actionId,
+          postId: target.postId,
+          commentId: target.targetId,
+          authorId: target.authorId,
+          action: command.action,
+          reasonCode: command.reasonCode,
         },
       });
     return { actionId, changedCount: changes.length, previousStatus: target.status, status: newStatus };

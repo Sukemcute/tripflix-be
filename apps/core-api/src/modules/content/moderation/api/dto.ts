@@ -92,6 +92,12 @@ export class ModerationLogDto {
   @ApiProperty() reasonCode!: string;
   @ApiProperty({ type: String, nullable: true }) reasonDetail!: string | null;
   @ApiProperty() createdAt!: string;
+  @ApiProperty({ type: String, nullable: true }) contentVersion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) policyVersion!: string | null;
+  @ApiProperty({ type: 'object', nullable: true, additionalProperties: true }) evidenceSnapshot!: Record<
+    string,
+    unknown
+  > | null;
 }
 export class ModerationReportDto {
   @ApiProperty() id!: string;
@@ -113,5 +119,81 @@ export class ModerationDecisionResultDto {
   @ApiProperty() actionId!: string;
   @ApiProperty() changedCount!: number;
   @ApiProperty() previousStatus!: string;
+  @ApiProperty() status!: string;
+}
+
+export class SubmitAppealDto {
+  @ApiProperty({ minLength: 1, maxLength: 1000 }) reason!: string;
+}
+export class AppealOutcomeDto {
+  @ApiProperty({ enum: ['upheld', 'overturned'] }) outcome!: 'upheld' | 'overturned';
+}
+export class AppealDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() decisionId!: string;
+  @ApiProperty() authorId!: string;
+  @ApiProperty() reason!: string;
+  @ApiProperty({ enum: ['pending', 'upheld', 'overturned'] }) status!: 'pending' | 'upheld' | 'overturned';
+  @ApiProperty({ type: String, nullable: true }) reviewerId!: string | null;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty({ type: String, nullable: true }) resolvedAt!: string | null;
+}
+export class AppealPageDto {
+  @ApiProperty({ type: [AppealDto] }) items!: AppealDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+}
+export class AppealQueueItemDto {
+  @ApiProperty({ type: AppealDto }) appeal!: AppealDto;
+  @ApiProperty({ type: ModerationLogDto }) decision!: ModerationLogDto;
+  @ApiProperty({ type: String, nullable: true }) targetText!: string | null;
+  @ApiProperty({ type: String, nullable: true }) targetStatus!: string | null;
+}
+export class AppealQueuePageDto {
+  @ApiProperty({ type: [AppealQueueItemDto] }) items!: AppealQueueItemDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+}
+export class MyDecisionDto {
+  @ApiProperty({ type: String, nullable: true }) targetPreview!: string | null;
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['post', 'comment'] }) targetType!: 'post' | 'comment';
+  @ApiProperty({ type: String, nullable: true }) postId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) commentId!: string | null;
+  @ApiProperty() action!: string;
+  @ApiProperty() reasonCode!: string;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty({ type: String, enum: ['pending', 'upheld', 'overturned'], nullable: true }) appealStatus!:
+    string | null;
+  @ApiProperty() canAppeal!: boolean;
+}
+export class MyDecisionPageDto {
+  @ApiProperty({ type: [MyDecisionDto] }) items!: MyDecisionDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+}
+export class MyReportDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['post', 'comment'] }) targetType!: 'post' | 'comment';
+  @ApiProperty() targetId!: string;
+  @ApiProperty() reasonCode!: string;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty({ type: String, enum: ['pending', 'resolved'], nullable: true }) caseStatus!: string | null;
+}
+export class MyReportPageDto {
+  @ApiProperty({ type: [MyReportDto] }) items!: MyReportDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+}
+export class FailedScanDto {
+  @ApiProperty() eventId!: string;
+  @ApiProperty() targetType!: string;
+  @ApiProperty() targetId!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() attempts!: number;
+  @ApiProperty() updatedAt!: string;
+}
+export class FailedScanPageDto {
+  @ApiProperty({ type: [FailedScanDto] }) items!: FailedScanDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+}
+export class ScanRetryDto {
+  @ApiProperty() eventId!: string;
   @ApiProperty() status!: string;
 }

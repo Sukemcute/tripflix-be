@@ -1,0 +1,176 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "43c82e38-0ce5-49c6-a969-e3359490bae4",
+  "prevIds": [
+    "acf3cece-0cd4-496e-9583-12ef33d676a3"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "retried_by"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.retried_by",
+        "n|col|content.moderation_scans.retried_by",
+        "e|col|content.moderation_scans.retried_by"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_scans",
+        "retried_at"
+      ],
+      "writes": [
+        "s|col|content.moderation_scans.retried_at",
+        "n|col|content.moderation_scans.retried_at",
+        "e|col|content.moderation_scans.retried_at"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_scans",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "reports",
+        "idx_reports_reporter_created"
+      ],
+      "writes": [
+        "s|idx|content.idx_reports_reporter_created",
+        "n|idx|content.idx_reports_reporter_created",
+        "e|idx|content.idx_reports_reporter_created",
+        "n|rel|content.idx_reports_reporter_created"
+      ],
+      "reads": [
+        "n|tbl|content.reports",
+        "n|sch|content",
+        "n|col|content.reports.reporter_id",
+        "n|col|content.reports.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_appeals"
+      ],
+      "writes": [
+        "s|fk|content.moderation_appeals.moderation_appeals_decision_id_moderation_actions_id_fkey",
+        "n|fk|content.moderation_appeals.moderation_appeals_decision_id_moderation_actions_id_fkey",
+        "e|fk|content.moderation_appeals.moderation_appeals_decision_id_moderation_actions_id_fkey",
+        "n|con|content.moderation_appeals.moderation_appeals_decision_id_moderation_actions_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_appeals",
+        "n|sch|content",
+        "n|tbl|content.moderation_actions",
+        "n|sch|content",
+        "n|col|content.moderation_appeals.decision_id",
+        "n|col|content.moderation_actions.id",
+        "e|uniqueness|content.moderation_actions.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "retried_by",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_scans",
+        "name": "retried_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "reports",
+        "name": "idx_reports_reporter_created",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "reporter_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_appeals",
+        "name": "moderation_appeals_decision_id_moderation_actions_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "decision_id"
+        ],
+        "schemaTo": "content",
+        "tableTo": "moderation_actions",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    }
+  ]
+}

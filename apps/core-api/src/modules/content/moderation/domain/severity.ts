@@ -25,8 +25,7 @@ export function evaluateSeverity(
         dangerous.test(label) && ai.categories[label] === true && score >= config.aiThreshold,
     ),
   );
-  const shouldAutoHide =
-    aiHide || rules.some((hit) => hit.code === 'SCAM_PATTERN') || reportCount >= config.reportThreshold;
+  const shouldAutoHide = aiHide || rules.some((hit) => hit.code === 'SCAM_PATTERN');
   const severity = Math.min(
     100,
     Math.max(
