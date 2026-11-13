@@ -5,7 +5,11 @@ import { follows } from '../../db/schema/index.js';
 export const FOLLOWER_PAGE_SIZE = 200;
 
 export class FollowRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly executor: Db | (() => Db)) {}
+
+  private get db(): Db {
+    return typeof this.executor === 'function' ? this.executor() : this.executor;
+  }
 
   private match(followerId: string, authorId: string) {
     return and(eq(follows.followerId, followerId), eq(follows.authorId, authorId));
@@ -17,12 +21,20 @@ export class FollowRepository {
     return rows.length > 0;
   }
 
-  async follow(followerId: string, authorId: string): Promise<void> {
-    await this.db.insert(follows).values({ followerId, authorId }).onConflictDoNothing();
+  async follow(followerId: string, authorId: string) {
+    const [row] = await this.db.insert(follows).values({ followerId, authorId }).onConflictDoNothing().returning();
+    return row;
   }
 
-  async unfollow(followerId: string, authorId: string): Promise<void> {
-    await this.db.delete(follows).where(this.match(followerId, authorId));
+  async unfollow(followerId: string, authorId: string) {
+    const [row] = await this.db.delete(follows).where(this.match(followerId, authorId)).returning();
+    return row;
+  }
+
+  async reachesThreshold(authorId: string, threshold: number): Promise<boolean> {
+    const rows = await this.db.select({ id: follows.followerId }).from(follows)
+      .where(eq(follows.authorId, authorId)).orderBy(asc(follows.followerId)).offset(threshold - 1).limit(1);
+    return rows.length > 0;
   }
 
   async listEligible(authorId: string, publishedAt: Date, cursor?: string) {

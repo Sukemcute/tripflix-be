@@ -71,7 +71,7 @@ export class EventRouter {
     comments?: Pick<CommentNotificationRepository, 'create' | 'hide'>,
     reactions?: Pick<ReactionNotificationRepository, 'apply'>,
     posts?: Pick<PostNotificationRepository, 'moderate'>,
-    followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel'>,
+    followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel' | 'applyFollow'>,
   ) {
     this.handlers = {
       ...createAccountEmailHandlers(mailer, links.webAppUrl),

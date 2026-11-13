@@ -7,6 +7,7 @@ import { DB, ENV } from '../tokens.js';
 const PAGE_SIZE = 200;
 const ServiceToken = z.object({ accessToken: z.string().min(1), expiresIn: z.number().positive() });
 const RecipientPage = z.object({
+  sharedPublishedAt: z.iso.datetime().optional(),
   isEligible: z.boolean(), recipients: z.array(z.uuid()).max(PAGE_SIZE), nextCursor: z.uuid().nullable(),
 });
 
@@ -40,6 +41,17 @@ export class FollowerPostWorker implements OnApplicationBootstrap, OnModuleDestr
   async onModuleDestroy(): Promise<void> {
     clearInterval(this.timer);
     await this.pending;
+  }
+
+  async applyFollow(input: { followerId: string; authorId: string; followedAt: string | null; changedAt: string }) {
+    await this.pool.query(
+      `INSERT INTO notification_follows (follower_id, author_id, followed_at, changed_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (follower_id, author_id) DO UPDATE SET followed_at = EXCLUDED.followed_at, changed_at = EXCLUDED.changed_at
+       WHERE notification_follows.changed_at < EXCLUDED.changed_at
+          OR (notification_follows.changed_at = EXCLUDED.changed_at AND EXCLUDED.followed_at IS NULL)`,
+      [input.followerId, input.authorId, input.followedAt, input.changedAt],
+    );
   }
 
   async enqueue(postId: string, authorId: string): Promise<void> {
@@ -89,7 +101,12 @@ export class FollowerPostWorker implements OnApplicationBootstrap, OnModuleDestr
         if (page.nextCursor && (page.nextCursor === job.cursor || page.nextCursor !== page.recipients.at(-1))) {
           throw new Error('Cursor follower không tiến');
         }
-        await this.savePage(client, job, page);
+        if (!job.cursor && page.sharedPublishedAt) {
+          await client.query(`UPDATE follower_post_jobs SET state = 'done', shared_published_at = $2, shared_created_at = now()
+            WHERE post_id = $1 AND state = 'pending'`, [job.post_id, page.sharedPublishedAt]);
+        } else {
+          await this.savePage(client, job, page);
+        }
       } catch {
         await client.query(
           `UPDATE follower_post_jobs SET attempts = attempts + 1,
@@ -161,6 +178,7 @@ export class FollowerPostWorker implements OnApplicationBootstrap, OnModuleDestr
     }
     const url = new URL(`/api/v1/internal/posts/${job.post_id}/follower-recipients`, baseUrl);
     if (job.cursor) url.searchParams.set('cursor', job.cursor);
+    else if (this.env.FOLLOWER_SHARED_THRESHOLD) url.searchParams.set('sharedThreshold', String(this.env.FOLLOWER_SHARED_THRESHOLD));
     const response = await fetch(url, {
       headers: { authorization: `Bearer ${this.token.value}` }, redirect: 'error', signal: AbortSignal.timeout(3000),
     });

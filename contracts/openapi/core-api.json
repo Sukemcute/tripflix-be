@@ -2008,6 +2008,14 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "sharedThreshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -6284,6 +6292,10 @@
         "properties": {
           "isEligible": {
             "type": "boolean"
+          },
+          "sharedPublishedAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "recipients": {
             "type": "array",

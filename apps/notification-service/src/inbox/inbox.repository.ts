@@ -60,6 +60,22 @@ const FOLLOWER_POST_VISIBLE = `(
   )
 )`;
 
+const SHARED_INBOX_ROWS = `
+  SELECT job.post_id AS id, f.follower_id AS user_id, 'follow.post.published' AS type,
+    'Có bài viết mới' AS title,
+    COALESCE(NULLIF(btrim(actor.display_name), ''), 'Người bạn theo dõi') || ' vừa đăng bài mới.' AS body,
+    '/trips/' || job.post_id AS link, jsonb_build_object('postId', job.post_id) AS data,
+    'follower-post:' || job.post_id AS source_event_id, job.shared_created_at AS created_at, receipt.read_at
+  FROM notification_follows f
+  JOIN follower_post_jobs job ON job.author_id = f.author_id
+    AND job.state = 'done' AND job.shared_created_at IS NOT NULL AND job.shared_published_at >= f.followed_at
+  LEFT JOIN user_directory actor ON actor.user_id = f.author_id
+  LEFT JOIN shared_follower_post_reads receipt ON receipt.user_id = f.follower_id AND receipt.post_id = job.post_id
+  WHERE f.follower_id = $1 AND f.followed_at IS NOT NULL
+`;
+
+const INBOX_COLUMNS = 'id, user_id, type, title, body, link, data, source_event_id, created_at, read_at';
+
 const InboxCursorSchema = z.tuple([z.iso.datetime(), z.uuid()]);
 
 export type InboxTab = 'all' | 'orders' | 'interactions';
@@ -113,9 +129,13 @@ export class InboxRepository implements OnModuleInit {
     const cursor = options.cursor === undefined ? null : decodeInboxCursor(options.cursor);
     const result = await this.pool.query<InboxRow & { cursor_created_at: string }>(
       `
+      WITH visible AS (
+        SELECT ${INBOX_COLUMNS} FROM inbox WHERE user_id = $1 AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
+        UNION ALL
+        ${SHARED_INBOX_ROWS} AND $5 <> 'orders'
+      )
       SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-      FROM inbox WHERE user_id = $1 AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
-        AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
+      FROM visible WHERE ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
         AND ($5 = 'all' OR ($5 = 'orders' AND type LIKE 'booking.%')
           OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%' OR type = 'follow.post.published')))
       ORDER BY created_at DESC, id DESC LIMIT $4
@@ -135,7 +155,8 @@ export class InboxRepository implements OnModuleInit {
 
   async countUnread(userId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
-       `SELECT count(*) AS count FROM inbox WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
+       `SELECT (SELECT count(*) FROM inbox WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE})
+         + (SELECT count(*) FROM (${SHARED_INBOX_ROWS}) AS shared WHERE read_at IS NULL) AS count`,
       [userId],
     );
     return Number(result.rows[0]?.count ?? 0);
@@ -146,26 +167,47 @@ export class InboxRepository implements OnModuleInit {
        `UPDATE inbox SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
       [userId, id],
     );
-    return (result.rowCount ?? 0) > 0;
+    if (result.rowCount) return true;
+    const shared = await this.pool.query<{ found: boolean }>(
+      `WITH eligible AS (${SHARED_INBOX_ROWS} AND job.post_id = $2), marked AS (
+        INSERT INTO shared_follower_post_reads (user_id, post_id)
+        SELECT user_id, id FROM eligible ON CONFLICT DO NOTHING
+      ) SELECT EXISTS (SELECT 1 FROM eligible) AS found`, [userId, id],
+    );
+    return shared.rows[0]?.found === true;
   }
 
   async markAllRead(userId: string): Promise<number> {
     const result = await this.pool.query(
-       `UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}`,
+       `WITH updated AS (
+          UPDATE inbox SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
+          RETURNING id
+        ), marked AS (
+          INSERT INTO shared_follower_post_reads (user_id, post_id)
+          SELECT user_id, id FROM (${SHARED_INBOX_ROWS}) AS shared WHERE read_at IS NULL
+          ON CONFLICT DO NOTHING RETURNING post_id
+        ) SELECT (SELECT count(*) FROM updated) + (SELECT count(*) FROM marked) AS count`,
       [userId],
     );
-    return result.rowCount ?? 0;
+    return Number((result.rows[0] as { count?: string } | undefined)?.count ?? 0);
   }
 
   async markAllReadThrough(userId: string, throughId: string): Promise<boolean> {
     const { rows } = await this.pool.query<{ found: boolean }>(
       `WITH boundary AS (
          SELECT created_at, id FROM inbox WHERE user_id = $1 AND id = $2
+         UNION ALL SELECT created_at, id FROM (${SHARED_INBOX_ROWS} AND job.post_id = $2) AS shared
        ), updated AS (
          UPDATE inbox SET read_at = now()
          FROM boundary
          WHERE inbox.user_id = $1 AND inbox.read_at IS NULL AND inbox.deleted_at IS NULL AND ${FOLLOWER_POST_VISIBLE}
            AND (inbox.created_at, inbox.id) <= (boundary.created_at, boundary.id)
+       )
+       , marked AS (
+         INSERT INTO shared_follower_post_reads (user_id, post_id)
+         SELECT shared.user_id, shared.id FROM (${SHARED_INBOX_ROWS}) AS shared CROSS JOIN boundary
+         WHERE shared.read_at IS NULL AND (shared.created_at, shared.id) <= (boundary.created_at, boundary.id)
+         ON CONFLICT DO NOTHING
        )
        SELECT EXISTS (SELECT 1 FROM boundary) AS found`,
       [userId, throughId],
