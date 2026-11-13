@@ -1,0 +1,282 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "2e555dbc-8d4a-443b-a5ce-91b3e595fd33",
+  "prevIds": [
+    "df2df340-1da0-4abc-953a-b0e1120faaac",
+    "43c82e38-0ce5-49c6-a969-e3359490bae4"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "media_assets",
+        "kind"
+      ],
+      "writes": [
+        "s|col|content.media_assets.kind",
+        "n|col|content.media_assets.kind",
+        "e|col|content.media_assets.kind"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "media_assets",
+        "width_px"
+      ],
+      "writes": [
+        "s|col|content.media_assets.width_px",
+        "n|col|content.media_assets.width_px",
+        "e|col|content.media_assets.width_px"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "media_assets",
+        "height_px"
+      ],
+      "writes": [
+        "s|col|content.media_assets.height_px",
+        "n|col|content.media_assets.height_px",
+        "e|col|content.media_assets.height_px"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "media_assets",
+        "duration_sec"
+      ],
+      "writes": [
+        "s|colprop|content.media_assets.duration_sec.notNull"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.duration_sec"
+      ],
+      "sqlHash": "c53e51e83d69e8a0"
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|ck|content.media_assets.ck_media_assets_kind",
+        "n|ck|content.media_assets.ck_media_assets_kind",
+        "e|ck|content.media_assets.ck_media_assets_kind",
+        "n|con|content.media_assets.ck_media_assets_kind"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.kind"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|ck|content.media_assets.ck_media_assets_dimensions",
+        "n|ck|content.media_assets.ck_media_assets_dimensions",
+        "e|ck|content.media_assets.ck_media_assets_dimensions",
+        "n|con|content.media_assets.ck_media_assets_dimensions"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.width_px",
+        "n|col|content.media_assets.height_px"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|ck|content.media_assets.ck_media_assets_mime_type"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.kind",
+        "n|col|content.media_assets.mime_type",
+        "e|col|content.media_assets.mime_type"
+      ],
+      "sqlHash": "85ed379091abaf45"
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|ck|content.media_assets.ck_media_assets_duration_sec"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.kind",
+        "n|col|content.media_assets.duration_sec",
+        "e|col|content.media_assets.duration_sec"
+      ],
+      "sqlHash": "e743a24a2c337e92"
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "media_assets"
+      ],
+      "writes": [
+        "s|ck|content.media_assets.ck_media_assets_ready_has_playback"
+      ],
+      "reads": [
+        "n|tbl|content.media_assets",
+        "n|sch|content",
+        "n|col|content.media_assets.kind",
+        "n|col|content.media_assets.status",
+        "n|col|content.media_assets.hls_prefix",
+        "n|col|content.media_assets.aspect",
+        "e|col|content.media_assets.status",
+        "e|col|content.media_assets.hls_prefix",
+        "e|col|content.media_assets.aspect"
+      ],
+      "sqlHash": "ffdaa9c453783ca0"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "media_assets",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'video'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "media_assets",
+        "name": "width_px",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "media_assets",
+        "name": "height_px",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "media_assets",
+        "name": "ck_media_assets_kind",
+        "value": "\"kind\" in ('video', 'image')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "media_assets",
+        "name": "ck_media_assets_dimensions",
+        "value": "(\"width_px\" is null or \"width_px\" > 0) and (\"height_px\" is null or \"height_px\" > 0)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"content\",\"media_assets\",\"duration_sec\"]",
+      "set": {
+        "notNull": false
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"content\",\"media_assets\",\"ck_media_assets_mime_type\"]",
+      "set": {
+        "value": "(\"kind\" = 'video' and \"mime_type\" in ('video/mp4', 'video/quicktime')) or (\"kind\" = 'image' and \"mime_type\" in ('image/jpeg', 'image/png', 'image/webp'))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"content\",\"media_assets\",\"ck_media_assets_duration_sec\"]",
+      "set": {
+        "value": "(\"kind\" = 'video' and \"duration_sec\" is not null and \"duration_sec\" > 0) or (\"kind\" = 'image' and \"duration_sec\" is null)"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"content\",\"media_assets\",\"ck_media_assets_ready_has_playback\"]",
+      "set": {
+        "value": "\"kind\" = 'image' or \"status\" <> 'ready' or (\"hls_prefix\" is not null and \"aspect\" is not null)"
+      }
+    }
+  ]
+}

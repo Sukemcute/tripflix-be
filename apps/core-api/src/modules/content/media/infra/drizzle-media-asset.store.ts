@@ -6,12 +6,15 @@ import { contentOutboxEvents, mediaAssets, renditions } from '../../db/schema/in
 import type {
   MediaAssetStatus,
   MediaAssetStore,
+  MediaKindInfo,
   MediaOutbox,
   NewUploadingAsset,
   PlaybackAsset,
+  ReadyImageAsset,
   ReadyRendition,
   UploadTarget,
 } from '../application/ports.js';
+import type { MediaKind, MediaMimeType } from '../domain/upload-rules.js';
 
 const CONTENT_EVENT_PRODUCER = 'core-api/content';
 
@@ -35,6 +38,8 @@ export class DrizzleMediaAssetStore implements MediaAssetStore {
     const [row] = await this.db
       .select({
         id: mediaAssets.id,
+        kind: mediaAssets.kind,
+        mimeType: mediaAssets.mimeType,
         status: mediaAssets.status,
         fileSizeBytes: mediaAssets.fileSizeBytes,
         sourceKey: mediaAssets.sourceKey,
@@ -42,7 +47,14 @@ export class DrizzleMediaAssetStore implements MediaAssetStore {
       })
       .from(mediaAssets)
       .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.ownerId, ownerId)));
-    return row ? { ...row, status: row.status as MediaAssetStatus } : null;
+    return row
+      ? {
+          ...row,
+          kind: row.kind as MediaKind,
+          mimeType: row.mimeType as MediaMimeType,
+          status: row.status as MediaAssetStatus,
+        }
+      : null;
   }
 
   async markProcessing(assetId: string): Promise<number | null> {
@@ -124,10 +136,50 @@ export class DrizzleMediaAssetStore implements MediaAssetStore {
           // Ràng buộc ck_media_assets_ready_has_playback bảo đảm video ready có đủ hai cột này.
           hlsPrefix: asset.hlsPrefix!,
           aspect: asset.aspect as MediaAspect,
-          durationSec: asset.durationSec,
+          // Ràng buộc ck_media_assets_duration_sec bảo đảm video có thời lượng; ảnh không có mức nên không tới đây.
+          durationSec: asset.durationSec!,
           levels,
         },
       ];
     });
+  }
+
+  async markImageReady(assetId: string): Promise<boolean> {
+    const rows = await this.db
+      .update(mediaAssets)
+      .set({ status: 'ready', updatedAt: sql`now()` })
+      .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.kind, 'image'), eq(mediaAssets.status, 'uploading')))
+      .returning({ id: mediaAssets.id });
+    return rows.length > 0;
+  }
+
+  async markUploadFailed(assetId: string, reason: string): Promise<void> {
+    await this.db
+      .update(mediaAssets)
+      .set({ status: 'failed', error: reason, updatedAt: sql`now()` })
+      .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.status, 'uploading')));
+  }
+
+  async findReadyImages(assetIds: string[]): Promise<ReadyImageAsset[]> {
+    if (assetIds.length === 0) return [];
+    return this.db
+      .select({
+        id: mediaAssets.id,
+        ownerId: mediaAssets.ownerId,
+        sourceKey: mediaAssets.sourceKey,
+        widthPx: mediaAssets.widthPx,
+        heightPx: mediaAssets.heightPx,
+      })
+      .from(mediaAssets)
+      .where(and(inArray(mediaAssets.id, assetIds), eq(mediaAssets.kind, 'image'), eq(mediaAssets.status, 'ready')));
+  }
+
+  async findKinds(assetIds: string[]): Promise<MediaKindInfo[]> {
+    if (assetIds.length === 0) return [];
+    const rows = await this.db
+      .select({ id: mediaAssets.id, ownerId: mediaAssets.ownerId, kind: mediaAssets.kind, status: mediaAssets.status })
+      .from(mediaAssets)
+      .where(inArray(mediaAssets.id, assetIds));
+    return rows.map((row) => ({ ...row, kind: row.kind as MediaKind, status: row.status as MediaAssetStatus }));
   }
 }

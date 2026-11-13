@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import type { ObjectStorage } from '@tripflix/storage';
-import { MEDIA_ASSET_STORE, OBJECT_STORAGE, type MediaAssetStatus, type MediaAssetStore } from './application/ports.js';
+import {
+  MEDIA_ASSET_STORE,
+  OBJECT_STORAGE,
+  type MediaAssetStatus,
+  type MediaAssetStore,
+  type MediaKindInfo,
+} from './application/ports.js';
 
 export interface PlaybackInfo {
   /** master.m3u8 trên CloudFront. */
@@ -11,6 +17,13 @@ export interface PlaybackInfo {
   durationSec: number;
   aspect: MediaAspect;
   levels: MediaQualityLevel[];
+}
+
+export interface ImageInfo {
+  /** Link CDN của ảnh gốc. */
+  url: string;
+  widthPx: number | null;
+  heightPx: number | null;
 }
 
 /** Hàm cho phần khác của hệ thống lấy thông tin phát video. Giao diện ở docs/09, mục Hàm cho module khác. */
@@ -45,5 +58,21 @@ export class MediaFacade {
   /** Trả null khi video không tồn tại. */
   getStatus(assetId: string): Promise<MediaAssetStatus | null> {
     return this.store.findStatus(assetId);
+  }
+
+  /** Chỉ ảnh đã tải lên xong: id không tồn tại, chưa xong hay là video thì không có trong kết quả. */
+  async getImages(assetIds: string[]): Promise<Record<string, ImageInfo>> {
+    const images = await this.store.findReadyImages([...new Set(assetIds)]);
+    return Object.fromEntries(
+      images.map(({ id, sourceKey, widthPx, heightPx }) => [
+        id,
+        { url: this.storage.getCdnUrl(sourceKey), widthPx, heightPx },
+      ]),
+    );
+  }
+
+  /** Loại (video hay ảnh), chủ và trạng thái của từng id có tồn tại. */
+  getKinds(assetIds: string[]): Promise<MediaKindInfo[]> {
+    return this.store.findKinds([...new Set(assetIds)]);
   }
 }

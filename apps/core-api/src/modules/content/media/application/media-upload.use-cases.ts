@@ -11,12 +11,16 @@ import {
 } from '@tripflix/storage';
 import { MediaError } from '../domain/errors.js';
 import {
+  IMAGE_SIGNATURE_BYTES,
   PART_SIZE_BYTES,
   UPLOAD_LINK_TTL_SECONDS,
   assertAllPartsListed,
+  assertImageWithinUploadLimits,
   assertWithinUploadLimits,
   buildAllPartNumbers,
   buildSourceRelativeKey,
+  detectImageMimeType,
+  getMediaKind,
   resolveRequestedPartNumbers,
   roundUpDurationSeconds,
   type MediaMimeType,
@@ -32,7 +36,10 @@ import {
 export interface CreateUploadInput {
   mimeType: MediaMimeType;
   fileSizeBytes: number;
-  durationSec: number;
+  /** Bắt buộc với video; ảnh không có. */
+  durationSec?: number;
+  widthPx?: number;
+  heightPx?: number;
 }
 
 export interface SignedPart {
@@ -65,8 +72,15 @@ export class MediaUploadUseCases {
   ) {}
 
   async createUpload(ownerId: string, input: CreateUploadInput): Promise<CreatedUpload> {
-    const durationSec = roundUpDurationSeconds(input.durationSec);
-    assertWithinUploadLimits(input.fileSizeBytes, durationSec);
+    const kind = getMediaKind(input.mimeType);
+    let durationSec: number | null = null;
+    if (kind === 'image') {
+      assertImageWithinUploadLimits(input.fileSizeBytes);
+    } else {
+      if (input.durationSec === undefined) throw new MediaError('MEDIA_TOO_LARGE', 'Video cần thời lượng');
+      durationSec = roundUpDurationSeconds(input.durationSec);
+      assertWithinUploadLimits(input.fileSizeBytes, durationSec);
+    }
 
     const assetId = randomUUID();
     const sourceKey = this.storage.resolveKey(buildSourceRelativeKey(assetId, input.mimeType));
@@ -75,11 +89,14 @@ export class MediaUploadUseCases {
     await this.store.insertUploadingAsset({
       id: assetId,
       ownerId,
+      kind,
       mimeType: input.mimeType,
       fileSizeBytes: input.fileSizeBytes,
       sourceKey,
       s3UploadId,
       durationSec,
+      widthPx: kind === 'image' ? (input.widthPx ?? null) : null,
+      heightPx: kind === 'image' ? (input.heightPx ?? null) : null,
     });
 
     const signedParts = await this.signParts(sourceKey, s3UploadId, buildAllPartNumbers(input.fileSizeBytes));
@@ -88,29 +105,60 @@ export class MediaUploadUseCases {
 
   async resignParts(ownerId: string, assetId: string, partNumbers: number[]): Promise<SignedParts> {
     const target = await this.store.findUploadTarget(assetId, ownerId);
-    if (!target) throw new MediaError('MEDIA_NOT_FOUND', 'Không tìm thấy video');
+    if (!target) throw new MediaError('MEDIA_NOT_FOUND', 'Không tìm thấy file');
     if (target.status !== 'uploading' || !target.s3UploadId) {
-      throw new MediaError('MEDIA_UPLOAD_NOT_ACTIVE', 'Video này không còn ở trạng thái đang tải lên');
+      throw new MediaError('MEDIA_UPLOAD_NOT_ACTIVE', 'File này không còn ở trạng thái đang tải lên');
     }
     const requestedPartNumbers = resolveRequestedPartNumbers(target.fileSizeBytes, partNumbers);
     return this.signParts(target.sourceKey, target.s3UploadId, requestedPartNumbers);
   }
 
-  /** Gọi lại nhiều lần vẫn cho cùng kết quả và chỉ giao việc chuyển mã một lần. */
+  /** Gọi lại nhiều lần vẫn cho cùng kết quả và chỉ giao việc chuyển mã một lần. Ảnh thì ready ngay, không chuyển mã. */
   async completeUpload(ownerId: string, assetId: string, parts: UploadedPart[]): Promise<CompletedUpload> {
     const target = await this.store.findUploadTarget(assetId, ownerId);
-    if (!target) throw new MediaError('MEDIA_NOT_FOUND', 'Không tìm thấy video');
+    if (!target) throw new MediaError('MEDIA_NOT_FOUND', 'Không tìm thấy file');
     if (target.status === 'processing' || target.status === 'ready') return { assetId, status: target.status };
     if (target.status !== 'uploading' || !target.s3UploadId) {
-      throw new MediaError('MEDIA_UPLOAD_NOT_ACTIVE', 'Video này không còn ở trạng thái đang tải lên');
+      throw new MediaError('MEDIA_UPLOAD_NOT_ACTIVE', 'File này không còn ở trạng thái đang tải lên');
     }
     assertAllPartsListed(target.fileSizeBytes, parts.map((part) => part.partNumber));
 
     // S3 nằm ngoài transaction. Ghi database lỗi thì app gọi lại, assembleSourceFile nhận ra file đã ghép.
     await this.assembleSourceFile(target.sourceKey, target.s3UploadId, parts);
     await this.assertSourceFileSize(target.sourceKey, target.fileSizeBytes);
+    if (target.kind === 'image') {
+      await this.assertImageMatchesDeclaredType(assetId, target.sourceKey, target.mimeType);
+      await this.store.markImageReady(assetId);
+      return { assetId, status: 'ready' };
+    }
     await this.requestTranscode(assetId, ownerId, target.sourceKey);
     return { assetId, status: 'processing' };
+  }
+
+  /** Đọc vài byte đầu file thật trên S3: phần mở rộng hay Content-Type do app gửi đều giả được. */
+  private async assertImageMatchesDeclaredType(assetId: string, key: string, declared: MediaMimeType): Promise<void> {
+    const head = await this.readHead(key, IMAGE_SIGNATURE_BYTES);
+    if (detectImageMimeType(head) === declared) return;
+    await this.store.markUploadFailed(assetId, `File không phải ${declared}`);
+    throw new MediaError('MEDIA_INVALID_IMAGE', 'File tải lên không phải ảnh JPEG, PNG hoặc WebP như đã khai');
+  }
+
+  private async readHead(key: string, byteCount: number): Promise<Uint8Array> {
+    const stream = await this.storage.getObject(key);
+    const chunks: Buffer[] = [];
+    let length = 0;
+    try {
+      for await (const chunk of stream) {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+        chunks.push(buffer);
+        length += buffer.length;
+        if (length >= byteCount) break;
+      }
+    } finally {
+      // Dừng sớm: chỉ cần vài byte, không tải cả ảnh 10 MB về.
+      stream.destroy();
+    }
+    return Buffer.concat(chunks).subarray(0, byteCount);
   }
 
   private async assembleSourceFile(key: string, uploadId: string, parts: UploadedPart[]): Promise<void> {
