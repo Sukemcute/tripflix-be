@@ -174,6 +174,46 @@ describe('Luật xúc phạm và đe doạ', () => {
     expect(evaluateSeverity(evaluateRules(text), null, 0, config).shouldAutoHide).toBe(false);
   });
 });
+describe('Chửi tục xét dấu (TF93)', () => {
+  const config = { aiThreshold: 0.8, reportThreshold: 3 };
+  const codesOf = (text: string) => evaluateRules(text).map((hit) => hit.code);
+
+  it.each([
+    'còn cho thuê',
+    'tháng cho chắc',
+    'dù mà trời mưa',
+    'mất lớn tiền vé',
+    'con chó nhà homestay',
+    'còn cho mang thú cưng',
+    'đặt phòng tháng cho chắc ăn nhé',
+    'dù mà trời mưa thì vẫn đi được',
+    'mất lớn tiền vé máy bay mùa cao điểm',
+    'thăng chức xong đi du lịch, mắt lớn hơn khi thấy biển',
+  ])('không bắt nhầm câu gõ có dấu: %s', (text) => {
+    expect(codesOf(text)).not.toContain('PROFANITY');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config).shouldAutoHide).toBe(false);
+  });
+
+  it.each([
+    'thằng chó chủ resort',
+    'đụ má cái dịch vụ',
+    'đù mẹ lừa khách',
+    'mặt lồn',
+    'thằng   chó',
+    'Ngu Như Bò',
+    'tháng cho chắc nhưng thằng chó chủ nhà lừa',
+  ])('vẫn bắt chửi tục gõ có dấu: %s', (text) => {
+    expect(codesOf(text)).toContain('PROFANITY');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config).autoHideReason).toBe('HARASSMENT');
+  });
+
+  it.each(['thang cho chu resort', 'du ma cai dich vu', 'mat lon', 'dit me lua khach', 'dm ad'])(
+    'vẫn bắt chửi tục gõ không dấu: %s',
+    (text) => {
+      expect(codesOf(text)).toContain('PROFANITY');
+    },
+  );
+});
 describe('Luật nội dung phản động (TF88)', () => {
   const config = { aiThreshold: 0.8, reportThreshold: 3 };
   const codesOf = (text: string) => evaluateRules(text).map((hit) => hit.code);
