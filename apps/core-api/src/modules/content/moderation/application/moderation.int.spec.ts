@@ -730,4 +730,91 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(detail.actions).toHaveLength(1);
     expect(detail.flags).toMatchObject({ ai: { model: 'omni-test' } });
   });
+  it('thống kê đếm ở server đúng khi hàng chờ vượt 100 dòng, khớp total của queue (TF89)', async () => {
+    // 120 bài có hồ sơ chờ duyệt, 30 hồ sơ khẩn cấp (severity 90); vượt giới hạn 100 dòng FE từng tải.
+    await pool.query(`
+      with created as (
+        insert into content.posts (id, author_id, post_type, title, status, published_at)
+        select gen_random_uuid(), $1, 'video', 'Bài ' || n, 'published', now() from generate_series(1, 120) n
+        returning id
+      ), numbered as (select id, row_number() over () as n from created)
+      insert into content.moderation_cases (target_type, target_id, post_id, author_id, severity, created_at)
+      select 'post', id, id, $1, case when n <= 30 then 90 else 40 end, now() - (n || ' minutes')::interval
+      from numbered`,
+      [AUTHOR],
+    );
+    // Không được tính: hồ sơ đã đóng và hồ sơ của bài đã bị gỡ.
+    const removedPost = randomUUID();
+    await pool.query(
+      "insert into content.posts (id, author_id, post_type, title, status) values ($1,$2,'video','Đã gỡ','removed')",
+      [removedPost, AUTHOR],
+    );
+    await pool.query(
+      `insert into content.moderation_cases (target_type, target_id, post_id, author_id, severity)
+       values ('post', $1, $1, $2, 95)`,
+      [removedPost, AUTHOR],
+    );
+    await pool.query(
+      `insert into content.moderation_cases (target_type, target_id, post_id, author_id, severity, status)
+       values ('post', $1, $1, $2, 95, 'resolved')`,
+      [postId, AUTHOR],
+    );
+    // Hai bình luận chờ duyệt.
+    const commentIds = [(await add()).id, (await add()).id];
+    for (const commentId of commentIds) {
+      await pool.query(
+        `insert into content.moderation_cases (target_type, target_id, post_id, author_id, severity)
+         values ('comment', $1, $2, $3, 85)`,
+        [commentId, postId, AUTHOR],
+      );
+    }
+    // Tự ẩn và báo cáo: một bản ghi trong 24 giờ, một bản ghi cũ hơn.
+    const actions = await pool.query(
+      `insert into content.moderation_actions
+         (post_id, moderator_id, actor_type, action, previous_status, post_status, reason_code, created_at)
+       values ($1, $2, 'system', 'auto_hide', 'published', 'hidden', 'SCAM', now() - interval '1 hour'),
+              ($1, $2, 'system', 'auto_hide', 'published', 'hidden', 'SCAM', now() - interval '30 hours'),
+              ($1, $2, 'staff', 'hide', 'published', 'hidden', 'SPAM', now())
+       returning id`,
+      [postId, AUTHOR],
+    );
+    await pool.query(
+      `insert into content.reports (target_type, target_id, reporter_id, reason_code, created_at)
+       values ('post', $1, gen_random_uuid(), 'SPAM', now()),
+              ('post', $1, gen_random_uuid(), 'SPAM', now() - interval '2 days')`,
+      [postId],
+    );
+    await pool.query(
+      `insert into content.moderation_appeals (decision_id, author_id, reason) values ($1, $2, 'Không vi phạm')`,
+      [actions.rows[2].id, AUTHOR],
+    );
+    await pool.query(
+      `insert into content.moderation_scans (event_id, target_type, target_id, content_version, status)
+       values (gen_random_uuid(), 'post', $1, 'v1', 'failed'),
+              (gen_random_uuid(), 'post', $1, 'v1', 'deferred'),
+              (gen_random_uuid(), 'post', $1, 'v1', 'deferred')`,
+      [postId],
+    );
+
+    const stats = await cases.repository.stats(80);
+    expect(stats).toMatchObject({
+      pendingTotal: 122,
+      pendingUrgent: 32,
+      pendingPosts: 120,
+      pendingComments: 2,
+      autoHidden24h: 1,
+      reports24h: 1,
+      pendingAppeals: 1,
+      failedScans: 1,
+      deferredScans: 2,
+      urgentSeverity: 80,
+    });
+    const oldest = await pool.query(
+      `select min(created_at) as at from content.moderation_cases where status = 'pending' and target_id <> $1`,
+      [removedPost],
+    );
+    expect(stats.oldestPendingAt).toBe(new Date(oldest.rows[0].at).toISOString());
+    const queue = await cases.repository.queue({ view: 'pending', limit: 20, offset: 0 });
+    expect(queue.total).toBe(stats.pendingTotal);
+  });
 });

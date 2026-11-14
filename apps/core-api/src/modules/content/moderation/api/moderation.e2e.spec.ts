@@ -55,6 +55,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
   const submitAppeal = vi.fn().mockResolvedValue({ id: randomUUID(), status: 'pending' });
   const decideAppeal = vi.fn().mockResolvedValue({ status: 'upheld' });
   const mine = vi.fn().mockResolvedValue([]);
+  const stats = vi.fn().mockResolvedValue({ pendingTotal: 3, urgentSeverity: 80 });
   const decide = vi.fn().mockResolvedValue({
     actionId: randomUUID(),
     changedCount: 1,
@@ -83,6 +84,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
           provide: ModerationRepository,
           useValue: {
             queue,
+            stats,
             log: async () => [],
             pendingAppeals: mine,
             decisionsByUser: mine,
@@ -172,6 +174,18 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await http().get('/api/v1/admin/moderation/queue').auth(tokens.member!, { type: 'bearer' }).expect(403);
     for (const role of ['moderator', 'superadmin'])
       await http().get('/api/v1/admin/moderation/queue').auth(tokens[role]!, { type: 'bearer' }).expect(200);
+  });
+  it('thống kê kiểm duyệt: guest 401, member 403, staff đọc được với ngưỡng khẩn cấp 80 (TF89)', async () => {
+    await http().get('/api/v1/admin/moderation/stats').expect(401);
+    await http().get('/api/v1/admin/moderation/stats').auth(tokens.member!, { type: 'bearer' }).expect(403);
+    for (const role of ['moderator', 'superadmin']) {
+      const res = await http()
+        .get('/api/v1/admin/moderation/stats')
+        .auth(tokens[role]!, { type: 'bearer' })
+        .expect(200);
+      expect(res.body).toMatchObject({ pendingTotal: 3 });
+    }
+    expect(stats).toHaveBeenCalledWith(80);
   });
   it('quyết định bắt buộc reasonCode và Idempotency-Key, replay chỉ gọi use case một lần', async () => {
     const url = `/api/v1/admin/moderation/queue/${randomUUID()}/decisions`;

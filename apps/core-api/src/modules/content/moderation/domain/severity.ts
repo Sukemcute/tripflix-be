@@ -1,5 +1,7 @@
 import type { ReasonCode } from './reason-codes.js';
 import type { RuleHit } from './rules.js';
+/** Ngưỡng hồ sơ "khẩn cấp" trên màn kiểm duyệt, khớp nhãn đỏ của Admin. */
+export const URGENT_SEVERITY = 80;
 export interface AiVerdict {
   id: string;
   flagged: boolean;
