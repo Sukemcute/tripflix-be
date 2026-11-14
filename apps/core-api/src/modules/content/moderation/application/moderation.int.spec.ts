@@ -679,6 +679,32 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     );
   });
 
+  it('bình luận tục tĩu, phản động tự ẩn dù AI lỗi, ghi đúng lý do; bình luận sạch giữ nguyên (TF88)', async () => {
+    const write = (body: string) => cases.add.execute({ postId, authorId: AUTHOR, body });
+    const profane = await write('đm thằng chủ homestay óc chó');
+    const extremist = await write('đả đảo cộng sản, lật đổ chế độ');
+    const clean = await write('mua hạt óc chó ở chợ đêm ngon lắm');
+    for (const comment of [profane, extremist, clean]) {
+      const snapshot = await cases.repository.loadTarget('comment', comment.id);
+      await cases.screen.execute(randomUUID(), snapshot!, null);
+    }
+    const statusOf = async (id: string) =>
+      (await pool.query('select status from content.comments where id=$1', [id])).rows[0].status;
+    const reasonOf = async (id: string) =>
+      (
+        await pool.query(
+          "select reason_code from content.moderation_actions where comment_id=$1 and actor_type='system'",
+          [id],
+        )
+      ).rows[0]?.reason_code;
+    expect(await statusOf(profane.id)).toBe('hidden');
+    expect(await reasonOf(profane.id)).toBe('HARASSMENT');
+    expect(await statusOf(extremist.id)).toBe('hidden');
+    expect(await reasonOf(extremist.id)).toBe('EXTREMISM');
+    expect(await statusOf(clean.id)).toBe('visible');
+    expect(await reasonOf(clean.id)).toBeUndefined();
+    expect(await count()).toBe(1);
+  });
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
     const root = await add();
     const snapshot = await cases.repository.loadTarget('comment', root.id);
