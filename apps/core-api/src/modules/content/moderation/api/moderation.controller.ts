@@ -55,8 +55,10 @@ import {
   MyDecisionPageDto,
   MyReportPageDto,
   FailedScanPageDto,
+  ModerationStatsDto,
   ScanRetryDto,
 } from './dto.js';
+import { URGENT_SEVERITY } from '../domain/severity.js';
 
 @ApiTags('Moderation - Reports')
 @ApiBearerAuth()
@@ -148,6 +150,12 @@ export class AdminModerationController {
     @Inject(DecideAppealUseCase) private readonly decideAppeal: DecideAppealUseCase,
     @Inject(ClaimDeferredScansUseCase) private readonly recovery: ClaimDeferredScansUseCase,
   ) {}
+  @Get('stats')
+  @ApiOkResponse({ type: ModerationStatsDto })
+  @ApiOperation({ summary: 'Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server' })
+  stats() {
+    return this.repository.stats(URGENT_SEVERITY);
+  }
   @Get('scans/failed')
   @ApiOkResponse({ type: FailedScanPageDto })
   async failedScans(@Query(new ZodBody(QueueQuerySchema)) raw: QueueQueryDto) {

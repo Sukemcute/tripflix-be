@@ -3180,6 +3180,33 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/stats": {
+      "get": {
+        "operationId": "AdminModerationController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/scans/failed": {
       "get": {
         "operationId": "AdminModerationController_failedScans",
@@ -8385,6 +8412,70 @@
           "reasonCode",
           "reasonDetail",
           "createdAt"
+        ]
+      },
+      "ModerationStatsDto": {
+        "type": "object",
+        "properties": {
+          "pendingTotal": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending"
+          },
+          "pendingUrgent": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt có severity ≥ urgentSeverity"
+          },
+          "pendingPosts": {
+            "type": "number"
+          },
+          "pendingComments": {
+            "type": "number"
+          },
+          "oldestPendingAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "autoHidden24h": {
+            "type": "number",
+            "description": "Số lần tự ẩn trong 24 giờ qua"
+          },
+          "reports24h": {
+            "type": "number",
+            "description": "Số báo cáo mới trong 24 giờ qua"
+          },
+          "pendingAppeals": {
+            "type": "number"
+          },
+          "failedScans": {
+            "type": "number",
+            "description": "Scan đã hết lượt thử, cần staff xem"
+          },
+          "deferredScans": {
+            "type": "number",
+            "description": "Scan đang chờ thử lại tự động"
+          },
+          "urgentSeverity": {
+            "type": "number"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pendingTotal",
+          "pendingUrgent",
+          "pendingPosts",
+          "pendingComments",
+          "oldestPendingAt",
+          "autoHidden24h",
+          "reports24h",
+          "pendingAppeals",
+          "failedScans",
+          "deferredScans",
+          "urgentSeverity",
+          "generatedAt"
         ]
       },
       "FailedScanDto": {
