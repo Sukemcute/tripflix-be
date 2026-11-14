@@ -11,86 +11,87 @@ export interface RuleHit {
 // con vật hay món ăn ("nhà có con chó", "hạt óc chó").
 const PROFANITY_PATTERN = new RegExp(
   '\\b(?:' +
-    [
-      'do ngu',
-      'thang ngu',
-      '(?:may|mi) (?:la )?(?:con|thang|do) cho',
-      'do (?:con|thang) cho',
-      'thang cho',
-      'ngu dot',
-      'ngu nhu (?:bo|cho|lon|heo|trau|con)',
-      '(?:may|mi) ngu',
-      '(?<!(?:hat|sua|banh|qua|nhan|keo|dau) )oc cho',
-      'dit me',
-      'dit con me',
-      'dit bo',
-      'dit cu',
-      'deo me',
-      'mat (?:nhu )?lon',
-      'du ma',
-      'du me',
-      'me kiep (?:may|mi|nha may)',
-      'dm|dmm|dcm|dkm|cmm',
-    ].join('|') +
-    ')\\b',
+  [
+    'do ngu',
+    'thang ngu',
+    '(?:may|mi) (?:la )?(?:con|thang|do) cho',
+    'do (?:con|thang) cho',
+    'thang cho',
+    'ngu dot',
+    'ngu nhu (?:bo|cho|lon|heo|trau|con)',
+    '(?:may|mi) ngu',
+    '(?<!(?:hat|sua|banh|qua|nhan|keo|dau) )oc cho',
+    'dit me',
+    'dit con me',
+    'dit bo',
+    'dit cu',
+    'duma',
+    'deo me',
+    'mat (?:nhu )?lon',
+    'du ma',
+    'du me',
+    'me kiep (?:may|mi|nha may)',
+    'dm|dmm|dcm|dkm|cmm',
+  ].join('|') +
+  ')\\b',
 );
 // Dạng có dấu của từng cụm trên (TF93). Bỏ dấu làm câu bình thường trùng cụm chửi tục
 // ("tháng cho" = "thằng chó", "dù mà" = "đụ má", "mất lớn" = "mặt lồn"), nên đoạn khớp mà
 // người viết gõ có dấu phải khớp đúng dạng có dấu; đoạn gõ không dấu thì giữ cách so cũ.
 const ACCENTED_PROFANITY_PATTERN = new RegExp(
   '^(?:' +
-    [
-      'đồ ngu',
-      'thằng ngu',
-      '(?:mày|mi) (?:là )?(?:con|thằng|đồ) chó',
-      'đồ (?:con|thằng) chó',
-      'thằng chó',
-      'ngu dốt',
-      'ngu như (?:bò|chó|lợn|heo|trâu|con)',
-      '(?:mày|mi) ngu',
-      'óc chó',
-      'địt mẹ',
-      'địt con mẹ',
-      'địt bố',
-      'địt cụ',
-      'đéo mẹ',
-      'mặt (?:như )?lồn',
-      'đ[ụù] má',
-      'đ[ụù] mẹ',
-      'mẹ kiếp (?:mày|mi|nhà mày)',
-      'đm|đmm|đcm|đkm|dm|dmm|dcm|dkm|cmm',
-    ].join('|') +
-    ')$',
+  [
+    'đồ ngu',
+    'thằng ngu',
+    '(?:mày|mi) (?:là )?(?:con|thằng|đồ) chó',
+    'đồ (?:con|thằng) chó',
+    'thằng chó',
+    'ngu dốt',
+    'ngu như (?:bò|chó|lợn|heo|trâu|con)',
+    '(?:mày|mi) ngu',
+    'óc chó',
+    'địt mẹ',
+    'địt con mẹ',
+    'địt bố',
+    'địt cụ',
+    'đéo mẹ',
+    'mặt (?:như )?lồn',
+    'đ[ụù] má',
+    'đ[ụù] mẹ',
+    'mẹ kiếp (?:mày|mi|nhà mày)',
+    'đm|đmm|đcm|đkm|dm|dmm|dcm|dkm|cmm',
+  ].join('|') +
+  ')$',
 );
 // Nội dung chống phá nhà nước, ly khai, xuyên tạc chủ quyền. Chỉ bắt cụm kêu gọi hoặc
 // xúc phạm rõ nghĩa; câu nhắc tới địa danh, lãnh tụ, lịch sử một cách bình thường không khớp.
 const EXTREMISM_PATTERN = new RegExp(
   '\\b(?:' +
-    [
-      'lat do (?:chinh quyen|che do|dang|nha nuoc|chinh phu|cong san)',
-      'da dao (?:dang|cong san|chinh quyen|che do|nha nuoc|chinh phu|viet cong)',
-      'giai the dang cong san',
-      '(?:ung ho|tham gia|gia nhap|theo) viet tan',
-      'nha nuoc de ?ga',
-      '(?:doi )?doc lap (?:tay nguyen|tay bac|nam bo)',
-      '(?:hoang sa|truong sa)(?: va (?:hoang sa|truong sa))? (?:la cua|thuoc ve|thuoc) trung quoc',
-      '(?:chinh quyen|che do|nha nuoc|dang) (?:cong san )?(?:an cuop|cuop ngay|doc tai|thoi nat|khon nan|chet tiet)',
-      '(?:cong san|viet cong) (?:khon nan|chet tiet|mat day|ac on|sat nhan)',
-      'ho tac',
-    ].join('|') +
-    ')\\b',
+  [
+    'lat do (?:chinh quyen|che do|dang|nha nuoc|chinh phu|cong san)',
+    'da dao (?:dang|cong san|chinh quyen|che do|nha nuoc|chinh phu|viet cong)',
+    'giai the dang cong san',
+    '(?:ung ho|tham gia|gia nhap|theo) viet tan',
+    'nha nuoc de ?ga',
+    '(?:doi )?doc lap (?:tay nguyen|tay bac|nam bo)',
+    '(?:hoang sa|truong sa)(?: va (?:hoang sa|truong sa))? (?:la cua|thuoc ve|thuoc) trung quoc',
+    '(?:chinh quyen|che do|nha nuoc|dang) (?:cong san )?(?:an cuop|cuop ngay|doc tai|thoi nat|khon nan|chet tiet)',
+    '(?:cong san|viet cong) (?:khon nan|chet tiet|mat day|ac on|sat nhan)',
+    'ho tac',
+  ].join('|') +
+  ')\\b',
 );
 // Đe doạ trực tiếp một người. Câu chê gay gắt về giá/dịch vụ ("giá cắt cổ", "chém khách") không khớp.
 const THREAT_PATTERN = new RegExp(
   '\\b(?:' +
-    [
-      'biet nha (?:may|mi|ma|em|con kia|thang kia) o dau',
-      'cho (?:may|mi|ma|no|chung may|con kia|thang kia) biet tay',
-      'tim ra (?:may|mi|ma)',
-      '(?:danh|dap|chem|giet) (?:cho )?(?:(?:may|mi|no|con kia|thang kia) )?(?:nhap vien|bam dap|gay (?:tay|chan)|chet)',
-      '(?:giet|chem|dap) (?:may|mi|chung may|ca nha may)',
-    ].join('|') +
-    ')\\b',
+  [
+    'biet nha (?:may|mi|ma|em|con kia|thang kia) o dau',
+    'cho (?:may|mi|ma|no|chung may|con kia|thang kia) biet tay',
+    'tim ra (?:may|mi|ma)',
+    '(?:danh|dap|chem|giet) (?:cho )?(?:(?:may|mi|no|con kia|thang kia) )?(?:nhap vien|bam dap|gay (?:tay|chan)|chet)',
+    '(?:giet|chem|dap) (?:may|mi|chung may|ca nha may)',
+  ].join('|') +
+  ')\\b',
 );
 
 function foldChar(char: string): string {
