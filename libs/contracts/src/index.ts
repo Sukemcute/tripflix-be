@@ -256,6 +256,7 @@ export const AccessRegistrationCodeRequestedV1Schema = z.object({
   email: z.email(),
   code: z.string().regex(/^[0-9]{8}$/),
   expiresAt: z.iso.datetime(),
+  purpose: z.enum(['register', 'login']).optional(),
 });
 export type AccessRegistrationCodeRequestedV1 = z.infer<typeof AccessRegistrationCodeRequestedV1Schema>;
 

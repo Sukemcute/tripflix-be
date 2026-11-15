@@ -205,4 +205,29 @@ describe('access E2E', () => {
     await registerTestAccount(app, { email: 'dup@example.com', password: PASSWORD, displayName: 'A' });
     await registerTestAccount(app, { email: 'DUP@example.com', password: PASSWORD, displayName: 'B' }, 409);
   });
+
+  it('đăng nhập 2 bước bằng mã xác thực email: POST /auth/login-code rồi POST /auth/login kèm mã', async () => {
+    await registerTestAccount(app, { email: 'otp@example.com', password: PASSWORD, displayName: 'OTP' });
+    await http().post('/api/auth/login-code').send({ email: 'otp@example.com', password: 'sai-mat-khau' }).expect(401);
+
+    const requested = await http().post('/api/auth/login-code').send({ email: 'otp@example.com', password: PASSWORD }).expect(202);
+    expect(requested.body).toMatchObject({ resendAfterSeconds: 60 });
+    const loginChallengeId = requested.body.loginChallengeId as string;
+
+    const codeEvent = [...store.outboxRows]
+      .reverse()
+      .find((e) => e.type === 'access.registration_code_requested' && (e.payload as { email?: string }).email === 'otp@example.com');
+    const code = (codeEvent?.payload as { code: string }).code;
+
+    await http()
+      .post('/api/auth/login')
+      .send({ email: 'otp@example.com', password: PASSWORD, loginChallengeId, code: '00000000' })
+      .expect(400);
+
+    const loggedIn = await http()
+      .post('/api/auth/login')
+      .send({ email: 'otp@example.com', password: PASSWORD, loginChallengeId, code })
+      .expect(200);
+    expect(loggedIn.body).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
+  });
 });
