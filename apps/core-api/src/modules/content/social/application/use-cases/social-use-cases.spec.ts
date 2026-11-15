@@ -32,6 +32,7 @@ import {
   PostMediaNotAllowedException,
   PostNotFoundException,
 } from '../../domain/index.js';
+import { PostShareLinks } from '../post-share-links.js';
 
 describe('Social Application Use Cases', () => {
   beforeAll(async () => {
@@ -189,12 +190,14 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.update.mockResolvedValue({ ...post, status: 'published', isVerified: true });
       (mockCommerceService.verifyCompletedBooking as any).mockResolvedValue(true);
 
-      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService);
+      const shareLinks = new PostShareLinks('https://tripflix.io.vn');
+      const useCase = new PublishPostUseCase(mockPostRepo, mockOutbox, mockCommerceService, shareLinks);
       const result = await useCase.execute({ postId, userId: authorId });
 
       expect(result.status).toBe('published');
       expect(result.isVerified).toBe(true);
-      expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
+      // Bài mẫu là Reel (video): link mở trình xem Reels trên web theo WEB_APP_URL.
+      expect(result.shareUrl).toBe(`https://tripflix.io.vn/inspiration?open=${postId}&kind=reel`);
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.post.published',
@@ -353,12 +356,7 @@ describe('Social Application Use Cases', () => {
         getDisplayNames: vi.fn().mockResolvedValue(new Map([[authorId, 'Thành Lê']])),
       };
 
-      const useCase = new GetPostDetailUseCase(
-        mockPostRepo,
-        mockReactionRepo,
-        mockBookmarkRepo,
-        mockUserDir,
-      );
+      const useCase = new GetPostDetailUseCase(mockPostRepo, mockReactionRepo, mockBookmarkRepo, mockUserDir);
 
       const result = await useCase.execute({ postId, viewerId: otherUserId });
       expect(result.post.authorName).toBe('Thành Lê');
@@ -373,7 +371,12 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findPublicPosts.mockResolvedValue([post1, post2]);
 
       const mockUserDir = {
-        getDisplayNames: vi.fn().mockResolvedValue(new Map([['u1', 'Người Dùng 1'], ['u2', 'Người Dùng 2']])),
+        getDisplayNames: vi.fn().mockResolvedValue(
+          new Map([
+            ['u1', 'Người Dùng 1'],
+            ['u2', 'Người Dùng 2'],
+          ]),
+        ),
       };
 
       const useCase = new ListPostsUseCase(mockPostRepo, mockUserDir);
@@ -469,57 +472,65 @@ describe('Social Application Use Cases', () => {
   });
 
   describe('Comment Use Cases', () => {
-    it.each([undefined, 'parent-1'])('tạo bình luận và phát outbox với parent %s', async (parentCommentId) => {
-      const post = samplePostRecord({ status: 'published' });
-      const commentRecord: CommentRecord = {
-        id: 'comm-1',
-        postId,
-        authorId: otherUserId,
-        status: 'visible',
-        hiddenByActionId: null,
-        cascadeRootCommentId: null,
-        parentCommentId: parentCommentId ?? null,
-        body: 'Bài viết hay quá!',
-        likeCount: 0,
-        isEdited: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        deletedAt: null,
-      };
+    it.each([undefined, 'parent-1'])(
+      'tạo bình luận và phát outbox với parent %s',
+      async (parentCommentId) => {
+        const post = samplePostRecord({ status: 'published' });
+        const commentRecord: CommentRecord = {
+          id: 'comm-1',
+          postId,
+          authorId: otherUserId,
+          status: 'visible',
+          hiddenByActionId: null,
+          cascadeRootCommentId: null,
+          parentCommentId: parentCommentId ?? null,
+          body: 'Bài viết hay quá!',
+          likeCount: 0,
+          isEdited: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+        };
 
-      mockPostRepo.findById.mockResolvedValue(post);
-      mockCommentRepo.create.mockResolvedValue(commentRecord);
-      if (parentCommentId) {
-        mockCommentRepo.findById.mockResolvedValue({ ...commentRecord, id: parentCommentId, authorId, parentCommentId: null });
-      }
+        mockPostRepo.findById.mockResolvedValue(post);
+        mockCommentRepo.create.mockResolvedValue(commentRecord);
+        if (parentCommentId) {
+          mockCommentRepo.findById.mockResolvedValue({
+            ...commentRecord,
+            id: parentCommentId,
+            authorId,
+            parentCommentId: null,
+          });
+        }
 
-      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
-        getDisplayNames: async () => new Map([[otherUserId, 'Trang']]),
-      });
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
+          getDisplayNames: async () => new Map([[otherUserId, 'Trang']]),
+        });
 
-      const result = await useCase.execute({
-        postId,
-        authorId: otherUserId,
-        body: 'Bài viết hay quá!',
-        ...(parentCommentId ? { parentCommentId } : {}),
-      });
+        const result = await useCase.execute({
+          postId,
+          authorId: otherUserId,
+          body: 'Bài viết hay quá!',
+          ...(parentCommentId ? { parentCommentId } : {}),
+        });
 
-      expect(result.id).toBe('comm-1');
-      expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', 1);
-      expect(mockOutbox.add).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'content.comment.created',
-          userId: otherUserId,
-          payload: expect.objectContaining({
-            commentId: 'comm-1',
-            postId,
-            authorId: otherUserId,
-            parentCommentAuthorId: parentCommentId ? authorId : null,
-            authorDisplayName: 'Trang',
+        expect(result.id).toBe('comm-1');
+        expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', 1);
+        expect(mockOutbox.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'content.comment.created',
+            userId: otherUserId,
+            payload: expect.objectContaining({
+              commentId: 'comm-1',
+              postId,
+              authorId: otherUserId,
+              parentCommentAuthorId: parentCommentId ? authorId : null,
+              authorDisplayName: 'Trang',
+            }),
           }),
-        }),
-      );
-    });
+        );
+      },
+    );
 
     it('từ chối bình luận vào bài viết private hoặc draft của người khác (trả về PostNotFoundException)', async () => {
       const privatePost = samplePostRecord({ status: 'published', visibility: 'private', authorId });
@@ -570,7 +581,7 @@ describe('Social Application Use Cases', () => {
       expect(mockCommentRepo.create).toHaveBeenCalled();
     });
 
-    it('từ chối bình luận khi reply vào một reply khác (chặn reply cấp 2)', async () => {
+    it('lưu trả lời một reply cùng cấp và giữ đúng người được trả lời', async () => {
       const post = samplePostRecord({ status: 'published' });
       const parentReplyRecord: CommentRecord = {
         id: 'reply-1',
@@ -589,9 +600,13 @@ describe('Social Application Use Cases', () => {
       };
 
       mockPostRepo.findById.mockResolvedValue(post);
-      mockCommentRepo.findById.mockResolvedValue(parentReplyRecord);
+      const root = { ...parentReplyRecord, id: 'root-comment-id', authorId, parentCommentId: null };
+      mockCommentRepo.findById.mockResolvedValueOnce(parentReplyRecord).mockResolvedValueOnce(root);
+      mockCommentRepo.create.mockResolvedValue({ ...parentReplyRecord, id: 'new-reply', replyToName: 'Dũng' });
 
-      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+      const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
+        getDisplayNames: async () => new Map([[otherUserId, 'Dũng']]),
+      });
 
       await expect(
         useCase.execute({
@@ -600,7 +615,11 @@ describe('Social Application Use Cases', () => {
           body: 'Cố tình reply vào reply',
           parentCommentId: 'reply-1',
         }),
-      ).rejects.toThrow(/Chỉ hỗ trợ phản hồi bình luận 1 cấp/);
+      ).resolves.toMatchObject({ id: 'new-reply', parentCommentId: root.id });
+      expect(mockCommentRepo.create).toHaveBeenCalledWith(expect.objectContaining({ parentCommentId: root.id, replyToName: 'Dũng' }));
+      expect(mockOutbox.add).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({
+        commentId: 'new-reply', replyToCommentId: 'reply-1', replyToAuthorId: otherUserId, parentCommentAuthorId: authorId,
+      }) }));
     });
 
     it('sửa bình luận cập nhật nội dung và phát sự kiện outbox content.comment.updated', async () => {
@@ -804,11 +823,11 @@ describe('Social Application Use Cases', () => {
       const post = samplePostRecord({ status: 'published', shareCount: 10 });
       mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, shareCount: 11 });
 
-      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox);
+      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox, new PostShareLinks('https://tripflix.io.vn'));
       const result = await useCase.execute({ postId, userId: otherUserId });
 
       expect(result.shareCount).toBe(11);
-      expect(result.shareUrl).toBe(`https://tripflix.vn/posts/${postId}`);
+      expect(result.shareUrl).toBe(`https://tripflix.io.vn/inspiration?open=${postId}&kind=reel`);
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'shareCount', 1);
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -827,6 +846,7 @@ describe('Social Application Use Cases', () => {
     it('ẩn bài đăng, lưu nhật ký kiểm duyệt và ghi sự kiện outbox content.post.moderated', async () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
+      mockPostRepo.update.mockResolvedValue({ ...post, status: 'hidden' });
       mockModerationRepo.create.mockResolvedValue({
         id: 'action-1',
         postId,
@@ -942,10 +962,14 @@ describe('Social Application Use Cases', () => {
       mockPostRepo.findById.mockResolvedValue(privatePost());
       const useCase = new GetPostStatsUseCase(mockPostRepo);
 
-      await expect(useCase.execute({ postId, viewerId: otherUserId })).rejects.toBeInstanceOf(PostNotFoundException);
+      await expect(useCase.execute({ postId, viewerId: otherUserId })).rejects.toBeInstanceOf(
+        PostNotFoundException,
+      );
       await expect(useCase.execute({ postId })).rejects.toBeInstanceOf(PostNotFoundException);
       await expect(useCase.execute({ postId, viewerId: authorId })).resolves.toMatchObject({ postId });
-      await expect(useCase.execute({ postId, viewerId: moderatorId, isStaff: true })).resolves.toMatchObject({ postId });
+      await expect(useCase.execute({ postId, viewerId: moderatorId, isStaff: true })).resolves.toMatchObject({
+        postId,
+      });
     });
 
     it('thống kê bài đã ẩn: khách nhận 404 như bài không tồn tại', async () => {
@@ -997,7 +1021,12 @@ describe('Social Application Use Cases', () => {
     });
 
     it('danh sách đã lưu bỏ bài riêng tư của người khác, giữ bài riêng tư của chính mình và ẩn bookingId', async () => {
-      const foreignPrivate = samplePostRecord({ id: 'foreign', authorId: otherUserId, status: 'published', visibility: 'private' });
+      const foreignPrivate = samplePostRecord({
+        id: 'foreign',
+        authorId: otherUserId,
+        status: 'published',
+        visibility: 'private',
+      });
       const ownPrivate = samplePostRecord({ id: 'own', status: 'published', visibility: 'private' });
       mockBookmarkRepo.findUserBookmarks.mockResolvedValue([
         { id: 'b1', postId: 'foreign', userId: authorId, createdAt: new Date() },

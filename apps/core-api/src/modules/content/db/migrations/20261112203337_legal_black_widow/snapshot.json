@@ -1,0 +1,110 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "acf3cece-0cd4-496e-9583-12ef33d676a3",
+  "prevIds": [
+    "84185ad6-1cbc-4f1d-9e27-1c7b3c26529b"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "reports",
+        "content_version"
+      ],
+      "writes": [
+        "s|col|content.reports.content_version",
+        "n|col|content.reports.content_version",
+        "e|col|content.reports.content_version"
+      ],
+      "reads": [
+        "n|tbl|content.reports",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "recreate_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "reports",
+        "uq_reports_target_reporter"
+      ],
+      "writes": [
+        "s|idx|content.uq_reports_target_reporter",
+        "n|idx|content.uq_reports_target_reporter",
+        "e|idx|content.uq_reports_target_reporter",
+        "n|rel|content.uq_reports_target_reporter"
+      ],
+      "reads": [
+        "n|tbl|content.reports",
+        "n|sch|content",
+        "n|col|content.reports.target_type",
+        "n|col|content.reports.target_id",
+        "n|col|content.reports.content_version",
+        "n|col|content.reports.reporter_id"
+      ],
+      "sharedWrites": [
+        "e|uniqueness|content.reports.reporter_id.target_id.target_type"
+      ],
+      "sqlHash": "46b709b3cd964d96"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "reports",
+        "name": "content_version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'legacy'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "indexes\u0000[\"content\",\"uq_reports_target_reporter\"]",
+      "set": {
+        "columns": [
+          {
+            "value": "target_type",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "target_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "content_version",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "reporter_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -41,8 +41,9 @@ export class ExploreController {
       'Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).',
       '',
       '- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.',
-      '- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Không có gì khớp thì vùng có `total: 0`, không đoán bừa.',
-      '- Vùng câu muốn tìm rỗng: `suggest` là các gợi ý khác (bỏ các từ trong `dropped`).',
+      '- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Gõ sai thì tìm cả câu gốc lẫn câu đã sửa rồi gộp kết quả.',
+      '- `sections` chỉ gồm mục khớp đủ câu: đúng nơi, không vượt ngân sách, khớp từ. Vùng không có mục nào như vậy thì `total: 0`.',
+      '- Vùng câu muốn tìm rỗng: `fallback` là kết quả thay thế sau khi nới điều kiện (`relaxed`: khác nơi, vượt ngân sách, bỏ từ). Không có gì liên quan thì `fallback: null`.',
       '- `loc` chỉ dùng khi câu không nói nơi.',
     ].join('\n'),
   })
@@ -68,9 +69,9 @@ export class ExploreController {
       'Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.',
       '',
       '- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.',
-      '- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.',
+      '- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.',
       '- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.',
-      '- Không bài nào khớp đủ câu nhưng hiểu được nơi hoặc ý muốn (vd "mùa thu hà nội"): `isFallback: true`, `items` là bài theo phần hiểu được, `dropped` là các từ không có trong dữ liệu.',
+      '- Không bài nào khớp đủ câu (vd "mùa thu hà nội", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.',
     ].join('\n'),
   })
   @ApiBody({ type: SearchPostsRequestDto })

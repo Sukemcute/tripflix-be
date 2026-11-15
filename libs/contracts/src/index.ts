@@ -173,6 +173,8 @@ export const ContentCommentCreatedV1Schema = z.object({
   authorId: z.uuid(),
   parentCommentId: z.uuid().nullable(),
   parentCommentAuthorId: z.uuid().nullable().optional(),
+  replyToCommentId: z.uuid().optional(),
+  replyToAuthorId: z.uuid().optional(),
   authorDisplayName: z.string().min(1).optional(),
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
@@ -309,7 +311,15 @@ export const ContentCommentHiddenV1Schema = z.object({
   commentId: z.uuid(),
   authorId: z.uuid(),
 });
-export const ContentCommentRestoredV1Schema = ContentCommentHiddenV1Schema;
+export const ContentCommentRestoredV1Schema = z.object({
+  postId: z.uuid(),
+  commentId: z.uuid(),
+  authorId: z.uuid(),
+  // Optional for v1 events emitted before restore included the comment content.
+  body: z.string().min(1).max(10_000).optional(),
+  parentCommentId: z.uuid().nullable().optional(),
+  postAuthorId: z.uuid().optional(),
+});
 export const ContentPostHiddenV1Schema = z.object({
   postId: z.uuid(),
   authorId: z.uuid(),
@@ -329,6 +339,14 @@ export const ContentModerationDecidedV1Schema = z.object({
   action: z.enum(['hide', 'restore', 'remove', 'dismiss']),
   reasonCode: z.string(),
   isAutomatic: z.boolean(),
+});
+export const ContentAppealDecidedV1Schema = z.object({
+  appealId: z.uuid(), authorId: z.uuid(), decisionId: z.uuid(),
+  outcome: z.enum(['upheld', 'overturned']),
+});
+export const ContentCommentModerationActionV1Schema = z.object({
+  actionId: z.uuid(), postId: z.uuid(), commentId: z.uuid(), authorId: z.uuid(),
+  action: z.enum(['hide', 'remove', 'restore']), reasonCode: z.string(),
 });
 export const ContentReportCreatedV1Schema = z.object({
   reportId: z.uuid(),
@@ -382,6 +400,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.post.hidden.v1': ContentPostHiddenV1Schema,
   'content.post.restored.v1': ContentPostRestoredV1Schema,
   'content.moderation.decided.v1': ContentModerationDecidedV1Schema,
+  'content.appeal.decided.v1': ContentAppealDecidedV1Schema,
+  'content.comment.moderation_action.v1': ContentCommentModerationActionV1Schema,
   'content.report.created.v1': ContentReportCreatedV1Schema,
   'event-envelope.v1': eventEnvelopeSchema,
   'role.v1': roleSchema,

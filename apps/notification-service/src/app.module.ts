@@ -173,8 +173,14 @@ export class AppModule implements OnApplicationShutdown {
 
   async onApplicationShutdown() {
     await this.db.end();
-    this.redis.disconnect();
-    this.realtimeRedis.pub.disconnect();
-    this.realtimeRedis.sub.disconnect();
+    // Let queued adapter commands finish before closing pub/sub connections.
+    await Promise.all([this.redis, this.realtimeRedis.pub, this.realtimeRedis.sub].map(async (client) => {
+      if (client.status === 'wait' || client.status === 'end') {
+        client.disconnect();
+        return;
+      }
+      try { await client.quit(); }
+      catch { client.disconnect(); }
+    }));
   }
 }

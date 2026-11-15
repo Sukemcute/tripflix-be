@@ -36,30 +36,41 @@ export class AddCommentUseCase {
 
     const body = Comment.validateBody(command.body);
 
-    // Nếu là reply, kiểm tra parent comment tồn tại và không phải reply của reply (chỉ 1 cấp)
+    // Lưu lượt trả lời dưới gốc để giữ phân trang một cấp. Event giữ tác giả của mục được trả lời.
+    let threadRootId: string | null = null;
+    let replyToAuthorId: string | null = null;
     let parentCommentAuthorId: string | null = null;
     if (command.parentCommentId) {
       const parent = await this.commentRepository.findById(command.parentCommentId);
       if (!parent || parent.postId !== command.postId || parent.deletedAt || parent.status !== 'visible') {
         throw new CommentNotFoundException(command.parentCommentId);
       }
-      Comment.validateParentForReply(parent);
-      parentCommentAuthorId = parent.authorId;
+      const root = parent.parentCommentId ? await this.commentRepository.findById(parent.parentCommentId) : parent;
+      if (!root || root.postId !== command.postId || root.deletedAt || root.status !== 'visible') {
+        throw new CommentNotFoundException(command.parentCommentId);
+      }
+      Comment.validateParentForReply(root);
+      threadRootId = root.id;
+      parentCommentAuthorId = root.authorId;
+      replyToAuthorId = parent.authorId;
     }
+
+    const displayIds = replyToAuthorId ? [command.authorId, replyToAuthorId] : [command.authorId];
+    const names = await this.userDirectory?.getDisplayNames(displayIds).catch(() => undefined);
+    const authorDisplayName = names?.get(command.authorId)?.trim();
+    const replyToName = replyToAuthorId ? names?.get(replyToAuthorId)?.trim() : undefined;
 
     const comment = await this.commentRepository.create({
       postId: command.postId,
       authorId: command.authorId,
-      parentCommentId: command.parentCommentId ?? null,
+      parentCommentId: threadRootId,
+      ...(replyToName ? { replyToName } : {}),
       body,
       isEdited: false,
     });
 
     // Tăng bộ đếm bình luận của bài viết
     await this.postRepository.incrementCounter(command.postId, 'commentCount', 1);
-
-    const names = await this.userDirectory?.getDisplayNames([command.authorId]).catch(() => undefined);
-    const authorDisplayName = names?.get(command.authorId)?.trim();
 
     // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
     await this.outbox.add({
@@ -71,8 +82,9 @@ export class AddCommentUseCase {
         postAuthorId: post.authorId,
         authorId: command.authorId,
         ...(authorDisplayName ? { authorDisplayName } : {}),
-        parentCommentId: command.parentCommentId ?? null,
+        parentCommentId: threadRootId,
         parentCommentAuthorId,
+        ...(command.parentCommentId ? { replyToCommentId: command.parentCommentId, replyToAuthorId } : {}),
         body: comment.body,
         createdAt: comment.createdAt.toISOString(),
       },

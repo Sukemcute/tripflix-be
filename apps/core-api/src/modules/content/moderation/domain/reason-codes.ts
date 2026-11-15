@@ -5,6 +5,7 @@ export const REASON_CODES = [
   'SEXUAL',
   'VIOLENCE',
   'MISINFORMATION',
+  'EXTREMISM',
   'OTHER',
 ] as const;
 export type ReasonCode = (typeof REASON_CODES)[number];

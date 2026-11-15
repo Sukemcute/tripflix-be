@@ -14,12 +14,20 @@ import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guar
 import { SocialErrorFilter } from './social-error.filter.js';
 import { ZodBody } from './http.js';
 import {
+  MarkPostSummaryCheckedDto,
+  MarkPostSummaryCheckedRequestSchema,
+  MarkPostSummaryCheckedResponseDto,
   PostSummaryResponseDto,
   SavePostSummaryDto,
   SavePostSummaryRequestSchema,
+  type MarkPostSummaryCheckedRequest,
   type SavePostSummaryRequest,
 } from './dto/post-summary.dto.js';
-import { GetPostSummaryUseCase, SavePostSummaryUseCase } from '../application/index.js';
+import {
+  GetPostSummaryUseCase,
+  MarkPostSummaryCheckedUseCase,
+  SavePostSummaryUseCase,
+} from '../application/index.js';
 
 @ApiTags('Social - AI Summary')
 @Controller('v1/posts/:postId/ai-summary')
@@ -28,6 +36,7 @@ export class PostSummaryController {
   constructor(
     private readonly savePostSummaryUseCase: SavePostSummaryUseCase,
     private readonly getPostSummaryUseCase: GetPostSummaryUseCase,
+    private readonly markPostSummaryCheckedUseCase: MarkPostSummaryCheckedUseCase,
   ) {}
 
   @Put()
@@ -62,6 +71,29 @@ export class PostSummaryController {
       modelName: body.modelName,
       generatedAt: body.generatedAt,
     });
+  }
+
+  @Put('checked')
+  @ApiBearerAuth()
+  @ServiceOnly('ai-service')
+  @ApiOperation({
+    summary: 'AI báo đã kiểm lại, đầu vào không đổi (Nội bộ)',
+    description:
+      'Worker chạy lại nhưng inputHash trùng bản đang lưu nên không gọi LLM, không lưu bản mới. ' +
+      'Core ghi checkedAt và số bình luận hiện tại để isStale không bị kẹt. Chỉ cập nhật khi inputHash khớp ' +
+      'và checkedAt mới hơn generatedAt lẫn checkedAt đang có; gửi lại nhiều lần không sao.',
+  })
+  @ApiBody({ type: MarkPostSummaryCheckedDto })
+  @ApiResponse({ status: 200, description: 'Đã xử lý', type: MarkPostSummaryCheckedResponseDto })
+  @ApiResponse({ status: 400, description: 'Dữ liệu gửi lên không hợp lệ hoặc postId sai định dạng UUID' })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực hoặc token không hợp lệ' })
+  @ApiResponse({ status: 403, description: 'Từ chối: Token không có quyền ai-service' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy bài viết' })
+  async markChecked(
+    @Param('postId', new ParseUUIDPipe()) postId: string,
+    @Body(new ZodBody(MarkPostSummaryCheckedRequestSchema)) body: MarkPostSummaryCheckedRequest,
+  ) {
+    return this.markPostSummaryCheckedUseCase.execute({ postId, ...body });
   }
 
   @Get()

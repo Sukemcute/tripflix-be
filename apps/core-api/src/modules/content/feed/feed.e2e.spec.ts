@@ -67,10 +67,22 @@ class FakeFeedStore implements FeedStore {
     return Promise.resolve(rows.slice(start, start + limit));
   }
 
+  /** Giữ thứ tự của rows; điểm giảm dần theo vị trí để cursor có rank như bản thật. */
+  listForYouPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
+    const ranked = this.rows.map((row, i) => ({ ...row, rank: 1 / (i + 1) }));
+    const start = after ? ranked.findIndex((row) => row.id === after.id) + 1 : 0;
+    return Promise.resolve(ranked.slice(start, start + limit));
+  }
+
   listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
     const sorted = [...this.rows].sort((a, b) => calculateHotScore(b) - calculateHotScore(a));
     const start = after ? sorted.findIndex((row) => row.id === after.id) + 1 : 0;
     return Promise.resolve(sorted.slice(start, start + limit));
+  }
+
+  /** Bản thật không theo thứ tự nào: trả ngược để test chắc thứ tự là do use case sắp lại. */
+  findPlayablePostsByIds(postIds: string[]): Promise<FeedPostRow[]> {
+    return Promise.resolve(this.rows.filter((row) => postIds.includes(row.id)).reverse());
   }
 
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]> {
@@ -256,11 +268,20 @@ describe('GET /api/v1/feed E2E', () => {
 
   const plainCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1) });
   const hotCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 7 });
+  const rankedCursor = encodeFeedCursor({
+    at: '2026-11-05T10:00:01.000000Z',
+    id: buildPostId(1),
+    score: 7,
+    rank: 0.5,
+    seed: 1,
+    asOf: '2026-11-13T00:00:00.000Z',
+  });
 
   it.each([
     ['tab chưa có', 'tab=following'],
     ['cursor của for_you dùng cho hot', `tab=hot&cursor=${plainCursor}`],
     ['cursor của hot dùng cho for_you', `tab=for_you&cursor=${hotCursor}`],
+    ['cursor có rank của for_you dùng cho hot', `tab=hot&cursor=${rankedCursor}`],
     ['limit vượt 20', 'limit=21'],
     ['limit bằng 0', 'limit=0'],
     ['limit không phải số', 'limit=abc'],
@@ -269,6 +290,31 @@ describe('GET /api/v1/feed E2E', () => {
     ['saved với tab hot', 'saved=true&tab=hot'],
   ])('%s thì trả 400', async (_name, query) => {
     await http().get(`/api/v1/feed?${query}`).expect(400);
+  });
+
+  it('post_ids trả thẻ đúng thứ tự truyền vào, bỏ bài không xem được, có trạng thái thích', async () => {
+    feedStore.liked = [{ userId, postId: buildPostId(1) }];
+    const missing = buildPostId(9);
+
+    const response = await http()
+      .get('/api/v1/feed')
+      .query({ post_ids: `${buildPostId(3)},${missing},${buildPostId(1)},${buildPostId(3)}` })
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    const body = response.body as FeedPageBody;
+
+    expect(body.items.map((item) => item.postId)).toEqual([buildPostId(3), buildPostId(1)]);
+    expect(body.items.map((item) => item.viewerState?.liked)).toEqual([false, true]);
+    expect(body.items[0]?.video.hlsUrl).toContain('master.m3u8');
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it('post_ids sai dạng, quá 20 id hoặc ghép với cursor, saved, author_id thì trả 400', async () => {
+    await http().get('/api/v1/feed').query({ post_ids: 'khong-phai-uuid' }).expect(400);
+    await http().get('/api/v1/feed').query({ post_ids: ',' }).expect(400);
+    const tooMany = Array.from({ length: 21 }, (_, i) => buildPostId(i)).join(',');
+    await http().get('/api/v1/feed').query({ post_ids: tooMany }).expect(400);
+    await http().get('/api/v1/feed').query({ post_ids: buildPostId(1), author_id: userId }).expect(400);
   });
 
   it('saved=true khi chưa đăng nhập trả 401', async () => {

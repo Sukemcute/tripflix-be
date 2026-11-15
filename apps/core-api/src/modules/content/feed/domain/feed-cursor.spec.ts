@@ -15,6 +15,14 @@ describe('feed cursor', () => {
     expect(decodeFeedCursor(encodeRaw({ ...VALID, score: 1.5 }))).toBeNull();
   });
 
+  it('giữ seed, điểm xếp hạng và mốc giờ của tab Dành cho bạn', () => {
+    const ranked = { ...VALID, rank: 0.012345678901234567, seed: 15, asOf: '2026-11-13T03:04:05.678Z' };
+    expect(decodeFeedCursor(encodeFeedCursor(ranked))).toEqual(ranked);
+    expect(decodeFeedCursor(encodeRaw({ ...VALID, seed: 16 }))).toBeNull();
+    expect(decodeFeedCursor(encodeRaw({ ...VALID, rank: -0.1 }))).toBeNull();
+    expect(decodeFeedCursor(encodeRaw({ ...VALID, asOf: '2026-11-13' }))).toBeNull();
+  });
+
   it.each([
     ['không phải base64 JSON', 'khong-hop-le'],
     ['thiếu id', encodeRaw({ at: VALID.at })],

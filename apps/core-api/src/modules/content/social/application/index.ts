@@ -26,6 +26,7 @@ export * from './use-cases/list-admin-posts.use-case.js';
 export * from './use-cases/get-admin-post-detail.use-case.js';
 export * from './use-cases/save-post-summary.use-case.js';
 export * from './use-cases/get-post-summary.use-case.js';
+export * from './use-cases/mark-post-summary-checked.use-case.js';
 export * from './use-cases/set-comment-reaction.use-case.js';
 export * from './use-cases/sample-comments.use-case.js';
 export * from './use-cases/get-comment-stats.use-case.js';

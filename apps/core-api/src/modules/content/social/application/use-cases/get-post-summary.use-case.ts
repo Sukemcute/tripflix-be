@@ -38,13 +38,12 @@ export class GetPostSummaryUseCase {
     const summary = await this.postSummaryRepository.findByPostId(query.postId);
     if (!summary) return null;
 
-    // Kiểm tra xem thảo luận có thay đổi (comment mới hoặc nội dung comment cũ bị sửa) kể từ thời điểm tóm tắt
+    // Thảo luận có đổi (bình luận mới hoặc bị sửa) kể từ lần AI xem gần nhất: lúc tóm tắt, hoặc lúc AI kiểm
+    // lại và thấy đầu vào không đổi (checkedAt). Thiếu checkedAt thì bình luận bị luật lọc bỏ làm cờ kẹt mãi.
     let discussionChanged = false;
-    if (this.commentRepository && summary.generatedAt) {
-      discussionChanged = await this.commentRepository.hasDiscussionChangedSince(
-        query.postId,
-        summary.generatedAt,
-      );
+    const freshAt = latestOf(summary.generatedAt, summary.checkedAt);
+    if (this.commentRepository && freshAt) {
+      discussionChanged = await this.commentRepository.hasDiscussionChangedSince(query.postId, freshAt);
     }
 
     // So sánh số lượng bình luận tại thời điểm tóm tắt với số bình luận hiện tại của bài viết
@@ -83,6 +82,10 @@ export class GetPostSummaryUseCase {
       isStale: blocked || isStale,
     };
   }
+}
+
+function latestOf(...dates: Array<Date | null | undefined>): Date | null {
+  return dates.reduce<Date | null>((latest, date) => (date && (!latest || date > latest) ? date : latest), null);
 }
 
 /**

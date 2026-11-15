@@ -423,7 +423,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const saveUseCase = { execute: vi.fn().mockResolvedValue(mockSummaryRecord) } as any;
       const getUseCase = { execute: vi.fn().mockResolvedValue(mockSummaryRecord) } as any;
 
-      const controller = new PostSummaryController(saveUseCase, getUseCase);
+      const controller = new PostSummaryController(saveUseCase, getUseCase, {} as any);
 
       const saved = await controller.saveSummary(postId, {
         status: 'ready',
@@ -443,7 +443,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       const saveUseCase = {} as any;
       const getUseCase = { execute: vi.fn().mockResolvedValue(null) } as any;
 
-      const controller = new PostSummaryController(saveUseCase, getUseCase);
+      const controller = new PostSummaryController(saveUseCase, getUseCase, {} as any);
 
       await expect(controller.getSummary(postId)).rejects.toThrow(
         `Bài viết ${postId} chưa có bản tóm tắt nào`,

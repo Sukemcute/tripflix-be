@@ -77,6 +77,20 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     })]);
   });
 
+  it('báo cho tác giả lượt trả lời được nhắm tới và mở lượt trả lời mới', async () => {
+    const replyToAuthorId = randomUUID();
+    const payload = comment({ authorDisplayName: 'Trang', replyToCommentId: randomUUID(), replyToAuthorId });
+    await router.route(event('content.comment.created', payload));
+    const { items } = await inbox.listForUser(replyToAuthorId, { limit: 20 });
+    expect(items).toEqual([expect.objectContaining({
+      title: 'Trang đã trả lời bình luận',
+      body: 'Trang đã trả lời bình luận của bạn.',
+      link: `/trips/${payload.postId}?comment=${payload.commentId}`,
+      data: expect.objectContaining({ commentId: payload.commentId, parentCommentId: payload.parentCommentId }),
+    })]);
+    expect(await inbox.countUnread(payload.parentCommentAuthorId!)).toBe(0);
+  });
+
   it('gộp hai vai trò của cùng một người và bỏ thông báo cho chính người bình luận', async () => {
     const userId = randomUUID();
     const payload = comment({ postAuthorId: userId, parentCommentAuthorId: userId });

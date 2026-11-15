@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "df2df340-1da0-4abc-953a-b0e1120faaac",
+  "prevIds": [
+    "a09baf16-820e-4eb8-8b44-174e8db4d8b5"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "checked_at"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.checked_at",
+        "n|col|content.post_summaries.checked_at",
+        "e|col|content.post_summaries.checked_at"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "checked_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

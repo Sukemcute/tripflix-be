@@ -36,8 +36,11 @@ export class PostSummaryRepository {
         SELECT 1
         FROM jsonb_array_elements_text(${postSummaries.sourceCommentIds}) AS src(id)
         LEFT JOIN content.comments c
-          ON src.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-         AND c.id = src.id::uuid
+          -- Postgres không đảm bảo thứ tự tính các vế của AND: ép ::uuid trong CASE để id lạ thành NULL
+          -- (không khớp dòng nào, nên bị coi là nguồn đã mất) thay vì làm cả câu lỗi.
+          ON c.id = CASE
+            WHEN src.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN src.id::uuid
+          END
         WHERE c.id IS NULL OR c.status != 'visible' OR c.deleted_at IS NOT NULL
       )`,
     ];
@@ -83,6 +86,8 @@ export class PostSummaryRepository {
           promptVersion: data.promptVersion,
           modelName: data.modelName,
           generatedAt: data.generatedAt,
+          // Lần kiểm "không đổi" trước đó thuộc về bản cũ, không áp cho bản vừa lưu.
+          checkedAt: null,
           updatedAt: new Date(),
         },
         where: sql`(
@@ -101,6 +106,32 @@ export class PostSummaryRepository {
       throw new Error(`Không thể lưu tóm tắt cho bài đăng ${data.postId}`);
     }
     return current;
+  }
+
+  /**
+   * AI kiểm lại và thấy đầu vào không đổi: ghi mốc kiểm và số bình luận hiện tại, không đụng nội dung.
+   * Chỉ áp cho đúng bản đang lưu (cùng inputHash) và chỉ tiến mốc lên, nên lệnh đến trễ hoặc lệnh của
+   * bản cũ không làm sai cờ isStale. Trả false khi không có dòng nào khớp.
+   */
+  async markChecked(data: {
+    postId: string;
+    inputHash: string;
+    checkedAt: Date;
+    commentCount: number;
+  }): Promise<boolean> {
+    const updated = await this.db
+      .update(postSummaries)
+      .set({ checkedAt: data.checkedAt, commentCountAtSummary: data.commentCount, updatedAt: new Date() })
+      .where(
+        and(
+          eq(postSummaries.postId, data.postId),
+          eq(postSummaries.inputHash, data.inputHash),
+          sql`${postSummaries.generatedAt} IS NOT NULL AND ${postSummaries.generatedAt} <= ${data.checkedAt}`,
+          sql`(${postSummaries.checkedAt} IS NULL OR ${postSummaries.checkedAt} < ${data.checkedAt})`,
+        ),
+      )
+      .returning({ postId: postSummaries.postId });
+    return updated.length > 0;
   }
 
   async upsert(data: NewPostSummaryRecord): Promise<PostSummaryRecord> {

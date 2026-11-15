@@ -15,6 +15,17 @@ export const FeedQuerySchema = z
     tab: z.enum(FEED_TABS).default('for_you'),
     limit: z.coerce.number().int().min(1).max(FEED_MAX_LIMIT).default(FEED_DEFAULT_LIMIT),
     author_id: z.uuid().optional(),
+    // Mở Reels từ kết quả tìm kiếm hay link: "a,b,c", trả thẻ theo đúng thứ tự này, bỏ qua bài không xem được.
+    post_ids: z
+      .string()
+      .transform((value) =>
+        value
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.uuid()).min(1).max(FEED_MAX_LIMIT))
+      .optional(),
     cursor: z
       .string()
       .transform((value, ctx): FeedCursor => {
@@ -33,11 +44,19 @@ export const FeedQuerySchema = z
       .default(false),
   })
   .superRefine((query, ctx) => {
+    // Lấy theo id không phân trang, không lọc thêm: ghép với các tham số này thì không rõ ý người gọi.
+    if (query.post_ids && (query.cursor || query.saved || query.author_id)) {
+      ctx.addIssue({ code: 'custom', path: ['post_ids'], message: 'post_ids không dùng chung với cursor, saved, author_id' });
+    }
     if (query.saved && query.tab === 'hot') {
       ctx.addIssue({ code: 'custom', path: ['saved'], message: 'saved chỉ dùng với tab for_you' });
     }
     // Cursor của tab này dùng ở tab kia sẽ cắt danh sách sai vị trí.
-    if (query.cursor && (query.tab === 'hot') !== (query.cursor.score !== undefined)) {
+    if (
+      query.cursor &&
+      ((query.tab === 'hot') !== (query.cursor.score !== undefined) ||
+        (query.tab === 'hot' && query.cursor.rank !== undefined))
+    ) {
       ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor không thuộc tab này' });
     }
   });

@@ -35,14 +35,21 @@ export class FeedController {
     enum: ['true', 'false'],
     description: 'true: chỉ Reels người xem đã lưu, mới nhất trước. Cần đăng nhập, chỉ dùng với tab for_you',
   })
+  @ApiQuery({
+    name: 'post_ids',
+    required: false,
+    type: String,
+    description: `Lấy thẻ của đúng các bài này (uuid cách nhau bởi dấu phẩy, tối đa ${FEED_MAX_LIMIT}), theo đúng thứ tự truyền vào. Bài ẩn, riêng tư, đã xoá, không phải Reels hoặc video chưa xử lý xong thì bỏ qua. Bỏ qua tab và limit, nextCursor luôn null; không dùng chung với cursor, saved, author_id`,
+  })
   @ApiOkResponse({ type: FeedPageDto })
-  @ApiBadRequestResponse({ description: 'tab, limit, cursor, author_id hoặc saved không hợp lệ' })
+  @ApiBadRequestResponse({ description: 'tab, limit, cursor, author_id, saved hoặc post_ids không hợp lệ' })
   @ApiUnauthorizedResponse({ description: 'saved=true khi chưa đăng nhập' })
   getFeed(
     @Query(new ZodBody(FeedQuerySchema)) query: z.infer<typeof FeedQuerySchema>,
     @OptionalCurrentUser() user?: AuthUser,
   ): Promise<FeedPage> {
     if (query.saved && !user) throw new UnauthorizedException('Cần đăng nhập để xem Reels đã lưu');
+    if (query.post_ids) return this.feed.getByIds(query.post_ids, user?.userId ?? null);
     return this.feed.getPage({
       tab: query.tab,
       limit: query.limit,

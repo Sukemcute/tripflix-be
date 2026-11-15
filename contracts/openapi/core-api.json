@@ -137,6 +137,15 @@
         "operationId": "AuthController_login",
         "parameters": [
           {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Tripflix-Client",
             "in": "header",
             "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
@@ -183,6 +192,15 @@
       "post": {
         "operationId": "AuthController_loginWithGoogle",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
@@ -236,6 +254,15 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt, bắt buộc cho web và admin",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Tripflix-Client",
             "in": "header",
@@ -2313,6 +2340,65 @@
         ]
       }
     },
+    "/api/v1/posts/{postId}/ai-summary/checked": {
+      "put": {
+        "description": "Worker chạy lại nhưng inputHash trùng bản đang lưu nên không gọi LLM, không lưu bản mới. Core ghi checkedAt và số bình luận hiện tại để isStale không bị kẹt. Chỉ cập nhật khi inputHash khớp và checkedAt mới hơn generatedAt lẫn checkedAt đang có; gửi lại nhiều lần không sao.",
+        "operationId": "PostSummaryController_markChecked",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkPostSummaryCheckedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đã xử lý",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkPostSummaryCheckedResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ hoặc postId sai định dạng UUID"
+          },
+          "401": {
+            "description": "Chưa xác thực hoặc token không hợp lệ"
+          },
+          "403": {
+            "description": "Từ chối: Token không có quyền ai-service"
+          },
+          "404": {
+            "description": "Không tìm thấy bài viết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "AI báo đã kiểm lại, đầu vào không đổi (Nội bộ)",
+        "tags": [
+          "Social - AI Summary"
+        ]
+      }
+    },
     "/api/v1/internal/ai-summary/reconciliation": {
       "get": {
         "description": "Chỉ dành cho ai-service. Quét danh sách bài tóm tắt bị held để worker AI chạy tóm tắt bù khi bị sót event.",
@@ -2559,6 +2645,15 @@
         "operationId": "FeedController_getFeed",
         "parameters": [
           {
+            "name": "post_ids",
+            "required": false,
+            "in": "query",
+            "description": "Lấy thẻ của đúng các bài này (uuid cách nhau bởi dấu phẩy, tối đa 20), theo đúng thứ tự truyền vào. Bài ẩn, riêng tư, đã xoá, không phải Reels hoặc video chưa xử lý xong thì bỏ qua. Bỏ qua tab và limit, nextCursor luôn null; không dùng chung với cursor, saved, author_id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "saved",
             "required": false,
             "in": "query",
@@ -2623,7 +2718,7 @@
             }
           },
           "400": {
-            "description": "tab, limit, cursor, author_id hoặc saved không hợp lệ"
+            "description": "tab, limit, cursor, author_id, saved hoặc post_ids không hợp lệ"
           },
           "401": {
             "description": "saved=true khi chưa đăng nhập"
@@ -2632,6 +2727,397 @@
         "summary": "Bảng tin Reels: chỉ gồm bài dạng video phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.",
         "tags": [
           "feed"
+        ]
+      }
+    },
+    "/api/v1/moderation/decisions/{id}/appeals": {
+      "post": {
+        "operationId": "ReportsController_submitAppeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAppealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Reports"
+        ]
+      }
+    },
+    "/api/v1/me/reports": {
+      "get": {
+        "operationId": "ReportsController_myReports",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "EXTREMISM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyReportPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Trạng thái các báo cáo của tôi",
+        "tags": [
+          "Moderation - Reports"
+        ]
+      }
+    },
+    "/api/v1/me/moderation/appeals": {
+      "get": {
+        "operationId": "ReportsController_myAppeals",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "EXTREMISM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Reports"
+        ]
+      }
+    },
+    "/api/v1/me/moderation/decisions": {
+      "get": {
+        "operationId": "ReportsController_myDecisions",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "EXTREMISM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyDecisionPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Reports"
         ]
       }
     },
@@ -2725,6 +3211,343 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/stats": {
+      "get": {
+        "operationId": "AdminModerationController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/scans/failed": {
+      "get": {
+        "operationId": "AdminModerationController_failedScans",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "EXTREMISM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailedScanPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/scans/{id}/retry": {
+      "post": {
+        "operationId": "AdminModerationController_retryScan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanRetryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/appeals": {
+      "get": {
+        "operationId": "AdminModerationController_appeals",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "reviewed",
+                "hidden",
+                "removed"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rule",
+                "ai",
+                "report",
+                "new_content"
+              ]
+            }
+          },
+          {
+            "name": "reasonCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SPAM_OR_COMMERCIAL",
+                "SCAM",
+                "HARASSMENT",
+                "SEXUAL",
+                "VIOLENCE",
+                "MISINFORMATION",
+                "EXTREMISM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí bắt đầu trang, lấy từ nextCursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealQueuePageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/appeals/{id}/decisions": {
+      "post": {
+        "operationId": "AdminModerationController_appealDecision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppealOutcomeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/queue": {
       "get": {
         "operationId": "AdminModerationController_queue",
@@ -2794,6 +3617,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3228,7 +4052,7 @@
     },
     "/api/search": {
       "post": {
-        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Không có gì khớp thì vùng có `total: 0`, không đoán bừa.\n- Vùng câu muốn tìm rỗng: `suggest` là các gợi ý khác (bỏ các từ trong `dropped`).\n- `loc` chỉ dùng khi câu không nói nơi.",
+        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Gõ sai thì tìm cả câu gốc lẫn câu đã sửa rồi gộp kết quả.\n- `sections` chỉ gồm mục khớp đủ câu: đúng nơi, không vượt ngân sách, khớp từ. Vùng không có mục nào như vậy thì `total: 0`.\n- Vùng câu muốn tìm rỗng: `fallback` là kết quả thay thế sau khi nới điều kiện (`relaxed`: khác nơi, vượt ngân sách, bỏ từ). Không có gì liên quan thì `fallback: null`.\n- `loc` chỉ dùng khi câu không nói nơi.",
         "operationId": "ExploreController_search",
         "parameters": [],
         "requestBody": {
@@ -3269,7 +4093,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu nhưng hiểu được nơi hoặc ý muốn (vd \"mùa thu hà nội\"): `isFallback: true`, `items` là bài theo phần hiểu được, `dropped` là các từ không có trong dữ liệu.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -6088,6 +6912,11 @@
             "type": "string",
             "nullable": true
           },
+          "replyToName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên hiển thị của người được trả lời"
+          },
           "body": {
             "type": "string"
           },
@@ -6780,6 +7609,45 @@
           }
         }
       },
+      "MarkPostSummaryCheckedDto": {
+        "type": "object",
+        "properties": {
+          "inputHash": {
+            "type": "string",
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "description": "Hash đầu vào vừa tính; phải trùng inputHash của bản đang lưu thì mới cập nhật"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-13T04:00:00.000Z",
+            "description": "Mốc lấy trước khi đọc dữ liệu (cùng quy ước với generatedAt); chỉ nhận mốc mới hơn mốc đã có"
+          },
+          "commentCount": {
+            "type": "number",
+            "example": 26,
+            "description": "Số bình luận đang hiện của cả bài lúc kiểm"
+          }
+        },
+        "required": [
+          "inputHash",
+          "checkedAt",
+          "commentCount"
+        ]
+      },
+      "MarkPostSummaryCheckedResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "example": true,
+            "description": "false: không có bản tóm tắt khớp inputHash hoặc đã có lần kiểm mới hơn; không cần thử lại"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
       "PostSummaryResponseDto": {
         "type": "object",
         "properties": {
@@ -6866,10 +7734,17 @@
             "example": "2026-11-05T14:00:00.000Z",
             "description": "Thời điểm sinh kết quả"
           },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-13T04:00:00.000Z",
+            "description": "Lần AI kiểm gần nhất thấy đầu vào không đổi; null khi chưa kiểm lại từ lúc lưu"
+          },
           "isStale": {
             "type": "boolean",
             "example": false,
-            "description": "Cờ cảnh báo bản tóm tắt đã cũ so với thảo luận hiện tại (số bình luận bài viết đã thay đổi)"
+            "description": "Bản tóm tắt đã cũ: số bình luận đổi, hoặc có bình luận mới/bị sửa sau max(generatedAt, checkedAt)"
           },
           "createdAt": {
             "type": "string",
@@ -7349,6 +8224,222 @@
           "nextCursor"
         ]
       },
+      "SubmitAppealDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "AppealDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "upheld",
+              "overturned"
+            ]
+          },
+          "reviewerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "decisionId",
+          "authorId",
+          "reason",
+          "status",
+          "reviewerId",
+          "createdAt",
+          "resolvedAt"
+        ]
+      },
+      "MyReportDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "caseStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "resolved"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "reasonCode",
+          "createdAt",
+          "caseStatus"
+        ]
+      },
+      "MyReportPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyReportDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "AppealPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppealDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "MyDecisionDto": {
+        "type": "object",
+        "properties": {
+          "targetPreview": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "nullable": true
+          },
+          "commentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "appealStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "upheld",
+              "overturned"
+            ],
+            "nullable": true
+          },
+          "canAppeal": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "targetPreview",
+          "id",
+          "targetType",
+          "postId",
+          "commentId",
+          "action",
+          "reasonCode",
+          "createdAt",
+          "appealStatus",
+          "canAppeal"
+        ]
+      },
+      "MyDecisionPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyDecisionDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
       "ReportDto": {
         "type": "object",
         "properties": {
@@ -7361,6 +8452,7 @@
               "SEXUAL",
               "VIOLENCE",
               "MISINFORMATION",
+              "EXTREMISM",
               "OTHER"
             ]
           },
@@ -7399,6 +8491,260 @@
           "reasonCode",
           "reasonDetail",
           "createdAt"
+        ]
+      },
+      "ModerationStatsDto": {
+        "type": "object",
+        "properties": {
+          "pendingTotal": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending"
+          },
+          "pendingUrgent": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt có severity ≥ urgentSeverity"
+          },
+          "pendingPosts": {
+            "type": "number"
+          },
+          "pendingComments": {
+            "type": "number"
+          },
+          "oldestPendingAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "autoHidden24h": {
+            "type": "number",
+            "description": "Số lần tự ẩn trong 24 giờ qua"
+          },
+          "reports24h": {
+            "type": "number",
+            "description": "Số báo cáo mới trong 24 giờ qua"
+          },
+          "pendingAppeals": {
+            "type": "number"
+          },
+          "failedScans": {
+            "type": "number",
+            "description": "Scan đã hết lượt thử, cần staff xem"
+          },
+          "deferredScans": {
+            "type": "number",
+            "description": "Scan đang chờ thử lại tự động"
+          },
+          "urgentSeverity": {
+            "type": "number"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pendingTotal",
+          "pendingUrgent",
+          "pendingPosts",
+          "pendingComments",
+          "oldestPendingAt",
+          "autoHidden24h",
+          "reports24h",
+          "pendingAppeals",
+          "failedScans",
+          "deferredScans",
+          "urgentSeverity",
+          "generatedAt"
+        ]
+      },
+      "FailedScanDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "targetType",
+          "targetId",
+          "status",
+          "attempts",
+          "updatedAt"
+        ]
+      },
+      "FailedScanPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FailedScanDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ScanRetryDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "status"
+        ]
+      },
+      "ModerationLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string",
+            "nullable": true
+          },
+          "commentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "moderatorId": {
+            "type": "string"
+          },
+          "actorType": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonDetail": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceSnapshot": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "postId",
+          "commentId",
+          "moderatorId",
+          "actorType",
+          "action",
+          "reasonCode",
+          "reasonDetail",
+          "createdAt",
+          "contentVersion",
+          "policyVersion",
+          "evidenceSnapshot"
+        ]
+      },
+      "AppealQueueItemDto": {
+        "type": "object",
+        "properties": {
+          "appeal": {
+            "$ref": "#/components/schemas/AppealDto"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ModerationLogDto"
+          },
+          "targetText": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "appeal",
+          "decision",
+          "targetText",
+          "targetStatus"
+        ]
+      },
+      "AppealQueuePageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppealQueueItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "AppealOutcomeDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "upheld",
+              "overturned"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
         ]
       },
       "ModerationCaseDto": {
@@ -7529,56 +8875,6 @@
           "coverMediaId"
         ]
       },
-      "ModerationLogDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "targetType": {
-            "type": "string"
-          },
-          "postId": {
-            "type": "string",
-            "nullable": true
-          },
-          "commentId": {
-            "type": "string",
-            "nullable": true
-          },
-          "moderatorId": {
-            "type": "string"
-          },
-          "actorType": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string"
-          },
-          "reasonCode": {
-            "type": "string"
-          },
-          "reasonDetail": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "targetType",
-          "postId",
-          "commentId",
-          "moderatorId",
-          "actorType",
-          "action",
-          "reasonCode",
-          "reasonDetail",
-          "createdAt"
-        ]
-      },
       "ModerationDetailDto": {
         "type": "object",
         "properties": {
@@ -7696,6 +8992,7 @@
               "SEXUAL",
               "VIOLENCE",
               "MISINFORMATION",
+              "EXTREMISM",
               "OTHER"
             ]
           },
@@ -8156,6 +9453,147 @@
           "items"
         ]
       },
+      "ExploreFallbackItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "hotel:P-h-dl-01",
+            "description": "`<loại>:<mã gốc>`, duy nhất"
+          },
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)"
+          },
+          "refId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt",
+            "description": "Nơi của mục"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm",
+            "description": "Lý do hiện mục này"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "stay: giá từ / đêm · plan: chi phí ước tính / người (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ngày của lộ trình"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          },
+          "section": {
+            "type": "string",
+            "example": "Ở đâu",
+            "description": "Tên vùng của mục gợi ý"
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "refId",
+          "title",
+          "subtitle",
+          "thumbnail",
+          "reason",
+          "priceFrom",
+          "days",
+          "location",
+          "section",
+          "relaxed"
+        ]
+      },
+      "ExploreFallbackDto": {
+        "type": "object",
+        "properties": {
+          "forQuery": {
+            "type": "string",
+            "example": "resort phú quốc dưới 300k",
+            "description": "Câu người dùng gõ: FE hiện \"Kết quả thay thế cho “…”\""
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Gộp trên các mục. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          },
+          "dropped": {
+            "example": [
+              "dịp",
+              "lễ"
+            ],
+            "description": "Từ trong câu mà các mục thay thế không khớp (dạng người dùng gõ)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "description": "Mục gần nhất sau khi nới điều kiện, theo vùng câu muốn",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreFallbackItemDto"
+            }
+          }
+        },
+        "required": [
+          "forQuery",
+          "relaxed",
+          "dropped",
+          "items"
+        ]
+      },
       "ExploreSuggestItemDto": {
         "type": "object",
         "properties": {
@@ -8254,8 +9692,19 @@
               "$ref": "#/components/schemas/ExploreSectionDto"
             }
           },
+          "fallback": {
+            "nullable": true,
+            "description": "Kết quả thay thế: vùng câu muốn không có mục nào khớp đủ câu (đúng nơi, không vượt ngân sách, khớp từ) nên nới điều kiện. null nếu có kết quả chính hoặc không có gì liên quan",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreFallbackDto"
+              }
+            ]
+          },
           "suggest": {
-            "description": "Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.items` (cùng mục, không có `relaxed`)",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExploreSuggestItemDto"
@@ -8266,7 +9715,8 @@
               "dịp",
               "lễ"
             ],
-            "description": "Từ đã bỏ qua để ra gợi ý khác",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.dropped`",
             "type": "array",
             "items": {
               "type": "string"
@@ -8277,6 +9727,7 @@
           "understood",
           "nearUser",
           "sections",
+          "fallback",
           "suggest",
           "dropped"
         ]
@@ -8352,7 +9803,22 @@
           },
           "isFallback": {
             "type": "boolean",
-            "description": "true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo \"không thấy <dropped>, gợi ý theo ...\""
+            "description": "true: không bài nào khớp đủ câu nên `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). FE nên báo \"Kết quả thay thế cho “q”\""
+          },
+          "fallbackRelaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Chỉ có giá trị khi `isFallback = true`. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
           }
         },
         "required": [
@@ -8361,7 +9827,8 @@
           "total",
           "nextCursor",
           "dropped",
-          "isFallback"
+          "isFallback",
+          "fallbackRelaxed"
         ]
       },
       "HomeProvinceDto": {

@@ -16,6 +16,7 @@ export const comments = contentSchema.table(
       .references(() => posts.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull(),
     parentCommentId: uuid('parent_comment_id'),
+    replyToName: text('reply_to_name'),
     body: text('body').notNull(),
     status: varchar('status', { length: 20 })
       .$type<'visible' | 'hidden' | 'removed'>()
@@ -37,5 +38,6 @@ export const comments = contentSchema.table(
   ],
 );
 
-export type CommentRecord = typeof comments.$inferSelect;
+type StoredComment = typeof comments.$inferSelect;
+export type CommentRecord = Omit<StoredComment, 'replyToName'> & Partial<Pick<StoredComment, 'replyToName'>>;
 export type NewCommentRecord = typeof comments.$inferInsert;

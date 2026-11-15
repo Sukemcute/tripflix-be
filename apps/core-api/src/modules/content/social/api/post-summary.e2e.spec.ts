@@ -23,7 +23,11 @@ import {
   registerServiceClient,
 } from '../../../access/index.js';
 import { PostSummaryController } from './post-summary.controller.js';
-import { GetPostSummaryUseCase, SavePostSummaryUseCase } from '../application/index.js';
+import {
+  GetPostSummaryUseCase,
+  MarkPostSummaryCheckedUseCase,
+  SavePostSummaryUseCase,
+} from '../application/index.js';
 import { PostRepository } from '../infra/post.repository.js';
 import { CommentRepository } from '../infra/comment.repository.js';
 import { PostSummaryRepository } from '../infra/post-summary.repository.js';
@@ -104,6 +108,7 @@ class FakePlatformModule {}
             promptVersion: data.promptVersion ?? null,
             modelName: data.modelName ?? null,
             generatedAt: data.generatedAt ?? null,
+            checkedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),
           };
@@ -114,6 +119,18 @@ class FakePlatformModule {}
           findByPostId: async (postId: string) => summaries.get(postId) ?? null,
           upsert: save,
           saveIfNewer: save,
+          // Bản bộ nhớ theo đúng điều kiện của câu UPDATE thật (test tích hợp ở post-summary.repository.int.spec.ts).
+          markChecked: async (data: { postId: string; inputHash: string; checkedAt: Date; commentCount: number }) => {
+            const current = summaries.get(data.postId);
+            const isMatched =
+              current?.inputHash === data.inputHash &&
+              current.generatedAt !== null &&
+              current.generatedAt <= data.checkedAt &&
+              (current.checkedAt === null || current.checkedAt < data.checkedAt);
+            if (!current || !isMatched) return false;
+            summaries.set(data.postId, { ...current, checkedAt: data.checkedAt, commentCountAtSummary: data.commentCount });
+            return true;
+          },
         };
       },
     },
@@ -122,6 +139,12 @@ class FakePlatformModule {}
       inject: [PostRepository, PostSummaryRepository],
       useFactory: (postRepo: PostRepository, summaryRepo: PostSummaryRepository) =>
         new SavePostSummaryUseCase(postRepo, summaryRepo),
+    },
+    {
+      provide: MarkPostSummaryCheckedUseCase,
+      inject: [PostRepository, PostSummaryRepository],
+      useFactory: (postRepo: PostRepository, summaryRepo: PostSummaryRepository) =>
+        new MarkPostSummaryCheckedUseCase(postRepo, summaryRepo),
     },
     {
       provide: GetPostSummaryUseCase,
@@ -409,5 +432,43 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
       summary: null,
       commentCountAtSummary: 2,
     });
+  });
+
+  it('PUT /checked: ai-service báo đã kiểm thì cập nhật checkedAt; hash lệch không đổi gì; service khác bị chặn', async () => {
+    const aiToken = (await issueServiceToken('ai-service').expect(200)).body.accessToken;
+    const videoToken = (await issueServiceToken('video-worker').expect(200)).body.accessToken;
+    await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set(bearer(aiToken))
+      .send({ status: 'ready', summary: 'Tóm tắt', inputHash: 'hash-checked', commentCount: 3, generatedAt: '2026-11-13T04:00:00.000Z' })
+      .expect(200);
+
+    const checked = await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary/checked`)
+      .set(bearer(aiToken))
+      .send({ inputHash: 'hash-checked', checkedAt: '2026-11-13T04:10:00.000Z', commentCount: 4 })
+      .expect(200);
+    expect(checked.body).toEqual({ updated: true });
+
+    const otherHash = await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary/checked`)
+      .set(bearer(aiToken))
+      .send({ inputHash: 'hash-khac', checkedAt: '2026-11-13T04:20:00.000Z', commentCount: 9 })
+      .expect(200);
+    expect(otherHash.body).toEqual({ updated: false });
+
+    const res = await http().get(`/api/v1/posts/${validPostId}/ai-summary`).expect(200);
+    expect(res.body).toMatchObject({ checkedAt: '2026-11-13T04:10:00.000Z', commentCountAtSummary: 4 });
+
+    await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary/checked`)
+      .set(bearer(videoToken))
+      .send({ inputHash: 'hash-checked', checkedAt: '2026-11-13T04:30:00.000Z', commentCount: 4 })
+      .expect(403);
+    await http()
+      .put(`/api/v1/posts/${validPostId}/ai-summary/checked`)
+      .set(bearer(aiToken))
+      .send({ inputHash: '', checkedAt: 'không phải ngày', commentCount: -1 })
+      .expect(400);
   });
 });

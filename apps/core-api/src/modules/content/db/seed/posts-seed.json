@@ -183,6 +183,16 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay SGN → DAD",
+            "notes": "Bay sáng để kịp tắm biển chiều",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "SGN",
+              "toAirport": "DAD"
+            }
+          },
+          {
+            "day": 1,
             "title": "Check-in Vinpearl Beach & Biển Mỹ Khê",
             "location": "Biển Mỹ Khê, Đà Nẵng",
             "notes": "Tắm biển và ăn hải sản Năm Đảnh"
@@ -198,6 +208,16 @@
             "title": "Cầu Rồng & Chợ Cồn mua quà",
             "location": "Chợ Cồn, Đà Nẵng",
             "notes": "Mua chả bò và mực rim me"
+          },
+          {
+            "day": 3,
+            "title": "Bay DAD → SGN",
+            "notes": "Chuyến chiều sau khi mua quà",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "DAD",
+              "toAirport": "SGN"
+            }
           }
         ]
       },
@@ -245,6 +265,23 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay HAN → DAD",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "HAN",
+              "toAirport": "DAD"
+            }
+          },
+          {
+            "day": 1,
+            "title": "Taxi sân bay Đà Nẵng → Hội An",
+            "notes": "Khoảng 45 phút",
+            "transport": {
+              "mode": "car"
+            }
+          },
+          {
+            "day": 1,
             "title": "Phố cổ & Thả hoa đăng sông Hoài",
             "location": "Sông Hoài, Hội An"
           },
@@ -252,6 +289,22 @@
             "day": 2,
             "title": "Làng gốm Thanh Hà & Rừng dừa Bảy Mẫu",
             "location": "Cẩm Thanh, Hội An"
+          },
+          {
+            "day": 2,
+            "title": "Taxi Hội An → sân bay Đà Nẵng",
+            "transport": {
+              "mode": "car"
+            }
+          },
+          {
+            "day": 2,
+            "title": "Bay DAD → HAN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "DAD",
+              "toAirport": "HAN"
+            }
           }
         ]
       },
@@ -298,6 +351,15 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay SGN → PQC",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "SGN",
+              "toAirport": "PQC"
+            }
+          },
+          {
+            "day": 1,
             "title": "Check-in Vinpearl Garden & Sunset Sanato",
             "location": "Bãi Trường, Phú Quốc"
           },
@@ -315,6 +377,15 @@
             "day": 4,
             "title": "Chợ đêm Phú Quốc thưởng thức hải sản",
             "location": "Dương Đông, Phú Quốc"
+          },
+          {
+            "day": 4,
+            "title": "Bay PQC → SGN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "PQC",
+              "toAirport": "SGN"
+            }
           }
         ]
       },
@@ -361,6 +432,16 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay HAN → DLI",
+            "notes": "Bay chuyến sớm, chiều nhận phòng",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "HAN",
+              "toAirport": "DLI"
+            }
+          },
+          {
+            "day": 1,
             "title": "Check-in Dalat Palace & Hồ Xuân Hương",
             "location": "Trung tâm Đà Lạt"
           },
@@ -373,6 +454,15 @@
             "day": 3,
             "title": "Cà phê rừng thông & Chợ đêm Đà Lạt",
             "location": "Chợ Đà Lạt"
+          },
+          {
+            "day": 3,
+            "title": "Bay DLI → HAN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "DLI",
+              "toAirport": "HAN"
+            }
           }
         ]
       },
@@ -419,6 +509,15 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay SGN → CXR",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "SGN",
+              "toAirport": "CXR"
+            }
+          },
+          {
+            "day": 1,
             "title": "Check-in Vinpearl Beach & Tháp Bà Ponagar",
             "location": "Nha Trang"
           },
@@ -436,6 +535,15 @@
             "day": 4,
             "title": "Tắm bùn khoáng Tháp Bà & Mua đặc sản",
             "location": "Nha Trang"
+          },
+          {
+            "day": 4,
+            "title": "Bay CXR → SGN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "CXR",
+              "toAirport": "SGN"
+            }
           }
         ]
       },
@@ -483,6 +591,23 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay SGN → VDO",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "SGN",
+              "toAirport": "VDO"
+            }
+          },
+          {
+            "day": 1,
+            "title": "Xe đưa đón Vân Đồn → Bãi Cháy",
+            "notes": "Khoảng 1 giờ",
+            "transport": {
+              "mode": "bus"
+            }
+          },
+          {
+            "day": 1,
             "title": "Tàu cao tốc ra đảo Rều & Tắm biển nhân tạo",
             "location": "Đảo Rều, Bãi Cháy"
           },
@@ -490,6 +615,22 @@
             "day": 2,
             "title": "Tour du thuyền thăm Hang Sửng Sốt & Đảo Ti Tốp",
             "location": "Vịnh Hạ Long"
+          },
+          {
+            "day": 2,
+            "title": "Xe Bãi Cháy → sân bay Vân Đồn",
+            "transport": {
+              "mode": "bus"
+            }
+          },
+          {
+            "day": 2,
+            "title": "Bay VDO → SGN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "VDO",
+              "toAirport": "SGN"
+            }
           }
         ]
       },
@@ -535,6 +676,23 @@
         "items": [
           {
             "day": 1,
+            "title": "Bay SGN → HAN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "SGN",
+              "toAirport": "HAN"
+            }
+          },
+          {
+            "day": 1,
+            "title": "Tàu đêm Hà Nội → Lào Cai",
+            "notes": "Đặt giường nằm khoang 4",
+            "transport": {
+              "mode": "train"
+            }
+          },
+          {
+            "day": 1,
             "title": "Check-in Hotel de la Coupole & Bản Cát Cát",
             "location": "Sa Pa"
           },
@@ -547,6 +705,22 @@
             "day": 3,
             "title": "Thác Bạc & Thưởng thức lẩu cá tầm",
             "location": "Đèo Ô Quy Hồ"
+          },
+          {
+            "day": 3,
+            "title": "Xe giường nằm Sa Pa → Hà Nội",
+            "transport": {
+              "mode": "bus"
+            }
+          },
+          {
+            "day": 3,
+            "title": "Bay HAN → SGN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "HAN",
+              "toAirport": "SGN"
+            }
           }
         ]
       },
@@ -593,6 +767,14 @@
         "items": [
           {
             "day": 1,
+            "title": "Xe limousine Hà Nội → Ninh Bình",
+            "notes": "Khoảng 2 giờ",
+            "transport": {
+              "mode": "car"
+            }
+          },
+          {
+            "day": 1,
             "title": "Đi thuyền Tuyến 2 Tràng An & Hang Sáng Tối",
             "location": "Quần thể Tràng An"
           },
@@ -600,6 +782,13 @@
             "day": 2,
             "title": "Hang Múa & Nghỉ dưỡng tại Emeralda",
             "location": "Gia Viễn, Ninh Bình"
+          },
+          {
+            "day": 2,
+            "title": "Xe limousine Ninh Bình → Hà Nội",
+            "transport": {
+              "mode": "car"
+            }
           }
         ]
       },
@@ -639,7 +828,45 @@
         "hotelId": "P-h-nt-01",
         "hotelName": "Vinpearl Beach Nha Trang",
         "destinationName": "Nha Trang",
-        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo"
+        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo",
+        "daysCount": 2,
+        "estimatedCostPerPerson": 3200000,
+        "items": [
+          {
+            "day": 1,
+            "title": "Bay HAN → CXR",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "HAN",
+              "toAirport": "CXR"
+            }
+          },
+          {
+            "day": 1,
+            "title": "Tàu lượn siêu tốc và khu trò chơi",
+            "location": "VinWonders Nha Trang",
+            "notes": "Đi buổi sáng ngày thường để đỡ xếp hàng"
+          },
+          {
+            "day": 1,
+            "title": "Xem show nhạc nước buổi tối",
+            "location": "VinWonders Nha Trang"
+          },
+          {
+            "day": 2,
+            "title": "Ăn bún chả cá và mua quà",
+            "location": "Chợ Đầm, Nha Trang"
+          },
+          {
+            "day": 2,
+            "title": "Bay CXR → HAN",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "CXR",
+              "toAirport": "HAN"
+            }
+          }
+        ]
       },
       "reactionCounts": {
         "like": 28,
@@ -678,7 +905,50 @@
         "hotelId": "P-h-nt-01",
         "hotelName": "Vinpearl Beach Nha Trang",
         "destinationName": "Nha Trang",
-        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo"
+        "priceDisclaimer": "Giá chỉ mang tính chất tham khảo",
+        "daysCount": 3,
+        "estimatedCostPerPerson": 3800000,
+        "items": [
+          {
+            "day": 1,
+            "title": "Bay HPH → CXR",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "HPH",
+              "toAirport": "CXR"
+            }
+          },
+          {
+            "day": 1,
+            "title": "Cáp treo vượt biển sang Hòn Tre",
+            "location": "Cáp treo Vinpearl, Nha Trang",
+            "notes": "Đi lúc hoàng hôn để có màu trời đẹp"
+          },
+          {
+            "day": 2,
+            "title": "Tour 3 đảo và lặn ngắm san hô",
+            "location": "Hòn Mun, Nha Trang"
+          },
+          {
+            "day": 2,
+            "title": "Hải sản tối ở bờ kè",
+            "location": "Phạm Văn Đồng, Nha Trang"
+          },
+          {
+            "day": 3,
+            "title": "Tháp Bà Ponagar",
+            "location": "Tháp Bà Ponagar, Nha Trang"
+          },
+          {
+            "day": 3,
+            "title": "Bay CXR → HPH",
+            "transport": {
+              "mode": "flight",
+              "fromAirport": "CXR",
+              "toAirport": "HPH"
+            }
+          }
+        ]
       },
       "reactionCounts": {
         "like": 33,

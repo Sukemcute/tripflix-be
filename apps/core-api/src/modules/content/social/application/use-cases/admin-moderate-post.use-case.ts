@@ -1,4 +1,9 @@
 import { Transactional } from '@tripflix/db';
+import {
+  contentVersion,
+  postEvidence,
+  MODERATION_POLICY_VERSION,
+} from '../../../moderation/domain/content-version.js';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { ModerationActionRepository } from '../../infra/moderation-action.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
@@ -68,7 +73,7 @@ export class AdminModeratePostUseCase {
     domainPost.moderate(command.action);
     const newStatus = domainPost.status;
 
-    await this.postRepository.update(command.postId, {
+    const updatedPost = await this.postRepository.update(command.postId, {
       status: newStatus,
     });
 
@@ -80,6 +85,13 @@ export class AdminModeratePostUseCase {
       postStatus: newStatus,
       reasonCode: command.reasonCode,
       reasonDetail: command.reasonDetail,
+      contentVersion: contentVersion(
+        postEvidence(updatedPost).text,
+        updatedPost.coverMediaId,
+        updatedPost.mediaIds,
+      ),
+      policyVersion: MODERATION_POLICY_VERSION,
+      evidenceSnapshot: postEvidence(updatedPost),
       reportIds: command.reportIds ?? [],
       actorType: command.actorType ?? 'staff',
       caseId: command.caseId,

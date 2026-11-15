@@ -3,9 +3,11 @@ import { AccessFacade } from '../../../access/index.js';
 import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
+import { pickFeedSeed } from '../domain/feed-rank.js';
 import { calculateHotScore } from '../domain/hot-score.js';
 import {
   FEED_PAGE_CACHE,
+  FEED_RANDOM,
   FEED_STORE,
   type FeedPageCache,
   type FeedPostRow,
@@ -39,7 +41,11 @@ export interface FeedPage {
 /** Trang đầu giống nhau với mọi người nên giữ ngắn trong Redis; bài mới hay số đếm trễ tối đa chừng này giây. */
 export const FEED_FIRST_PAGE_TTL_SECONDS = 10;
 
-/** Bản đầu của F1: for_you lấy bài mới nhất, hot lấy theo bộ đếm tương tác. Trending, snapshot, tab following thuộc các phần sau (docs/09 mục 3 đến 5). */
+/**
+ * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo bộ đếm tương tác,
+ * bằng điểm thì ngẫu nhiên (domain/feed-rank.ts). Trang tác giả và Reels đã lưu vẫn mới nhất trước.
+ * Trending, snapshot, tab following thuộc các phần sau (docs/09 mục 3 đến 5).
+ */
 @Injectable()
 export class FeedUseCases {
   /** Trang đầu đang được đọc từ database: request tới cùng lúc chờ chung một lần đọc thay vì mỗi request một lần. */
@@ -50,6 +56,8 @@ export class FeedUseCases {
     @Inject(MediaFacade) private readonly media: MediaFacade,
     @Optional() @Inject(AccessFacade) private readonly access?: AccessFacade,
     @Optional() @Inject(FEED_PAGE_CACHE) private readonly cache?: FeedPageCache,
+    /** Nguồn ngẫu nhiên chọn seed ở trang đầu; test truyền hàm cố định. */
+    @Optional() @Inject(FEED_RANDOM) private readonly random: () => number = Math.random,
   ) {}
 
   async getPage(query: {
@@ -69,32 +77,46 @@ export class FeedUseCases {
         ? await this.loadSharedPage(tab, query.limit, query.after, null, query.authorId)
         : await this.loadFirstPage(tab, query.limit);
     if (!query.viewerId) return shared;
+    return { items: await this.withViewerState(shared.items, query.viewerId), nextCursor: shared.nextCursor };
+  }
 
-    // Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache.
-    const postIds = shared.items.map((item) => item.postId);
+  /**
+   * Thẻ Reels của đúng các bài cần mở (từ kết quả tìm kiếm, link chia sẻ), theo thứ tự `postIds`.
+   * Bài không xem được trên feed (ẩn, riêng tư, đã xoá, không phải Reels, video chưa xử lý xong) thì bỏ qua.
+   */
+  async getByIds(postIds: string[], viewerId: string | null): Promise<FeedPage> {
+    const ids = [...new Set(postIds)];
+    const cards = await this.buildCards(await this.store.findPlayablePostsByIds(ids));
+    const byId = new Map(cards.map((card) => [card.postId, card]));
+    const items = ids.flatMap((id) => byId.get(id) ?? []);
+    return { items: viewerId ? await this.withViewerState(items, viewerId) : items, nextCursor: null };
+  }
+
+  /** Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache. */
+  private async withViewerState(items: FeedCard[], viewerId: string): Promise<FeedCard[]> {
+    const postIds = items.map((item) => item.postId);
     const [liked, saved] = await Promise.all([
-      this.store.findLikedPostIds(query.viewerId, postIds),
-      this.store.findSavedPostIds(query.viewerId, postIds),
+      this.store.findLikedPostIds(viewerId, postIds),
+      this.store.findSavedPostIds(viewerId, postIds),
     ]);
     const likedIds = new Set(liked);
     const savedIds = new Set(saved);
-    return {
-      items: shared.items.map((item) => ({
-        ...item,
-        viewerState: { liked: likedIds.has(item.postId), saved: savedIds.has(item.postId) },
-      })),
-      nextCursor: shared.nextCursor,
-    };
+    return items.map((item) => ({
+      ...item,
+      viewerState: { liked: likedIds.has(item.postId), saved: savedIds.has(item.postId) },
+    }));
   }
 
   private async loadFirstPage(tab: FeedTab, limit: number): Promise<SharedFeedPage<FeedCard>> {
-    // v2: thẻ có thêm tripAttachment và feed chỉ còn bài video; không đọc nhầm trang cũ trong cache.
-    const key = `feed:first-page:v2:${tab}:${limit}`;
+    // Mỗi lần mở hay tải lại chọn seed mới, nên thứ tự đổi; mỗi seed một khoá để cache vẫn trúng khi đông người.
+    const seed = pickFeedSeed(this.random);
+    // v3: thứ tự theo seed, cursor có seed (v2: thẻ có tripAttachment, chỉ bài video).
+    const key = `feed:first-page:v3:${tab}:${seed}:${limit}`;
     const cached = await this.readCache(key);
     if (cached) return cached;
     const inFlight = this.loading.get(key);
     if (inFlight) return inFlight;
-    const load = this.loadSharedPage(tab, limit, null)
+    const load = this.loadSharedPage(tab, limit, null, null, undefined, seed)
       .then(async (page) => {
         await this.cache?.set(key, page, FEED_FIRST_PAGE_TTL_SECONDS).catch(() => undefined);
         return page;
@@ -120,29 +142,24 @@ export class FeedUseCases {
     after: FeedCursor | null,
     savedByUserId: string | null = null,
     authorId?: string,
+    firstPageSeed?: number,
   ): Promise<SharedFeedPage<FeedCard>> {
     const isHot = tab === 'hot' && !savedByUserId;
+    // Trang tác giả và Reels đã lưu giữ mới nhất trước; cursor for_you cũ (app bản trước, chưa có rank) cũng vậy.
+    const isRankedForYou = tab === 'for_you' && !savedByUserId && !authorId && (!after || after.rank !== undefined);
+    // Cursor cũ chưa có seed thì lấy seed 0, để các trang sau của nó vẫn cùng một thứ tự.
+    const seed = after ? (after.seed ?? 0) : (firstPageSeed ?? pickFeedSeed(this.random));
+    const asOf = after?.asOf ?? new Date().toISOString();
     const listQuery = { limit: limit + 1, after, ...(authorId ? { authorId } : {}) };
     const rows = await (savedByUserId
       ? this.store.listSavedPlayablePosts({ ...listQuery, userId: savedByUserId })
       : isHot
-        ? this.store.listHotPosts(listQuery)
-        : this.store.listPlayablePosts(listQuery));
+        ? this.store.listHotPosts({ ...listQuery, seed })
+        : isRankedForYou
+          ? this.store.listForYouPosts({ ...listQuery, seed, asOf })
+          : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, limit);
-    const [playback, authorNames] = await Promise.all([
-      this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)),
-      this.access
-        ? this.access.getDisplayNames(pageRows.map((r) => r.authorId)).catch(() => new Map<string, string>())
-        : new Map<string, string>(),
-    ]);
-
-    const items = pageRows.flatMap((row) => {
-      // Một bài có thể có nhiều media; lấy video đầu tiên phát được.
-      const mediaId = row.mediaIds.find((id) => playback[id]);
-      const video = mediaId ? playback[mediaId] : undefined;
-      if (!video) return [];
-      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null)];
-    });
+    const items = await this.buildCards(pageRows);
 
     const last = pageRows.at(-1);
     return {
@@ -152,10 +169,27 @@ export class FeedUseCases {
           ? encodeFeedCursor({
               at: last.cursorAt,
               id: last.id,
-              ...(isHot ? { score: calculateHotScore(last) } : {}),
+              ...(isHot ? { score: calculateHotScore(last), seed } : {}),
+              ...(isRankedForYou && last.rank !== undefined ? { rank: last.rank, seed, asOf } : {}),
             })
           : null,
     };
+  }
+
+  private async buildCards(rows: FeedPostRow[]): Promise<FeedCard[]> {
+    const [playback, authorNames] = await Promise.all([
+      this.media.getPlayback(rows.flatMap((row) => row.mediaIds)),
+      this.access
+        ? this.access.getDisplayNames(rows.map((r) => r.authorId)).catch(() => new Map<string, string>())
+        : new Map<string, string>(),
+    ]);
+    return rows.flatMap((row) => {
+      // Một bài có thể có nhiều media; lấy video đầu tiên phát được.
+      const mediaId = row.mediaIds.find((id) => playback[id]);
+      const video = mediaId ? playback[mediaId] : undefined;
+      if (!video) return [];
+      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null)];
+    });
   }
 }
 

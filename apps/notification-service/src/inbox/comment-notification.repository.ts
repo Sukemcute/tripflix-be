@@ -29,7 +29,7 @@ export class CommentNotificationRepository {
         `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id, comment_id, interaction_occurred_at)
          SELECT recipient.user_id,
            CASE WHEN recipient.is_reply THEN 'comment.replied' ELSE 'comment.created' END,
-           CASE WHEN recipient.is_reply THEN 'Có người trả lời bình luận' ELSE 'Có bình luận mới' END,
+           CASE WHEN recipient.is_reply THEN COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') || ' đã trả lời bình luận' ELSE 'Có bình luận mới' END,
            COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') ||
              CASE WHEN recipient.is_reply THEN ' đã trả lời bình luận của bạn.' ELSE ' đã bình luận bài của bạn.' END,
            $4, $5::jsonb, $6, $7::uuid, $8
