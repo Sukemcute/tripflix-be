@@ -90,6 +90,11 @@ export const coreEnvSchema = baseEnvSchema
     DATABASE_URL_DISCOVERY: z.string(),
     DATABASE_URL_ANALYTICS: z.string(),
     DATABASE_URL_COMMERCE: z.string(),
+    // Pool commerce tự tăng theo tải (L4). BUDGET: tổng kết nối commerce cho mọi bản core-api cộng lại, chia theo số bản
+    // đang chạy; CEILING: trần của một bản. Phải nằm trong max_connections của Postgres (deploy/compose.server.yaml).
+    COMMERCE_POOL_AUTOSCALE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    COMMERCE_POOL_BUDGET: z.coerce.number().int().min(10).default(60),
+    COMMERCE_POOL_CEILING: z.coerce.number().int().min(10).default(30),
     // Khoá ký access token ES256, PEM PKCS8 (sinh bằng pnpm --filter @tripflix/core-api auth:keygen).
     AUTH_JWT_PRIVATE_KEY: OptionalStringSchema,
     AUTH_JWT_KID: OptionalStringSchema,
