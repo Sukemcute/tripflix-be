@@ -21,6 +21,7 @@ import { ReactionNotificationRepository } from '../grouping/reaction-notificatio
 import { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
 import { DirectoryRepository } from '../directory/directory.repository.js';
+import { POST_COMMENTS_CHANGED_EVENT, PostCommentSignals } from '../realtime/post-comment-signals.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
 import { EventRouter, type ProcessedEvents } from './event-router.js';
@@ -55,6 +56,10 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
   private consumer: RedisStreamsConsumer | undefined;
   private connection: Redis | undefined;
   private isStopping = false;
+  private readonly postSignals = new PostCommentSignals(
+    (postId, data) => this.realtime.emitToPost(postId, POST_COMMENTS_CHANGED_EVENT, data),
+    (err, event) => this.logger.warn({ err, eventId: event.eventId, type: event.type }, 'Không phát được tín hiệu bình luận'),
+  );
 
   constructor(
     @Inject(ENV) private readonly env: Env,
@@ -97,6 +102,8 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       streams: [STREAMS.access, STREAMS.content, STREAMS.commerce],
       handler: async (event) => {
         disconnectRevokedUser(event, this.realtime);
+        // TF99: báo người đang mở bài trước khi ghi inbox, để bình luận hiện nhanh.
+        this.postSignals.handle(event);
         await router.route(event);
       },
       onError: (err, delivery) => this.logger.error({ err, ...delivery }, 'Xử lý sự kiện lỗi, sẽ thử lại'),
@@ -106,6 +113,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
 
   async onApplicationShutdown(): Promise<void> {
     this.isStopping = true;
+    this.postSignals.stop();
     await this.consumer?.stop();
     this.connection?.disconnect();
   }
