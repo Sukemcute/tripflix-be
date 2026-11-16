@@ -217,6 +217,33 @@ describe('Chửi tục xét dấu (TF93)', () => {
   ])('vẫn bắt chửi tục gõ không dấu: %s', (text) => {
     expect(codesOf(text)).toContain('PROFANITY');
   });
+
+  it.each([
+    'đit me',
+    'dit mẹ',
+    'thằng cho',
+    'thang chó',
+    'mặt lon',
+    'mat lồn',
+    'may la con chó',
+    'đụma cái dịch vụ',
+    'đu ma',
+    'd́it me',
+    'thằnǵ chó',
+  ])('vẫn bắt chửi tục gõ lẫn dấu hoặc có dấu rời: %s', (text) => {
+    expect(codesOf(text)).toContain('PROFANITY');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config).autoHideReason).toBe('HARASSMENT');
+  });
+
+  it.each([
+    'dù má không cho đi',
+    'dụ má mua vé',
+    'dù mẹ dặn rồi',
+    'mặt lớn hơn',
+    'tháng chó con',
+  ])('không bắt nhầm khi chữ gõ có dấu sai dấu chửi: %s', (text) => {
+    expect(codesOf(text)).not.toContain('PROFANITY');
+  });
 });
 describe('Luật nội dung phản động (TF88)', () => {
   const config = { aiThreshold: 0.8, reportThreshold: 3 };

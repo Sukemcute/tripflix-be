@@ -56,7 +56,7 @@ const ACCENTED_PROFANITY_PATTERN = new RegExp(
       'địt cụ',
       'đéo mẹ',
       'mặt (?:như )?lồn',
-      'đ[ụù] má',
+      'đ[ụù] ?má',
       'đ[ụù] mẹ',
       'mẹ kiếp (?:mày|mi|nhà mày)',
       'đm|đmm|đcm|đkm|dm|dmm|dcm|dkm|cmm',
@@ -99,13 +99,67 @@ function foldChar(char: string): string {
   return folded.length === 1 ? folded : char;
 }
 
+// Gõ lẫn dấu ("đit me", "thằng cho", "mat lồn") vẫn phải bắt (TF93), nên so từng chữ:
+// chữ gõ có dấu phải đúng dấu, chữ gõ không dấu thì cho qua. Riêng "đ" + nguyên âm có dấu:
+// gõ "d" thì nguyên âm phải không dấu, để "dù má", "dụ má" (= dù/dụ mẹ) không thành "đụ má".
+const LENIENT_PROFANITY_PATTERN = new RegExp(toLenientSource(ACCENTED_PROFANITY_PATTERN.source));
+
+function toLenientSource(source: string): string {
+  const tokens = source.match(/\[[^\]]*\]|\\.|[\s\S]/g) ?? [];
+  // Bản cho phép cả dạng không dấu, và dạng chỉ không dấu (null nếu token không có dấu).
+  const lenient = (token: string): { any: string; plain: string | null } => {
+    if (token.startsWith('[')) {
+      const chars = Array.from(token.slice(1, -1));
+      const plain = [...new Set(chars.map(foldChar))].join('');
+      const accented = chars.some((char) => foldChar(char) !== char);
+      return {
+        any: accented ? `[${[...new Set([...chars, ...plain])].join('')}]` : token,
+        plain: accented ? `[${plain}]` : null,
+      };
+    }
+    const plain = foldChar(token);
+    return plain !== token && token.length === 1
+      ? { any: `[${token}${plain}]`, plain }
+      : { any: token, plain: null };
+  };
+  let out = '';
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]!;
+    if (token !== 'đ') {
+      out += lenient(token).any;
+      continue;
+    }
+    const next = tokens[i + 1] ? lenient(tokens[i + 1]!) : null;
+    if (next?.plain) {
+      out += `(?:đ${next.any}|[đd]${next.plain})`;
+      i++;
+    } else {
+      out += '[đd]';
+    }
+  }
+  return out;
+}
+
 /** Tìm chửi tục mà vẫn xét dấu: chỉ số của bản bỏ dấu khớp từng ký tự với bản gốc. */
 function findProfanity(text: string): string | null {
-  const original = text.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Không cho lách luật bằng dấu rời: dấu không ghép được sau NFC ("d" + dấu sắc rời) bị bỏ,
+  // phụ âm ghép thành chữ ngoài tiếng Việt ("g" + dấu sắc = "ǵ") đưa về chữ gốc.
+  const original = Array.from(
+    text
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    (char) => {
+      const base = foldChar(char);
+      return base !== char && char !== 'đ' && !/[aeiouy]/.test(base) ? base : char;
+    },
+  ).join('');
   const folded = Array.from(original.split(''), foldChar).join('');
   for (const match of folded.matchAll(new RegExp(PROFANITY_PATTERN.source, 'g'))) {
     const typed = original.slice(match.index, match.index + match[0].length);
-    if (typed === match[0] || ACCENTED_PROFANITY_PATTERN.test(typed)) return match[0];
+    if (typed === match[0] || LENIENT_PROFANITY_PATTERN.test(typed)) return match[0];
   }
   return null;
 }
