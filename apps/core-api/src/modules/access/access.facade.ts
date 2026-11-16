@@ -15,7 +15,7 @@ export class AccessFacade {
   async getDisplayNames(userIds: string[]): Promise<Map<string, string>> {
     const ids = [...new Set(userIds)].filter((id) => UUID.test(id));
     if (ids.length === 0) return new Map();
-    const users = await this.store.users.findByIds(ids);
+    const users = await this.store.users.findDisplayNamesByIds(ids);
     return new Map(users.map((u) => [u.id, u.displayName]));
   }
 }
