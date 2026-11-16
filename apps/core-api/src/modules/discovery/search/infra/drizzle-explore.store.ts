@@ -1,5 +1,5 @@
 import type { Db } from '@tripflix/db';
-import { and, arrayOverlaps, asc, between, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, arrayOverlaps, asc, between, eq, gte, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { searchCounts, searchDocuments } from '../../db/schema/index.js';
 import type { ExploreStore } from '../application/ports.js';
 import { PHRASE_NS } from '../domain/explore/stats.js';
@@ -60,6 +60,8 @@ export class DrizzleExploreStore implements ExploreStore {
       where.push(
         or(
           eq(searchDocuments.place, f.place),
+          !f.isAll ? isNull(searchDocuments.place) : undefined, // điều kiện khớp từ bên dưới vẫn áp dụng
+          f.placeTerms.length ? and(isNull(searchDocuments.place), arrayOverlaps(searchDocuments.terms, f.placeTerms)) : undefined,
           f.center
             ? and(gte(searchDocuments.lat, f.center.lat - f.latSpan), lte(searchDocuments.lat, f.center.lat + f.latSpan))
             : undefined,
