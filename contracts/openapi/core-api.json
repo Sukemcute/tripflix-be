@@ -4334,6 +4334,65 @@
         ]
       }
     },
+    "/api/v1/admin/search/vocab-gaps": {
+      "get": {
+        "description": "So log câu tìm (tìm khám phá + trang đầu tìm bài, không lưu người tìm) với chỉ mục nội dung bằng log-likelihood ratio G².\nKhông gồm ngân sách, số ngày, từ dừng, nơi đã hiểu, và n-gram mà mọi từ đều đã khớp từ điển.\nKiểu viết gần nhau (cách 1–2 chữ, đã bỏ dấu) gom một nhóm. Ngày tính theo UTC.",
+        "operationId": "AdminVocabGapsController_list",
+        "parameters": [
+          {
+            "name": "minCount",
+            "required": false,
+            "in": "query",
+            "description": "Bỏ n-gram có ít câu tìm hơn; 1–1000, mặc định 3",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–200, mặc định 50",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "1–90, mặc định 7",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabGapsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số ngoài khoảng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Khoảng trống từ vựng: n-gram người tìm dùng nhiều hơn hẳn nội dung",
+        "tags": [
+          "Admin Search Vocab Gaps"
+        ]
+      }
+    },
     "/api/v1/admin/discovery/jobs": {
       "get": {
         "operationId": "AdminDiscoveryJobsController_list",
@@ -10672,6 +10731,110 @@
         "required": [
           "checkedAt",
           "workers"
+        ]
+      },
+      "VocabGapVariantDto": {
+        "type": "object",
+        "properties": {
+          "gram": {
+            "type": "string",
+            "example": "ha loii"
+          },
+          "queryHits": {
+            "type": "number",
+            "example": 4,
+            "description": "Số câu tìm có kiểu viết này"
+          }
+        },
+        "required": [
+          "gram",
+          "queryHits"
+        ]
+      },
+      "VocabGapDto": {
+        "type": "object",
+        "properties": {
+          "gram": {
+            "type": "string",
+            "example": "ha loi",
+            "description": "N-gram đã bỏ dấu, viết thường; kiểu viết có điểm cao nhất của nhóm"
+          },
+          "n": {
+            "type": "number",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "Số từ"
+          },
+          "score": {
+            "type": "number",
+            "example": 61.2,
+            "description": "G² (log-likelihood): càng cao càng chắc người tìm dùng nhiều hơn nội dung"
+          },
+          "queryHits": {
+            "type": "number",
+            "example": 21,
+            "description": "Tổng số câu tìm của cả nhóm"
+          },
+          "contentCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số lần `gram` xuất hiện trong nội dung đã đánh chỉ mục"
+          },
+          "variants": {
+            "description": "Các kiểu viết gần nhau đã gom (gồm cả `gram`), nhiều điểm nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocabGapVariantDto"
+            }
+          },
+          "samples": {
+            "example": [
+              "hà lội ăn gì",
+              "homestay hà lội"
+            ],
+            "description": "Tối đa 5 câu tìm gốc",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "gram",
+          "n",
+          "score",
+          "queryHits",
+          "contentCount",
+          "variants",
+          "samples"
+        ]
+      },
+      "VocabGapsDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "example": 7
+          },
+          "queries": {
+            "type": "number",
+            "example": 1342,
+            "description": "Số câu tìm đã đếm trong khoảng ngày"
+          },
+          "items": {
+            "description": "Điểm cao nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocabGapDto"
+            }
+          }
+        },
+        "required": [
+          "days",
+          "queries",
+          "items"
         ]
       },
       "JobSummaryDto": {

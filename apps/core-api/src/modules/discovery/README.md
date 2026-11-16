@@ -2,7 +2,7 @@
 
 - Chủ: Duy (backup Dũng)
 - Database: `core`, schema `discovery`, user Postgres `tf_discovery`
-- Bảng chính: `search_entities`, `search_documents`, `search_counts` (tìm kiếm); `recommend_*` (gợi ý bài, TF28)
+- Bảng chính: `search_entities`, `search_documents`, `search_counts`, `search_query_grams` (tìm kiếm); `recommend_*` (gợi ý bài, TF28)
 
 ## Phần con
 
@@ -39,6 +39,7 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | `GET /api/recommendations/posts` | `recommend/api/post-recommendations.controller.ts` | Gợi ý bài `for_you`/`trending`, đăng nhập tuỳ chọn (TF28) |
 | Bảng `recommend_*` | `db/schema/recommend.ts` | Bảng thô `recommend_interactions`, metadata bài, điểm bài, đặc trưng người, `recommend_algos`, `recommend_job_state` |
 | Job đặc trưng gợi ý | `recommend/jobs/build-features.job.ts` | Lúc khởi động và mỗi 10 phút (admin đổi được, TF103); dọn hạn lưu bảng thô mỗi 24 giờ (`purge-interactions.job.ts`) |
+| Khoảng trống từ vựng (TF102) | `search/domain/explore/vocab-gaps.ts`, `search/api/admin-vocab-gaps.controller.ts`, bảng `search_query_grams` | Mỗi lượt tìm khám phá và trang đầu tìm bài cộng n-gram 1–2 của câu (bỏ phần engine đã hiểu) theo ngày, không lưu người tìm, tối đa 5 câu mẫu, xoá sau 90 ngày (`PurgeInteractionsJob`). `GET /api/v1/admin/search/vocab-gaps?days&limit&minCount` (moderator, superadmin): so với `ng` của chỉ mục bằng G² (log-likelihood), gom kiểu viết gần nhau, để admin chọn từ thêm vào lexicon |
 | Admin theo dõi/chạy job | `jobs/admin-discovery-jobs.controller.ts`, `jobs/job-runs.ts` | `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin): 20 lần chạy gần nhất của `explore`, `suggest`, `recommend_build`, `recommend_purge` (Redis `discovery:job-runs:{job}`, 7 ngày) + số liệu gợi ý. `POST …/jobs/:job/run` (superadmin): chạy ngay, không chờ, không chạy chồng. `PUT …/jobs/:job/interval` (superadmin, TF103, `explore` và `recommend_build`): đổi chu kỳ tự chạy (1 phút–24 giờ, `null` về 10 phút), lưu Redis `discovery:job-interval:{job}`; job đọc lại mỗi phút nên có hiệu lực không cần khởi động lại. Chạy trên process trả lời request (`APP_ROLE: all`) |
 
 ## Giao tiếp

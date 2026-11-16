@@ -8,6 +8,7 @@ import { RebuildExploreIndexJob } from '../jobs/rebuild-explore-index.job.js';
 import { IndexHealth } from '../jobs/index-health.js';
 import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
+import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
 import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-cases.js';
 import type { ExploreCatalog, ExploreHotel, ExplorePost, ExploreStore } from './ports.js';
 import type { JobRuns } from '../../jobs/job-runs.js';
@@ -61,6 +62,27 @@ class FakeStore extends MemoryExploreSource implements ExploreStore {
     const before = this.live.docs.length;
     this.live.docs = this.live.docs.filter((d) => !ids.includes(d.id));
     return before - this.live.docs.length;
+  }
+  /** Đếm câu tìm trong RAM, cùng phép cộng dồn với bảng search_query_grams. */
+  readonly grams = new Map<string, QueryGramRow & { day: string }>();
+  async recordQueryGrams(day: string, rows: QueryGramRow[]) {
+    for (const r of rows) {
+      const old = this.grams.get(`${day}|${r.gram}`);
+      const samples = old ? [...old.samples, ...r.samples.filter((s) => !old.samples.includes(s))].slice(0, 5) : r.samples;
+      this.grams.set(`${day}|${r.gram}`, { day, gram: r.gram, hits: (old?.hits ?? 0) + r.hits, samples });
+    }
+  }
+  async listQueryGrams(since: string, minCount: number) {
+    const sum = new Map<string, QueryGramRow>();
+    for (const r of this.grams.values()) {
+      if (r.day < since) continue;
+      const s = sum.get(r.gram) ?? { gram: r.gram, hits: 0, samples: [] };
+      sum.set(r.gram, { gram: r.gram, hits: s.hits + r.hits, samples: [...new Set([...s.samples, ...r.samples])].slice(0, 5) });
+    }
+    return [...sum.values()].filter((r) => r.hits >= minCount || r.gram.startsWith('#'));
+  }
+  async purgeQueryGrams() {
+    return 0;
   }
 }
 
@@ -190,6 +212,43 @@ describe('ExploreUseCases', () => {
     expect(await explore.searchPosts({ q: 'hà nội', postType: 'all', limit: 20 })).toMatchObject({ isFallback: false, dropped: [] });
     // Không hiểu gì (không nơi, không ý muốn) thì vẫn rỗng, không đoán bừa.
     expect(await explore.searchPosts({ q: 'zzzz', postType: 'all', limit: 20 })).toMatchObject({ total: 0, items: [], isFallback: false });
+  });
+
+  describe('TF102: khoảng trống từ vựng', () => {
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('đếm n-gram mỗi lượt tìm và trang đầu tìm bài; lật trang không đếm', async () => {
+      const { explore, store } = setup([hotel('H1', 'Vinpearl Đà Nẵng', 'Đà Nẵng')], [post('P1', 'Ăn gì ở Đà Nẵng')]);
+      await explore.search({ q: 'quán nàng thơ đà nẵng' });
+      await explore.searchPosts({ q: 'nàng thơ', postType: 'all', limit: 1 });
+      await explore.searchPosts({ q: 'nàng thơ', postType: 'all', limit: 1, cursor: 'x' });
+      await flush();
+      const day = [...store.grams.values()][0]!.day;
+      expect(store.grams.get(`${day}|#q`)!.hits).toBe(2);
+      expect(store.grams.get(`${day}|nang tho`)).toMatchObject({ hits: 2, samples: ['quán nàng thơ đà nẵng', 'nàng thơ'] });
+      // Nơi đã hiểu không vào seq nên không thành n-gram.
+      expect([...store.grams.keys()].some((k) => k.includes('da nang'))).toBe(false);
+    });
+
+    it('vocabGaps: cụm người tìm dùng mà nội dung không có lên đầu, có câu mẫu', async () => {
+      const { explore } = setup(
+        [hotel('H1', 'Khách sạn Đà Lạt Center', 'Lâm Đồng', { city: 'Đà Lạt' })],
+        [post('P1', 'Nàng tiên cá ở Đà Lạt'), post('P2', 'Thơ tình Đà Lạt'), post('P3', 'Quán đẹp ở Đà Lạt')],
+      );
+      for (const q of ['quán nàng thơ đà lạt', 'cafe nàng thơ', 'nàng thơ đà lạt', 'quán đẹp đà lạt']) await explore.search({ q });
+      await flush();
+      const page = await explore.vocabGaps({ days: 7, limit: 10, minCount: 2 });
+      expect(page).toMatchObject({ days: 7, queries: 4 });
+      expect(page.items[0]).toMatchObject({ gram: 'nang tho', n: 2, queryHits: 3, contentCount: 0 });
+      expect(page.items[0]!.samples).toEqual(expect.arrayContaining(['quán nàng thơ đà lạt', 'cafe nàng thơ']));
+    });
+
+    it('ghi đếm lỗi không làm hỏng lượt tìm', async () => {
+      const { explore, store } = setup([hotel('H1', 'Vinpearl Đà Nẵng', 'Đà Nẵng')], []);
+      store.recordQueryGrams = () => Promise.reject(new Error('db down'));
+      await expect(explore.search({ q: 'khách sạn đà nẵng' })).resolves.toMatchObject({ understood: { place: 'Đà Nẵng' } });
+      await flush();
+    });
   });
 
   it('dựng lại chỉ mục từ cả hai nguồn', async () => {
