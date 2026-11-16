@@ -118,6 +118,21 @@ describe('EventRouter', () => {
     expect(mailer.sent).toHaveLength(1);
   });
 
+  it('access.registration_code_requested với purpose login gửi email mã xác thực đăng nhập', async () => {
+    const mailer = new MemoryMailer();
+    const router = new EventRouter(mailer, new MemoryProcessedEvents(), log);
+    const event = createEvent('access.registration_code_requested', {
+      email: 'khang@example.com',
+      code: '12345678',
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      purpose: 'login',
+    });
+    expect(await router.route(event)).toBe('handled');
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]?.subject).toBe('Mã xác thực đăng nhập Tripflix');
+    expect(mailer.sent[0]?.text).toContain('12345678');
+  });
+
   const paidPayload = (contactEmail: string | null) => ({
     orderId: randomUUID(),
     userId: randomUUID(),

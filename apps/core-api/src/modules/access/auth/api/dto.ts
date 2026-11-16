@@ -43,11 +43,23 @@ export const RegisterRequestSchema = RegistrationCodeRequestSchema.extend({
   acceptTerms: z.literal(true, TERMS_REQUIRED_MESSAGE),
 });
 
-export const LoginRequestSchema = z.object({
+export const LoginCodeRequestSchema = z.object({
   email: lookupEmailField(),
   password: currentPasswordField(),
-  deviceName: deviceNameField(),
 });
+
+export const LoginRequestSchema = z
+  .object({
+    email: lookupEmailField(),
+    password: currentPasswordField(),
+    deviceName: deviceNameField(),
+    loginChallengeId: z.uuid(INVALID_REGISTRATION_CODE).optional(),
+    code: z.string().regex(REGISTRATION_CODE_PATTERN, INVALID_REGISTRATION_CODE).optional(),
+  })
+  .refine((v) => (v.loginChallengeId === undefined) === (v.code === undefined), {
+    message: INVALID_REGISTRATION_CODE,
+    path: ['code'],
+  });
 
 // Web, admin không gửi refreshToken trong body (có khi không gửi body): core-api đọc từ cookie tripflix_refresh.
 export const RefreshRequestSchema = z.preprocess(
@@ -112,11 +124,27 @@ export class RegisterDto extends RegistrationCodeDto {
   acceptTerms!: true;
 }
 
+export class LoginCodeDto {
+  @ApiProperty({ example: 'khang@example.com' }) email!: string;
+  @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encPassword?: string;
+  @ApiPropertyOptional({ description: PLAIN_PASSWORD_DESCRIPTION }) password?: string;
+}
+
+export class LoginCodeResultDto {
+  @ApiProperty({ format: 'uuid' }) loginChallengeId!: string;
+  @ApiProperty({ example: 60, description: 'Số giây phải đợi trước khi xin mã lại cho email này' })
+  resendAfterSeconds!: number;
+}
+
 export class LoginDto {
   @ApiProperty({ example: 'khang@example.com' }) email!: string;
   @ApiPropertyOptional({ description: ENC_PASSWORD_DESCRIPTION }) encPassword?: string;
   @ApiPropertyOptional({ description: PLAIN_PASSWORD_DESCRIPTION }) password?: string;
   @ApiPropertyOptional({ example: 'Pixel 8' }) deviceName?: string;
+  @ApiPropertyOptional({ format: 'uuid', description: 'ID thử thách mã xác thực đăng nhập từ POST /auth/login-code' })
+  loginChallengeId?: string;
+  @ApiPropertyOptional({ pattern: REGISTRATION_CODE_PATTERN.source, description: 'Mã xác thực 8 chữ số gửi qua email' })
+  code?: string;
 }
 
 export class RefreshDto {
