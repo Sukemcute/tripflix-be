@@ -16,7 +16,7 @@ import {
   type SidBlocklist,
 } from '@tripflix/auth';
 import { loadEnv } from '@tripflix/config';
-import { createPool, ping } from '@tripflix/db';
+import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, createPool, ping } from '@tripflix/db';
 import { loggerModule } from '@tripflix/observability';
 import { Redis } from 'ioredis';
 import { createRemoteJWKSet } from 'jose';
@@ -100,7 +100,7 @@ export class MeController {
       provide: DB,
       inject: [ENV],
       useFactory: (env: Env) =>
-        createPool({ url: env.DATABASE_URL_NOTIFICATION, max: 10, applicationName: 'notification-service' }),
+        createPool({ url: env.DATABASE_URL_NOTIFICATION, max: 10, applicationName: 'notification-service', statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS }),
     },
     {
       provide: REDIS,
