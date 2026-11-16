@@ -185,7 +185,10 @@ export class RecordScreeningUseCase {
         !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden))
     )
       return;
-    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) return;
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
     if (occurredAt && (await this.repository.hasStaffDecisionAfter(target, occurredAt))) return;
     const attempts = (previousScan?.attempts ?? 0) + 1;
     const scanStatus =
@@ -279,7 +282,10 @@ export class ScreenContentUseCase {
       return;
     }
     if (target.status === 'held') await this.record.execute(eventId, target, null, occurredAt);
-    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) return;
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
     const playback = target.coverMediaId ? await this.media.getPlayback([target.coverMediaId]) : {};
     const poster = target.coverMediaId ? playback[target.coverMediaId]?.posters.w540 : undefined;
     const result = await this.ai.moderate([
