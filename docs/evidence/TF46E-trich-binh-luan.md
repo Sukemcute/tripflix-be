@@ -13,7 +13,7 @@
 | Thông báo bình luận có đoạn trích nội dung | Có | `src/inbox/comment-excerpt.spec.ts` (cắt 100 ký tự kể cả emoji, gộp khoảng trắng, chuỗi rỗng thì bỏ) |
 
 ## Kết quả kiểm tra
-`pnpm turbo run lint typecheck test --filter=@tripflix/notification-service`: 18 file, 122 test pass. Lint 0 lỗi, 4 cảnh báo có sẵn ở `push.int.spec.ts`. Test `*.int.spec.ts` cần DB nên chưa chạy.
+`pnpm turbo run lint typecheck test --filter=@tripflix/notification-service`: 18 file, 122 test pass. Lint 0 lỗi, 4 cảnh báo có sẵn ở `push.int.spec.ts`. Test `*.int.spec.ts` chạy trên CI: pass. Hai test trong `comment-notification.int.spec.ts` đã được sửa để kiểm tra luôn `excerpt` trong `data`.
 
 ## Cách kiểm lại
 1. Chạy notification-service với DB.
