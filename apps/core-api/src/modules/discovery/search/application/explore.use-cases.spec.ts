@@ -38,6 +38,8 @@ const post = (id: string, title: string, extra: Partial<ExplorePost> = {}): Expl
   tripAttachment: null,
   reactionTotal: 10,
   commentCount: 1,
+  authorId: 'U1',
+  createdAt: new Date('2026-11-01T08:00:00Z'),
   ...extra,
 });
 
@@ -65,6 +67,7 @@ function setup(hotels: ExploreHotel[], posts: ExplorePost[], hidden: string[] = 
     listHotels: async () => ({ items: hotels, nextCursor: null }),
     listPosts: async () => ({ items: posts, nextCursor: null }),
     findVisiblePostIds: async (ids) => new Set(ids.filter((id) => !hidden.includes(id))),
+    getAuthorNames: async (ids) => new Map(ids.filter((id) => id === 'U1').map((id) => [id, 'Minh Anh'])),
   };
   return { store, catalog, explore: new ExploreUseCases(store, catalog) };
 }
@@ -118,6 +121,58 @@ describe('ExploreUseCases', () => {
     const plans = await explore.searchPosts({ q: 'lịch trình đà nẵng dưới 2tr', postType: 'plan', limit: 20 });
     expect(plans).toMatchObject({ isFallback: true, fallbackRelaxed: ['budget'], nextCursor: null, understood: { budget: 2_000_000 } });
     expect(plans.items.map((i) => [i.refId, i.reason.includes('vượt ngân sách')])).toEqual([['P1', true]]);
+  });
+
+  it('TF95: article = lộ trình + bài viết, bỏ mọi video (kể cả video kèm lộ trình), trang đủ limit', async () => {
+    const trip = { destinationName: 'Đà Nẵng', daysCount: 3, estimatedCostPerPerson: 2_500_000 };
+    const posts = [
+      post('P1', 'Lịch trình Đà Nẵng 3N2Đ', { tripAttachment: trip }),
+      post('V1', 'Vlog lịch trình Đà Nẵng 3 ngày', { postType: 'video', tripAttachment: trip }),
+      post('V2', 'Video biển Đà Nẵng', { postType: 'video' }),
+      post('P2', 'Review biển Đà Nẵng'),
+      post('P3', 'Ăn gì ở Đà Nẵng'),
+      post('P4', 'Đà Nẵng mùa mưa'),
+    ];
+    const { explore } = setup([], posts);
+    // V1 nằm trong vùng Lộ trình: lọc theo vùng thôi thì V1 lọt vào article.
+    expect((await explore.searchPosts({ q: 'đà nẵng', postType: 'plan', limit: 20 })).items.map((i) => i.refId)).toContain('V1');
+    const first = await explore.searchPosts({ q: 'đà nẵng', postType: 'article', limit: 2 });
+    expect(first).toMatchObject({ total: 4, isFallback: false });
+    expect(first.items).toHaveLength(2);
+    const rest = await explore.searchPosts({ q: 'đà nẵng', postType: 'article', limit: 2, cursor: first.nextCursor! });
+    expect(rest.items).toHaveLength(2);
+    expect(rest.nextCursor).toBeNull();
+    expect(new Set([...first.items, ...rest.items].map((i) => i.refId))).toEqual(new Set(['P1', 'P2', 'P3', 'P4']));
+
+    // Kết quả thay thế ('mùa thu' không có trong dữ liệu): V1 có trong `all` nhưng không lọt vào article.
+    const fallbackSetup = setup([], [posts[0]!, posts[1]!, post('P2', 'Review biển Đà Nẵng')]);
+    const q = 'lịch trình đà nẵng mùa thu';
+    const all = await fallbackSetup.explore.searchPosts({ q, postType: 'all', limit: 20 });
+    expect(all.isFallback).toBe(true);
+    expect(all.items.map((i) => i.refId)).toContain('V1');
+    const article = await fallbackSetup.explore.searchPosts({ q, postType: 'article', limit: 20 });
+    expect(article).toMatchObject({ isFallback: true, dropped: ['mùa thu'] });
+    expect(article.items.map((i) => i.refId)).toEqual(['P1']);
+  });
+
+  it('TF95: item bài có số tim, bình luận, ngày đăng, tác giả (avatar null); khách sạn để null', async () => {
+    const posts = [
+      post('P1', 'Review biển Đà Nẵng', { reactionTotal: 120, commentCount: 8 }),
+      post('P2', 'Ăn gì ở Đà Nẵng', { authorId: 'U-missing', createdAt: new Date('2026-10-02T00:00:00Z') }),
+    ];
+    const { explore } = setup([hotel('H1', 'Vinpearl Resort Đà Nẵng', 'Đà Nẵng')], posts);
+    const page = await explore.searchPosts({ q: 'đà nẵng', postType: 'article', limit: 20 });
+    expect(page.items.find((i) => i.refId === 'P1')).toMatchObject({
+      likes: 120,
+      comments: 8,
+      createdAt: '2026-11-01T08:00:00.000Z',
+      author: { id: 'U1', name: 'Minh Anh', avatarUrl: null },
+    });
+    expect(page.items.find((i) => i.refId === 'P2')).toMatchObject({ createdAt: '2026-10-02T00:00:00.000Z', author: { id: 'U-missing', name: null } });
+    const explorePage = await explore.search({ q: 'đà nẵng' });
+    const items = explorePage.sections.flatMap((s) => s.items);
+    expect(items.find((i) => i.refId === 'H1')).toMatchObject({ likes: null, comments: null, createdAt: null, author: null });
+    expect(items.find((i) => i.refId === 'P1')).toMatchObject({ likes: 120, author: { name: 'Minh Anh' } });
   });
 
   it('tìm bài: không bài nào khớp đủ câu thì gợi ý theo phần hiểu được và nói rõ từ nào bị bỏ', async () => {

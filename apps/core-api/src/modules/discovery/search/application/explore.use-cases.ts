@@ -10,8 +10,8 @@ import { EXPLORE_CATALOG, EXPLORE_STORE, type ExploreCatalog, type ExploreHotel,
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_PAGES = 1_000;
 const POST_KINDS = new Set(['post', 'plan', 'video']);
-/** Vùng của từng postType khi tìm bài; `all` gộp cả ba theo thứ tự engine xếp. */
-const POST_TYPE_KINDS = { all: ['plan', 'video', 'post'], plan: ['plan'], video: ['video'], post: ['post'] } as const;
+/** Vùng của từng postType khi tìm bài; `all` gộp cả ba theo thứ tự engine xếp. `article`: mọi bài không phải video. */
+const POST_TYPE_KINDS = { all: ['plan', 'video', 'post'], plan: ['plan'], video: ['video'], post: ['post'], article: ['plan', 'post'] } as const;
 export type PostType = keyof typeof POST_TYPE_KINDS;
 export const POST_TYPES = Object.keys(POST_TYPE_KINDS) as PostType[];
 // ponytail: lấy tối đa chừng này bài khớp rồi cắt trang trong RAM; đủ cho vài nghìn bài, lớn hơn thì phân trang trong engine.
@@ -55,7 +55,18 @@ export interface ExploreResultItem {
   priceFrom: number | null;
   days: number | null;
   location: { lat: number; lng: number } | null;
+  /** Bài: lượt thích; null nếu không phải bài. */
+  likes: number | null;
+  /** Bài: số bình luận; null nếu không phải bài. */
+  comments: number | null;
+  /** Bài: ngày đăng (ISO); null nếu không phải bài hoặc chỉ mục chưa dựng lại. */
+  createdAt: string | null;
+  /** Bài: tác giả; avatar chưa có dữ liệu nên luôn null (như feed). */
+  author: { id: string; name: string | null; avatarUrl: string | null } | null;
 }
+
+/** Tên tác giả theo id, tra một lần cho cả trang. */
+type AuthorNames = ReadonlyMap<string, string>;
 
 export interface ExploreResultSection {
   kind: string;
@@ -130,6 +141,8 @@ export function postToObject(p: ExplorePost): ExploreObject {
     likes: p.reactionTotal,
     n: p.commentCount,
     topics: isVideo && days ? ['plan'] : [],
+    authorId: p.authorId,
+    createdAt: new Date(p.createdAt).toISOString(),
   };
 }
 
@@ -145,7 +158,8 @@ function postReason({ obj, reason }: ExploreItem): string {
   return why.join(' · ');
 }
 
-function toItem({ obj, reason }: ExploreItem): ExploreResultItem {
+function toResultItem({ obj, reason }: ExploreItem, names: AuthorNames): ExploreResultItem {
+  const isPost = POST_KINDS.has(obj.kind);
   return {
     id: obj.id,
     kind: obj.kind,
@@ -157,6 +171,10 @@ function toItem({ obj, reason }: ExploreItem): ExploreResultItem {
     priceFrom: obj.priceNight ?? obj.cost ?? null,
     days: obj.days ?? null,
     location: obj.lat != null && obj.lon != null ? { lat: obj.lat, lng: obj.lon } : null,
+    likes: isPost ? (obj.likes ?? 0) : null,
+    comments: isPost ? (obj.n ?? 0) : null,
+    createdAt: isPost ? (obj.createdAt ?? null) : null,
+    author: isPost && obj.authorId ? { id: obj.authorId, name: names.get(obj.authorId) ?? null, avatarUrl: null } : null,
   };
 }
 
@@ -190,6 +208,8 @@ export class ExploreUseCases {
     const postIds = [...new Set(all.filter((i) => POST_KINDS.has(i.obj.kind)).map((i) => i.obj.refId ?? ''))];
     const visible = postIds.length ? await this.catalog.findVisiblePostIds(postIds) : new Set<string>();
     const isShown = (i: ExploreItem) => !POST_KINDS.has(i.obj.kind) || visible.has(i.obj.refId ?? '');
+    const names = await this.authorNames(all.filter(isShown));
+    const toItem = (i: ExploreItem) => toResultItem(i, names);
     const fallback = r.fallback && {
       forQuery: query.q,
       relaxed: r.fallback.relaxed,
@@ -215,10 +235,12 @@ export class ExploreUseCases {
     const kinds: readonly string[] = POST_TYPE_KINDS[query.postType];
     const r = await searchExplore(this.store, query.q, { perSection: MAX_POST_RESULTS, fullKinds: kinds });
     const seen = new Set<string>();
+    // Vùng Lộ trình có cả video kèm lộ trình: `article` bỏ mọi video. Kết quả thay thế lọc theo loại của bài nên không cần.
+    const isWanted = (i: ExploreItem) => query.postType !== 'article' || i.obj.kind !== 'video';
     const found = r.sections
       .filter((s) => kinds.includes(s.kind))
       .flatMap((s) => s.items)
-      .filter((i) => !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)));
+      .filter((i) => isWanted(i) && !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)));
     // Không bài nào khớp đủ câu ('mùa thu hà nội' khi chưa ai viết về mùa thu, lộ trình vượt ngân sách): dùng kết quả thay thế, như /search.
     const fallback = found.length === 0 ? r.fallback : null;
     const isFallback = Boolean(fallback?.items.length);
@@ -228,15 +250,21 @@ export class ExploreUseCases {
     const visible = candidates.length ? await this.catalog.findVisiblePostIds(candidates.map((i) => i.obj.refId ?? '')) : new Set<string>();
     const shown = candidates.filter((i) => visible.has(i.obj.refId ?? ''));
     const page = paginate(shown, query.cursor, query.limit);
+    const names = await this.authorNames(page.items);
     return {
       understood: understoodOf(r.understood),
-      items: page.items.map((i) => toItem({ ...i, reason: postReason(i) })),
+      items: page.items.map((i) => toResultItem({ ...i, reason: postReason(i) }, names)),
       total: shown.length,
       nextCursor: page.nextCursor,
       dropped: isFallback && shown.length > 0 ? fallback!.dropped : [],
       isFallback: isFallback && shown.length > 0,
       fallbackRelaxed: isFallback && shown.length > 0 ? fallback!.relaxed : [],
     };
+  }
+
+  private async authorNames(items: ExploreItem[]): Promise<AuthorNames> {
+    const ids = [...new Set(items.flatMap((i) => (i.obj.authorId ? [i.obj.authorId] : [])))];
+    return ids.length ? this.catalog.getAuthorNames(ids) : new Map();
   }
 
   /** Dựng lại toàn bộ chỉ mục từ commerce + content. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */

@@ -320,12 +320,13 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListBookmarksUseCase,
-      inject: [BookmarkRepository, PostRepository, USER_DIRECTORY_PORT],
+      inject: [BookmarkRepository, PostRepository, USER_DIRECTORY_PORT, ReactionRepository],
       useFactory: (
         bookmarkRepo: BookmarkRepository,
         postRepo: PostRepository,
         userDirectory: UserDirectoryPort,
-      ) => new ListBookmarksUseCase(bookmarkRepo, postRepo, userDirectory),
+        reactionRepo: ReactionRepository,
+      ) => new ListBookmarksUseCase(bookmarkRepo, postRepo, userDirectory, reactionRepo),
     },
     {
       provide: TrackShareUseCase,
