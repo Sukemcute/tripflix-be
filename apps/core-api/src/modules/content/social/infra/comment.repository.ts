@@ -1,6 +1,7 @@
-import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '@tripflix/db';
+import { isBeforeCursor } from './keyset-cursor.js';
 import { comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
 
 export type SampledCommentRecord = CommentRecord & {
@@ -179,10 +180,7 @@ export class CommentRepository {
 
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(
-        or(
-          lt(comments.createdAt, options.cursorCreatedAt),
-          and(eq(comments.createdAt, options.cursorCreatedAt), lt(comments.id, options.cursorId)),
-        )!,
+        isBeforeCursor(comments, comments.createdAt, comments.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
 
