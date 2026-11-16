@@ -656975,6 +656975,4121 @@
      "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Có thể mang thú cưng sau khi được chỗ nghỉ đồng ý trước."
     }
    }
+  },
+  {
+   "id": "P-osm-vung-tau-001",
+   "name": "Imperial Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 5,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/The_Imperial_Hotel%2C_Bai_sau_Tp_Vung_Tau_vn_-_panoramio.jpg/1280px-The_Imperial_Hotel%2C_Bai_sau_Tp_Vung_Tau_vn_-_panoramio.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/The_Imperial_Hotel%2C_Bai_sau_Tp_Vung_Tau_vn_-_panoramio.jpg/1280px-The_Imperial_Hotel%2C_Bai_sau_Tp_Vung_Tau_vn_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Bai_Truoc%2C_Vung_Tau.jpg/1280px-Bai_Truoc%2C_Vung_Tau.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Bai_Truoc_Vung_Tau.jpg/1280px-Bai_Truoc_Vung_Tau.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Bai_truoc-_duong_halong-tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio.jpg/1280px-Bai_truoc-_duong_halong-tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Hotel_Umani_Double_Room_Sea_view_%2813%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%2813%29.jpg"
+   ],
+   "basePrice": 5540000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-001--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 15,
+     "priceFactor": 0.97,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 9,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 14,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 26,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 18,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Hotel_Umani_Double_Room_Sea_view_%2813%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%2813%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Gương trang điểm",
+       "Minibar",
+       "Áo choàng tắm",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-001--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 18,
+     "priceFactor": 1.25,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 29,
+       "perks": [
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 11,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 30,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 22,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Hotel_Umani_Double_Room_Sea_view_%2814%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%2814%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ấm siêu tốc",
+       "Áo choàng tắm",
+       "Gương trang điểm",
+       "Bàn làm việc",
+       "Ghế sofa"
+      ]
+     }
+    }
+   ],
+   "address": "159-163 Thùy Vân, Vũng Tàu",
+   "lat": 10.34398,
+   "lng": 107.0949,
+   "ratingAvg": 4.8,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "15:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Imperial Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Du lịch Vũng Tàu khoảng 0.2 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     },
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Du lịch Vũng Tàu",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Công viên Thùy Vân",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Bãi Sau",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Đài Liệt sĩ",
+      "distanceKm": 0.6
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "kids",
+      "name": "Dịch vụ Nôi/Cũi",
+      "icon": "crib",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi trẻ em",
+      "icon": "pool",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi ngoài trời",
+      "icon": "pool",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Spa",
+      "icon": "spa",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Thể thao dưới nước",
+      "icon": "beach",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en",
+     "ko"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 11,
+     "openedAt": "2001-08-09",
+     "roomCount": 107,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 500.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 500000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-002",
+   "name": "Pacific Hotel Vung Tau",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 4,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Bai_truoc_tp_Vun_tau%2C_Duong_Quang_trung%2C_Ba_ria_Vung_tau_vn_-_panoramio.jpg/1280px-Bai_truoc_tp_Vun_tau%2C_Duong_Quang_trung%2C_Ba_ria_Vung_tau_vn_-_panoramio.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Bai_truoc_tp_Vun_tau%2C_Duong_Quang_trung%2C_Ba_ria_Vung_tau_vn_-_panoramio.jpg/1280px-Bai_truoc_tp_Vun_tau%2C_Duong_Quang_trung%2C_Ba_ria_Vung_tau_vn_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/B%C3%A3i_bi%E1%BB%83n_V%C5%A9ng_T%C3%A0u_2016.jpg/1280px-B%C3%A3i_bi%E1%BB%83n_V%C5%A9ng_T%C3%A0u_2016.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/B%C3%A3i_sau%2C_V%C5%A9ng_T%C3%A0u%2C_02_2014.JPG/1280px-B%C3%A3i_sau%2C_V%C5%A9ng_T%C3%A0u%2C_02_2014.JPG",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Cong_vien_bai_truoc-Ph%C6%B0%E1%BB%9Dng_1%2C_tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio_%282%29.jpg/1280px-Cong_vien_bai_truoc-Ph%C6%B0%E1%BB%9Dng_1%2C_tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio_%282%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Hotel_Umani_Double_Room_Sea_view_%2816%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%2816%29.jpg"
+   ],
+   "basePrice": 1670000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-002--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 13,
+     "priceFactor": 0.96,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 18,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 33,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 37,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 20,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Hotel_Umani_Double_Room_Sea_view_%2816%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%2816%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ấm siêu tốc",
+       "Bồn tắm",
+       "Áo choàng tắm",
+       "Két an toàn",
+       "Dọn phòng hằng ngày"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-002--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 6,
+     "priceFactor": 1.17,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 31,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 32,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 31,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 26,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Hotel_Umani_Double_Room_Sea_view_%282%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%282%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Mũ tắm",
+       "Bàn làm việc",
+       "Dọn phòng hằng ngày",
+       "Bồn tắm",
+       "Áo choàng tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-002--FAM",
+     "code": "FAM",
+     "name": "Phòng gia đình",
+     "maxGuests": 4,
+     "defaultTotal": 7,
+     "priceFactor": 1.71,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 34,
+       "perks": [
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 10,
+       "perks": [
+        "Bữa sáng buffet cho 4 người",
+        "Trả phòng muộn đến 14:00"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 28,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi lớn và 1 giường sofa",
+      "areaM2": 51,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Hotel_Umani_Double_Room_Sea_view_%289%29.jpg/1280px-Hotel_Umani_Double_Room_Sea_view_%289%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Áo choàng tắm",
+       "Bồn tắm",
+       "Két an toàn"
+      ]
+     }
+    }
+   ],
+   "address": "4 Lê Lợi, Vũng Tàu",
+   "lat": 10.346873,
+   "lng": 107.074648,
+   "ratingAvg": 4.5,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Pacific Hotel Vung Tau là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Đường Sách Vũng Tàu khoảng 0.1 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "pool",
+      "text": "Hồ bơi với không gian thoáng đãng"
+     },
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "spa",
+      "text": "Dịch vụ thư giãn sau ngày vui chơi"
+     },
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Đường Sách Vũng Tàu",
+      "distanceKm": 0.1
+     },
+     {
+      "name": "Công viên Bãi Trước",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Bãi Trước",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Nhà thờ Vũng Tàu",
+      "distanceKm": 0.3
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Khu vui chơi trẻ em (Kids Club)",
+      "icon": "kids",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Bar cạnh bể bơi",
+      "icon": "bar",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Thể thao dưới nước",
+      "icon": "beach",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Nhà hàng đặc sản địa phương",
+      "icon": "restaurant",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "wellness",
+      "name": "Spa",
+      "icon": "spa",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Đưa đón sân bay",
+      "icon": "shuttle",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Dịch vụ Nôi/Cũi",
+      "icon": "crib",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Phòng mát-xa",
+      "icon": "massage",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en",
+     "ru",
+     "ko"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 7,
+     "openedAt": "2018-01-19",
+     "roomCount": 132,
+     "restaurants": 1,
+     "bars": 1
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 500.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 500000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-003",
+   "name": "Mường Thanh Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 4,
+   "brand": "Mường Thanh",
+   "style": "thành phố",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Couples_in_Vung_Tau_Beach_%28Vietnam%29.jpg/1280px-Couples_in_Vung_Tau_Beach_%28Vietnam%29.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Couples_in_Vung_Tau_Beach_%28Vietnam%29.jpg/1280px-Couples_in_Vung_Tau_Beach_%28Vietnam%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/FrontBeachVungtau.JPG/1280px-FrontBeachVungtau.JPG",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_01.jpg/1280px-Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_01.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_02.jpg/1280px-Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_02.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Centennial_Inn_Master_Suite.jpg/1280px-Centennial_Inn_Master_Suite.jpg"
+   ],
+   "basePrice": 2110000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-003--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 30,
+     "priceFactor": 1.03,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 17,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 25,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 42,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 22,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Centennial_Inn_Master_Suite.jpg/1280px-Centennial_Inn_Master_Suite.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Áo choàng tắm",
+       "Bàn làm việc",
+       "Gương trang điểm",
+       "Bồn tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-003--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 14,
+     "priceFactor": 1.29,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 23,
+       "perks": [
+        "Trả phòng muộn đến 14:00"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 33,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 28,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 26,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Hotel_Room_%282081798558%29.jpg/1280px-Hotel_Room_%282081798558%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ghế sofa",
+       "Gương trang điểm",
+       "Dọn phòng hằng ngày",
+       "Ban công",
+       "Ấm siêu tốc"
+      ]
+     }
+    }
+   ],
+   "address": "Thống Nhất, Vũng Tàu",
+   "lat": 10.345951,
+   "lng": 107.075433,
+   "ratingAvg": 4.4,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Mường Thanh Hotel là chỗ nghỉ trong lòng thành phố tại Vũng Tàu, TP.HCM. Từ đây đi Nhà thờ Vũng Tàu khoảng 0.2 km. Vị trí thuận tiện cùng dịch vụ thiết thực giúp lịch trình của bạn linh hoạt hơn. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "food",
+      "text": "Gần các địa điểm ẩm thực"
+     },
+     {
+      "icon": "culture",
+      "text": "Dễ khám phá điểm tham quan"
+     },
+     {
+      "icon": "location",
+      "text": "Vị trí trung tâm, thuận tiện di chuyển"
+     },
+     {
+      "icon": "family",
+      "text": "Tiện cho chuyến đi gia đình"
+     },
+     {
+      "icon": "work",
+      "text": "Phù hợp chuyến công tác"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Nhà thờ Vũng Tàu",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Đường Sách Vũng Tàu",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Công viên Bãi Trước",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Bãi Trước",
+      "distanceKm": 0.3
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Phòng mát-xa",
+      "icon": "massage",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi trẻ em",
+      "icon": "pool",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Spa",
+      "icon": "spa",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Nhà hàng đặc sản địa phương",
+      "icon": "restaurant",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Phòng Gym",
+      "icon": "gym",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Đưa đón sân bay",
+      "icon": "shuttle",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Business Center",
+      "icon": "business",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "kids",
+      "name": "Dịch vụ Nôi/Cũi",
+      "icon": "crib",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en",
+     "ko",
+     "ru"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 10,
+     "openedAt": "2023-12-08",
+     "roomCount": 105,
+     "restaurants": 1,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 4 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 4–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 500.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 500000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-004",
+   "name": "Annata Beach Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 4,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_03.jpg/1280px-Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_03.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_03.jpg/1280px-Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_03.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_04.jpg/1280px-Pla%C4%9Do_en_V%C5%A9ng_T%C3%A0u_04.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Sau_Beach_in_Vungtau.jpg/1280px-Sau_Beach_in_Vungtau.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/VN-Strand-restaur.jpg/1280px-VN-Strand-restaur.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/f/ff/DUNK_-_Beachfront_Room_2nd_Floor_-_LowRes.JPG"
+   ],
+   "basePrice": 1140000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-004--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 16,
+     "priceFactor": 0.97,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 33,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 17,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 29,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 18,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/f/ff/DUNK_-_Beachfront_Room_2nd_Floor_-_LowRes.JPG"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Gương trang điểm",
+       "Minibar",
+       "Áo choàng tắm",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-004--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 13,
+     "priceFactor": 1.25,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 26,
+       "perks": [
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 34,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 28,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 22,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Hotel_Room_%2832259665218%29.jpg/1280px-Hotel_Room_%2832259665218%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ấm siêu tốc",
+       "Áo choàng tắm",
+       "Gương trang điểm",
+       "Bàn làm việc",
+       "Ghế sofa"
+      ]
+     }
+    }
+   ],
+   "address": "165 Thùy Vân, Vũng Tàu",
+   "lat": 10.34895,
+   "lng": 107.097939,
+   "ratingAvg": 4.8,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Annata Beach Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Đài Liệt sĩ khoảng 0.6 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     },
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Đài Liệt sĩ",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Chợ Du lịch Vũng Tàu",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Bãi Sau",
+      "distanceKm": 0.7
+     },
+     {
+      "name": "Công viên Thùy Vân",
+      "distanceKm": 0.9
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "kids",
+      "name": "Dịch vụ Nôi/Cũi",
+      "icon": "crib",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi trẻ em",
+      "icon": "pool",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi ngoài trời",
+      "icon": "pool",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Spa",
+      "icon": "spa",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Thể thao dưới nước",
+      "icon": "beach",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en",
+     "ko"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 11,
+     "openedAt": "2014-10-25",
+     "roomCount": 155,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 500.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 500000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-005",
+   "name": "Lan Rung Spa & Resort",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 4,
+   "brand": null,
+   "style": "resort",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/VN-vungtau-bai-sau-1.jpg/1280px-VN-vungtau-bai-sau-1.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/VN-vungtau-bai-sau-1.jpg/1280px-VN-vungtau-bai-sau-1.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Vung_Tau_mount_Nho_panorama.jpg/1280px-Vung_Tau_mount_Nho_panorama.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Vung_tau_bai_truoc_-_panoramio.jpg/1280px-Vung_tau_bai_truoc_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Vung_tau_bai_truoc_2011.Dyt_-_panoramio.jpg/1280px-Vung_tau_bai_truoc_2011.Dyt_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/f/f1/Hotel-Salt.jpg"
+   ],
+   "basePrice": 1390000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-005--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng vườn",
+     "maxGuests": 2,
+     "defaultTotal": 18,
+     "priceFactor": 1.07,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 5,
+       "perks": [
+        "Nhận phòng sớm tuỳ tình trạng phòng"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 27,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 27,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 29,
+      "view": "garden",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/f/f1/Hotel-Salt.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Áo choàng tắm",
+       "Bồn tắm",
+       "Ấm siêu tốc",
+       "Gương trang điểm",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-005--DLXV",
+     "code": "DLXV",
+     "name": "Deluxe hướng biển",
+     "maxGuests": 2,
+     "defaultTotal": 21,
+     "priceFactor": 1.36,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 32,
+       "perks": [
+        "Trả phòng muộn đến 14:00"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 23,
+       "perks": [
+        "Bữa sáng buffet cho 2 người",
+        "Trả phòng muộn đến 14:00"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 28,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 36,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/9/96/Luxurious_rooms.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Dọn phòng hằng ngày",
+       "Mũ tắm",
+       "Gương trang điểm",
+       "Ban công",
+       "Bồn tắm",
+       "Bàn làm việc"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-005--FAM",
+     "code": "FAM",
+     "name": "Family Suite",
+     "maxGuests": 4,
+     "defaultTotal": 3,
+     "priceFactor": 2.04,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 30,
+       "perks": [
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 12,
+       "perks": [
+        "Bữa sáng buffet cho 4 người",
+        "Đưa đón sân bay một chiều"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 26,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi lớn và 1 giường sofa",
+      "areaM2": 47,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/MAK_Hotel%2C_Tirana%2C_Albania_%2849817782348%29.jpg/1280px-MAK_Hotel%2C_Tirana%2C_Albania_%2849817782348%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ấm siêu tốc",
+       "Áo choàng tắm",
+       "Dọn phòng hằng ngày",
+       "Bàn làm việc"
+      ]
+     }
+    }
+   ],
+   "address": "Vũng Tàu",
+   "lat": 10.326597,
+   "lng": 107.081261,
+   "ratingAvg": 4.7,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Lan Rung Spa & Resort là chỗ nghỉ nghỉ dưỡng tại Vũng Tàu, TP.HCM. Từ đây đi Bãi Dứa khoảng 0.2 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     },
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     },
+     {
+      "icon": "pool",
+      "text": "Hồ bơi với không gian thoáng đãng"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Bãi Dứa",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Tượng Chúa Kitô Vua",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Công viên Tao Phùng",
+      "distanceKm": 0.5
+     },
+     {
+      "name": "Đồi Con Heo",
+      "distanceKm": 0.6
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Dịch vụ Nôi/Cũi",
+      "icon": "crib",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Business Center",
+      "icon": "business",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Spa",
+      "icon": "spa",
+      "featured": true
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi trẻ em",
+      "icon": "pool",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Khu vui chơi trẻ em (Kids Club)",
+      "icon": "kids",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi ngoài trời",
+      "icon": "pool",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en",
+     "ko",
+     "zh"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 11,
+     "openedAt": "2024-12-09",
+     "roomCount": 115,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 500.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 500000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-006",
+   "name": "The Coast Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 3,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/V%C5%A9ng_T%C3%A0u_City_view_from_the_sea.jpg/1280px-V%C5%A9ng_T%C3%A0u_City_view_from_the_sea.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/V%C5%A9ng_T%C3%A0u_City_view_from_the_sea.jpg/1280px-V%C5%A9ng_T%C3%A0u_City_view_from_the_sea.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/%E1%BA%A2nh_%C4%91%E1%BA%B9p_V%C5%A9ng_T%C3%A0u_-_Bi%E1%BB%83n_b%C3%A3i_sau_-_G%E1%BA%A7n_H%C3%B2n_B%C3%A0.jpg/1280px-%E1%BA%A2nh_%C4%91%E1%BA%B9p_V%C5%A9ng_T%C3%A0u_-_Bi%E1%BB%83n_b%C3%A3i_sau_-_G%E1%BA%A7n_H%C3%B2n_B%C3%A0.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/%E1%BA%A2nh_%C4%91%E1%BA%B9p_V%C5%A9ng_T%C3%A0u_-_On_the_Back_Beach_1.jpg/1280px-%E1%BA%A2nh_%C4%91%E1%BA%B9p_V%C5%A9ng_T%C3%A0u_-_On_the_Back_Beach_1.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Bai_truoc_Vungtau_vietnam_-_panoramio.jpg/1280px-Bai_truoc_Vungtau_vietnam_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/MAK_Hotel%2C_Tirana%2C_Albania_%2849818320881%29.jpg/1280px-MAK_Hotel%2C_Tirana%2C_Albania_%2849818320881%29.jpg"
+   ],
+   "basePrice": 630000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-006--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 22,
+     "priceFactor": 1.01,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 20,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 14,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 37,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 24,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/MAK_Hotel%2C_Tirana%2C_Albania_%2849818320881%29.jpg/1280px-MAK_Hotel%2C_Tirana%2C_Albania_%2849818320881%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Áo choàng tắm",
+       "Két an toàn",
+       "Gương trang điểm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-006--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 7,
+     "priceFactor": 1.34,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 13,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 27,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 31,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 28,
+      "view": "pool",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/a/a2/Maryam_hotel_room.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-006--FAM",
+     "code": "FAM",
+     "name": "Phòng gia đình",
+     "maxGuests": 4,
+     "defaultTotal": 4,
+     "priceFactor": 1.82,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 19,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 18,
+       "perks": [
+        "Bữa sáng buffet cho 4 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 35,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi lớn và 1 giường sofa",
+      "areaM2": 55,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Panorama_of_suite_living_room.jpg/1280px-Panorama_of_suite_living_room.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Bàn làm việc",
+       "Dọn phòng hằng ngày"
+      ]
+     }
+    }
+   ],
+   "address": "300A Phan Chu Trinh, Vũng Tàu",
+   "lat": 10.329414,
+   "lng": 107.086729,
+   "ratingAvg": 4.4,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "The Coast Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Đồi Con Heo khoảng 0.2 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     },
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     },
+     {
+      "icon": "pool",
+      "text": "Hồ bơi với không gian thoáng đãng"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Đồi Con Heo",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Bãi Ô Quắn",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Tượng Chúa Kitô Vua",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Công viên Tao Phùng",
+      "distanceKm": 0.6
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi ngoài trời",
+      "icon": "pool",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 6,
+     "openedAt": "2009-09-24",
+     "roomCount": 77,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 300.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 300000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-007",
+   "name": "Sea View Residence",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 3,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/VN-vungtau-fischerboote.jpg/1280px-VN-vungtau-fischerboote.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/VN-vungtau-fischerboote.jpg/1280px-VN-vungtau-fischerboote.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/V%E1%BB%8Bnh_G%C3%A0nh_R%C3%A1i.JPG/1280px-V%E1%BB%8Bnh_G%C3%A0nh_R%C3%A1i.JPG",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Grand_hotel%2C_quang_trung_street-Ph%C6%B0%E1%BB%9Dng_1%2C_tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio.jpg/1280px-Grand_hotel%2C_quang_trung_street-Ph%C6%B0%E1%BB%9Dng_1%2C_tp._V%C5%A9ng_T%C3%A0u%2C_B%C3%A0_R%E1%BB%8Ba_-_V%C5%A9ng_T%C3%A0u%2C_Vi%E1%BB%87t_Nam_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Hotelo_OCAP_en_V%C5%A9ng_T%C3%A0u_01.jpg/1280px-Hotelo_OCAP_en_V%C5%A9ng_T%C3%A0u_01.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Phutawan_Kan_Resort.jpg/1280px-Phutawan_Kan_Resort.jpg"
+   ],
+   "basePrice": 1620000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-007--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng biển",
+     "maxGuests": 2,
+     "defaultTotal": 31,
+     "priceFactor": 1.07,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 26,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 20,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 38,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 40,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Phutawan_Kan_Resort.jpg/1280px-Phutawan_Kan_Resort.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Dọn phòng hằng ngày",
+       "Minibar",
+       "Bàn làm việc",
+       "Ban công"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-007--PRM",
+     "code": "PRM",
+     "name": "Premier",
+     "maxGuests": 2,
+     "defaultTotal": 14,
+     "priceFactor": 1.41,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 10,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 14,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 39,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường siêu lớn",
+      "areaM2": 44,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Southbeachhotel-room.jpg/1280px-Southbeachhotel-room.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Mũ tắm",
+       "Bàn làm việc",
+       "Két an toàn",
+       "Minibar"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-007--STE",
+     "code": "STE",
+     "name": "Suite",
+     "maxGuests": 3,
+     "defaultTotal": 6,
+     "priceFactor": 2.17,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 29,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 25,
+       "perks": [
+        "Bữa sáng buffet cho 3 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 34,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường siêu lớn",
+      "areaM2": 68,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Wedding_Suite.jpg/1280px-Wedding_Suite.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Dọn phòng hằng ngày",
+       "Ban công",
+       "Áo choàng tắm",
+       "Gương trang điểm"
+      ]
+     }
+    }
+   ],
+   "address": "36 Hạ Long, Vũng Tàu",
+   "lat": 10.32889,
+   "lng": 107.079284,
+   "ratingAvg": 4.4,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Sea View Residence là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Bãi Dứa khoảng 0.2 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     },
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     },
+     {
+      "icon": "spa",
+      "text": "Dịch vụ thư giãn sau ngày vui chơi"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Bãi Dứa",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Niết Bàn Tịnh Xá",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Tượng Chúa Kitô Vua",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Đồi Con Heo",
+      "distanceKm": 0.8
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 9,
+     "openedAt": "2001-08-21",
+     "roomCount": 132,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 4 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 4–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 300.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 300000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-008",
+   "name": "Petro Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 3,
+   "brand": null,
+   "style": "thành phố",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Palace_Hotel%2C_nguyen_trai%2C_phuong_1%2C_tp_Vungtau%2C_Vietnam_-_panoramio.jpg/1280px-Palace_Hotel%2C_nguyen_trai%2C_phuong_1%2C_tp_Vungtau%2C_Vietnam_-_panoramio.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Palace_Hotel%2C_nguyen_trai%2C_phuong_1%2C_tp_Vungtau%2C_Vietnam_-_panoramio.jpg/1280px-Palace_Hotel%2C_nguyen_trai%2C_phuong_1%2C_tp_Vungtau%2C_Vietnam_-_panoramio.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/2/26/DIC_Phoenix%2C_nguy%E1%BB%85n_an_ninh%2C_v%C5%A9ng_t%C3%A0u%2C_b%C3%A0_r%E1%BB%8Ba-v%C5%A9ng_t%C3%A0u_%282%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/6/6e/Vung-Tau-Melody.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Vung_Tau%2C_Viet_Nam_2021.jpg/1280px-Vung_Tau%2C_Viet_Nam_2021.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Dila_Hotel%2C_Kad%C4%B1k%C3%B6y_%2820191210-IMG_20191210_175617%29.jpg/1280px-Dila_Hotel%2C_Kad%C4%B1k%C3%B6y_%2820191210-IMG_20191210_175617%29.jpg"
+   ],
+   "basePrice": 900000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-008--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 21,
+     "priceFactor": 0.93,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 6,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 8,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 31,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 24,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Dila_Hotel%2C_Kad%C4%B1k%C3%B6y_%2820191210-IMG_20191210_175617%29.jpg/1280px-Dila_Hotel%2C_Kad%C4%B1k%C3%B6y_%2820191210-IMG_20191210_175617%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bồn tắm",
+       "Ấm siêu tốc"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-008--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 9,
+     "priceFactor": 1.27,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 29,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 10,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 41,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 25,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/DL2A_Four_Seasons_Bora_Bora_6.jpg/1280px-DL2A_Four_Seasons_Bora_Bora_6.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Ấm siêu tốc",
+       "Ghế sofa",
+       "Bàn làm việc",
+       "Bồn tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-008--FAM",
+     "code": "FAM",
+     "name": "Phòng gia đình",
+     "maxGuests": 4,
+     "defaultTotal": 4,
+     "priceFactor": 1.7,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 33,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 17,
+       "perks": [
+        "Bữa sáng buffet cho 4 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 41,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi lớn và 1 giường sofa",
+      "areaM2": 43,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/1501_room%2C_1_July_2024_%2810%29.jpg/1280px-1501_room%2C_1_July_2024_%2810%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Bàn làm việc",
+       "Ghế sofa"
+      ]
+     }
+    }
+   ],
+   "address": "9-11 Hoàng Diệu, Vũng Tàu",
+   "lat": 10.35132,
+   "lng": 107.073346,
+   "ratingAvg": 4.5,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Petro Hotel là chỗ nghỉ trong lòng thành phố tại Vũng Tàu, TP.HCM. Từ đây đi Bảo tàng Vũ khí cổ Robert Taylor khoảng 0.2 km. Vị trí thuận tiện cùng dịch vụ thiết thực giúp lịch trình của bạn linh hoạt hơn. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "food",
+      "text": "Gần các địa điểm ẩm thực"
+     },
+     {
+      "icon": "culture",
+      "text": "Dễ khám phá điểm tham quan"
+     },
+     {
+      "icon": "location",
+      "text": "Vị trí trung tâm, thuận tiện di chuyển"
+     },
+     {
+      "icon": "family",
+      "text": "Tiện cho chuyến đi gia đình"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Bảo tàng Vũ khí cổ Robert Taylor",
+      "distanceKm": 0.2
+     },
+     {
+      "name": "Chợ Phường 1",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Đường Sách Vũng Tàu",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Bảo tàng Bà Rịa-Vũng Tàu",
+      "distanceKm": 0.4
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 7,
+     "openedAt": "2019-10-10",
+     "roomCount": 121,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 300.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 300000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-009",
+   "name": "Diamond Star Hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 3,
+   "brand": null,
+   "style": "thành phố",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/V%C5%A9ng_T%C3%A0u_sunset.jpg/1280px-V%C5%A9ng_T%C3%A0u_sunset.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/V%C5%A9ng_T%C3%A0u_sunset.jpg/1280px-V%C5%A9ng_T%C3%A0u_sunset.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/V%C5%A9ng_t%C3%A0u_bi%E1%BB%83n_h%C3%A1t.jpg/1280px-V%C5%A9ng_t%C3%A0u_bi%E1%BB%83n_h%C3%A1t.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/2/23/Quang_Trung_street%2C_Vung_Tau_030324_1.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/9/96/Quang_Trung_street%2C_Vung_Tau_030324_2.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/1501_room%2C_1_July_2024_%289%29.jpg/1280px-1501_room%2C_1_July_2024_%289%29.jpg"
+   ],
+   "basePrice": 770000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-009--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng phố",
+     "maxGuests": 2,
+     "defaultTotal": 32,
+     "priceFactor": 1.02,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 27,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 16,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 34,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 39,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/1501_room%2C_1_July_2024_%289%29.jpg/1280px-1501_room%2C_1_July_2024_%289%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Áo choàng tắm",
+       "Bồn tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-009--PRM",
+     "code": "PRM",
+     "name": "Premier",
+     "maxGuests": 2,
+     "defaultTotal": 27,
+     "priceFactor": 1.32,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 5,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 14,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 36,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường siêu lớn",
+      "areaM2": 43,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Hotel_Room_Chicago_Hilton2.jpg/1280px-Hotel_Room_Chicago_Hilton2.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bồn tắm",
+       "Minibar"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-009--STE",
+     "code": "STE",
+     "name": "Suite",
+     "maxGuests": 3,
+     "defaultTotal": 6,
+     "priceFactor": 2.11,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 24,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 22,
+       "perks": [
+        "Bữa sáng buffet cho 3 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 43,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường siêu lớn",
+      "areaM2": 67,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Hotel_room_Hotel_Burgenland_in_Eisenstadt.JPG/1280px-Hotel_room_Hotel_Burgenland_in_Eisenstadt.JPG"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Két an toàn",
+       "Ghế sofa"
+      ]
+     }
+    }
+   ],
+   "address": "4 Thống Nhất, Vũng Tàu",
+   "lat": 10.345552,
+   "lng": 107.077097,
+   "ratingAvg": 4.5,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Diamond Star Hotel là chỗ nghỉ trong lòng thành phố tại Vũng Tàu, TP.HCM. Từ đây đi Nhà thờ Vũng Tàu khoảng 0.1 km. Phòng nghỉ tiện nghi đáp ứng tốt cả chuyến đi nghỉ dưỡng lẫn công tác. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "location",
+      "text": "Vị trí trung tâm, thuận tiện di chuyển"
+     },
+     {
+      "icon": "work",
+      "text": "Phù hợp chuyến công tác"
+     },
+     {
+      "icon": "view",
+      "text": "Không gian nghỉ ngơi thoáng đãng"
+     },
+     {
+      "icon": "family",
+      "text": "Tiện cho chuyến đi gia đình"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Nhà thờ Vũng Tàu",
+      "distanceKm": 0.1
+     },
+     {
+      "name": "Đường Sách Vũng Tàu",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Công viên Bãi Trước",
+      "distanceKm": 0.4
+     },
+     {
+      "name": "Bãi Trước",
+      "distanceKm": 0.4
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thang máy",
+      "icon": "elevator",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Giặt ủi",
+      "icon": "laundry",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 5,
+     "openedAt": "2000-09-21",
+     "roomCount": 120,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 300.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 300000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-010",
+   "name": "Mepros hotel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 2,
+   "brand": null,
+   "style": "biển",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Tran_Phu_street%2C_Vung_Tau_030324_1.jpg/1280px-Tran_Phu_street%2C_Vung_Tau_030324_1.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Tran_Phu_street%2C_Vung_Tau_030324_1.jpg/1280px-Tran_Phu_street%2C_Vung_Tau_030324_1.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/d/d2/Tran_Phu_street%2C_Vung_Tau_030324_2.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/5/50/Tran_Phu_street%2C_Vung_Tau_030324_3.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2842153166380%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2842153166380%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Room_Stanley_Hotel_Estes_Park_Colorado_2024.jpg/1280px-Room_Stanley_Hotel_Estes_Park_Colorado_2024.jpg"
+   ],
+   "basePrice": 460000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-010--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 25,
+     "priceFactor": 1.01,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 19,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 14,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 36,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 24,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Room_Stanley_Hotel_Estes_Park_Colorado_2024.jpg/1280px-Room_Stanley_Hotel_Estes_Park_Colorado_2024.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Áo choàng tắm",
+       "Két an toàn",
+       "Gương trang điểm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-010--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 10,
+     "priceFactor": 1.34,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 26,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 12,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 29,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 28,
+      "view": "pool",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Room_18120%2C_Luxor_Resort_%26_Casino.jpg/1280px-Room_18120%2C_Luxor_Resort_%26_Casino.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-010--FAM",
+     "code": "FAM",
+     "name": "Phòng gia đình",
+     "maxGuests": 4,
+     "defaultTotal": 5,
+     "priceFactor": 1.82,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 28,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 22,
+       "perks": [
+        "Bữa sáng buffet cho 4 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 44,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi lớn và 1 giường sofa",
+      "areaM2": 55,
+      "view": "sea",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tropical_Noir_Chic_Boutique_Hotel_Room_in_Lisbon_%2854940806211%29.jpg/1280px-Tropical_Noir_Chic_Boutique_Hotel_Room_in_Lisbon_%2854940806211%29.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Minibar",
+       "Bàn làm việc",
+       "Dọn phòng hằng ngày"
+      ]
+     }
+    }
+   ],
+   "address": "147 Thùy Vân, Vũng Tàu",
+   "lat": 10.337281,
+   "lng": 107.090847,
+   "ratingAvg": 4.2,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "12:00",
+   "details": {
+    "description": "Mepros hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "beach",
+      "text": "Gần bãi biển và các hoạt động ven biển"
+     },
+     {
+      "icon": "family",
+      "text": "Phù hợp kỳ nghỉ gia đình"
+     },
+     {
+      "icon": "pool",
+      "text": "Hồ bơi với không gian thoáng đãng"
+     },
+     {
+      "icon": "view",
+      "text": "Tầm nhìn hướng biển"
+     },
+     {
+      "icon": "food",
+      "text": "Ẩm thực địa phương phong phú"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Đêm Vũng Tàu",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Công viên Thùy Vân",
+      "distanceKm": 0.7
+     },
+     {
+      "name": "Chợ Du lịch Vũng Tàu",
+      "distanceKm": 1.0
+     },
+     {
+      "name": "Bãi Sau",
+      "distanceKm": 1.0
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Lễ tân 24 giờ",
+      "icon": "reception",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": false
+     },
+     {
+      "group": "kids",
+      "name": "Ghế ăn trẻ em",
+      "icon": "high-chair",
+      "featured": false
+     },
+     {
+      "group": "wellness",
+      "name": "Bể bơi ngoài trời",
+      "icon": "pool",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": "220V",
+     "floors": 3,
+     "openedAt": "2000-12-16",
+     "roomCount": 40,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Giường phụ có tính phí, tuỳ hạng phòng, tối đa 01 giường phụ mỗi phòng.",
+     "deposit": "Đặt cọc 300.000 VND/phòng/đêm khi nhận phòng bằng tiền mặt hoặc thẻ; khoản cọc được hoàn lại khi trả phòng sau khi kiểm tra phòng.",
+     "depositAmount": 300000,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-011",
+   "name": "Rie Homestay Vũng Tàu",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 2,
+   "brand": null,
+   "style": "homestay",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843056580955%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843056580955%29.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843056580955%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843056580955%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843913499002%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843913499002%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2830093241248%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2830093241248%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843243195844%29.jpg/1280px-View_of_Vung_Tau_from_Vung_Tau_lighthouse_%28August_3%2C_2018%29_%2843243195844%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Family_Room%2C_Homestay.jpg/1280px-Family_Room%2C_Homestay.jpg"
+   ],
+   "basePrice": 650000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-011--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng vườn",
+     "maxGuests": 2,
+     "defaultTotal": 43,
+     "priceFactor": 1.07,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 9,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 20,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 44,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 26,
+      "view": "garden",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Family_Room%2C_Homestay.jpg/1280px-Family_Room%2C_Homestay.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Dọn phòng hằng ngày",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-011--DLXV",
+     "code": "DLXV",
+     "name": "Deluxe hướng vườn (tầng cao)",
+     "maxGuests": 2,
+     "defaultTotal": 8,
+     "priceFactor": 1.3,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 25,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 19,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 32,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 28,
+      "view": "garden",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Elegant_hotel_room_with_dining_setup_and_cozy_ambiance_near_the_city_center_in_the_early_morning.jpg/1280px-Elegant_hotel_room_with_dining_setup_and_cozy_ambiance_near_the_city_center_in_the_early_morning.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Minibar"
+      ]
+     }
+    }
+   ],
+   "address": "51A La Văn Cầu, Vũng Tàu",
+   "lat": 10.338651,
+   "lng": 107.088968,
+   "ratingAvg": 4.4,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "11:00",
+   "details": {
+    "description": "Rie Homestay Vũng Tàu là chỗ nghỉ mang không khí gia đình tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Không gian gần gũi đem lại trải nghiệm lưu trú giản dị, ấm cúng. Sau lịch trình khám phá, hãy trở về nghỉ ngơi trong không gian dễ chịu.",
+    "highlights": [
+     {
+      "icon": "location",
+      "text": "Dễ di chuyển đến điểm tham quan"
+     },
+     {
+      "icon": "culture",
+      "text": "Gần trải nghiệm đời sống địa phương"
+     },
+     {
+      "icon": "food",
+      "text": "Khám phá ẩm thực bản địa"
+     },
+     {
+      "icon": "view",
+      "text": "Góc nghỉ ngơi gần gũi thiên nhiên"
+     },
+     {
+      "icon": "quiet",
+      "text": "Không gian lưu trú ấm cúng"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Đêm Vũng Tàu",
+      "distanceKm": 0.3
+     },
+     {
+      "name": "Công viên Thùy Vân",
+      "distanceKm": 0.8
+     },
+     {
+      "name": "Chợ Du lịch Vũng Tàu",
+      "distanceKm": 0.9
+     },
+     {
+      "name": "Chợ Vũng Tàu",
+      "distanceKm": 1.1
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Bếp chung",
+      "icon": "kitchen",
+      "featured": false
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": null,
+     "floors": 2,
+     "openedAt": "2005-12-20",
+     "roomCount": 51,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 4 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 4–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Không cung cấp giường phụ.",
+     "deposit": "Không yêu cầu đặt cọc.",
+     "depositAmount": 0,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Có thể mang thú cưng sau khi được chỗ nghỉ đồng ý trước."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-012",
+   "name": "Suna's HOME",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 2,
+   "brand": null,
+   "style": "homestay",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Vung_Tau%2C_Viet_Nam.jpg/1280px-Vung_Tau%2C_Viet_Nam.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Vung_Tau%2C_Viet_Nam.jpg/1280px-Vung_Tau%2C_Viet_Nam.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/6/6c/V%C5%A9ng_T%C3%A0u_skyline_2022.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%282%29.jpg/1280px-V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%282%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%283%29.jpg/1280px-V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%283%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Room_at_Travelodge_Hotel_Sydney_Airport%2C_2022%2C_01.jpg/1280px-Room_at_Travelodge_Hotel_Sydney_Airport%2C_2022%2C_01.jpg"
+   ],
+   "basePrice": 620000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-012--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng vườn",
+     "maxGuests": 2,
+     "defaultTotal": 36,
+     "priceFactor": 1.06,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 14,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 11,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 39,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 30,
+      "view": "garden",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Room_at_Travelodge_Hotel_Sydney_Airport%2C_2022%2C_01.jpg/1280px-Room_at_Travelodge_Hotel_Sydney_Airport%2C_2022%2C_01.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Áo choàng tắm",
+       "Bàn làm việc"
+      ]
+     }
+    }
+   ],
+   "address": "Vũng Tàu",
+   "lat": 10.336414,
+   "lng": 107.081819,
+   "ratingAvg": 4.4,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "11:00",
+   "details": {
+    "description": "Suna's HOME là chỗ nghỉ mang không khí gia đình tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Xóm Lưới khoảng 0.8 km. Không gian gần gũi đem lại trải nghiệm lưu trú giản dị, ấm cúng. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "location",
+      "text": "Dễ di chuyển đến điểm tham quan"
+     },
+     {
+      "icon": "quiet",
+      "text": "Không gian lưu trú ấm cúng"
+     },
+     {
+      "icon": "view",
+      "text": "Góc nghỉ ngơi gần gũi thiên nhiên"
+     },
+     {
+      "icon": "culture",
+      "text": "Gần trải nghiệm đời sống địa phương"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Xóm Lưới",
+      "distanceKm": 0.8
+     },
+     {
+      "name": "Tượng Trần Hưng Đạo",
+      "distanceKm": 0.8
+     },
+     {
+      "name": "Niết Bàn Tịnh Xá",
+      "distanceKm": 0.8
+     },
+     {
+      "name": "Trận địa pháo cổ Núi Nhỏ",
+      "distanceKm": 0.8
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Bếp chung",
+      "icon": "kitchen",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": null,
+     "floors": 3,
+     "openedAt": "2021-11-11",
+     "roomCount": 36,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 4 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 4–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Không cung cấp giường phụ.",
+     "deposit": "Không yêu cầu đặt cọc.",
+     "depositAmount": 0,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Có thể mang thú cưng sau khi được chỗ nghỉ đồng ý trước."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-013",
+   "name": "An Homestay Vũng Tàu",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 1,
+   "brand": null,
+   "style": "homestay",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%284%29.jpg/1280px-V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%284%29.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%284%29.jpg/1280px-V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%284%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%285%29.jpg/1280px-V%C5%A9ng_T%C3%A0u_skyline_10-01-2023_%285%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Vung_Tau_at_night.jpg/1280px-Vung_Tau_at_night.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Vung_Tau_in_Vietnam.jpg/1280px-Vung_Tau_in_Vietnam.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Room_in_Hotel.jpg/1280px-Room_in_Hotel.jpg"
+   ],
+   "basePrice": 290000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-013--DLX",
+     "code": "DLX",
+     "name": "Deluxe hướng vườn",
+     "maxGuests": 2,
+     "defaultTotal": 76,
+     "priceFactor": 0.92,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 8,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 11,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 35,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "1 giường đôi",
+      "areaM2": 26,
+      "view": "garden",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Room_in_Hotel.jpg/1280px-Room_in_Hotel.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Bàn làm việc"
+      ]
+     }
+    }
+   ],
+   "address": "B3 Hoàng Cầm, Vũng Tàu",
+   "lat": 10.336592,
+   "lng": 107.083953,
+   "ratingAvg": 3.9,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "11:00",
+   "details": {
+    "description": "An Homestay Vũng Tàu là chỗ nghỉ mang không khí gia đình tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.9 km. Không gian gần gũi đem lại trải nghiệm lưu trú giản dị, ấm cúng. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "highlights": [
+     {
+      "icon": "food",
+      "text": "Khám phá ẩm thực bản địa"
+     },
+     {
+      "icon": "view",
+      "text": "Góc nghỉ ngơi gần gũi thiên nhiên"
+     },
+     {
+      "icon": "location",
+      "text": "Dễ di chuyển đến điểm tham quan"
+     },
+     {
+      "icon": "quiet",
+      "text": "Không gian lưu trú ấm cúng"
+     },
+     {
+      "icon": "culture",
+      "text": "Gần trải nghiệm đời sống địa phương"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Đêm Vũng Tàu",
+      "distanceKm": 0.9
+     },
+     {
+      "name": "Chợ Xóm Lưới",
+      "distanceKm": 1.0
+     },
+     {
+      "name": "Đồi Con Heo",
+      "distanceKm": 1.0
+     },
+     {
+      "name": "Tượng Trần Hưng Đạo",
+      "distanceKm": 1.0
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Bếp chung",
+      "icon": "kitchen",
+      "featured": true
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": null,
+     "floors": 2,
+     "openedAt": "2022-07-02",
+     "roomCount": 76,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 4 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 4–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Không cung cấp giường phụ.",
+     "deposit": "Không yêu cầu đặt cọc.",
+     "depositAmount": 0,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Có thể mang thú cưng sau khi được chỗ nghỉ đồng ý trước."
+    }
+   }
+  },
+  {
+   "id": "P-osm-vung-tau-014",
+   "name": "Gecko Hostel",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
+   "stars": 1,
+   "brand": null,
+   "style": "homestay",
+   "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/V%C5%A9ng_T%C3%A0u%2C_from_above.jpg/1280px-V%C5%A9ng_T%C3%A0u%2C_from_above.jpg",
+   "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/V%C5%A9ng_T%C3%A0u%2C_from_above.jpg/1280px-V%C5%A9ng_T%C3%A0u%2C_from_above.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_01.jpg/1280px-Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_01.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_02.jpg/1280px-Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_02.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_03.jpg/1280px-Vida%C4%B5o_al_V%C5%A9ng_T%C3%A0u_de_sur_la_monto_N%C3%BAi_Nh%E1%BB%8F_03.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Room_in_Esfam_Hotel.jpg/1280px-Room_in_Esfam_Hotel.jpg"
+   ],
+   "basePrice": 270000,
+   "roomTypes": [
+    {
+     "id": "P-osm-vung-tau-014--STD",
+     "code": "STD",
+     "name": "Phòng tiêu chuẩn",
+     "maxGuests": 2,
+     "defaultTotal": 34,
+     "priceFactor": 0.97,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 22,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 33,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 35,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 15,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Room_in_Esfam_Hotel.jpg/1280px-Room_in_Esfam_Hotel.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Dọn phòng hằng ngày",
+       "Mũ tắm"
+      ]
+     }
+    },
+    {
+     "id": "P-osm-vung-tau-014--SUP",
+     "code": "SUP",
+     "name": "Phòng Superior",
+     "maxGuests": 2,
+     "defaultTotal": 17,
+     "priceFactor": 1.2,
+     "ratePlans": [
+      {
+       "code": "RO",
+       "name": "Chỉ phòng · huỷ miễn phí",
+       "meal": "none",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1,
+       "discountPct": 23,
+       "perks": []
+      },
+      {
+       "code": "BB",
+       "name": "Kèm ăn sáng · huỷ miễn phí",
+       "meal": "breakfast",
+       "refundable": true,
+       "freeCancelDays": 3,
+       "priceFactor": 1.15,
+       "discountPct": 30,
+       "perks": [
+        "Bữa sáng buffet cho 2 người"
+       ]
+      },
+      {
+       "code": "NR",
+       "name": "Chỉ phòng · không hoàn huỷ (giá tốt)",
+       "meal": "none",
+       "refundable": false,
+       "freeCancelDays": 0,
+       "priceFactor": 0.88,
+       "discountPct": 44,
+       "perks": []
+      }
+     ],
+     "details": {
+      "bedType": "2 giường đơn",
+      "areaM2": 19,
+      "view": "city",
+      "images": [
+       "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Palmaroga_hotel_room_125609_HDR.jpg/1280px-Palmaroga_hotel_room_125609_HDR.jpg"
+      ],
+      "amenities": [
+       "Điều hoà không khí",
+       "Nước uống miễn phí",
+       "TV màn hình phẳng",
+       "Máy sấy tóc",
+       "Bếp nhỏ",
+       "Ghế sofa",
+       "Két an toàn"
+      ]
+     }
+    }
+   ],
+   "address": "Vũng Tàu",
+   "lat": 10.344138,
+   "lng": 107.082306,
+   "ratingAvg": 4.1,
+   "reviewCount": 0,
+   "ratingSource": null,
+   "checkInTime": "14:00",
+   "checkOutTime": "11:00",
+   "details": {
+    "description": "Gecko Hostel là chỗ nghỉ mang không khí gia đình tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Vũng Tàu khoảng 0.6 km. Không gian gần gũi đem lại trải nghiệm lưu trú giản dị, ấm cúng. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "highlights": [
+     {
+      "icon": "location",
+      "text": "Dễ di chuyển đến điểm tham quan"
+     },
+     {
+      "icon": "culture",
+      "text": "Gần trải nghiệm đời sống địa phương"
+     },
+     {
+      "icon": "quiet",
+      "text": "Không gian lưu trú ấm cúng"
+     },
+     {
+      "icon": "view",
+      "text": "Góc nghỉ ngơi gần gũi thiên nhiên"
+     }
+    ],
+    "nearby": [
+     {
+      "name": "Chợ Vũng Tàu",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Tượng Trần Hưng Đạo",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Nhà thờ Vũng Tàu",
+      "distanceKm": 0.6
+     },
+     {
+      "name": "Chợ Xóm Lưới",
+      "distanceKm": 0.7
+     }
+    ],
+    "amenities": [
+     {
+      "group": "general",
+      "name": "Wifi miễn phí",
+      "icon": "wifi",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bãi đỗ xe",
+      "icon": "parking",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Bình chữa cháy",
+      "icon": "extinguisher",
+      "featured": true
+     },
+     {
+      "group": "dining",
+      "name": "Quầy cà phê",
+      "icon": "cafe",
+      "featured": true
+     },
+     {
+      "group": "sports",
+      "name": "Xe đạp miễn phí",
+      "icon": "bike",
+      "featured": true
+     },
+     {
+      "group": "general",
+      "name": "Thiết bị báo cháy",
+      "icon": "fire-alarm",
+      "featured": false
+     },
+     {
+      "group": "dining",
+      "name": "Bếp chung",
+      "icon": "kitchen",
+      "featured": false
+     }
+    ],
+    "languages": [
+     "vi",
+     "en"
+    ],
+    "facts": {
+     "voltage": null,
+     "floors": 2,
+     "openedAt": "2020-11-11",
+     "roomCount": 51,
+     "restaurants": 0,
+     "bars": 0
+    },
+    "policies": {
+     "child": "Trẻ em dưới 6 tuổi: miễn phí khi dùng giường có sẵn. Người lớn thứ 3 và trẻ em 6–11 tuổi phụ thu theo quy định của khách sạn.",
+     "extraBed": "Không cung cấp giường phụ.",
+     "deposit": "Không yêu cầu đặt cọc.",
+     "depositAmount": 0,
+     "stay": "Không hút thuốc trong phòng; giữ yên tĩnh từ 22:00 đến 06:00. Không cho phép mang thú cưng."
+    }
+   }
   }
  ],
  "flights": [
