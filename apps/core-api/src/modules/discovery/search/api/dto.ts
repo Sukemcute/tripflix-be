@@ -121,6 +121,12 @@ export class ExploreRequestDto {
   loc?: ExploreLocationDto | null;
 }
 
+class ExploreAuthorDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String, nullable: true, example: 'Minh Anh', description: 'Tên hiển thị; null nếu không tìm thấy người dùng' }) name!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Chưa có dữ liệu, hiện luôn là null (như feed)' }) avatarUrl!: string | null;
+}
+
 export class ExploreItemDto {
   @ApiProperty({ example: 'hotel:P-h-dl-01', description: '`<loại>:<mã gốc>`, duy nhất' }) id!: string;
   @ApiProperty({ example: 'stay', description: 'stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)' }) kind!: string;
@@ -133,6 +139,16 @@ export class ExploreItemDto {
   priceFrom!: number | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Số ngày của lộ trình' }) days!: number | null;
   @ApiProperty({ type: ExploreLocationDto, nullable: true }) location!: ExploreLocationDto | null;
+  @ApiProperty({ type: Number, nullable: true, example: 120, description: 'plan/post/video: lượt thích · mục khác: null' }) likes!: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 8, description: 'plan/post/video: số bình luận · mục khác: null' }) comments!: number | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy',
+  })
+  createdAt!: string | null;
+  @ApiProperty({ type: ExploreAuthorDto, nullable: true, description: 'plan/post/video: tác giả · mục khác: null' }) author!: ExploreAuthorDto | null;
 }
 
 class ExploreSuggestItemDto extends ExploreItemDto {
@@ -203,7 +219,8 @@ export class SearchPostsRequestDto {
     enum: POST_TYPES,
     required: false,
     default: 'all',
-    description: 'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường',
+    description:
+      'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)',
   })
   postType?: PostType;
   @ApiProperty({ type: String, required: false, nullable: true, description: '`nextCursor` của trang trước' }) cursor?: string | null;
