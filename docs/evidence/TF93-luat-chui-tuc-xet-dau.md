@@ -9,6 +9,7 @@
   - Người viết gõ có dấu ở đoạn khớp: đoạn đó phải khớp dạng có dấu trong `ACCENTED_PROFANITY_PATTERN` (ví dụ "thằng chó", "đụ má", "mặt lồn") mới tính.
   - Người viết gõ không dấu: giữ cách so cũ, vì không phân biệt được "du ma" với "dù mà".
   - Xét mọi đoạn khớp trong câu, nên câu có một đoạn trùng vô hại rồi mới chửi thật vẫn bị bắt.
+- Thêm cụm viết liền `duma` vào `PROFANITY_PATTERN` (dạng gõ không dấu, có test).
 - Chửi tục **vẫn nằm trong danh sách tự ẩn** (`severity.ts` không đổi).
 - Không đổi `normalizeText`, API, sự kiện hay schema. Các luật khác (SĐT, link, lừa đảo, đe doạ, phản động) không đổi.
 
@@ -16,13 +17,15 @@
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
 | 6 câu Thành gửi và các câu bình thường không khớp `PROFANITY` | ✅ | `rules.spec.ts` › "Chửi tục xét dấu (TF93)" › "không bắt nhầm câu gõ có dấu" (10 câu, kiểm cả không tự ẩn) |
-| Câu chửi thật vẫn bị bắt khi gõ có dấu và không dấu | ✅ | "vẫn bắt chửi tục gõ có dấu" (7 câu, lý do tự ẩn `HARASSMENT`), "vẫn bắt chửi tục gõ không dấu" (5 câu); toàn bộ ca TF88 cũ vẫn pass |
+| Câu chửi thật vẫn bị bắt khi gõ có dấu và không dấu | ✅ | "vẫn bắt chửi tục gõ có dấu" (7 câu, lý do tự ẩn `HARASSMENT`), "vẫn bắt chửi tục gõ không dấu" (6 câu, có `duma`); toàn bộ ca TF88 cũ vẫn pass |
 | Lint, typecheck, test pass | ✅ | Mục "Kết quả kiểm tra" |
 
 ## Kết quả kiểm tra
 - `vitest run …/moderation/domain/rules.spec.ts`: 139/139 pass.
 - `pnpm turbo run lint typecheck test --affected`: 49/49 task thành công. core-api 2409 test pass, 4 skip có sẵn. Lint 0 lỗi (core-api còn 109 warning có sẵn).
 - `vitest run --config vitest.int.config.ts src/modules/content/moderation` (Postgres thật): 30/30 pass.
+
+- Lượt 2026-11-16 sau khi thêm `duma`: `vitest run src/modules/content/moderation` 161/161 pass; `pnpm lint` 23/23 task đạt.
 
 ## Cách kiểm lại
 1. `pnpm turbo run lint typecheck test --affected`
