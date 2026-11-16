@@ -19,6 +19,8 @@
 ## Kết quả kiểm tra
 - `pnpm turbo run lint typecheck test --affected --continue --concurrency=2`: lint 0 lỗi (core-api 112 cảnh báo có sẵn, không ở file của task), typecheck pass, test các lib và notification-service pass. core-api: 7 test e2e của access/content hết giờ 5 s khi chạy song song với cả repo; chạy riêng 4 file đó: 28/28 pass.
 - `pnpm exec vitest run --maxWorkers=4` (core-api): 121 file pass, 2557 test pass, 4 skip.
+- Sau khi merge `origin/develop` mới nhất (16/11): `pnpm contracts:build` không đổi thêm; `pnpm exec vitest run --maxWorkers=4` (core-api): 121 file pass, 2561 test pass, 4 skip. Turbo cả repo: 48/49 task pass, core-api chỉ còn 1 test e2e hết giờ 5 s (`commerce/trace-context.spec.ts`, không liên quan; chạy riêng pass).
+- Chạy lại trên stack thật sau merge: `GET /api/v1/admin/search/vocab-gaps?days=1&minCount=2` trả 200, `nang tho` đứng đầu (điểm 117, 10 lượt, contentCount 0); `days=0` 400; không token 401.
 
 ## Cách kiểm lại
 1. `pnpm stack:be`, chờ log "Đã dựng chỉ mục tìm khám phá".
