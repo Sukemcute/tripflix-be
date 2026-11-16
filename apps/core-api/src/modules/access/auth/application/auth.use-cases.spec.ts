@@ -128,4 +128,29 @@ describe('AuthUseCases.login', () => {
     const [a, b] = await Promise.allSettled([wrongPassword, wrongEmail]);
     expect(a.status === 'rejected' && a.reason).toEqual(b.status === 'rejected' && b.reason);
   });
+
+  it('xin mã xác thực đăng nhập: kiểm tra mật khẩu trước, gửi mã và tiêu mã khi đăng nhập', async () => {
+    const { auth, store } = await setup();
+    await expect(auth.requestLoginCode({ email: 'an@example.com', password: 'sai' }, meta)).rejects.toMatchObject({
+      code: 'invalid_credentials',
+    });
+
+    const loginChallengeId = await auth.requestLoginCode({ email: 'an@example.com', password: 'mat-khau-1' }, meta);
+    const event = store.outboxRows.find((e) => e.type === 'access.registration_code_requested');
+    expect(event?.payload).toMatchObject({ email: 'an@example.com', purpose: 'login' });
+    const code = (event?.payload as { code: string }).code;
+    expect(code).toMatch(/^[0-9]{8}$/);
+
+    // Sai mã xác thực thì bị từ chối, mã vẫn còn để nhập lại.
+    await expect(
+      auth.login({ email: 'an@example.com', password: 'mat-khau-1', loginChallengeId, code: '00000000' }, meta),
+    ).rejects.toMatchObject({ code: 'invalid_registration_code' });
+
+    // Đúng mã xác thực thì đăng nhập thành công và mã bị tiêu, không dùng lại được.
+    const pair = await auth.login({ email: 'an@example.com', password: 'mat-khau-1', loginChallengeId, code }, meta);
+    expect(pair.accessToken).toBeTruthy();
+    await expect(
+      auth.login({ email: 'an@example.com', password: 'mat-khau-1', loginChallengeId, code }, meta),
+    ).rejects.toMatchObject({ code: 'invalid_registration_code' });
+  });
 });

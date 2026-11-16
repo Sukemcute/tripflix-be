@@ -1,0 +1,38 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "830efb36-4e6a-438c-88ef-b1bea68d9299",
+  "prevIds": [
+    "2e555dbc-8d4a-443b-a5ce-91b3e595fd33"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "comments"
+      ],
+      "writes": [
+        "s|ck|content.comments.ck_comments_status"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comments.status",
+        "e|col|content.comments.status"
+      ],
+      "sqlHash": "b99d97f26252a027"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"content\",\"comments\",\"ck_comments_status\"]",
+      "set": {
+        "value": "\"status\" IN ('visible', 'held', 'hidden', 'removed')"
+      }
+    }
+  ]
+}

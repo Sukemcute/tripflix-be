@@ -32,7 +32,8 @@ describe('Seed Content (TF07)', () => {
       expect(['video', 'vlog']).toContain(post.postType);
       expect(post.status).toBe('published');
       expect(post.visibility).toBe('public');
-      expect(post.mediaIds.length).toBeGreaterThan(0);
+      // Reels kèm đúng một video; bài viết không kèm video (TF25), seed chưa có ảnh nên để trống.
+      expect(post.mediaIds).toHaveLength(post.postType === 'video' ? 1 : 0);
 
       // Kiểm tra tripAttachment
       if (post.tripAttachment) {

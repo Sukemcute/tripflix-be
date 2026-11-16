@@ -131,13 +131,6 @@ export class ListPostsQueryDto {
 
   @ApiPropertyOptional({ description: 'Lọc theo hashtag' })
   hashtag?: string;
-
-  @ApiPropertyOptional({
-    deprecated: true,
-    description:
-      'Đã ngừng dùng: tìm bài qua POST /api/search/posts (discovery). Vẫn nhận để client cũ không lỗi (tìm ILIKE trong tiêu đề và nội dung); sẽ gỡ ở bản sau',
-  })
-  keyword?: string;
 }
 
 export class ListUserPostsQueryDto {

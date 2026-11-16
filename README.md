@@ -101,11 +101,12 @@ pnpm lint && pnpm typecheck && pnpm test
 ```
 apps/
   core-api/              # 5 module: access, content, discovery, commerce, analytics (README trong từng module)
-  notification-service/  # khung, chưa có consumer
-  video-worker/          # chuyển mã video bằng FFmpeg, chạy trên Node; sẽ chuyển sang Go
+  notification-service/  # consumer group notification, inbox in-app (Socket.IO), email; push chưa làm
+  video-worker/          # chuyển mã video bằng FFmpeg, bản Node, chỉ dùng ở dev local
+  video-worker-go/       # bản Go, chạy trên staging
 libs/
-  auth/  config/  contracts/  db/  event-bus/  observability/   # đã có
-  outbox/  idempotency/  storage/  testing/                    # chưa làm, xem README từng thư mục
+  auth/  config/  contracts/  db/  event-bus/  observability/
+  outbox/  idempotency/  storage/  testing/                    # xem README từng thư mục
 contracts/               # file sinh ra, có commit; FE, AI đọc từ đây
 deploy/                  # compose.yaml, init Postgres, Traefik, ghi chú AWS
 tools/                   # script kiểm ranh giới module
