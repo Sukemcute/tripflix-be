@@ -77,7 +77,7 @@ export interface CandidateQuery {
   /** 'hot@v0' */
   postBuilder: string;
   postType: string | null;
-  /** Bài đã tương tác, đã phục vụ: không lấy. */
+  /** Bài không lấy (explore bỏ bài đã tương tác; hot/fresh để rỗng, bài đã tương tác chỉ bị đẩy xuống cuối). */
   excludePostIds: string[];
   limit: number;
   now: Date;
@@ -114,6 +114,8 @@ export interface RecommendStore {
   findUserFeatures(builderKey: string, userId: string): Promise<Record<string, unknown> | null>;
   /** Bài người dùng đã tương tác (kể cả bài của chính họ). */
   listInteractedPostIds(userId: string, now: Date): Promise<string[]>;
+  /** Bài người dùng tự đăng trong (since, until], mới nhất trước, đọc dòng `publish` của bảng thô (có ngay, không chờ job). */
+  listOwnRecentPostIds(q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]>;
   /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
   findPostMetas(postIds: string[]): Promise<PostMeta[]>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */

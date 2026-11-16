@@ -1,25 +1,16 @@
 import { PLACES } from '../../../search/domain/places.js';
 import { round4, type Candidate, type RankedItem, type Ranker } from '../contracts.js';
 
-const MAX_PER_AUTHOR = 2;
 const TRENDING = { code: 'trending', text: 'Bài viết thịnh hành trên TripFlix' };
 
-type Scored = { candidate: Candidate; final: number; item: RankedItem };
+type Scored = { candidate: Candidate; final: number; item: Omit<RankedItem, 'authorId'> };
 
-/** Sắp giảm dần theo final, rồi hot, rồi postId (phá hoà cố định); tối đa 2 bài/tác giả, dư thì dồn cuối. */
-function sortWithAuthorCap(scored: Scored[]): RankedItem[] {
+/** Sắp giảm dần theo final, rồi hot, rồi postId (phá hoà cố định). Đa dạng tác giả: feed-policy.ts. */
+function sortByFinal(scored: Scored[]): RankedItem[] {
   scored.sort(
     (a, b) => b.final - a.final || b.candidate.score - a.candidate.score || a.candidate.postId.localeCompare(b.candidate.postId),
   );
-  const perAuthor = new Map<string, number>();
-  const head: RankedItem[] = [];
-  const overflow: RankedItem[] = [];
-  for (const { candidate, item } of scored) {
-    const n = perAuthor.get(candidate.authorId) ?? 0;
-    perAuthor.set(candidate.authorId, n + 1);
-    (n < MAX_PER_AUTHOR ? head : overflow).push(item);
-  }
-  return [...head, ...overflow];
+  return scored.map(({ candidate, item }) => ({ ...item, authorId: candidate.authorId }));
 }
 
 const weightMap = (v: unknown): Record<string, number> =>
@@ -42,7 +33,7 @@ export const tagAffinityRankerV0: Ranker = {
     const userPlaces = weightMap(userFeatures?.places);
     const isPersonalized = Object.keys(userTags).length > 0 || Object.keys(userPlaces).length > 0;
 
-    return sortWithAuthorCap(
+    return sortByFinal(
       candidates.map((c) => {
         const hot = c.score;
         if (!isPersonalized) {
@@ -73,7 +64,7 @@ export const popularRankerV0: Ranker = {
   name: 'popular_v0',
   accepts: { postBuilders: ['hot@v0'], userBuilders: ['none@v0', 'tag_affinity@v0'] },
   rank({ candidates }) {
-    return sortWithAuthorCap(
+    return sortByFinal(
       candidates.map((c) => ({
         candidate: c,
         final: c.score,

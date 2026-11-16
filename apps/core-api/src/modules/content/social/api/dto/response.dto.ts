@@ -7,6 +7,13 @@ export class PostViewerContextDto {
   @ApiProperty() isBookmarked!: boolean;
 }
 
+export class PostImageDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'Link CDN của ảnh gốc' }) url!: string;
+  @ApiProperty({ type: Number, nullable: true }) widthPx!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) heightPx!: number | null;
+}
+
 // Document the existing wire format so generated clients do not treat JSON responses as void.
 export class SocialPostDto {
   @ApiProperty() id!: string;
@@ -22,6 +29,12 @@ export class SocialPostDto {
   @ApiProperty() isVerified!: boolean;
   @ApiProperty({ type: [String] }) mediaIds!: string[];
   @ApiProperty({ type: String, nullable: true }) coverMediaId!: string | null;
+  @ApiProperty({
+    type: [PostImageDto],
+    required: false,
+    description: 'Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng',
+  })
+  images?: PostImageDto[];
   @ApiProperty({ type: TripAttachmentDto, nullable: true }) tripAttachment!: TripAttachmentDto | null;
   @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reactionCounts!: Record<
     string,

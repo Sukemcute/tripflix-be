@@ -4,13 +4,16 @@ import { buildTransactionHostToken, createDb, type Db, type ModuleTransactionHos
 import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
 import { OutboxWriter } from '@tripflix/outbox';
 import { Redis } from 'ioredis';
-import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import type { CoreEnv } from '../../platform/env.js';
+import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import { PostShareLinks } from './social/application/post-share-links.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { FollowsController } from './social/api/follows.controller.js';
 import { FollowRepository } from './social/infra/follow.repository.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
 import { FeedModule } from './feed/feed.module.js';
+import { MediaFacade } from './media/media.facade.js';
 import { MediaModule } from './media/media.module.js';
 import { ModerationModule } from './moderation/moderation.module.js';
 import {
@@ -30,6 +33,9 @@ import {
   COMMERCE_SERVICE_PORT,
   USER_DIRECTORY_PORT,
   type UserDirectoryPort,
+  POST_MEDIA_PORT,
+  type PostMediaPort,
+  PostImagesResolver,
   CONTENT_OUTBOX,
   CreateDraftUseCase,
   DeleteCommentUseCase,
@@ -91,6 +97,12 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     AiSummaryInternalController,
   ],
   providers: [
+    // Link chia sẻ bài trỏ về web theo môi trường (WEB_APP_URL), không ghi cứng tên miền.
+    {
+      provide: PostShareLinks,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv) => new PostShareLinks(env.WEB_APP_URL),
+    },
     // 1. Drizzle DB Client cho schema 'content' (kết nối trực tiếp khi không ở trong transaction)
     {
       provide: CONTENT_DB,
@@ -181,21 +193,41 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
 
     // 5. Application Use Cases
     {
+      provide: POST_MEDIA_PORT,
+      inject: [MediaFacade],
+      useFactory: (media: MediaFacade): PostMediaPort => ({
+        findMediaInfo: async (mediaIds) =>
+          new Map((await media.getKinds(mediaIds)).map(({ id, ...info }) => [id, info])),
+        getImages: async (mediaIds) =>
+          new Map(Object.entries(await media.getImages(mediaIds)).map(([id, image]) => [id, { id, ...image }])),
+      }),
+    },
+    {
+      provide: PostImagesResolver,
+      inject: [POST_MEDIA_PORT],
+      useFactory: (postMedia: PostMediaPort) => new PostImagesResolver(postMedia),
+    },
+    {
       provide: CreateDraftUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new CreateDraftUseCase(postRepo),
+      inject: [PostRepository, POST_MEDIA_PORT],
+      useFactory: (postRepo: PostRepository, postMedia: PostMediaPort) => new CreateDraftUseCase(postRepo, postMedia),
     },
     {
       provide: UpdatePostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
-        new UpdatePostUseCase(postRepo, outbox),
+      inject: [PostRepository, CONTENT_OUTBOX, POST_MEDIA_PORT],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, postMedia: PostMediaPort) =>
+        new UpdatePostUseCase(postRepo, outbox, postMedia),
     },
     {
       provide: PublishPostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, commerceService: CommerceServicePort) =>
-        new PublishPostUseCase(postRepo, outbox, commerceService),
+      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT, PostShareLinks, POST_MEDIA_PORT],
+      useFactory: (
+        postRepo: PostRepository,
+        outbox: ContentOutbox,
+        commerceService: CommerceServicePort,
+        shareLinks: PostShareLinks,
+        postMedia: PostMediaPort,
+      ) => new PublishPostUseCase(postRepo, outbox, commerceService, shareLinks, postMedia),
     },
     {
       provide: DeletePostUseCase,
@@ -205,13 +237,14 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: GetPostDetailUseCase,
-      inject: [PostRepository, ReactionRepository, BookmarkRepository, USER_DIRECTORY_PORT],
+      inject: [PostRepository, ReactionRepository, BookmarkRepository, USER_DIRECTORY_PORT, PostShareLinks],
       useFactory: (
         postRepo: PostRepository,
         reactionRepo: ReactionRepository,
         bookmarkRepo: BookmarkRepository,
         userDirectory: UserDirectoryPort,
-      ) => new GetPostDetailUseCase(postRepo, reactionRepo, bookmarkRepo, userDirectory),
+        shareLinks: PostShareLinks,
+      ) => new GetPostDetailUseCase(postRepo, reactionRepo, bookmarkRepo, userDirectory, shareLinks),
     },
     {
       provide: ListPostsUseCase,
@@ -296,9 +329,9 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: TrackShareUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox) =>
-        new TrackShareUseCase(postRepo, outbox),
+      inject: [PostRepository, CONTENT_OUTBOX, PostShareLinks],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, shareLinks: PostShareLinks) =>
+        new TrackShareUseCase(postRepo, outbox, shareLinks),
     },
     {
       provide: AdminModeratePostUseCase,
@@ -313,14 +346,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: ListAdminPostsUseCase,
-      inject: [PostRepository],
-      useFactory: (postRepo: PostRepository) => new ListAdminPostsUseCase(postRepo),
+      inject: [PostRepository, USER_DIRECTORY_PORT],
+      useFactory: (postRepo: PostRepository, userDirectory: UserDirectoryPort) =>
+        new ListAdminPostsUseCase(postRepo, userDirectory),
     },
     {
       provide: GetAdminPostDetailUseCase,
-      inject: [PostRepository, ModerationActionRepository],
-      useFactory: (postRepo: PostRepository, modRepo: ModerationActionRepository) =>
-        new GetAdminPostDetailUseCase(postRepo, modRepo),
+      inject: [PostRepository, ModerationActionRepository, USER_DIRECTORY_PORT],
+      useFactory: (
+        postRepo: PostRepository,
+        modRepo: ModerationActionRepository,
+        userDirectory: UserDirectoryPort,
+      ) => new GetAdminPostDetailUseCase(postRepo, modRepo, userDirectory),
     },
     {
       provide: SavePostSummaryUseCase,

@@ -114,8 +114,10 @@ describe('ExploreUseCases', () => {
     expect(first.items.find((i) => i.refId === 'P1')?.reason).toMatch(/^3 ngày · .*♥ 120$/);
     const videos = await explore.searchPosts({ q: 'đà nẵng', postType: 'video', limit: 20 });
     expect(videos.items.map((i) => i.refId)).toEqual(['V1']);
+    // Lộ trình duy nhất 2,5tr vượt ngân sách 2tr: không bao giờ là kết quả chính, chỉ là kết quả thay thế có ghi rõ đã nới ngân sách.
     const plans = await explore.searchPosts({ q: 'lịch trình đà nẵng dưới 2tr', postType: 'plan', limit: 20 });
-    expect(plans).toMatchObject({ total: 0, items: [], nextCursor: null, understood: { budget: 2_000_000 } });
+    expect(plans).toMatchObject({ isFallback: true, fallbackRelaxed: ['budget'], nextCursor: null, understood: { budget: 2_000_000 } });
+    expect(plans.items.map((i) => [i.refId, i.reason.includes('vượt ngân sách')])).toEqual([['P1', true]]);
   });
 
   it('tìm bài: không bài nào khớp đủ câu thì gợi ý theo phần hiểu được và nói rõ từ nào bị bỏ', async () => {

@@ -1,6 +1,6 @@
 import type { MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import type { NewOutboxEvent } from '@tripflix/outbox';
-import type { MediaMimeType } from '../domain/upload-rules.js';
+import type { MediaKind, MediaMimeType } from '../domain/upload-rules.js';
 
 export const MEDIA_ASSET_STORE = Symbol('MEDIA_ASSET_STORE');
 export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
@@ -13,19 +13,42 @@ export type MediaAssetStatus = 'uploading' | 'processing' | 'ready' | 'failed';
 export interface NewUploadingAsset {
   id: string;
   ownerId: string;
+  /** Không gửi là video, như mặc định của cột. */
+  kind?: MediaKind;
   mimeType: MediaMimeType;
   fileSizeBytes: number;
   sourceKey: string;
   s3UploadId: string;
-  durationSec: number;
+  /** Video: số giây app khai. Ảnh: null. */
+  durationSec: number | null;
+  widthPx?: number | null;
+  heightPx?: number | null;
 }
 
 export interface UploadTarget {
   id: string;
+  kind: MediaKind;
+  mimeType: MediaMimeType;
   status: MediaAssetStatus;
   fileSizeBytes: number;
   sourceKey: string;
   s3UploadId: string | null;
+}
+
+/** Ảnh đã tải lên xong, dùng được trong bài viết. */
+export interface ReadyImageAsset {
+  id: string;
+  ownerId: string;
+  sourceKey: string;
+  widthPx: number | null;
+  heightPx: number | null;
+}
+
+export interface MediaKindInfo {
+  id: string;
+  ownerId: string;
+  kind: MediaKind;
+  status: MediaAssetStatus;
 }
 
 export interface ReadyRendition {
@@ -70,4 +93,12 @@ export interface MediaAssetStore {
   recordError(assetId: string, reason: string): Promise<void>;
   /** Chỉ trả về video ready; id không có hoặc chưa ready thì không có trong kết quả. */
   findPlaybackAssets(assetIds: string[]): Promise<PlaybackAsset[]>;
+  /** Ảnh: chuyển uploading sang ready. Trả false khi ảnh không còn uploading (gọi lại lần hai). */
+  markImageReady(assetId: string): Promise<boolean>;
+  /** Chuyển uploading sang failed, dùng khi file tải lên không phải ảnh đúng loại. */
+  markUploadFailed(assetId: string, reason: string): Promise<void>;
+  /** Chỉ ảnh ready; id không có, chưa xong hay là video thì không có trong kết quả. */
+  findReadyImages(assetIds: string[]): Promise<ReadyImageAsset[]>;
+  /** Loại, chủ và trạng thái của từng id có tồn tại, để module khác kiểm media gắn vào bài. */
+  findKinds(assetIds: string[]): Promise<MediaKindInfo[]>;
 }

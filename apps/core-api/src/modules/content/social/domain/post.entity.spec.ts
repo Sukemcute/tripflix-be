@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertMediaAllowedForPostType,
+  assertMediaKindsForPostType,
   Comment,
+  MAX_VLOG_IMAGES,
   InvalidPostStatusTransitionException,
   InvalidReactionTypeException,
   Post,
@@ -95,18 +97,17 @@ describe('Post Entity Domain Rules', () => {
     expect(() => emptyDraft.publish(authorId, { isVerified: false })).toThrow(PostPublishValidationException);
   });
 
-  it('bài viết (vlog) không được gắn video khi chỉnh sửa', () => {
+  it(`bài viết (vlog) gắn quá ${MAX_VLOG_IMAGES} ảnh khi chỉnh sửa thì bị chặn, giữ nguyên ảnh cũ`, () => {
     const vlog = createTestPost({ postType: 'vlog', mediaIds: [] });
-    expect(() => vlog.update(authorId, { mediaIds: ['018d9f10-1234-7000-8000-000000000002'] })).toThrow(
-      PostMediaNotAllowedException,
-    );
+    const tooMany = Array.from({ length: MAX_VLOG_IMAGES + 1 }, (_, index) => `image-${index}`);
+    expect(() => vlog.update(authorId, { mediaIds: tooMany })).toThrow(PostMediaNotAllowedException);
     expect(vlog.mediaIds).toEqual([]);
   });
 
-  it('bản nháp vlog cũ đã lỡ gắn video thì không xuất bản được', () => {
-    const legacyVlog = createTestPost({ postType: 'vlog' });
-    expect(() => legacyVlog.publish(authorId, { isVerified: false })).toThrow(PostMediaNotAllowedException);
-    expect(legacyVlog.status).toBe('draft');
+  it('vlog chỉ có ảnh, không có chữ vẫn xuất bản được', () => {
+    const vlog = createTestPost({ postType: 'vlog', mediaIds: ['image-1'], body: '' });
+    vlog.publish(authorId, { isVerified: false });
+    expect(vlog.status).toBe('published');
   });
 
   it('vlog chỉ có chữ xuất bản bình thường', () => {
@@ -120,10 +121,50 @@ describe('Post Entity Domain Rules', () => {
     expect(() => reel.publish(authorId, { isVerified: false })).toThrow(PostPublishValidationException);
   });
 
-  it('assertMediaAllowedForPostType chỉ chặn vlog có media', () => {
-    expect(() => assertMediaAllowedForPostType('vlog', ['m1'])).toThrow(PostMediaNotAllowedException);
-    expect(() => assertMediaAllowedForPostType('vlog', [])).not.toThrow();
+  it('assertMediaAllowedForPostType chặn trùng id và vlog quá số ảnh', () => {
+    expect(() => assertMediaAllowedForPostType('vlog', ['m1', 'm1'])).toThrow(PostMediaNotAllowedException);
+    expect(() =>
+      assertMediaAllowedForPostType('vlog', Array.from({ length: MAX_VLOG_IMAGES + 1 }, (_, index) => `m${index}`)),
+    ).toThrow(PostMediaNotAllowedException);
+    expect(() => assertMediaAllowedForPostType('vlog', ['m1', 'm2'])).not.toThrow();
     expect(() => assertMediaAllowedForPostType('video', ['m1'])).not.toThrow();
+  });
+
+  describe('assertMediaKindsForPostType', () => {
+    const readyImage = { kind: 'image', ownerId: authorId, status: 'ready' } as const;
+    const kinds = (entries: Array<[string, { kind: 'video' | 'image'; ownerId: string; status: 'uploading' | 'ready' }]>) =>
+      new Map(entries);
+
+    it('vlog kèm ảnh của chính tác giả đã tải xong thì được', () => {
+      expect(() =>
+        assertMediaKindsForPostType('vlog', authorId, ['i1', 'i2'], kinds([['i1', readyImage], ['i2', readyImage]])),
+      ).not.toThrow();
+    });
+
+    it('vlog kèm video (kể cả bản nháp cũ) thì bị chặn: video phải đăng dạng Reels', () => {
+      expect(() =>
+        assertMediaKindsForPostType('vlog', authorId, ['v1'], kinds([['v1', { ...readyImage, kind: 'video' }]])),
+      ).toThrow('không được kèm video');
+    });
+
+    it('vlog kèm ảnh của người khác, ảnh chưa tải xong hay id lạ thì bị chặn', () => {
+      expect(() =>
+        assertMediaKindsForPostType('vlog', authorId, ['i1'], kinds([['i1', { ...readyImage, ownerId: 'other-user' }]])),
+      ).toThrow(PostMediaNotAllowedException);
+      expect(() =>
+        assertMediaKindsForPostType('vlog', authorId, ['i1'], kinds([['i1', { ...readyImage, status: 'uploading' }]])),
+      ).toThrow(PostMediaNotAllowedException);
+      expect(() => assertMediaKindsForPostType('vlog', authorId, ['unknown'], kinds([]))).toThrow(
+        PostMediaNotAllowedException,
+      );
+    });
+
+    it('Reels kèm ảnh thì bị chặn; id video không tìm thấy vẫn cho qua như trước', () => {
+      expect(() => assertMediaKindsForPostType('video', authorId, ['i1'], kinds([['i1', readyImage]]))).toThrow(
+        'Reels chỉ kèm video',
+      );
+      expect(() => assertMediaKindsForPostType('video', authorId, ['seed-video'], kinds([]))).not.toThrow();
+    });
   });
 
   it('chỉnh sửa bài đăng cập nhật đúng dữ liệu', () => {

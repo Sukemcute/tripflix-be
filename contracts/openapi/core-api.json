@@ -2449,7 +2449,7 @@
             }
           },
           "422": {
-            "description": "MEDIA_TOO_LARGE",
+            "description": "MEDIA_TOO_LARGE (video quá 5 phút hoặc 1 GB, ảnh quá 10 MB)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2597,6 +2597,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "MEDIA_INVALID_IMAGE: file không phải ảnh đúng loại đã khai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaErrorDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2613,6 +2623,15 @@
       "get": {
         "operationId": "FeedController_getFeed",
         "parameters": [
+          {
+            "name": "post_ids",
+            "required": false,
+            "in": "query",
+            "description": "Lấy thẻ của đúng các bài này (uuid cách nhau bởi dấu phẩy, tối đa 20), theo đúng thứ tự truyền vào. Bài ẩn, riêng tư, đã xoá, không phải Reels hoặc video chưa xử lý xong thì bỏ qua. Bỏ qua tab và limit, nextCursor luôn null; không dùng chung với cursor, saved, author_id",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "saved",
             "required": false,
@@ -2678,7 +2697,7 @@
             }
           },
           "400": {
-            "description": "tab, limit, cursor, author_id hoặc saved không hợp lệ"
+            "description": "tab, limit, cursor, author_id, saved hoặc post_ids không hợp lệ"
           },
           "401": {
             "description": "saved=true khi chưa đăng nhập"
@@ -2804,6 +2823,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -2919,6 +2939,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3033,6 +3054,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3168,6 +3190,33 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/stats": {
+      "get": {
+        "operationId": "AdminModerationController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/scans/failed": {
       "get": {
         "operationId": "AdminModerationController_failedScans",
@@ -3237,6 +3286,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3386,6 +3436,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3545,6 +3596,7 @@
                 "SEXUAL",
                 "VIOLENCE",
                 "MISINFORMATION",
+                "EXTREMISM",
                 "OTHER"
               ]
             }
@@ -3979,7 +4031,7 @@
     },
     "/api/search": {
       "post": {
-        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Không có gì khớp thì vùng có `total: 0`, không đoán bừa.\n- Vùng câu muốn tìm rỗng: `suggest` là các gợi ý khác (bỏ các từ trong `dropped`).\n- `loc` chỉ dùng khi câu không nói nơi.",
+        "description": "Một ô tìm cho app. Công khai, không cần đăng nhập. Chỉ đọc chỉ mục của discovery (dựng lại mỗi 10 phút).\n\n- Hiểu nơi (`đà lạt`, `sg`), ý muốn (`ks`, `ăn gì`), ngân sách (`dưới 2tr`), số ngày (`3n2đ`), tên riêng, gõ sai nhẹ, không dấu.\n- Gõ có dấu thì tôn trọng dấu (`trứng` ≠ `Trung`). Gõ sai thì tìm cả câu gốc lẫn câu đã sửa rồi gộp kết quả.\n- `sections` chỉ gồm mục khớp đủ câu: đúng nơi, không vượt ngân sách, khớp từ. Vùng không có mục nào như vậy thì `total: 0`.\n- Vùng câu muốn tìm rỗng: `fallback` là kết quả thay thế sau khi nới điều kiện (`relaxed`: khác nơi, vượt ngân sách, bỏ từ). Không có gì liên quan thì `fallback: null`.\n- `loc` chỉ dùng khi câu không nói nơi.",
         "operationId": "ExploreController_search",
         "parameters": [],
         "requestBody": {
@@ -4020,7 +4072,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Ngân sách trong câu là lọc cứng theo chi phí mỗi người của lộ trình. Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu nhưng hiểu được nơi hoặc ý muốn (vd \"mùa thu hà nội\"): `isFallback: true`, `items` là bài theo phần hiểu được, `dropped` là các từ không có trong dữ liệu.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -4106,7 +4158,7 @@
     },
     "/api/recommendations/posts": {
       "get": {
-        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không trả bài đã tương tác. Người đăng nhập: bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài) bị đẩy xuống cuối, không bị bỏ; gọi lại cùng cursor ra cùng trang.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
         "operationId": "PostRecommendationsController_recommendPosts",
         "parameters": [
           {
@@ -6376,6 +6428,33 @@
           "title"
         ]
       },
+      "PostImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "description": "Link CDN của ảnh gốc"
+          },
+          "widthPx": {
+            "type": "number",
+            "nullable": true
+          },
+          "heightPx": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "widthPx",
+          "heightPx"
+        ]
+      },
       "PostViewerContextDto": {
         "type": "object",
         "properties": {
@@ -6459,6 +6538,13 @@
           "coverMediaId": {
             "type": "string",
             "nullable": true
+          },
+          "images": {
+            "description": "Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostImageDto"
+            }
           },
           "tripAttachment": {
             "nullable": true,
@@ -7727,7 +7813,10 @@
             "type": "string",
             "enum": [
               "video/mp4",
-              "video/quicktime"
+              "video/quicktime",
+              "image/jpeg",
+              "image/png",
+              "image/webp"
             ]
           },
           "fileSizeBytes": {
@@ -7737,13 +7826,22 @@
           "durationSec": {
             "type": "number",
             "example": 42.5,
-            "description": "Làm tròn lên số nguyên. Tối đa 5 phút."
+            "description": "Bắt buộc với video, làm tròn lên số nguyên, tối đa 5 phút. Ảnh thì không gửi."
+          },
+          "widthPx": {
+            "type": "number",
+            "example": 1080,
+            "description": "Chỉ cho ảnh: chiều rộng đọc từ file, để dàn trang."
+          },
+          "heightPx": {
+            "type": "number",
+            "example": 1350,
+            "description": "Chỉ cho ảnh: chiều cao đọc từ file."
           }
         },
         "required": [
           "mimeType",
-          "fileSizeBytes",
-          "durationSec"
+          "fileSizeBytes"
         ]
       },
       "SignedPartDto": {
@@ -7888,7 +7986,7 @@
               "processing",
               "ready"
             ],
-            "description": "ready khi gọi lại lúc video đã chuyển mã xong."
+            "description": "Video: processing (đang chuyển mã), ready khi gọi lại lúc đã xong. Ảnh: ready ngay."
           }
         },
         "required": [
@@ -8375,6 +8473,7 @@
               "SEXUAL",
               "VIOLENCE",
               "MISINFORMATION",
+              "EXTREMISM",
               "OTHER"
             ]
           },
@@ -8413,6 +8512,70 @@
           "reasonCode",
           "reasonDetail",
           "createdAt"
+        ]
+      },
+      "ModerationStatsDto": {
+        "type": "object",
+        "properties": {
+          "pendingTotal": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending"
+          },
+          "pendingUrgent": {
+            "type": "number",
+            "description": "Hồ sơ chờ duyệt có severity ≥ urgentSeverity"
+          },
+          "pendingPosts": {
+            "type": "number"
+          },
+          "pendingComments": {
+            "type": "number"
+          },
+          "oldestPendingAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "autoHidden24h": {
+            "type": "number",
+            "description": "Số lần tự ẩn trong 24 giờ qua"
+          },
+          "reports24h": {
+            "type": "number",
+            "description": "Số báo cáo mới trong 24 giờ qua"
+          },
+          "pendingAppeals": {
+            "type": "number"
+          },
+          "failedScans": {
+            "type": "number",
+            "description": "Scan đã hết lượt thử, cần staff xem"
+          },
+          "deferredScans": {
+            "type": "number",
+            "description": "Scan đang chờ thử lại tự động"
+          },
+          "urgentSeverity": {
+            "type": "number"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pendingTotal",
+          "pendingUrgent",
+          "pendingPosts",
+          "pendingComments",
+          "oldestPendingAt",
+          "autoHidden24h",
+          "reports24h",
+          "pendingAppeals",
+          "failedScans",
+          "deferredScans",
+          "urgentSeverity",
+          "generatedAt"
         ]
       },
       "FailedScanDto": {
@@ -8850,6 +9013,7 @@
               "SEXUAL",
               "VIOLENCE",
               "MISINFORMATION",
+              "EXTREMISM",
               "OTHER"
             ]
           },
@@ -9310,6 +9474,147 @@
           "items"
         ]
       },
+      "ExploreFallbackItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "hotel:P-h-dl-01",
+            "description": "`<loại>:<mã gốc>`, duy nhất"
+          },
+          "kind": {
+            "type": "string",
+            "example": "stay",
+            "description": "stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)"
+          },
+          "refId": {
+            "type": "string",
+            "example": "P-h-dl-01",
+            "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ana Mandara Villas Đà Lạt"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "example": "Đà Lạt",
+            "description": "Nơi của mục"
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Khớp: chill · Ở Đà Lạt · 5 sao · ~1200k/đêm",
+            "description": "Lý do hiện mục này"
+          },
+          "priceFrom": {
+            "type": "number",
+            "nullable": true,
+            "description": "stay: giá từ / đêm · plan: chi phí ước tính / người (VND)"
+          },
+          "days": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ngày của lộ trình"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreLocationDto"
+              }
+            ]
+          },
+          "section": {
+            "type": "string",
+            "example": "Ở đâu",
+            "description": "Tên vùng của mục gợi ý"
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "refId",
+          "title",
+          "subtitle",
+          "thumbnail",
+          "reason",
+          "priceFrom",
+          "days",
+          "location",
+          "section",
+          "relaxed"
+        ]
+      },
+      "ExploreFallbackDto": {
+        "type": "object",
+        "properties": {
+          "forQuery": {
+            "type": "string",
+            "example": "resort phú quốc dưới 300k",
+            "description": "Câu người dùng gõ: FE hiện \"Kết quả thay thế cho “…”\""
+          },
+          "relaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Gộp trên các mục. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          },
+          "dropped": {
+            "example": [
+              "dịp",
+              "lễ"
+            ],
+            "description": "Từ trong câu mà các mục thay thế không khớp (dạng người dùng gõ)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "description": "Mục gần nhất sau khi nới điều kiện, theo vùng câu muốn",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreFallbackItemDto"
+            }
+          }
+        },
+        "required": [
+          "forQuery",
+          "relaxed",
+          "dropped",
+          "items"
+        ]
+      },
       "ExploreSuggestItemDto": {
         "type": "object",
         "properties": {
@@ -9408,8 +9713,19 @@
               "$ref": "#/components/schemas/ExploreSectionDto"
             }
           },
+          "fallback": {
+            "nullable": true,
+            "description": "Kết quả thay thế: vùng câu muốn không có mục nào khớp đủ câu (đúng nơi, không vượt ngân sách, khớp từ) nên nới điều kiện. null nếu có kết quả chính hoặc không có gì liên quan",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreFallbackDto"
+              }
+            ]
+          },
           "suggest": {
-            "description": "Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.items` (cùng mục, không có `relaxed`)",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExploreSuggestItemDto"
@@ -9420,7 +9736,8 @@
               "dịp",
               "lễ"
             ],
-            "description": "Từ đã bỏ qua để ra gợi ý khác",
+            "deprecated": true,
+            "description": "Đã thay bằng `fallback.dropped`",
             "type": "array",
             "items": {
               "type": "string"
@@ -9431,6 +9748,7 @@
           "understood",
           "nearUser",
           "sections",
+          "fallback",
           "suggest",
           "dropped"
         ]
@@ -9506,7 +9824,22 @@
           },
           "isFallback": {
             "type": "boolean",
-            "description": "true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo \"không thấy <dropped>, gợi ý theo ...\""
+            "description": "true: không bài nào khớp đủ câu nên `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). FE nên báo \"Kết quả thay thế cho “q”\""
+          },
+          "fallbackRelaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Chỉ có giá trị khi `isFallback = true`. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
           }
         },
         "required": [
@@ -9515,7 +9848,8 @@
           "total",
           "nextCursor",
           "dropped",
-          "isFallback"
+          "isFallback",
+          "fallbackRelaxed"
         ]
       },
       "HomeProvinceDto": {
@@ -9708,7 +10042,8 @@
               "matches_place",
               "matches_interest",
               "trending",
-              "explore"
+              "explore",
+              "own_post"
             ]
           },
           "text": {
@@ -9734,9 +10069,10 @@
               "hot",
               "taste",
               "fresh",
-              "explore"
+              "explore",
+              "own"
             ],
-            "description": "Nguồn ứng viên: hot (điểm nóng), fresh (đăng trong 48 giờ), explore (~5% ngẫu nhiên để đo)"
+            "description": "Nguồn ứng viên: hot (điểm nóng), fresh (đăng trong 48 giờ), explore (~5% ngẫu nhiên để đo), own (bài người xem vừa đăng)"
           },
           "reason": {
             "$ref": "#/components/schemas/RecommendReasonDto"

@@ -44,6 +44,8 @@ x-core-env: &core-env
   AI_SERVICE_URL: ${AI_SERVICE_URL:-}
   CORE_API_INTERNAL_URL: http://core-api:3000
   MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
+  # Link chia sẻ bài do core-api trả về (shareUrl) trỏ về web này; trùng biến của notification-service.
+  WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
 
 services:
   # ---------- Giai đoạn 1: database, Redis ----------

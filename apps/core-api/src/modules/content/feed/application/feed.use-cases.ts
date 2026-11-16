@@ -77,22 +77,34 @@ export class FeedUseCases {
         ? await this.loadSharedPage(tab, query.limit, query.after, null, query.authorId)
         : await this.loadFirstPage(tab, query.limit);
     if (!query.viewerId) return shared;
+    return { items: await this.withViewerState(shared.items, query.viewerId), nextCursor: shared.nextCursor };
+  }
 
-    // Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache.
-    const postIds = shared.items.map((item) => item.postId);
+  /**
+   * Thẻ Reels của đúng các bài cần mở (từ kết quả tìm kiếm, link chia sẻ), theo thứ tự `postIds`.
+   * Bài không xem được trên feed (ẩn, riêng tư, đã xoá, không phải Reels, video chưa xử lý xong) thì bỏ qua.
+   */
+  async getByIds(postIds: string[], viewerId: string | null): Promise<FeedPage> {
+    const ids = [...new Set(postIds)];
+    const cards = await this.buildCards(await this.store.findPlayablePostsByIds(ids));
+    const byId = new Map(cards.map((card) => [card.postId, card]));
+    const items = ids.flatMap((id) => byId.get(id) ?? []);
+    return { items: viewerId ? await this.withViewerState(items, viewerId) : items, nextCursor: null };
+  }
+
+  /** Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache. */
+  private async withViewerState(items: FeedCard[], viewerId: string): Promise<FeedCard[]> {
+    const postIds = items.map((item) => item.postId);
     const [liked, saved] = await Promise.all([
-      this.store.findLikedPostIds(query.viewerId, postIds),
-      this.store.findSavedPostIds(query.viewerId, postIds),
+      this.store.findLikedPostIds(viewerId, postIds),
+      this.store.findSavedPostIds(viewerId, postIds),
     ]);
     const likedIds = new Set(liked);
     const savedIds = new Set(saved);
-    return {
-      items: shared.items.map((item) => ({
-        ...item,
-        viewerState: { liked: likedIds.has(item.postId), saved: savedIds.has(item.postId) },
-      })),
-      nextCursor: shared.nextCursor,
-    };
+    return items.map((item) => ({
+      ...item,
+      viewerState: { liked: likedIds.has(item.postId), saved: savedIds.has(item.postId) },
+    }));
   }
 
   private async loadFirstPage(tab: FeedTab, limit: number): Promise<SharedFeedPage<FeedCard>> {
@@ -147,20 +159,7 @@ export class FeedUseCases {
           ? this.store.listForYouPosts({ ...listQuery, seed, asOf })
           : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, limit);
-    const [playback, authorNames] = await Promise.all([
-      this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)),
-      this.access
-        ? this.access.getDisplayNames(pageRows.map((r) => r.authorId)).catch(() => new Map<string, string>())
-        : new Map<string, string>(),
-    ]);
-
-    const items = pageRows.flatMap((row) => {
-      // Một bài có thể có nhiều media; lấy video đầu tiên phát được.
-      const mediaId = row.mediaIds.find((id) => playback[id]);
-      const video = mediaId ? playback[mediaId] : undefined;
-      if (!video) return [];
-      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null)];
-    });
+    const items = await this.buildCards(pageRows);
 
     const last = pageRows.at(-1);
     return {
@@ -175,6 +174,22 @@ export class FeedUseCases {
             })
           : null,
     };
+  }
+
+  private async buildCards(rows: FeedPostRow[]): Promise<FeedCard[]> {
+    const [playback, authorNames] = await Promise.all([
+      this.media.getPlayback(rows.flatMap((row) => row.mediaIds)),
+      this.access
+        ? this.access.getDisplayNames(rows.map((r) => r.authorId)).catch(() => new Map<string, string>())
+        : new Map<string, string>(),
+    ]);
+    return rows.flatMap((row) => {
+      // Một bài có thể có nhiều media; lấy video đầu tiên phát được.
+      const mediaId = row.mediaIds.find((id) => playback[id]);
+      const video = mediaId ? playback[mediaId] : undefined;
+      if (!video) return [];
+      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null)];
+    });
   }
 }
 

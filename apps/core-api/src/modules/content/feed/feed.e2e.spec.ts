@@ -80,6 +80,11 @@ class FakeFeedStore implements FeedStore {
     return Promise.resolve(sorted.slice(start, start + limit));
   }
 
+  /** Bản thật không theo thứ tự nào: trả ngược để test chắc thứ tự là do use case sắp lại. */
+  findPlayablePostsByIds(postIds: string[]): Promise<FeedPostRow[]> {
+    return Promise.resolve(this.rows.filter((row) => postIds.includes(row.id)).reverse());
+  }
+
   findLikedPostIds(userId: string, postIds: string[]): Promise<string[]> {
     return Promise.resolve(
       this.liked.filter((like) => like.userId === userId && postIds.includes(like.postId)).map((like) => like.postId),
@@ -285,6 +290,31 @@ describe('GET /api/v1/feed E2E', () => {
     ['saved với tab hot', 'saved=true&tab=hot'],
   ])('%s thì trả 400', async (_name, query) => {
     await http().get(`/api/v1/feed?${query}`).expect(400);
+  });
+
+  it('post_ids trả thẻ đúng thứ tự truyền vào, bỏ bài không xem được, có trạng thái thích', async () => {
+    feedStore.liked = [{ userId, postId: buildPostId(1) }];
+    const missing = buildPostId(9);
+
+    const response = await http()
+      .get('/api/v1/feed')
+      .query({ post_ids: `${buildPostId(3)},${missing},${buildPostId(1)},${buildPostId(3)}` })
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    const body = response.body as FeedPageBody;
+
+    expect(body.items.map((item) => item.postId)).toEqual([buildPostId(3), buildPostId(1)]);
+    expect(body.items.map((item) => item.viewerState?.liked)).toEqual([false, true]);
+    expect(body.items[0]?.video.hlsUrl).toContain('master.m3u8');
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it('post_ids sai dạng, quá 20 id hoặc ghép với cursor, saved, author_id thì trả 400', async () => {
+    await http().get('/api/v1/feed').query({ post_ids: 'khong-phai-uuid' }).expect(400);
+    await http().get('/api/v1/feed').query({ post_ids: ',' }).expect(400);
+    const tooMany = Array.from({ length: 21 }, (_, i) => buildPostId(i)).join(',');
+    await http().get('/api/v1/feed').query({ post_ids: tooMany }).expect(400);
+    await http().get('/api/v1/feed').query({ post_ids: buildPostId(1), author_id: userId }).expect(400);
   });
 
   it('saved=true khi chưa đăng nhập trả 401', async () => {

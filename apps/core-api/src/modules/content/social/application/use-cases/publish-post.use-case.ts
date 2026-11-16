@@ -1,8 +1,11 @@
 import { Transactional } from '@tripflix/db';
 import { InvalidPostStatusTransitionException, Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { assertPostMediaAllowed } from '../common/post-media.js';
+import { PostShareLinks } from '../post-share-links.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
+import type { PostMediaPort } from '../ports/post-media.port.js';
 
 export interface PublishPostCommand {
   postId: string;
@@ -22,6 +25,8 @@ export class PublishPostUseCase {
     private readonly postRepository: PostRepository,
     private readonly outbox: ContentOutbox,
     private readonly commerceService?: CommerceServicePort,
+    private readonly shareLinks: PostShareLinks = new PostShareLinks(),
+    private readonly postMedia?: PostMediaPort,
   ) {}
 
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
@@ -29,6 +34,13 @@ export class PublishPostUseCase {
     if (!record) {
       throw new PostNotFoundException(command.postId);
     }
+
+    // Chặn cả bản nháp cũ đã lỡ gắn video vào bài viết, hoặc ảnh vào Reels, trước khi có quy tắc tách bạch.
+    await assertPostMediaAllowed(this.postMedia, {
+      postType: record.postType,
+      authorId: record.authorId,
+      mediaIds: record.mediaIds,
+    });
 
     // Kiểm tra dấu "ĐÃ XÁC THỰC" (Verified Badge - F2/FR3) NGOÀI TRANSACTION để không giữ DB connection
     let isVerified = false;
@@ -88,7 +100,7 @@ export class PublishPostUseCase {
       publishedAt,
     });
 
-    const shareUrl = `https://tripflix.vn/posts/${record.id}`;
+    const shareUrl = this.shareLinks.buildUrl(record.id, domainPost.postType);
 
     // Ghi sự kiện vào content.outbox_events trong cùng transaction DB
     await this.outbox.add({

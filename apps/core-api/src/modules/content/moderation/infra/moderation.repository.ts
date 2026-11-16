@@ -107,6 +107,63 @@ export class ModerationRepository {
       .offset(offset);
   }
 
+  /**
+   * Số liệu tổng cho màn kiểm duyệt, đếm thẳng trong Postgres để không phụ thuộc trang FE tải về.
+   * "Hàng chờ" dùng cùng điều kiện với queue view=pending để thẻ số khớp total của danh sách.
+   */
+  async stats(urgentSeverity: number) {
+    const result = await this.db.execute<{
+      pending_total: number;
+      pending_urgent: number;
+      pending_posts: number;
+      pending_comments: number;
+      oldest_pending_at: string | null;
+      auto_hidden_24h: number;
+      reports_24h: number;
+      pending_appeals: number;
+      failed_scans: number;
+      deferred_scans: number;
+    }>(sql`
+      WITH pending AS (
+        SELECT c.target_type, c.severity, c.created_at
+        FROM ${moderationCases} c
+        LEFT JOIN ${posts} p ON c.target_type = 'post' AND p.id = c.target_id
+        LEFT JOIN ${comments} cm ON c.target_type = 'comment' AND cm.id = c.target_id
+        WHERE c.status = 'pending'
+          AND coalesce(p.status, cm.status, '') IN ('published', 'visible', 'hidden')
+      )
+      SELECT
+        (SELECT count(*)::int FROM pending) AS pending_total,
+        (SELECT count(*)::int FROM pending WHERE severity >= ${urgentSeverity}) AS pending_urgent,
+        (SELECT count(*)::int FROM pending WHERE target_type = 'post') AS pending_posts,
+        (SELECT count(*)::int FROM pending WHERE target_type = 'comment') AS pending_comments,
+        (SELECT min(created_at) FROM pending) AS oldest_pending_at,
+        (SELECT count(*)::int FROM ${moderationActions}
+          WHERE action = 'auto_hide' AND created_at >= now() - interval '24 hours') AS auto_hidden_24h,
+        (SELECT count(*)::int FROM ${reports}
+          WHERE created_at >= now() - interval '24 hours') AS reports_24h,
+        (SELECT count(*)::int FROM ${moderationAppeals} WHERE status = 'pending') AS pending_appeals,
+        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'failed') AS failed_scans,
+        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'deferred') AS deferred_scans
+    `);
+    const row = result.rows[0]!;
+    const oldest = row.oldest_pending_at ? new Date(row.oldest_pending_at) : null;
+    return {
+      pendingTotal: Number(row.pending_total),
+      pendingUrgent: Number(row.pending_urgent),
+      pendingPosts: Number(row.pending_posts),
+      pendingComments: Number(row.pending_comments),
+      oldestPendingAt: oldest ? oldest.toISOString() : null,
+      autoHidden24h: Number(row.auto_hidden_24h),
+      reports24h: Number(row.reports_24h),
+      pendingAppeals: Number(row.pending_appeals),
+      failedScans: Number(row.failed_scans),
+      deferredScans: Number(row.deferred_scans),
+      urgentSeverity,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async pendingAppeals(limit: number, offset: number) {
     return this.db
       .select({

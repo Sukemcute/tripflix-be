@@ -1,5 +1,6 @@
 import { SocialErrorFilter } from './social-error.filter.js';
 import {
+  Optional,
   UseFilters,
   Body,
   Controller,
@@ -31,6 +32,7 @@ import {
   GetPostDetailUseCase,
   ListPostsUseCase,
   ListUserPostsUseCase,
+  PostImagesResolver,
   PublishPostUseCase,
   TrackShareUseCase,
   UpdatePostUseCase,
@@ -49,6 +51,8 @@ export class PostsController {
     private readonly listPostsUseCase: ListPostsUseCase,
     private readonly listUserPostsUseCase: ListUserPostsUseCase,
     private readonly trackShareUseCase: TrackShareUseCase,
+    // Không có (test dựng controller bằng tay) thì trả bài như cũ, không kèm images.
+    @Optional() private readonly postImages?: PostImagesResolver,
   ) {}
 
   @Post('posts')
@@ -58,7 +62,7 @@ export class PostsController {
   @ApiResponse({ status: 201, description: 'Bản nháp đã được tạo thành công', type: SocialPostDto })
   @ApiResponse({ status: 403, description: 'Email chưa được xác thực (email_unverified)' })
   async createDraft(@CurrentUser() user: AuthUser, @Body() dto: CreatePostDto) {
-    return this.createDraftUseCase.execute({
+    const post = await this.createDraftUseCase.execute({
       authorId: user.userId,
       postType: dto.post_type,
       title: dto.title,
@@ -69,6 +73,7 @@ export class PostsController {
       coverMediaId: dto.cover_media_id,
       tripAttachment: dto.trip_attachment,
     });
+    return this.postImages ? this.postImages.attachOne(post) : post;
   }
 
   @Get('posts')
@@ -76,7 +81,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Lấy danh sách bài đăng công khai cho bảng tin và tìm kiếm (FR2, FR4)' })
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng kèm nextCursor', type: SocialPostPageDto })
   async listPublicPosts(@Query() query: ListPostsQueryDto, @OptionalCurrentUser() user?: AuthUser) {
-    return this.listPostsUseCase.execute({
+    const page = await this.listPostsUseCase.execute({
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       authorId: query.author_id,
@@ -85,6 +90,7 @@ export class PostsController {
       keyword: query.keyword,
       viewerId: user?.userId ?? null,
     });
+    return this.postImages ? this.postImages.attachToPage(page) : page;
   }
 
   @Get('me/posts')
@@ -94,13 +100,14 @@ export class PostsController {
   @ApiResponse({ status: 200, description: 'Danh sách bài của người dùng', type: SocialPostPageDto })
   @ApiResponse({ status: 400, description: 'post_type không hợp lệ' })
   async listMyPosts(@CurrentUser() user: AuthUser, @Query() query: ListUserPostsQueryDto) {
-    return this.listUserPostsUseCase.execute({
+    const page = await this.listUserPostsUseCase.execute({
       authorId: user.userId,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       status: query.status,
       postType: parseListPostTypeFilter(query.post_type),
     });
+    return this.postImages ? this.postImages.attachToPage(page) : page;
   }
 
   @Get('posts/:id')
@@ -113,11 +120,12 @@ export class PostsController {
   })
   async getPostDetail(@Param('id') postId: string, @OptionalCurrentUser() user?: AuthUser) {
     const isStaff = user?.role === 'moderator' || user?.role === 'superadmin';
-    return this.getPostDetailUseCase.execute({
+    const detail = await this.getPostDetailUseCase.execute({
       postId,
       viewerId: user?.userId,
       isStaff,
     });
+    return this.postImages ? { ...detail, post: await this.postImages.attachOne(detail.post) } : detail;
   }
 
   @Patch('posts/:id')
@@ -126,7 +134,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Sửa bản nháp hoặc bài đã đăng (FR1, FR5, FR7)' })
   @ApiResponse({ status: 200, description: 'Bài đăng sau khi cập nhật', type: SocialPostDto })
   async updatePost(@Param('id') postId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdatePostDto) {
-    return this.updatePostUseCase.execute({
+    const post = await this.updatePostUseCase.execute({
       postId,
       userId: user.userId,
       title: dto.title,
@@ -137,6 +145,7 @@ export class PostsController {
       coverMediaId: dto.cover_media_id,
       tripAttachment: dto.trip_attachment,
     });
+    return this.postImages ? this.postImages.attachOne(post) : post;
   }
 
   @Post('posts/:id/publish')
