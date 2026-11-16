@@ -32,11 +32,10 @@
 
 
 ## Review của Thành: tránh 409 khi chỉ bộ đếm đổi
-- `assertPrecheckedPost` chỉ so `status`, `title`, `body`, `hashtags`, `updatedAt`, `deletedAt`. Không so bộ đếm; cập nhật media/visibility qua use case vẫn được bảo vệ bằng `updatedAt`.
-- Test tái hiện tại `UpdatePostUseCase`: đang await kiểm media thì cả reaction/comment/share/bookmark count đổi, sửa bài vẫn thành công và không ghi đè bộ đếm. Trên bản cũ: 1 fail / 6 pass; sau sửa: 7/7 pass.
-- Sáu ca thay đổi từng trường được so vẫn trả 409, không update và không ghi outbox.
-- `pnpm turbo run lint typecheck test --affected`: 49/49 task đạt, core-api 2492 pass, 4 skip có sẵn.
-- CI trước review (bdd780b) đã đạt core-api integration 187/187, gồm 8/8 test TF91; CI sẽ kiểm lại commit sửa guard.
+- Lần sửa đầu (`ec967d9`) bỏ bộ đếm nhưng vẫn so `updatedAt`, dựa trên giả định bộ đếm không đổi `updatedAt`. Giả định này sai: `PostRepository.incrementCounter` (bình luận, chia sẻ, lưu bài) và `updateReactionCounts` (thả tim) đều ghi `updatedAt: new Date()`, nên trên DB thật tác giả vẫn bị 409. Unit test lúc đó pass vì mock không đổi `updatedAt`.
+- Sửa lại: `assertPrecheckedPost` không so `updatedAt` nữa, chỉ so các trường nội dung tác giả sửa được: `status`, `title`, `body`, `hashtags`, `visibility`, `mediaIds`, `coverMediaId`, `tripAttachment`, `isVerified`, `deletedAt`. Không đổi `incrementCounter` vì discovery đồng bộ theo `updatedAt` (`findPostsForSync`).
+- Unit test: mock đổi cả `updatedAt` như repository thật, sửa bài vẫn qua; 9 ca đổi từng trường nội dung vẫn trả 409, không update, không ghi outbox.
+- Integration test `content-precheck.int.spec.ts` (Postgres thật): gọi `incrementCounter` ×3 và `updateReactionCounts`, `updatedAt` đổi nhưng `assertPrecheckedPost` cho qua; sửa `body` ở phiên khác thì báo 409.
 
 ## Theo dõi TF92 / FE tác giả
 - Giữ `replyToCommentId`, `replyToAuthorId`, `authorDisplayName` cho bình luận held khi phát created lúc nhả. Test người được trả lời cấp 2 nhận đúng thông báo và tên tác giả.
