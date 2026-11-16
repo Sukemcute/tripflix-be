@@ -87,7 +87,6 @@ export class PostsController {
       authorId: query.author_id,
       postType: query.post_type,
       hashtag: query.hashtag,
-      keyword: query.keyword,
       viewerId: user?.userId ?? null,
     });
     return this.postImages ? this.postImages.attachToPage(page) : page;
