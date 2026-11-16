@@ -34,12 +34,12 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | `GET /api/stays` | `search/api/stays.controller.ts` | Trang kết quả web OTA: khách sạn còn phòng ở một nơi cho ngày đã chọn, giá thật từ commerce; lọc sao, giá; sắp giá hoặc sao |
 | `GET /api/recommendations/home` | `recommend/api/home-recommendations.controller.ts` | Khối "Gợi ý dành cho bạn" trang chủ web, mỗi thẻ kèm lý do (TF12) |
 | `POST /api/search` | `search/api/explore.controller.ts` | Tìm khám phá của app: một ô tìm, kết quả chia vùng (Ở đâu, Lộ trình, Bài viết, Video). Xem mục 6 (TF11) |
-| Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút |
+| Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút (admin đổi được, TF103) |
 | Gỡ bài ẩn khỏi chỉ mục + nạp tương tác cho gợi ý | `consumers/discovery-events.consumer.ts` | Consumer **duy nhất** của group `core-discovery` trên `stream:core.{content,commerce,access,discovery}`: mỗi sự kiện qua search (bài bị ẩn/xoá rời `search_documents` trong vài giây, TF33) rồi recommend (dòng thô `recommend_interactions`, TF28) |
 | `GET /api/recommendations/posts` | `recommend/api/post-recommendations.controller.ts` | Gợi ý bài `for_you`/`trending`, đăng nhập tuỳ chọn (TF28) |
 | Bảng `recommend_*` | `db/schema/recommend.ts` | Bảng thô `recommend_interactions`, metadata bài, điểm bài, đặc trưng người, `recommend_algos`, `recommend_job_state` |
 | Job đặc trưng gợi ý | `recommend/jobs/build-features.job.ts` | Lúc khởi động và mỗi 10 phút; dọn hạn lưu bảng thô mỗi 24 giờ (`purge-interactions.job.ts`) |
-| Admin theo dõi/chạy job | `jobs/admin-discovery-jobs.controller.ts`, `jobs/job-runs.ts` | `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin): 20 lần chạy gần nhất của `explore`, `suggest`, `recommend_build`, `recommend_purge` (Redis `discovery:job-runs:{job}`, 7 ngày) + số liệu gợi ý. `POST …/jobs/:job/run` (superadmin): chạy ngay, không chờ, không chạy chồng. Chạy trên process trả lời request (`APP_ROLE: all`) |
+| Admin theo dõi/chạy job | `jobs/admin-discovery-jobs.controller.ts`, `jobs/job-runs.ts` | `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin): 20 lần chạy gần nhất của `explore`, `suggest`, `recommend_build`, `recommend_purge` (Redis `discovery:job-runs:{job}`, 7 ngày) + số liệu gợi ý. `POST …/jobs/:job/run` (superadmin): chạy ngay, không chờ, không chạy chồng. `PUT …/jobs/explore/interval` (superadmin, TF103): đổi chu kỳ dựng lại chỉ mục (1 phút–24 giờ, `null` về 10 phút), lưu Redis `discovery:job-interval:explore`; job đọc lại mỗi phút nên có hiệu lực không cần khởi động lại. Chạy trên process trả lời request (`APP_ROLE: all`) |
 
 ## Giao tiếp
 

@@ -1,6 +1,7 @@
-import { BadRequestException, Controller, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import { ApiAcceptedResponse, ApiBearerAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiAcceptedResponse, ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@tripflix/auth';
+import { z } from 'zod';
 import { RECOMMEND_STORE, type RecommendStore } from '../recommend/application/ports.js';
 import { BUILD_FEATURES_EVERY_MS, BuildFeaturesJob } from '../recommend/jobs/build-features.job.js';
 import { PURGE_INTERACTIONS_EVERY_MS, PurgeInteractionsJob } from '../recommend/jobs/purge-interactions.job.js';
@@ -11,6 +12,13 @@ import { JOB_KEYS, JOB_OUTCOMES, JobRuns, type JobKey, type JobOutcome, type Job
 
 const GROUPS = ['search', 'recommend'] as const;
 type JobGroup = (typeof GROUPS)[number];
+const MINUTE_MS = 60_000;
+/** Job admin đổi được chu kỳ. Dưới 1 phút vô nghĩa (job đọc chu kỳ mỗi phút) và mỗi lượt dựng lại toàn bộ chỉ mục. */
+const INTERVAL_LIMITS = { min: MINUTE_MS, max: 24 * 60 * MINUTE_MS };
+
+export const SetJobIntervalRequestSchema = z.object({
+  intervalMs: z.number().int().min(INTERVAL_LIMITS.min, 'Ít nhất 1 phút').max(INTERVAL_LIMITS.max, 'Nhiều nhất 24 giờ').nullable(),
+});
 
 class JobSummaryDto {
   @ApiPropertyOptional({ type: Number, description: 'Số mục trong chỉ mục (explore, suggest)' })
@@ -62,8 +70,14 @@ class DiscoveryJobDto {
   @ApiProperty({ enum: GROUPS })
   group!: JobGroup;
 
-  @ApiProperty({ type: Number, nullable: true, description: 'Chu kỳ tự chạy (ms); null = chỉ chạy lúc khởi động' })
+  @ApiProperty({ type: Number, nullable: true, description: 'Chu kỳ tự chạy đang dùng (ms); null = chỉ chạy lúc khởi động' })
   intervalMs!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, description: 'Chu kỳ mặc định trong code (ms); null = chỉ chạy lúc khởi động' })
+  defaultIntervalMs!: number | null;
+
+  @ApiProperty({ type: Boolean, description: 'Admin đổi được chu kỳ (PUT …/jobs/:job/interval)' })
+  canChangeInterval!: boolean;
 
   @ApiProperty({ type: Boolean, description: 'Đang chạy trên process trả lời request này' })
   isRunning!: boolean;
@@ -128,6 +142,22 @@ class DiscoveryJobsDto {
   recommendStats!: RecommendStatsDto | null;
 }
 
+class SetJobIntervalRequestDto {
+  @ApiProperty({ type: Number, nullable: true, minimum: INTERVAL_LIMITS.min, maximum: INTERVAL_LIMITS.max, example: 30 * MINUTE_MS, description: 'Chu kỳ mới (ms), 1 phút đến 24 giờ; null = về mặc định' })
+  intervalMs!: number | null;
+}
+
+class JobIntervalDto {
+  @ApiProperty({ enum: JOB_KEYS })
+  job!: JobKey;
+
+  @ApiProperty({ type: Number, description: 'Chu kỳ đang dùng sau khi đổi (ms)' })
+  intervalMs!: number;
+
+  @ApiProperty({ type: Number })
+  defaultIntervalMs!: number;
+}
+
 class RunJobDto {
   @ApiProperty({ type: Boolean })
   accepted!: boolean;
@@ -146,7 +176,7 @@ interface RunnableJob {
 @ApiBearerAuth()
 @Controller('v1/admin/discovery/jobs')
 export class AdminDiscoveryJobsController {
-  private readonly jobs: Record<JobKey, { group: JobGroup; intervalMs: number | null; instance: RunnableJob }>;
+  private readonly jobs: Record<JobKey, { group: JobGroup; intervalMs: number | null; canChangeInterval: boolean; instance: RunnableJob }>;
 
   constructor(
     @Inject(JobRuns) private readonly runs: JobRuns,
@@ -157,10 +187,10 @@ export class AdminDiscoveryJobsController {
     @Inject(PurgeInteractionsJob) purge: PurgeInteractionsJob,
   ) {
     this.jobs = {
-      explore: { group: 'search', intervalMs: EXPLORE_INDEX_INTERVAL_MS, instance: explore },
-      suggest: { group: 'search', intervalMs: null, instance: suggest },
-      recommend_build: { group: 'recommend', intervalMs: BUILD_FEATURES_EVERY_MS, instance: build },
-      recommend_purge: { group: 'recommend', intervalMs: PURGE_INTERACTIONS_EVERY_MS, instance: purge },
+      explore: { group: 'search', intervalMs: EXPLORE_INDEX_INTERVAL_MS, canChangeInterval: true, instance: explore },
+      suggest: { group: 'search', intervalMs: null, canChangeInterval: false, instance: suggest },
+      recommend_build: { group: 'recommend', intervalMs: BUILD_FEATURES_EVERY_MS, canChangeInterval: false, instance: build },
+      recommend_purge: { group: 'recommend', intervalMs: PURGE_INTERACTIONS_EVERY_MS, canChangeInterval: false, instance: purge },
     };
   }
 
@@ -179,9 +209,12 @@ export class AdminDiscoveryJobsController {
     const [jobs, recommendStats] = await Promise.all([
       Promise.all(
         keys.map(async (job) => {
-          const { intervalMs, instance } = this.jobs[job];
-          const runs = await this.runs.list(job).catch(() => []);
-          return { job, group: group as JobGroup, intervalMs, isRunning: instance.isRunning, runs };
+          const { intervalMs: defaultIntervalMs, canChangeInterval, instance } = this.jobs[job];
+          const [runs, intervalMs] = await Promise.all([
+            this.runs.list(job).catch(() => []),
+            canChangeInterval && defaultIntervalMs !== null ? this.runs.getIntervalMs(job, defaultIntervalMs) : defaultIntervalMs,
+          ]);
+          return { job, group: group as JobGroup, intervalMs, defaultIntervalMs, canChangeInterval, isRunning: instance.isRunning, runs };
         }),
       ),
       group === 'recommend' ? this.recommendStats(now) : Promise.resolve(null),
@@ -203,6 +236,28 @@ export class AdminDiscoveryJobsController {
     // Không chờ: job có thể chạy vài giây; job tự log và tự ghi lỗi vào lịch sử.
     void instance.run('manual');
     return { accepted: true, reason: null };
+  }
+
+  @Put(':job/interval')
+  @Roles('superadmin')
+  @ApiOperation({ summary: 'Đổi chu kỳ tự chạy của job (hiện chỉ explore); có hiệu lực trong vòng 1 phút, không cần khởi động lại' })
+  @ApiParam({ name: 'job', enum: JOB_KEYS })
+  @ApiBody({ type: SetJobIntervalRequestDto })
+  @ApiOkResponse({ type: JobIntervalDto })
+  @ApiBadRequestResponse({ description: 'Chu kỳ ngoài 1 phút–24 giờ, hoặc job này không đổi được chu kỳ' })
+  @ApiNotFoundResponse({ description: 'Không có job này' })
+  async setInterval(@Param('job') job: string, @Body() body: unknown): Promise<JobIntervalDto> {
+    if (!JOB_KEYS.includes(job as JobKey)) throw new NotFoundException('Không có job này');
+    const { intervalMs: defaultIntervalMs, canChangeInterval } = this.jobs[job as JobKey];
+    if (!canChangeInterval || defaultIntervalMs === null) {
+      throw new BadRequestException({ message: 'Job này không đổi được chu kỳ', errors: [{ field: 'job', message: 'Chỉ đổi được: explore' }] });
+    }
+    const parsed = SetJobIntervalRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ message: 'Tham số không hợp lệ', errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) });
+    }
+    await this.runs.setIntervalMs(job as JobKey, parsed.data.intervalMs);
+    return { job: job as JobKey, intervalMs: parsed.data.intervalMs ?? defaultIntervalMs, defaultIntervalMs };
   }
 
   private async recommendStats(now: Date): Promise<RecommendStatsDto> {
