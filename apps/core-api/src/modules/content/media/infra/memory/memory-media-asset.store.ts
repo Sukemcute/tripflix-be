@@ -3,13 +3,17 @@ import { buildEventEnvelope, type NewOutboxEvent } from '@tripflix/outbox';
 import type {
   MediaAssetStatus,
   MediaAssetStore,
+  MediaKindInfo,
   NewUploadingAsset,
   PlaybackAsset,
+  ReadyImageAsset,
   ReadyRendition,
   UploadTarget,
 } from '../../application/ports.js';
+import type { MediaKind } from '../../domain/upload-rules.js';
 
 type StoredAsset = NewUploadingAsset & {
+  kind: MediaKind;
   status: MediaAssetStatus;
   transcodeAttempts: number;
   hlsPrefix?: string;
@@ -32,7 +36,13 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
   };
 
   insertUploadingAsset(asset: NewUploadingAsset): Promise<void> {
-    this.assets.set(asset.id, { ...asset, status: 'uploading', transcodeAttempts: 0, levels: new Set() });
+    this.assets.set(asset.id, {
+      ...asset,
+      kind: asset.kind ?? 'video',
+      status: 'uploading',
+      transcodeAttempts: 0,
+      levels: new Set(),
+    });
     return Promise.resolve();
   }
 
@@ -41,6 +51,8 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
     if (!asset || asset.ownerId !== ownerId) return Promise.resolve(null);
     return Promise.resolve({
       id: asset.id,
+      kind: asset.kind,
+      mimeType: asset.mimeType,
       status: asset.status,
       fileSizeBytes: asset.fileSizeBytes,
       sourceKey: asset.sourceKey,
@@ -98,10 +110,50 @@ export class MemoryMediaAssetStore implements MediaAssetStore {
       readyAssets.map((asset) => ({
         id: asset.id,
         hlsPrefix: asset.hlsPrefix!,
-        durationSec: asset.durationSec,
+        durationSec: asset.durationSec!,
         aspect: asset.aspect!,
         levels: [...asset.levels].sort((a, b) => a - b),
       })),
+    );
+  }
+
+  markImageReady(assetId: string): Promise<boolean> {
+    const asset = this.assets.get(assetId);
+    if (asset?.kind !== 'image' || asset.status !== 'uploading') return Promise.resolve(false);
+    asset.status = 'ready';
+    return Promise.resolve(true);
+  }
+
+  markUploadFailed(assetId: string, reason: string): Promise<void> {
+    const asset = this.assets.get(assetId);
+    if (asset?.status === 'uploading') Object.assign(asset, { status: 'failed', error: reason });
+    return Promise.resolve();
+  }
+
+  findReadyImages(assetIds: string[]): Promise<ReadyImageAsset[]> {
+    return Promise.resolve(
+      assetIds.flatMap((id) => {
+        const asset = this.assets.get(id);
+        if (asset?.kind !== 'image' || asset.status !== 'ready') return [];
+        return [
+          {
+            id: asset.id,
+            ownerId: asset.ownerId,
+            sourceKey: asset.sourceKey,
+            widthPx: asset.widthPx ?? null,
+            heightPx: asset.heightPx ?? null,
+          },
+        ];
+      }),
+    );
+  }
+
+  findKinds(assetIds: string[]): Promise<MediaKindInfo[]> {
+    return Promise.resolve(
+      assetIds.flatMap((id) => {
+        const asset = this.assets.get(id);
+        return asset ? [{ id: asset.id, ownerId: asset.ownerId, kind: asset.kind, status: asset.status }] : [];
+      }),
     );
   }
 }

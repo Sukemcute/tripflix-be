@@ -4,7 +4,9 @@ export type MediaErrorCode =
   | 'MEDIA_UPLOAD_NOT_ACTIVE'
   | 'MEDIA_INVALID_PART_NUMBER'
   | 'MEDIA_UPLOAD_INCOMPLETE'
-  | 'MEDIA_UPLOAD_EXPIRED';
+  | 'MEDIA_UPLOAD_EXPIRED'
+  /** File tải lên không đúng định dạng ảnh đã khai. */
+  | 'MEDIA_INVALID_IMAGE';
 
 /** Lỗi nghiệp vụ của media; tầng api đổi sang mã HTTP. */
 export class MediaError extends Error {

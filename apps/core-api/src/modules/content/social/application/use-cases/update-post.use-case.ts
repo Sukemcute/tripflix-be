@@ -1,7 +1,9 @@
 import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { assertPostMediaAllowed } from '../common/post-media.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
+import type { PostMediaPort } from '../ports/post-media.port.js';
 import type {
   PostRecord,
   PostVisibility,
@@ -24,6 +26,7 @@ export class UpdatePostUseCase {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly outbox?: ContentOutbox,
+    private readonly postMedia?: PostMediaPort,
   ) {}
 
   @Transactional('content')
@@ -58,6 +61,15 @@ export class UpdatePostUseCase {
       updatedAt: record.updatedAt,
       deletedAt: record.deletedAt,
     });
+
+    // Chủ ảnh phải là tác giả bài; người khác sửa thì domainPost.update chặn trước ở dưới.
+    if (command.mediaIds !== undefined && domainPost.isOwnedBy(command.userId)) {
+      await assertPostMediaAllowed(this.postMedia, {
+        postType: record.postType,
+        authorId: record.authorId,
+        mediaIds: command.mediaIds,
+      });
+    }
 
     domainPost.update(command.userId, {
       title: command.title,
