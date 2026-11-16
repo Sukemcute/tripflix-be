@@ -2131,6 +2131,7 @@
               "enum": [
                 "draft",
                 "published",
+                "held",
                 "hidden",
                 "removed",
                 "deleted"
@@ -6593,6 +6594,7 @@
             "enum": [
               "draft",
               "published",
+              "held",
               "hidden",
               "removed",
               "deleted"

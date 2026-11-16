@@ -18,8 +18,9 @@ export const comments = contentSchema.table(
     parentCommentId: uuid('parent_comment_id'),
     replyToName: text('reply_to_name'),
     body: text('body').notNull(),
+    // held: luật nhanh giữ lại lúc đăng, chờ kiểm duyệt (TF90).
     status: varchar('status', { length: 20 })
-      .$type<'visible' | 'hidden' | 'removed'>()
+      .$type<'visible' | 'held' | 'hidden' | 'removed'>()
       .notNull()
       .default('visible'),
     hiddenByActionId: uuid('hidden_by_action_id'),
@@ -31,7 +32,7 @@ export const comments = contentSchema.table(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    check('ck_comments_status', sql`${t.status} IN ('visible', 'hidden', 'removed')`),
+    check('ck_comments_status', sql`${t.status} IN ('visible', 'held', 'hidden', 'removed')`),
     index('idx_comments_post_created').on(t.postId, t.createdAt),
     index('idx_comments_parent').on(t.parentCommentId),
     index('idx_comments_author').on(t.authorId),
