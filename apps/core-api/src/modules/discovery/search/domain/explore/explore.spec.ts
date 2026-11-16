@@ -292,4 +292,37 @@ describe('tìm', () => {
     expect(secs.video).toContain('t1');
     expect(secs.plan).toEqual(expect.arrayContaining(['t1', 'p1']));
   });
+
+  it('bài chưa rõ nơi mà nhắc tới nơi trong câu thì vẫn ra; "hà lội" là Hà Nội', async () => {
+    const videos = [
+      o({ id: 'v1', kind: 'video', title: '', text: 'Hôm nay bay ra hà lội học AI nhe ae' }),
+      o({ id: 'v2', kind: 'video', title: '', text: 'Cà phê trứng ở Hà Nội ngon xỉu' }),
+      o({ id: 'v3', kind: 'video', title: '', text: 'Đà Lạt mùa mưa' }),
+      o({ id: 'v4', kind: 'video', title: 'Phố cổ', place: 'Hội An', text: 'nhớ Hà Nội quá' }),
+    ];
+    const found = async (q: string) => (await searchExplore(src(videos), q)).sections.find((s) => s.kind === 'video');
+    const hanoi = await found('hà nội');
+    // Không rõ nơi + nhắc Hà Nội: ra. Không nhắc: không ra. Đã biết ở nơi khác: vẫn loại như cũ.
+    expect(hanoi!.items.map((i) => i.obj.id).sort()).toEqual(['v1', 'v2']);
+    expect(hanoi!.items[0]!.reason).toContain('Nhắc tới Hà Nội');
+    expect((await searchExplore(src(videos), 'hà lội')).understood.place).toBe('Hà Nội');
+    expect((await found('hà lội'))!.items.map((i) => i.obj.id).sort()).toEqual(['v1', 'v2']);
+    // Bí danh 3 chữ khớp đủ cặp liền nhau: 'Hồ Chí Minh' ra, 'chí minh' lẻ thì không.
+    const sg = [o({ id: 's1', kind: 'video', title: '', text: 'một ngày ở Hồ Chí Minh' }), o({ id: 's2', kind: 'video', title: '', text: 'anh Chí Minh' })];
+    expect((await searchExplore(src(sg), 'sài gòn')).sections.find((s) => s.kind === 'video')!.items.map((i) => i.obj.id)).toEqual(['s1']);
+  });
+
+  it('dữ liệu ít: bài chưa rõ nơi khớp từ chính chỉ vào kết quả thay thế, xếp sau bài gần nơi', async () => {
+    const videos = [
+      o({ id: 'u1', kind: 'video', title: '', text: 'phở ngon xỉu' }),
+      o({ id: 'u2', kind: 'video', title: 'Phở Đà Lạt', place: 'Đà Lạt' }),
+      o({ id: 'u3', kind: 'video', title: '', text: 'Đà Lạt mùa mưa' }),
+    ];
+    const r = await searchExplore(src(videos), 'phở hà nội');
+    expect(r.sections.find((s) => s.kind === 'video')!.total).toBe(0);
+    expect(r.fallback!.items.map((i) => [i.obj.id, i.relaxed])).toEqual([['u1', ['place']]]);
+    expect(r.fallback!.items[0]!.reason).toContain('Chưa rõ nơi');
+    // Câu chỉ có nơi: không kéo bài chưa rõ nơi lên.
+    expect((await searchExplore(src(videos), 'hà nội')).fallback?.items.map((i) => i.obj.id) ?? []).toEqual([]);
+  });
 });

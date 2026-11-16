@@ -117,6 +117,10 @@ interface Row {
   unmatched: string[];
   /** Khớp ít nhất một từ chính, hoặc đúng nơi / đúng ý muốn: đủ liên quan để làm gợi ý thay thế. */
   isRelated: boolean;
+  /** Bài chưa rõ nơi, lọt vào vì nhắc tới nơi trong câu (không chắc là ở đó). */
+  isMention: boolean;
+  /** Bài chưa rõ nơi, không nhắc nơi: chỉ làm kết quả thay thế. */
+  isUnknownPlace: boolean;
   /** Cách hiểu cho ra dòng này (để ghi lý do). */
   u: Understood;
 }
@@ -199,6 +203,12 @@ async function searchVertical(
     return [s, hit];
   };
 
+  // Bí danh nơi thành token của tf: 'hanoi' -> [hanoi], 'ha noi' -> [ha_noi], 'ho chi minh' -> [ho_chi, chi_minh] (tf chỉ có từ đơn + cặp).
+  const placeGroups = (u.place ? LEX.membersOf('place', u.place) : []).map((m) => {
+    const w = m.split(' ');
+    return w.length === 1 ? w : w.slice(1).map((b, i) => `${w[i]}_${b}`);
+  });
+  const placeTerms = [...new Set(placeGroups.flat())];
   const docs = await st.source.candidates({
     vertical: vt.name,
     isAll: isBroad || !qterms.length,
@@ -207,6 +217,7 @@ async function searchVertical(
     tiers: [...qtier],
     days: u.days,
     place: u.place,
+    placeTerms,
     center,
     latSpan: FAR_KM / 111,
   });
@@ -215,13 +226,25 @@ async function searchVertical(
     const relaxed: Relax[] = [];
     let near = 0; // 0 = đúng nơi; > 0 = km tới tâm nơi (gần đó, xếp sau)
     let penalty = 1;
-    if (u.place && o.place !== u.place) {
+    // Chưa rõ nơi (caption không gắn lộ trình) mà có nhắc nơi trong câu: coi như đúng nơi, không loại.
+    const isMention = Boolean(u.place) && o.place == null && placeGroups.some((g) => g.every((t) => Object.hasOwn(doc.tf, t)));
+    let isUnknownPlace = false;
+    if (u.place && o.place !== u.place && !isMention) {
       const d = center ? km(o, center) : null;
-      if (d === null || d > FAR_KM) continue; // không biết ở đâu, hoặc quá xa: không phải "gần đó"
-      near = d;
-      if (d > NEAR_KM) {
+      if (d === null && o.place == null) {
+        // Không biết ở đâu: chỉ cho tầng thay thế, xếp sau bài gần nơi, phạt bằng bài xa nhất còn được nhận.
+        isUnknownPlace = true;
+        near = FAR_KM;
         relaxed.push('place');
-        penalty *= NEAR_KM / d;
+        penalty *= NEAR_KM / FAR_KM;
+      } else if (d === null || d > FAR_KM) {
+        continue; // biết là ở nơi khác (không có toạ độ), hoặc quá xa: không phải "gần đó"
+      } else {
+        near = d;
+        if (d > NEAR_KM) {
+          relaxed.push('place');
+          penalty *= NEAR_KM / d;
+        }
       }
     }
     const price = vt.price(o);
@@ -254,7 +277,7 @@ async function searchVertical(
       const isRelated = missing.length < core.length || isPlace || u.intents.includes(k) || (!core.length && !u.place && !u.intents.length);
       const dist = user && o.lat != null ? km(o, user) : null;
       if (user) near = dist !== null && dist <= NEAR_KM ? 0 : dist || 1e4; // như nơi: gần người dùng xếp trước
-      out.set(k, [...(out.get(k) ?? []), { doc, vertical: vt, s, hit, cov, near, dist, rank: penalty, relaxed, missing, unmatched, isRelated, u }]);
+      out.set(k, [...(out.get(k) ?? []), { doc, vertical: vt, s, hit, cov, near, dist, rank: penalty, relaxed, missing, unmatched, isRelated, isMention, isUnknownPlace, u }]);
     }
   }
   const isScored = qterms.length > 0 || Boolean(u.days);
@@ -323,7 +346,7 @@ function reasonOf(r: Row): string {
   const ws = [...new Set(r.hit.filter((h) => h[0] !== '~').map((h) => h.replace(/_/g, ' ')))].sort((a, b) => b.length - a.length).slice(0, 3);
   if (ws.length) why.push(`Khớp: ${ws.join(', ')}`);
   if (r.hit[0]?.[0] === '~') why.push(`Cùng tầm ${r.hit[0].slice(1)}`);
-  if (u.place) why.push(r.near ? `Gần ${u.place} · ${r.near.toFixed(0)} km` : `Ở ${u.place}`);
+  if (u.place) why.push(r.isMention ? `Nhắc tới ${u.place}` : r.isUnknownPlace ? 'Chưa rõ nơi' : r.near ? `Gần ${u.place} · ${r.near.toFixed(0)} km` : `Ở ${u.place}`);
   if (r.dist !== null) why.push(`Cách bạn ${r.dist.toFixed(1).replace('.', ',')} km`);
   return [...why, ...r.vertical.reason(u, r.doc.obj, r.relaxed.includes('budget'))].join(' · ');
 }
