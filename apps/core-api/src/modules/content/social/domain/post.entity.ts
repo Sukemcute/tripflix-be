@@ -6,7 +6,7 @@ import {
 } from './errors.js';
 
 export type PostType = 'video' | 'vlog';
-export type PostStatus = 'draft' | 'published' | 'hidden' | 'removed' | 'deleted';
+export type PostStatus = 'draft' | 'published' | 'held' | 'hidden' | 'removed' | 'deleted';
 export type PostVisibility = 'public' | 'private';
 
 /** Bài viết kèm tối đa chừng này ảnh (như Instagram). */
@@ -157,7 +157,8 @@ export class Post {
     if (this.props.status === 'deleted' || this.props.status === 'hidden' || this.props.status === 'removed') {
       return false;
     }
-    if (this.props.status === 'draft') {
+    // Bài đang giữ chờ kiểm duyệt: tác giả vẫn thấy để biết trạng thái, người khác như bài không tồn tại.
+    if (this.props.status === 'draft' || this.props.status === 'held') {
       return viewerId === this.props.authorId;
     }
     if (this.props.visibility === 'private') {
