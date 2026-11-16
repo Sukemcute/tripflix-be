@@ -8,7 +8,7 @@ Người đang mở một bài thấy bình luận mới, bình luận sửa/xo�
 ## Đã làm
 - Gateway `/ws`: thêm `post.watch` / `post.unwatch` với body `{ postId }`. Kiểm `postId` là uuid, mỗi socket tối đa 3 phòng `post:<postId>`. Ack `{ ok: true }` hoặc `{ ok: false, code: 'invalid' | 'too_many' }`.
 - `PostCommentSignals`: nghe `content.comment.created/updated/deleted/hidden/restored` (v1). Chỉ khi `postVisibility === 'public'` mới phát `post.comments.changed { postId, commentId, parentCommentId, kind, actorId, changeCount }` vào phòng. Thiếu field thì không phát, nên core chưa deploy cũng không lộ gì.
-- Chỉ tín hiệu, không gửi nội dung bình luận. `actorId` là `null` với hidden/restored để không lộ kiểm duyệt viên.
+- Chỉ tín hiệu, không gửi nội dung bình luận. `actorId` là `null` với hidden/restored và với deleted do super admin xoá, để không lộ người kiểm duyệt (theo góp ý review của anh Thành).
 - Gọi trong consumer trước khi ghi inbox, để tín hiệu không phải chờ các bước ghi database. Phát lỗi hoặc payload hỏng chỉ ghi log, không làm hỏng thông báo.
 - Gom lô: mỗi bài, thay đổi đầu tiên phát ngay; thay đổi tới trong 250 ms sau đó được gom, cuối khoảng phát một lần với thay đổi mới nhất và `changeCount`. Bài ≤ 4 thay đổi/giây vẫn phát ngay từng cái.
 - Đường phát giữ outbox 500 ms như đã thống nhất (phương án c).
