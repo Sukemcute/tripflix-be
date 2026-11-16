@@ -3,6 +3,7 @@
 // MODE=stress: giữ tốc độ gửi 50 → 100 → 200 → 400 → 800 request/giây, mỗi bậc 30 s, tìm điểm vỡ.
 // MODE=spike: 10 request/giây, vọt lên 500 trong 20 s (bài viral), rồi về 10.
 // MODE=soak: 20 request/giây trong SOAK_MINUTES phút (mặc định 30), tìm rò rỉ và tồn đọng outbox.
+// MODE=sweep: 1, 2, 5, 10, 25 người gửi liên tục, mỗi mức 15 s: vẽ đường sức ghi (dừng tăng sớm = ghi bị tuần tự hoá).
 // stress, spike, soak giữ tốc độ gửi cố định (arrival rate): server chậm thì request vẫn tới, không tự giảm tải.
 import http from 'k6/http';
 import { check } from 'k6';
@@ -44,6 +45,14 @@ function buildScenarios() {
   if (MODE === 'soak') {
     return { soak: rateStep('soak', 20, 0, SOAK_MINUTES * 60, 200) };
   }
+  if (MODE === 'sweep') {
+    return Object.fromEntries(
+      [1, 2, 5, 10, 25].map((vus, i) => [
+        `vus${vus}`,
+        { executor: 'constant-vus', vus, duration: '15s', startTime: `${i * 20}s`, exec: 'sendComment', tags: { step: `vus${vus}` } },
+      ]),
+    );
+  }
   return Object.fromEntries(
     [50, 100, 200].map((vus, i) => [
       `vus${vus}`,
@@ -59,6 +68,8 @@ export const options = {
   scenarios,
   thresholds: {
     ...Object.fromEntries(Object.keys(scenarios).map((step) => [`http_req_duration{step:${step}}`, ['p(95)<300']])),
+    // Ngưỡng luôn đạt, chỉ để k6 tách số lượt bị bỏ (k6 không kịp gửi vì hết VU) theo từng bậc.
+    ...Object.fromEntries(Object.keys(scenarios).map((step) => [`dropped_iterations{step:${step}}`, ['count>=0']])),
     'http_req_failed{name:write}': ['rate<0.01'],
   },
 };
@@ -66,7 +77,13 @@ export const options = {
 export function setup() {
   const tokens = loginAll();
   const firstPage = listComments(tokens[0], null, { name: 'setup' }).json('items');
-  return { tokens, parentIds: firstPage.map((comment) => comment.id), startedAt: Date.now() };
+  return {
+    tokens,
+    parentIds: firstPage.map((comment) => comment.id),
+    startedAt: Date.now(),
+    // Thời lượng từng bậc (giây) để summarize.mjs tính số request/giây thật.
+    steps: Object.fromEntries(Object.entries(scenarios).map(([step, scenario]) => [step, parseInt(scenario.duration, 10)])),
+  };
 }
 
 let ownToken = null;
