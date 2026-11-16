@@ -331580,9 +331580,9 @@
   {
    "id": "P-osm-ho-chi-minh-003",
    "name": "The Wind Boutique Hotel",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Vung Tau",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 4,
    "brand": null,
    "style": "biển",
@@ -331724,7 +331724,7 @@
      }
     }
    ],
-   "address": "98 Phan Chu Trinh, P2, Vung Tau",
+   "address": "98 Phan Chu Trinh, P2, Vũng Tàu",
    "lat": 10.336215,
    "lng": 107.08115,
    "ratingAvg": 4.7,
@@ -331733,7 +331733,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "The Wind Boutique Hotel là chỗ nghỉ gần biển tại Vung Tau, TP.HCM. Từ đây đi Niết Bàn Tịnh Xá khoảng 0.8 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "description": "The Wind Boutique Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Niết Bàn Tịnh Xá khoảng 0.8 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
     "highlights": [
      {
       "icon": "family",
@@ -345154,9 +345154,9 @@
   {
    "id": "P-osm-ho-chi-minh-018",
    "name": "Khách sạn Kim Ngân",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 5,
    "brand": null,
    "style": "biển",
@@ -345302,7 +345302,7 @@
      }
     }
    ],
-   "address": "243 Lê Hồng Phong, Long Hải",
+   "address": "243 Lê Hồng Phong, Vũng Tàu",
    "lat": 10.349954,
    "lng": 107.0917,
    "ratingAvg": 4.8,
@@ -345311,7 +345311,7 @@
    "checkInTime": "15:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Khách sạn Kim Ngân là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Đài Liệt sĩ khoảng 0.2 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Khách sạn Kim Ngân là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Đài Liệt sĩ khoảng 0.2 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "spa",
@@ -351172,9 +351172,9 @@
   {
    "id": "P-osm-ho-chi-minh-026",
    "name": "Khách sạn Sen Biển",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
    "style": "biển",
@@ -351306,7 +351306,7 @@
      }
     }
    ],
-   "address": "154 Hạ Long, Long Hải",
+   "address": "154 Hạ Long, Vũng Tàu",
    "lat": 10.34053,
    "lng": 107.07391,
    "ratingAvg": 4.2,
@@ -351315,7 +351315,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Khách sạn Sen Biển là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Chợ Xóm Lưới khoảng 0.3 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "description": "Khách sạn Sen Biển là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Xóm Lưới khoảng 0.3 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
     "highlights": [
      {
       "icon": "food",
@@ -351438,9 +351438,9 @@
   {
    "id": "P-osm-ho-chi-minh-027",
    "name": "Hoai An Hotel",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 2,
    "brand": null,
    "style": "biển",
@@ -351572,7 +351572,7 @@
      }
     }
    ],
-   "address": "B2 A Chau Area, Long Hải",
+   "address": "B2 A Chau Area, Vũng Tàu",
    "lat": 10.336574,
    "lng": 107.083993,
    "ratingAvg": 4.2,
@@ -351581,7 +351581,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Hoai An Hotel là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.9 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "description": "Hoai An Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.9 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
     "highlights": [
      {
       "icon": "food",
@@ -351704,9 +351704,9 @@
   {
    "id": "P-osm-ho-chi-minh-028",
    "name": "Lam Son",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
    "style": "biển",
@@ -351838,7 +351838,7 @@
      }
     }
    ],
-   "address": "7 Lê Ngọc Hân, Ward 1, Long Hải",
+   "address": "7 Lê Ngọc Hân, Ward 1, Vũng Tàu",
    "lat": 10.351724,
    "lng": 107.072084,
    "ratingAvg": 4.6,
@@ -351847,7 +351847,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Lam Son là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Bảo tàng Bà Rịa-Vũng Tàu khoảng 0.3 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "description": "Lam Son là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Bảo tàng Bà Rịa-Vũng Tàu khoảng 0.3 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
     "highlights": [
      {
       "icon": "food",
@@ -351970,9 +351970,9 @@
   {
    "id": "P-osm-ho-chi-minh-029",
    "name": "V Boutique Hotel",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 4,
    "brand": null,
    "style": "biển",
@@ -352118,7 +352118,7 @@
      }
     }
    ],
-   "address": "32 Phan Huy Ích, Long Hải",
+   "address": "32 Phan Huy Ích, Vũng Tàu",
    "lat": 10.337667,
    "lng": 107.082856,
    "ratingAvg": 4.5,
@@ -352127,7 +352127,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "V Boutique Hotel là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Tượng Trần Hưng Đạo khoảng 0.8 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
+    "description": "V Boutique Hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Tượng Trần Hưng Đạo khoảng 0.8 km. Không gian hướng biển đón gió tự nhiên, phù hợp cho kỳ nghỉ thư thái. Từ đây, bạn có thể sắp xếp những chuyến tham quan ngắn trong ngày.",
     "highlights": [
      {
       "icon": "family",
@@ -354597,9 +354597,9 @@
   {
    "id": "P-osm-ho-chi-minh-033",
    "name": "Binh An 2",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
    "style": "biển",
@@ -354794,7 +354794,7 @@
      }
     }
    ],
-   "address": "Long Hải",
+   "address": "Vũng Tàu",
    "lat": 10.336653,
    "lng": 107.08196,
    "ratingAvg": 4.6,
@@ -354803,7 +354803,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Binh An 2 là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Tượng Trần Hưng Đạo khoảng 0.8 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Binh An 2 là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Tượng Trần Hưng Đạo khoảng 0.8 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "food",
@@ -354914,9 +354914,9 @@
   {
    "id": "P-osm-ho-chi-minh-034",
    "name": "Green hotel",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 2,
    "brand": null,
    "style": "biển",
@@ -354992,7 +354992,7 @@
      }
     }
    ],
-   "address": "147C Thùy Vân, Long Hải",
+   "address": "147C Thùy Vân, Vũng Tàu",
    "lat": 10.337459,
    "lng": 107.090925,
    "ratingAvg": 4.2,
@@ -355001,7 +355001,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Green hotel là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Green hotel là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "food",
@@ -357824,8 +357824,8 @@
   {
    "id": "P-osm-ho-chi-minh-038",
    "name": "Motel sân vườn 192",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
    "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
@@ -358644,9 +358644,9 @@
   {
    "id": "P-osm-ho-chi-minh-040",
    "name": "Petro House",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 2,
    "brand": null,
    "style": "biển",
@@ -358720,7 +358720,7 @@
      }
     }
    ],
-   "address": "63 Trần Hưng Đạo, Long Hải",
+   "address": "63 Trần Hưng Đạo, Vũng Tàu",
    "lat": 10.349227,
    "lng": 107.07494,
    "ratingAvg": 4.2,
@@ -358729,7 +358729,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Petro House là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Bảo tàng Vũ khí cổ Robert Taylor khoảng 0.2 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Petro House là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Bảo tàng Vũ khí cổ Robert Taylor khoảng 0.2 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "spa",
@@ -359701,9 +359701,9 @@
   {
    "id": "P-osm-ho-chi-minh-041",
    "name": "Nhà Nghỉ Biển Xanh",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 1,
    "brand": null,
    "style": "homestay",
@@ -359893,7 +359893,7 @@
      }
     }
    ],
-   "address": "604 Nguyễn An Ninh, Long Hải",
+   "address": "604 Nguyễn An Ninh, Vũng Tàu",
    "lat": 10.359385,
    "lng": 107.098083,
    "ratingAvg": 4.2,
@@ -359902,7 +359902,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "11:00",
    "details": {
-    "description": "Nhà Nghỉ Biển Xanh là chỗ nghỉ mang không khí gia đình tại Long Hải, TP.HCM. Từ đây đi Chợ Phường 8 khoảng 0.8 km. Chỗ ở chú trọng sự thoải mái và cảm giác thân thuộc trong từng ngày lưu trú. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Nhà Nghỉ Biển Xanh là chỗ nghỉ mang không khí gia đình tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Phường 8 khoảng 0.8 km. Chỗ ở chú trọng sự thoải mái và cảm giác thân thuộc trong từng ngày lưu trú. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "culture",
@@ -360182,9 +360182,9 @@
   {
    "id": "P-osm-ho-chi-minh-042",
    "name": "Minh Hiền",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
    "style": "biển",
@@ -360375,7 +360375,7 @@
      }
     }
    ],
-   "address": "45 La Văn Cầu, Long Hải",
+   "address": "45 La Văn Cầu, Vũng Tàu",
    "lat": 10.33865,
    "lng": 107.089149,
    "ratingAvg": 4.2,
@@ -360384,7 +360384,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Minh Hiền là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Minh Hiền là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Chợ Đêm Vũng Tàu khoảng 0.3 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "beach",
@@ -371158,9 +371158,9 @@
   {
    "id": "P-osm-ho-chi-minh-059",
    "name": "Palm Villas",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 3,
    "brand": null,
    "style": "biển",
@@ -371355,7 +371355,7 @@
      }
     }
    ],
-   "address": "79 Võ Thị Sáu, Long Hải",
+   "address": "79 Võ Thị Sáu, Vũng Tàu",
    "lat": 10.333308,
    "lng": 107.085483,
    "ratingAvg": 4.3,
@@ -371364,7 +371364,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Palm Villas là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Đồi Con Heo khoảng 0.6 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Palm Villas là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Đồi Con Heo khoảng 0.6 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "food",
@@ -375673,9 +375673,9 @@
   {
    "id": "P-osm-ho-chi-minh-067",
    "name": "Khách sạn Ô Cấp",
-   "provinceSlug": "ho-chi-minh",
-   "provinceName": "TP.HCM",
-   "city": "Long Hải",
+   "provinceSlug": "vung-tau",
+   "provinceName": "Vũng Tàu",
+   "city": "Vũng Tàu",
    "stars": 2,
    "brand": null,
    "style": "biển",
@@ -375750,7 +375750,7 @@
      }
     }
    ],
-   "address": "Hạ Long, Long Hải",
+   "address": "Hạ Long, Vũng Tàu",
    "lat": 10.333107,
    "lng": 107.073082,
    "ratingAvg": 4.1,
@@ -375759,7 +375759,7 @@
    "checkInTime": "14:00",
    "checkOutTime": "12:00",
    "details": {
-    "description": "Khách sạn Ô Cấp là chỗ nghỉ gần biển tại Long Hải, TP.HCM. Từ đây đi Niết Bàn Tịnh Xá khoảng 0.5 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
+    "description": "Khách sạn Ô Cấp là chỗ nghỉ gần biển tại Vũng Tàu, TP.HCM. Từ đây đi Niết Bàn Tịnh Xá khoảng 0.5 km. Phòng nghỉ sáng thoáng và các tiện ích nghỉ dưỡng giúp bạn tận hưởng những ngày bên biển. Đây là điểm khởi đầu thuận tiện để cảm nhận nét riêng của địa phương.",
     "highlights": [
      {
       "icon": "food",
