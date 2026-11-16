@@ -11,7 +11,8 @@ import {
 import { contentSchema } from './content-schema.js';
 
 export type PostType = 'video' | 'vlog';
-export type PostStatus = 'draft' | 'published' | 'hidden' | 'removed' | 'deleted';
+// held: luật nhanh giữ lại lúc đăng, chờ kiểm duyệt; chỉ tác giả và staff thấy (TF90).
+export type PostStatus = 'draft' | 'published' | 'held' | 'hidden' | 'removed' | 'deleted';
 export type PostVisibility = 'public' | 'private';
 
 export interface TripItineraryItem {

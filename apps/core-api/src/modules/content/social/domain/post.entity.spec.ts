@@ -74,6 +74,21 @@ describe('Post Entity Domain Rules', () => {
     expect(deletedPost.canBeViewedBy(authorId, true)).toBe(true); // staff xem được
   });
 
+  it('bài đang giữ chờ kiểm duyệt chỉ tác giả hoặc staff xem được (TF90)', () => {
+    const heldPost = createTestPost({ status: 'held', publishedAt: new Date() });
+    expect(heldPost.canBeViewedBy(authorId)).toBe(true);
+    expect(heldPost.canBeViewedBy(otherUserId)).toBe(false);
+    expect(heldPost.canBeViewedBy(undefined)).toBe(false);
+    expect(heldPost.canBeViewedBy(otherUserId, true)).toBe(true);
+  });
+
+  it('tác giả vẫn sửa được bài đang giữ', () => {
+    const heldPost = createTestPost({ status: 'held' });
+    heldPost.update(authorId, { body: 'Bản sửa' });
+    expect(heldPost.body).toBe('Bản sửa');
+    expect(heldPost.status).toBe('held');
+  });
+
   it('xuất bản bài đăng thành công khi thoả mãn điều kiện', () => {
     const draft = createTestPost();
     draft.publish(authorId, { isVerified: true });

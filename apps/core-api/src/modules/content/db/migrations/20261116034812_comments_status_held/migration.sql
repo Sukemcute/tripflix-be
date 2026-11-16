@@ -1,0 +1,1 @@
+ALTER TABLE "content"."comments" DROP CONSTRAINT "ck_comments_status", ADD CONSTRAINT "ck_comments_status" CHECK ("status" IN ('visible', 'held', 'hidden', 'removed'));

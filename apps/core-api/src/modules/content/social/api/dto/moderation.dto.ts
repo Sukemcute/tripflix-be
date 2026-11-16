@@ -22,7 +22,7 @@ export class AdminPostQueryDto {
   @ApiPropertyOptional({ description: 'Keyset cursor' })
   cursor?: string;
 
-  @ApiPropertyOptional({ enum: ['draft', 'published', 'hidden', 'removed', 'deleted'], description: 'Lọc trạng thái' })
+  @ApiPropertyOptional({ enum: ['draft', 'published', 'held', 'hidden', 'removed', 'deleted'], description: 'Lọc trạng thái' })
   status?: PostStatus;
 
   @ApiPropertyOptional({ description: 'Lọc theo tác giả' })

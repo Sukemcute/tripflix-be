@@ -101,6 +101,37 @@
         ]
       }
     },
+    "/api/auth/login-code": {
+      "post": {
+        "operationId": "AuthController_requestLoginCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginCodeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -1030,16 +1061,6 @@
             "required": false,
             "in": "query",
             "description": "Lọc theo hashtag",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "keyword",
-            "required": false,
-            "in": "query",
-            "deprecated": true,
-            "description": "Đã ngừng dùng: tìm bài qua POST /api/search/posts (discovery). Vẫn nhận để client cũ không lỗi (tìm ILIKE trong tiêu đề và nội dung); sẽ gỡ ở bản sau",
             "schema": {
               "type": "string"
             }
@@ -2100,6 +2121,7 @@
               "enum": [
                 "draft",
                 "published",
+                "held",
                 "hidden",
                 "removed",
                 "deleted"
@@ -5718,6 +5740,44 @@
           "createdAt"
         ]
       },
+      "LoginCodeDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          },
+          "encPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
+          "password": {
+            "type": "string",
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "LoginCodeResultDto": {
+        "type": "object",
+        "properties": {
+          "loginChallengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resendAfterSeconds": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây phải đợi trước khi xin mã lại cho email này"
+          }
+        },
+        "required": [
+          "loginChallengeId",
+          "resendAfterSeconds"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -5736,6 +5796,16 @@
           "deviceName": {
             "type": "string",
             "example": "Pixel 8"
+          },
+          "loginChallengeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID thử thách mã xác thực đăng nhập từ POST /auth/login-code"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$",
+            "description": "Mã xác thực 8 chữ số gửi qua email"
           }
         },
         "required": [
@@ -6514,6 +6584,7 @@
             "enum": [
               "draft",
               "published",
+              "held",
               "hidden",
               "removed",
               "deleted"
