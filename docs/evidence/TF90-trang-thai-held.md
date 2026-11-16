@@ -45,3 +45,8 @@
 ## Ảnh hưởng tới phần của người khác
 - Có: `content/social` (chủ Thành): `post.entity.ts`, `track-share.use-case.ts`, DTO, test; `content/db` (Phong, Thành, Trang): kiểu trạng thái và migration mới. Hướng làm đã được Thành duyệt (kế hoạch `docs/moderation/05-ke-hoach-p1-be07-be08.md` mục 8). Không đổi chữ ký hàm hay endpoint; API chỉ thêm giá trị enum.
 - Integration test đọc `DrizzleFeedStore` của module feed (Phong) nhưng không sửa code feed.
+
+## Kiểm lại sau khi tách nhánh
+- Đã merge develop tại 52d1757: lint/typecheck/unit test đạt 49/49 task; core-api 2467 pass, 4 skip có sẵn.
+- Integration content 76/76 là kết quả trước lần merge này. Docker hiện trả lỗi 500 nên chờ CI chạy lại integration cho HEAD mới.
+- PR #190 của Thành có cùng kiểm tra canBeViewedBy ở track-share; cần phối hợp thứ tự merge và giữ test của cả hai PR.
