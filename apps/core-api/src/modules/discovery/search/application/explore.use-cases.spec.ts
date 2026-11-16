@@ -13,7 +13,10 @@ import { ExploreUseCases, hotelToObject, postToObject } from './explore.use-case
 import type { ExploreCatalog, ExploreHotel, ExplorePost, ExploreStore } from './ports.js';
 import type { JobRuns } from '../../jobs/job-runs.js';
 
-const passThroughRuns = { track: (_job: string, _trigger: string, fn: () => Promise<unknown>) => fn() } as unknown as JobRuns;
+const passThroughRuns = {
+  track: (_job: string, _trigger: string, fn: () => Promise<unknown>) => fn(),
+  getIntervalMs: (_job: string, fallback: number) => Promise.resolve(fallback),
+} as unknown as JobRuns;
 
 const hotel = (id: string, name: string, province: string, extra: Partial<ExploreHotel> = {}): ExploreHotel => ({
   id,
