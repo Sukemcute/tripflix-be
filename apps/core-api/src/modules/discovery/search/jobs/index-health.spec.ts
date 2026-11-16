@@ -91,4 +91,18 @@ describe('IndexHealth', () => {
     expect((await api.read()).workers[0]?.jobs[0]?.status).toBe('overdue');
     worker.onApplicationShutdown();
   });
+
+  it('stuck/overdue theo chu kỳ job đang chạy (admin đổi), không cố định 10 phút', async () => {
+    const { api, worker } = setup();
+    worker.onApplicationBootstrap();
+    worker.start('suggest', now);
+    worker.finish('suggest', now, 'succeeded', 1);
+    worker.start('explore', now, 60 * minute);
+    worker.finish('explore', now, 'succeeded', 42);
+    await vi.advanceTimersByTimeAsync(30 * minute);
+    expect((await api.read()).workers[0]?.jobs[0]?.status).toBe('succeeded'); // chu kỳ cố định 10 phút sẽ báo overdue
+    await vi.advanceTimersByTimeAsync(35 * minute);
+    expect((await api.read()).workers[0]?.jobs[0]?.status).toBe('overdue');
+    worker.onApplicationShutdown();
+  });
 });

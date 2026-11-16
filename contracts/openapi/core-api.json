@@ -4419,6 +4419,64 @@
         ]
       }
     },
+    "/api/v1/admin/discovery/jobs/{job}/interval": {
+      "put": {
+        "operationId": "AdminDiscoveryJobsController_setInterval",
+        "parameters": [
+          {
+            "name": "job",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "explore",
+                "suggest",
+                "recommend_build",
+                "recommend_purge"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetJobIntervalRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobIntervalDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Chu kỳ ngoài 1 phút–24 giờ, hoặc job này không đổi được chu kỳ"
+          },
+          "404": {
+            "description": "Không có job này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đổi chu kỳ tự chạy của job (explore, recommend_build); có hiệu lực trong vòng 1 phút, không cần khởi động lại",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
     "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
@@ -10726,7 +10784,16 @@
           "intervalMs": {
             "type": "number",
             "nullable": true,
-            "description": "Chu kỳ tự chạy (ms); null = chỉ chạy lúc khởi động"
+            "description": "Chu kỳ tự chạy đang dùng (ms); null = chỉ chạy lúc khởi động"
+          },
+          "defaultIntervalMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chu kỳ mặc định trong code (ms); null = chỉ chạy lúc khởi động"
+          },
+          "canChangeInterval": {
+            "type": "boolean",
+            "description": "Admin đổi được chu kỳ (PUT …/jobs/:job/interval)"
           },
           "isRunning": {
             "type": "boolean",
@@ -10744,6 +10811,8 @@
           "job",
           "group",
           "intervalMs",
+          "defaultIntervalMs",
+          "canChangeInterval",
           "isRunning",
           "runs"
         ]
@@ -10879,6 +10948,48 @@
         "required": [
           "accepted",
           "reason"
+        ]
+      },
+      "SetJobIntervalRequestDto": {
+        "type": "object",
+        "properties": {
+          "intervalMs": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 60000,
+            "maximum": 86400000,
+            "example": 1800000,
+            "description": "Chu kỳ mới (ms), 1 phút đến 24 giờ; null = về mặc định"
+          }
+        },
+        "required": [
+          "intervalMs"
+        ]
+      },
+      "JobIntervalDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest",
+              "recommend_build",
+              "recommend_purge"
+            ]
+          },
+          "intervalMs": {
+            "type": "number",
+            "description": "Chu kỳ đang dùng sau khi đổi (ms)"
+          },
+          "defaultIntervalMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "job",
+          "intervalMs",
+          "defaultIntervalMs"
         ]
       },
       "ProvinceDto": {
