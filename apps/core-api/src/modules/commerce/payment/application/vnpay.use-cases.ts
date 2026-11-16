@@ -93,6 +93,21 @@ export class VnpayUseCases {
     return { RspCode: '00', Message: 'Confirm Success' };
   }
 
+  /**
+   * Khách quay lại app khi lần trả VNPay chưa có kết quả: coi như huỷ lần đó để đơn về pending, trả lại hoặc huỷ giỏ được.
+   * Chỉ đụng khoản VNPay còn initiated; đã thành công hay đã có kết quả thì giữ nguyên. Nếu VNPay vẫn báo thành công về sau,
+   * TX2 ghi nhận tiền về muộn và tự tạo khoản hoàn (late_success).
+   */
+  async cancelPendingPayment(userId: string, orderId: string): Promise<{ orderId: string; status: string }> {
+    const order = await this.orders.findOrder(orderId);
+    if (!order || order.userId !== userId) throw new CommerceError('not_found', 'Không có đơn này.');
+    if (order.status !== 'paying') return { orderId, status: order.status };
+    const live = (await this.orders.findPaymentsOfOrder(orderId)).find((p) => p.gateway === VNPAY_GATEWAY && p.status === 'initiated');
+    if (live) await this.payment.applyResult(live.gatewayKey, { status: 'failed', code: 'vnpay_cancelled' });
+    const latest = await this.orders.findOrder(orderId);
+    return { orderId, status: latest?.status ?? order.status };
+  }
+
   /** Return URL: trình duyệt quay về sau khi trả. Kiểm chữ ký và ghi kết quả như IPN (an toàn khi IPN đã ghi trước). */
   async handleReturn(params: Record<string, string>): Promise<{ orderId: string | null; isValidSignature: boolean; isSuccess: boolean }> {
     const config = this.requireConfig();

@@ -856,6 +856,33 @@ describe('Social Application Use Cases', () => {
     );
   });
 
+  describe('TrackShareUseCase chặn bài không xem được', () => {
+    it.each([
+      ['bị ẩn', { status: 'hidden' as const }],
+      ['bị gỡ', { status: 'removed' as const }],
+      ['riêng tư của người khác', { status: 'published' as const, visibility: 'private' as const }],
+      ['bản nháp của người khác', { status: 'draft' as const }],
+    ])('bài %s: báo không tìm thấy, không tăng shareCount, không ghi outbox', async (_label, overrides) => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord(overrides));
+      const outbox = { add: vi.fn() };
+
+      const useCase = new TrackShareUseCase(mockPostRepo, outbox, new PostShareLinks('https://tripflix.io.vn'));
+
+      await expect(useCase.execute({ postId, userId: otherUserId })).rejects.toThrow(PostNotFoundException);
+      expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
+      expect(outbox.add).not.toHaveBeenCalled();
+    });
+
+    it('khách chưa đăng nhập vẫn ghi nhận chia sẻ bài công khai', async () => {
+      const post = samplePostRecord({ status: 'published', shareCount: 2 });
+      mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, shareCount: 3 });
+
+      const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox, new PostShareLinks('https://tripflix.io.vn'));
+
+      await expect(useCase.execute({ postId })).resolves.toMatchObject({ shareCount: 3 });
+    });
+  });
+
   describe('AdminModeratePostUseCase', () => {
     it('ẩn bài đăng, lưu nhật ký kiểm duyệt và ghi sự kiện outbox content.post.moderated', async () => {
       const post = samplePostRecord({ status: 'published' });

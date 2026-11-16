@@ -32,6 +32,11 @@ class VnpayReturnResultDto {
   @ApiProperty() isSuccess!: boolean;
 }
 
+class CancelVnpayResultDto {
+  @ApiProperty({ format: 'uuid' }) orderId!: string;
+  @ApiProperty({ enum: ['pending', 'paying', 'paid', 'cancelled', 'expired'], description: 'pending: đã huỷ lần trả, trả lại hoặc huỷ giỏ được' }) status!: string;
+}
+
 /** Bắt đầu thanh toán VNPay cho một đơn đang giữ chỗ. Cần đăng nhập và Idempotency-Key. */
 @ApiTags('checkout')
 @ApiBearerAuth()
@@ -50,6 +55,16 @@ export class VnpayCheckoutController {
   @ApiOkResponse({ type: StartVnpayResultDto })
   start(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodQuery(StartVnpayRequestSchema)) body: z.infer<typeof StartVnpayRequestSchema>, @Req() req: Request) {
     return this.vnpay.startPayment(user.userId, id, { ...body, clientIp: req.ip ?? '127.0.0.1' });
+  }
+
+  /** Khách quay lại khi lần trả VNPay chưa có kết quả: huỷ lần đó, đơn về pending. Gọi lại nhiều lần vẫn ra cùng kết quả. */
+  @Post(':id/vnpay-cancel')
+  @Idempotent()
+  @ApiHeader(IDEMPOTENCY_KEY_HEADER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: CancelVnpayResultDto })
+  cancel(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.vnpay.cancelPendingPayment(user.userId, id);
   }
 }
 

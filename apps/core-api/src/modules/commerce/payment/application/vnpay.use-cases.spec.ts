@@ -132,3 +132,47 @@ describe('VnpayUseCases: callback metadata và thông điệp thất bại', () 
     expect(paymentUseCases.applyResult).not.toHaveBeenCalled();
   });
 });
+
+describe('VnpayUseCases: khách quay lại khi lần trả VNPay chưa có kết quả', () => {
+  type Order = Awaited<ReturnType<OrderStore['findOrder']>>;
+  function setupCancel(order: { userId: string; status: string }, payments: Partial<PaymentRecord>[]) {
+    const state = { ...order };
+    const store = {
+      findOrder: vi.fn<OrderStore['findOrder']>().mockImplementation(async () => ({ id: 'order-1', ...state }) as Order),
+      findPaymentsOfOrder: vi.fn<OrderStore['findPaymentsOfOrder']>().mockResolvedValue(payments as PaymentRecord[]),
+    };
+    const payment = {
+      applyResult: vi.fn<PaymentUseCases['applyResult']>().mockImplementation(async () => {
+        state.status = 'pending';
+        return { kind: 'failed', code: 'vnpay_cancelled' };
+      }),
+    };
+    const useCases = new VnpayUseCases(config, store as unknown as OrderStore, payment as unknown as PaymentUseCases);
+    return { useCases, payment };
+  }
+  const live = { gateway: VNPAY_GATEWAY, status: 'initiated' as const, gatewayKey: 'TXN01' };
+
+  it('huỷ lần VNPay đang chờ và trả đơn về pending', async () => {
+    const { useCases, payment } = setupCancel({ userId: 'user-1', status: 'paying' }, [{ ...live, status: 'failed', gatewayKey: 'OLD' }, live]);
+    await expect(useCases.cancelPendingPayment('user-1', 'order-1')).resolves.toEqual({ orderId: 'order-1', status: 'pending' });
+    expect(payment.applyResult).toHaveBeenCalledExactlyOnceWith('TXN01', { status: 'failed', code: 'vnpay_cancelled' });
+  });
+
+  it.each(['paid', 'pending', 'expired'])('đơn %s thì không đụng gì', async (status) => {
+    const { useCases, payment } = setupCancel({ userId: 'user-1', status }, [live]);
+    await expect(useCases.cancelPendingPayment('user-1', 'order-1')).resolves.toEqual({ orderId: 'order-1', status });
+    expect(payment.applyResult).not.toHaveBeenCalled();
+  });
+
+  it('không huỷ lần trả bằng thẻ đang chờ OTP', async () => {
+    const { useCases, payment } = setupCancel({ userId: 'user-1', status: 'paying' }, [{ gateway: 'mock', status: 'requires_action', gatewayKey: 'CARD' }]);
+    await expect(useCases.cancelPendingPayment('user-1', 'order-1')).resolves.toEqual({ orderId: 'order-1', status: 'paying' });
+    expect(payment.applyResult).not.toHaveBeenCalled();
+  });
+
+  it('đơn của người khác thì 404', async () => {
+    const { useCases, payment } = setupCancel({ userId: 'user-2', status: 'paying' }, [live]);
+    await expect(useCases.cancelPendingPayment('user-1', 'order-1')).rejects.toMatchObject({ code: 'not_found' });
+    expect(payment.applyResult).not.toHaveBeenCalled();
+  });
+});

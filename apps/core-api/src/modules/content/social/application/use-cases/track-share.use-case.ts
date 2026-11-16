@@ -28,7 +28,7 @@ export class TrackShareUseCase {
     if (!post || post.status === 'deleted') {
       throw new PostNotFoundException(command.postId);
     }
-    // Bài đang giữ, bị ẩn hay gỡ thì không cho chia sẻ, giống thả tim và lưu bài (TF90).
+    // Không xem được bài (held, ẩn, gỡ, riêng tư hoặc nháp của người khác) thì không tăng lượt chia sẻ.
     const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
     if (!domainPost.canBeViewedBy(command.userId)) {
       throw new PostNotFoundException(command.postId);
