@@ -248,7 +248,7 @@ Gọi thử `/moderate` có token: trường `model` có `+visobert-vihsd@` và 
 
 ### Trợ lý Tripi (`POST /ai/chat`)
 
-App gọi `https://<API_HOST>/ai/chat`. Gateway chỉ nhận đúng `POST` vào đường này, bỏ tiền tố `/ai` rồi chuyển tới `ai-service:8000/chat` (`traefik/server.yml`, router `ai-chat`), chung giới hạn tốc độ với `/api`. ai-service chỉ nhận token người dùng, kiểm bằng JWKS của core-api rồi hỏi `/api/auth/me` để chặn phiên đã thu hồi. Cần `AI_TAG` từ `sha-164c7db` trở lên.
+App gọi `https://<API_HOST>/ai/chat`. Gateway chỉ nhận đúng `POST` vào đường này, bỏ tiền tố `/ai` rồi chuyển tới `ai-service:8000/chat` (`traefik/server.yml`, router `ai-chat`, hạn mức `rate-limit-chat`). Web gọi khác origin nên trình duyệt gửi `OPTIONS /ai/chat` trước: router `ai-chat-preflight` chuyển preflight tới CORSMiddleware của ai-service (hạn mức `rate-limit-api`), ai-service nhận origin trong `CORS_ORIGINS` (lấy từ `AUTH_WEB_ORIGINS`). ai-service chỉ nhận token người dùng, kiểm bằng JWKS của core-api rồi hỏi `/api/auth/me` để chặn phiên đã thu hồi. Cần `AI_TAG` từ `sha-164c7db` trở lên.
 
 `CHAT_LLM_ENABLED=false` (mặc định): Tripi chỉ tìm bài, chỗ ở, chuyến bay bằng API của core, không gọi DeepSeek. Đặt `true` thì mỗi câu chat gọi DeepSeek một lần để hiểu câu hỏi, dùng `DEEPSEEK_API_KEY` sẵn có của phần tóm tắt.
 
@@ -266,6 +266,12 @@ dc --profile gateway up -d --wait traefik
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.tripflix.io.vn/ai/chat
+```
+
+Preflight của web: `200` và có `access-control-allow-origin: https://tripflix.io.vn` là đạt. `404` là gateway chưa có router `ai-chat-preflight`; `400` là ai-service chưa nhận `CORS_ORIGINS` (chạy lại `ai-service`).
+
+```bash
+curl -si -X OPTIONS https://api.tripflix.io.vn/ai/chat -H 'Origin: https://tripflix.io.vn' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: authorization,content-type' | grep -iE '^HTTP|access-control-allow-origin'
 ```
 
 3. Chạy app với `EXPO_PUBLIC_AI_URL=https://api.tripflix.io.vn/ai`. Tắt trợ lý khẩn cấp: xoá router `ai-chat` trong `traefik/server.yml` rồi chạy lại gateway; chỉ tắt DeepSeek: đặt `CHAT_LLM_ENABLED=false` rồi chạy lại `ai-service`.

@@ -170,6 +170,8 @@ services:
     logging: *logging
     environment:
       CORE_API_URL: http://core-api:3000
+      # Web gọi /ai/chat từ trình duyệt; thiếu biến này ai-service chỉ nhận localhost và chặn preflight của web.
+      CORS_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
