@@ -1,6 +1,6 @@
 # video-worker (Go)
 
-Bản Go của `apps/video-worker`, viết lại theo yêu cầu của mentor. Hai bản chạy song song cho tới khi đo xong và chốt chuyển; bản TypeScript vẫn là bản đang chạy.
+Bản Go của `apps/video-worker`, viết lại theo yêu cầu của mentor. Staging chạy bản Go; bản TypeScript chỉ còn trong compose dev local. Hai bản chung consumer group `video-worker` nên không chạy cùng lúc trên một Redis.
 
 Worker chuyển mã video sang HLS: nhận `content.media.transcode_requested` từ `stream:media` (group `video-worker`), ghi file vào `videos/{assetId}/r{revision}/` trên S3, rồi báo `media.rendition.completed` cho từng mức, hoặc `media.transcode.failed` khi lỗi quá 3 lần.
 
