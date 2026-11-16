@@ -172,6 +172,8 @@ describe('Social Application Use Cases', () => {
   });
 
   describe('ListBookmarksUseCase', () => {
+    type ReactionRepositoryArg = ConstructorParameters<typeof ListBookmarksUseCase>[3];
+
     it('truyền bộ lọc postType xuống repository để lọc ngay trong câu truy vấn', async () => {
       mockBookmarkRepo.findUserBookmarks.mockResolvedValue([]);
       mockPostRepo.findByIds.mockResolvedValue([]);
@@ -180,6 +182,38 @@ describe('Social Application Use Cases', () => {
       expect(mockBookmarkRepo.findUserBookmarks).toHaveBeenCalledWith(
         expect.objectContaining({ userId: authorId, postType: 'vlog' }),
       );
+    });
+
+    it('gắn viewerContext cho từng bài để tab Đã lưu hiện đúng tim và nút lưu sau khi tải lại', async () => {
+      const liked = samplePostRecord({ id: 'liked', status: 'published' });
+      const notLiked = samplePostRecord({ id: 'not-liked', status: 'published' });
+      mockBookmarkRepo.findUserBookmarks.mockResolvedValue([
+        { id: 'b1', postId: 'liked', userId: authorId, createdAt: new Date() },
+        { id: 'b2', postId: 'not-liked', userId: authorId, createdAt: new Date() },
+      ]);
+      mockPostRepo.findByIds.mockResolvedValue([liked, notLiked]);
+      const reactionRepo = { findByPostsAndUser: vi.fn().mockResolvedValue(new Map([['liked', 'like']])) };
+      const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo, undefined, reactionRepo as unknown as ReactionRepositoryArg);
+
+      const result = await useCase.execute({ userId: authorId });
+
+      expect(reactionRepo.findByPostsAndUser).toHaveBeenCalledWith(['liked', 'not-liked'], authorId);
+      expect(result.items.map((item) => item.viewerContext)).toEqual([
+        { myReaction: 'like', isBookmarked: true },
+        { myReaction: null, isBookmarked: true },
+      ]);
+    });
+
+    it('không có bài nào hợp lệ thì không tra cảm xúc', async () => {
+      mockBookmarkRepo.findUserBookmarks.mockResolvedValue([]);
+      mockPostRepo.findByIds.mockResolvedValue([]);
+      const reactionRepo = { findByPostsAndUser: vi.fn() };
+      const useCase = new ListBookmarksUseCase(mockBookmarkRepo, mockPostRepo, undefined, reactionRepo as unknown as ReactionRepositoryArg);
+
+      const result = await useCase.execute({ userId: authorId });
+
+      expect(result.items).toEqual([]);
+      expect(reactionRepo.findByPostsAndUser).not.toHaveBeenCalled();
     });
   });
 
@@ -840,6 +874,21 @@ describe('Social Application Use Cases', () => {
         }),
       );
     });
+
+    it.each(['held', 'hidden', 'removed', 'draft'] as const)(
+      'không cho chia sẻ bài %s của người khác, không tăng shareCount, không ghi outbox (TF90)',
+      async (status) => {
+        mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status, shareCount: 10 }));
+        const outbox = { add: vi.fn() };
+        const useCase = new TrackShareUseCase(mockPostRepo, outbox, new PostShareLinks('https://tripflix.io.vn'));
+
+        // Người đã đăng nhập khác tác giả và khách chưa đăng nhập đều không chia sẻ được.
+        await expect(useCase.execute({ postId, userId: otherUserId })).rejects.toBeInstanceOf(PostNotFoundException);
+        await expect(useCase.execute({ postId })).rejects.toBeInstanceOf(PostNotFoundException);
+        expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
+        expect(outbox.add).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('TrackShareUseCase chặn bài không xem được', () => {
