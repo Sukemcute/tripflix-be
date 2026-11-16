@@ -1,6 +1,6 @@
 # Gateway trên server: chỉ đi HTTPS, chỉ nhận đúng API_HOST. Máy dev dùng dynamic.yml.
 # Thêm service nào thì thêm router của service đó khi nó đã chạy.
-# AI chỉ mở đúng POST /ai/chat cho trợ lý Tripi (TF31); /moderate và /health vẫn chỉ trong mạng nội bộ.
+# AI chỉ mở đúng POST /ai/chat (và preflight OPTIONS của nó) cho trợ lý Tripi (TF31); /moderate và /health vẫn chỉ trong mạng nội bộ.
 http:
   middlewares:
     # Cùng mức với dynamic.yml, xem README.md.
@@ -58,6 +58,15 @@ http:
       service: ai-service
       entryPoints: [websecure]
       middlewares: [rate-limit-chat, strip-ai-prefix]
+      tls:
+        certResolver: letsencrypt
+    # Web gọi /ai/chat khác origin nên trình duyệt hỏi OPTIONS trước; CORSMiddleware của ai-service trả lời.
+    # Không dùng rate-limit-chat để preflight không ăn mất nửa hạn mức chat.
+    ai-chat-preflight:
+      rule: Host(`{{ env "API_HOST" }}`) && Method(`OPTIONS`) && Path(`/ai/chat`)
+      service: ai-service
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api, strip-ai-prefix]
       tls:
         certResolver: letsencrypt
 
