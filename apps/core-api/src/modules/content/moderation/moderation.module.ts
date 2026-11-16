@@ -1,3 +1,6 @@
+import { PostShareLinks } from '../social/application/post-share-links.js';
+import { CONTENT_GATE_PORT } from '../social/application/ports/content-gate.port.js';
+import { RulesContentGate } from './application/content-gate.js';
 import { Module } from '@nestjs/common';
 import { buildTransactionHostToken, createDb, type ModuleTransactionHost } from '@tripflix/db';
 import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
@@ -39,7 +42,9 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     }),
   ],
   controllers: [ReportsController, AdminModerationController],
+  exports: [CONTENT_GATE_PORT],
   providers: [
+    { provide: CONTENT_GATE_PORT, useClass: RulesContentGate },
     {
       provide: ModerationRepository,
       inject: [buildTransactionHostToken('content')],
@@ -85,9 +90,9 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     },
     {
       provide: AdminModeratePostUseCase,
-      inject: [PostRepository, ModerationActionRepository, OUTBOX],
-      useFactory: (posts: PostRepository, actions: ModerationActionRepository, outbox: ContentOutbox) =>
-        new AdminModeratePostUseCase(posts, actions, outbox),
+      inject: [PostRepository, ModerationActionRepository, OUTBOX, CORE_ENV],
+      useFactory: (posts: PostRepository, actions: ModerationActionRepository, outbox: ContentOutbox, env: CoreEnv) =>
+        new AdminModeratePostUseCase(posts, actions, outbox, new PostShareLinks(env.WEB_APP_URL)),
     },
     {
       provide: ChangeVisibilityUseCase,

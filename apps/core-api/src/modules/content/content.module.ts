@@ -1,3 +1,4 @@
+import { CONTENT_GATE_PORT, type ContentGatePort } from './social/application/ports/content-gate.port.js';
 import { Module } from '@nestjs/common';
 import type { EventEnvelope } from '@tripflix/contracts';
 import { buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
@@ -214,20 +215,20 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: UpdatePostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX, POST_MEDIA_PORT],
-      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, postMedia: PostMediaPort) =>
-        new UpdatePostUseCase(postRepo, outbox, postMedia),
+      inject: [PostRepository, CONTENT_OUTBOX, POST_MEDIA_PORT, CONTENT_GATE_PORT],
+      useFactory: (postRepo: PostRepository, outbox: ContentOutbox, postMedia: PostMediaPort, gate: ContentGatePort) =>
+        new UpdatePostUseCase(postRepo, outbox, postMedia, gate),
     },
     {
       provide: PublishPostUseCase,
-      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT, PostShareLinks, POST_MEDIA_PORT],
+      inject: [PostRepository, CONTENT_OUTBOX, COMMERCE_SERVICE_PORT, PostShareLinks, POST_MEDIA_PORT, CONTENT_GATE_PORT],
       useFactory: (
         postRepo: PostRepository,
         outbox: ContentOutbox,
         commerceService: CommerceServicePort,
         shareLinks: PostShareLinks,
-        postMedia: PostMediaPort,
-      ) => new PublishPostUseCase(postRepo, outbox, commerceService, shareLinks, postMedia),
+        postMedia: PostMediaPort, gate: ContentGatePort,
+      ) => new PublishPostUseCase(postRepo, outbox, commerceService, shareLinks, postMedia, gate),
     },
     {
       provide: DeletePostUseCase,
@@ -275,16 +276,16 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: AddCommentUseCase,
-      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX, USER_DIRECTORY_PORT],
+      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX, USER_DIRECTORY_PORT, CONTENT_GATE_PORT],
       useFactory: (
-        postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox, userDirectory: UserDirectoryPort,
-      ) => new AddCommentUseCase(postRepo, commentRepo, outbox, userDirectory),
+        postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox, userDirectory: UserDirectoryPort, gate: ContentGatePort,
+      ) => new AddCommentUseCase(postRepo, commentRepo, outbox, userDirectory, gate),
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository, CONTENT_OUTBOX, PostRepository],
-      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox, postRepo: PostRepository) =>
-        new EditCommentUseCase(commentRepo, outbox, postRepo),
+      inject: [CommentRepository, CONTENT_OUTBOX, PostRepository, CONTENT_GATE_PORT],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox, postRepo: PostRepository, gate: ContentGatePort) =>
+        new EditCommentUseCase(commentRepo, outbox, postRepo, gate),
     },
     {
       provide: DeleteCommentUseCase,

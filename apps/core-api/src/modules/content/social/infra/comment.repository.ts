@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '@tripflix/db';
@@ -14,11 +15,15 @@ export interface FindCommentsOptions {
   cursorId?: string;
   parentCommentId?: string;
   flat?: boolean;
+  viewerId?: string;
+  isStaff?: boolean;
 }
 
 export interface CountCommentsOptions {
   flat?: boolean;
   parentCommentId?: string;
+  viewerId?: string;
+  isStaff?: boolean;
 }
 
 export class CommentRepository {
@@ -162,11 +167,29 @@ export class CommentRepository {
    * Nếu options.flat = true: trả về mọi cấp bình luận (cả gốc và phản hồi),
    * mỗi phần tử có sẵn parentCommentId phục vụ AI tóm tắt hoặc xây dựng cây bình luận.
    */
+  private readableStatus(viewerId?: string, isStaff = false) {
+    return or(eq(comments.status, 'visible'), and(eq(comments.status, 'held'),
+      isStaff ? sql`true` : viewerId ? eq(comments.authorId, viewerId) : sql`false`))!;
+  }
+
+  async holdWithVisibleReplies(id: string, isRoot: boolean): Promise<number> {
+    const marker = randomUUID();
+    const rows = await this.db.update(comments).set({
+      status: 'held', hiddenByActionId: marker, updatedAt: new Date(),
+    }).where(and(
+      isRoot ? or(eq(comments.id, id), eq(comments.parentCommentId, id)) : eq(comments.id, id),
+      eq(comments.status, 'visible'), isNull(comments.deletedAt),
+    )).returning({ id: comments.id });
+    if (isRoot) await this.db.update(comments).set({ cascadeRootCommentId: id })
+      .where(and(eq(comments.parentCommentId, id), eq(comments.hiddenByActionId, marker)));
+    return rows.length;
+  }
+
   async findByPostId(options: FindCommentsOptions): Promise<CommentRecord[]> {
     const conditions = [
       eq(comments.postId, options.postId),
       isNull(comments.deletedAt),
-      eq(comments.status, 'visible'),
+      this.readableStatus(options.viewerId, options.isStaff),
     ];
 
     if (!options.flat) {
@@ -221,7 +244,7 @@ export class CommentRepository {
     const conditions = [
       eq(comments.postId, postId),
       isNull(comments.deletedAt),
-      eq(comments.status, 'visible'),
+      this.readableStatus(options?.viewerId, options?.isStaff),
     ];
 
     if (!options?.flat) {

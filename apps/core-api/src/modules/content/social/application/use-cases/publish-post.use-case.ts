@@ -1,3 +1,6 @@
+import type { PostRecord } from '../../../db/schema/index.js';
+import type { ContentGatePort } from '../ports/content-gate.port.js';
+import { assertPrecheckedPost, postGateText } from '../common/content-precheck.js';
 import { Transactional } from '@tripflix/db';
 import { InvalidPostStatusTransitionException, Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
@@ -14,9 +17,9 @@ export interface PublishPostCommand {
 
 export interface PublishPostResult {
   id: string;
-  status: 'published';
+  status: 'published' | 'held';
   isVerified: boolean;
-  publishedAt: Date;
+  publishedAt: Date | null;
   shareUrl: string;
 }
 
@@ -27,6 +30,7 @@ export class PublishPostUseCase {
     private readonly commerceService?: CommerceServicePort,
     private readonly shareLinks: PostShareLinks = new PostShareLinks(),
     private readonly postMedia?: PostMediaPort,
+    private readonly gate?: ContentGatePort,
   ) {}
 
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
@@ -49,14 +53,16 @@ export class PublishPostUseCase {
       isVerified = await this.commerceService.verifyCompletedBooking(bookingId, command.userId);
     }
 
-    return this.publishInTransaction(record, command.userId, isVerified);
+    const shouldHold = this.gate?.precheck(postGateText(record)).shouldHold ?? false;
+    return this.publishInTransaction(record, command.userId, isVerified, shouldHold);
   }
 
   @Transactional('content')
   protected async publishInTransaction(
-    record: any,
+    record: PostRecord,
     userId: string,
     isVerified: boolean,
+    shouldHold: boolean,
   ): Promise<PublishPostResult> {
     const current = this.postRepository.findByIdForUpdate
       ? await this.postRepository.findByIdForUpdate(record.id)
@@ -65,6 +71,7 @@ export class PublishPostUseCase {
     if (current.status !== 'draft') {
       throw new InvalidPostStatusTransitionException(current.status, 'published');
     }
+    assertPrecheckedPost(current, record);
 
     const domainPost = new Post({
       id: record.id,
@@ -92,10 +99,11 @@ export class PublishPostUseCase {
 
     domainPost.publish(userId, { isVerified });
 
-    const publishedAt = domainPost.publishedAt ?? new Date();
+    const publishedAt = shouldHold ? null : domainPost.publishedAt ?? new Date();
+    const status = shouldHold ? 'held' : 'published';
 
     await this.postRepository.update(record.id, {
-      status: 'published',
+      status,
       isVerified: domainPost.isVerified,
       publishedAt,
     });
@@ -104,7 +112,7 @@ export class PublishPostUseCase {
 
     // Ghi sự kiện vào content.outbox_events trong cùng transaction DB
     await this.outbox.add({
-      type: 'content.post.published',
+      type: shouldHold ? 'content.post.held' : 'content.post.published',
       userId,
       payload: {
         postId: record.id,
@@ -112,14 +120,14 @@ export class PublishPostUseCase {
         postType: domainPost.postType,
         title: domainPost.title,
         isVerified: domainPost.isVerified,
-        publishedAt: publishedAt.toISOString(),
+        publishedAt: publishedAt?.toISOString() ?? null,
         shareUrl,
       },
     });
 
     return {
       id: record.id,
-      status: 'published',
+      status,
       isVerified: domainPost.isVerified,
       publishedAt,
       shareUrl,
