@@ -46,7 +46,10 @@ export function createCommentHandlers(options: {
         recipients.set(replyRecipient, true);
       }
       recipients.delete(comment.authorId);
-      const threadRows = await options.comments.notifyThread?.({
+      // N2 chỉ chạy cho bài public: bài private chỉ tác giả xem được, báo người khác vừa lộ hoạt động vừa dẫn tới 404.
+      // Thiếu postVisibility (core chưa ghi) cũng bỏ qua cho chắc.
+      const isPublicPost = comment.postVisibility === 'public';
+      const threadRows = isPublicPost ? await options.comments.notifyThread?.({
         commentId: comment.commentId,
         postId: comment.postId,
         authorId: comment.authorId,
@@ -56,7 +59,7 @@ export function createCommentHandlers(options: {
         excludedUserIds: [...recipients.keys()],
         eventId: event.eventId,
         occurredAt: event.occurredAt,
-      });
+      }) : undefined;
       await Promise.all(
         (threadRows ?? []).map(({ row, isNew }) => isNew
           ? emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })
