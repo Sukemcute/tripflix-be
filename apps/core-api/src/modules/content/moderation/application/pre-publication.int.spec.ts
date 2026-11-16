@@ -186,7 +186,8 @@ describe('TF91 giữ trước khi public trên Postgres thật', () => {
     expect(JSON.stringify(queued)).toContain(c.id);
     expect((await cases.comments.findById(c.id))?.status).toBe('held');
     await decide('comment', c.id);
-    await worker.execute(randomUUID(), 'comment', c.id);
+    await worker.execute(eventId, 'comment', c.id);
+    expect((await cases.repository.scan(eventId))?.status).toBe('superseded');
     expect((await cases.comments.findById(c.id))?.status).toBe('visible');
   });
 
