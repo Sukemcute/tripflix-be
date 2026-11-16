@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
-import { JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
+import { isDue, JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
 import { BuildFeaturesUseCases } from '../application/build-features.use-cases.js';
 
 export const BUILD_FEATURES_EVERY_MS = 10 * 60 * 1000;
@@ -38,7 +38,7 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
   /** Chạy khi đã qua đủ chu kỳ kể từ lượt trước. */
   async tick() {
     const intervalMs = await this.runs.getIntervalMs('recommend_build', BUILD_FEATURES_EVERY_MS);
-    if (Date.now() - this.lastStartedAt >= intervalMs) await this.run();
+    if (isDue(this.lastStartedAt, intervalMs)) await this.run();
   }
 
   async run(trigger: JobTrigger = 'schedule') {

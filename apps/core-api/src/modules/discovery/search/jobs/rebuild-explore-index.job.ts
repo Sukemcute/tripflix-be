@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
-import { JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
+import { isDue, JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
 import { EXPLORE_INDEX_INTERVAL_MS, IndexHealth } from './index-health.js';
 
@@ -40,7 +40,7 @@ export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplica
   /** Chạy khi đã qua đủ chu kỳ kể từ lượt trước. */
   async tick() {
     this.intervalMs = await this.runs.getIntervalMs('explore', EXPLORE_INDEX_INTERVAL_MS);
-    if (Date.now() - this.lastStartedAt >= this.intervalMs) await this.run();
+    if (isDue(this.lastStartedAt, this.intervalMs)) await this.run();
   }
 
   async run(trigger: JobTrigger = 'schedule') {

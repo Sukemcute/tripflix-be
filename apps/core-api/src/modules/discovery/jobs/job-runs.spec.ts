@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import { JobRuns } from './job-runs.js';
+import { isDue, JobRuns } from './job-runs.js';
 
 /** Redis giả: đủ hset/hvals/hdel/expire và multi().hset().expire().exec(). */
 function fakeRedis(opts: { isBroken?: boolean } = {}) {
@@ -80,5 +80,17 @@ describe('JobRuns', () => {
     await runs.setIntervalMs('explore', null);
     expect(strings.has('discovery:job-interval:explore')).toBe(false);
     expect(await new JobRuns(fakeRedis({ isBroken: true }).redis).getIntervalMs('explore', 600_000)).toBe(600_000);
+  });
+});
+
+describe('isDue (TF103)', () => {
+  const minute = 60_000;
+  it('lượt trước ghi giờ trễ vài ms sau nhịp: nhịp đủ chu kỳ vẫn chạy, không trượt thêm một nhịp', () => {
+    expect(isDue(5, 2 * minute, 2 * minute)).toBe(true);
+    expect(isDue(5, 10 * minute, 10 * minute)).toBe(true);
+  });
+  it('chưa tới chu kỳ (nhịp trước đó) thì chưa chạy', () => {
+    expect(isDue(5, 2 * minute, minute)).toBe(false);
+    expect(isDue(5, 10 * minute, 9 * minute)).toBe(false);
   });
 });

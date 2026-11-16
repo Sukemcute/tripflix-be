@@ -38,6 +38,13 @@ export interface JobResult {
 /** Job có chu kỳ admin đổi được đọc lại chu kỳ mỗi nhịp này: đổi có hiệu lực trong vòng một nhịp, không cần khởi động lại. */
 export const SCHEDULE_TICK_MS = 60_000;
 
+/**
+ * Đến lượt chạy chưa. Chừa nửa nhịp: lượt trước ghi giờ bắt đầu trễ vài ms sau nhịp (chờ Redis), so `>=` đúng
+ * chu kỳ thì lượt sau trượt thêm một nhịp (10 phút thành 11). Chạy tay lệch nhịp thì lượt sau có thể sớm tối đa nửa nhịp.
+ */
+export const isDue = (lastStartedAt: number, intervalMs: number, now = Date.now()) =>
+  now - lastStartedAt >= intervalMs - SCHEDULE_TICK_MS / 2;
+
 const KEEP = 20;
 const TTL_SECONDS = 7 * 24 * 3600;
 const key = (job: JobKey) => `discovery:job-runs:${job}`;
