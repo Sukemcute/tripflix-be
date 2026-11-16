@@ -1,3 +1,4 @@
+import { PostShareLinks } from '../post-share-links.js';
 import { Transactional } from '@tripflix/db';
 import {
   contentVersion,
@@ -35,6 +36,7 @@ export class AdminModeratePostUseCase {
     private readonly postRepository: PostRepository,
     private readonly moderationActionRepository: ModerationActionRepository,
     private readonly outbox: ContentOutbox,
+    private readonly shareLinks: PostShareLinks = new PostShareLinks(),
   ) {}
 
   @Transactional('content')
@@ -70,11 +72,13 @@ export class AdminModeratePostUseCase {
       deletedAt: record.deletedAt,
     });
 
-    domainPost.moderate(command.action);
+    const releasingHeld = previousStatus === 'held' && command.action === 'restore';
+    domainPost.moderate(command.action, releasingHeld ? 'published' : undefined);
     const newStatus = domainPost.status;
 
     const updatedPost = await this.postRepository.update(command.postId, {
       status: newStatus,
+      ...(releasingHeld ? { publishedAt: new Date() } : {}),
     });
 
     const actionRecord = await this.moderationActionRepository.create({
@@ -114,7 +118,7 @@ export class AdminModeratePostUseCase {
 
     if (previousStatus !== newStatus && ['hidden', 'removed', 'published'].includes(newStatus)) {
       await this.outbox.add({
-        type: newStatus === 'published' ? 'content.post.restored' : 'content.post.hidden',
+        type: releasingHeld ? 'content.post.published' : newStatus === 'published' ? 'content.post.restored' : 'content.post.hidden',
         userId: command.moderatorId,
         payload: {
           postId: record.id,
@@ -124,6 +128,13 @@ export class AdminModeratePostUseCase {
           actionId: actionRecord.id,
           reasonCode: command.reasonCode,
           hiddenAt: actionRecord.createdAt.toISOString(),
+          ...(releasingHeld ? {
+            postType: updatedPost.postType,
+            title: updatedPost.title,
+            isVerified: updatedPost.isVerified,
+            publishedAt: updatedPost.publishedAt!.toISOString(),
+            shareUrl: this.shareLinks.buildUrl(updatedPost.id, updatedPost.postType),
+          } : {}),
         },
       });
     }

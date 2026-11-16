@@ -394,7 +394,15 @@ export const DiscoveryStaysSearchedV1Schema = z.object({
 });
 export type DiscoveryStaysSearchedV1 = z.infer<typeof DiscoveryStaysSearchedV1Schema>;
 
+/** Nội dung đang giữ: chỉ moderation nhận, không tạo thông báo công khai. */
+export const ContentPostHeldV1Schema = z.object({ postId: z.uuid(), authorId: z.uuid() });
+export const ContentCommentHeldV1Schema = z.object({ commentId: z.uuid(), postId: z.uuid(), authorId: z.uuid() });
+export type ContentPostHeldV1 = z.infer<typeof ContentPostHeldV1Schema>;
+export type ContentCommentHeldV1 = z.infer<typeof ContentCommentHeldV1Schema>;
+
 export const exportedSchemas: Record<string, z.ZodType> = {
+  'content.post.held.v1': ContentPostHeldV1Schema,
+  'content.comment.held.v1': ContentCommentHeldV1Schema,
   'content.comment.hidden.v1': ContentCommentHiddenV1Schema,
   'content.comment.restored.v1': ContentCommentRestoredV1Schema,
   'content.post.hidden.v1': ContentPostHiddenV1Schema,

@@ -6809,7 +6809,8 @@
           "status": {
             "type": "string",
             "enum": [
-              "published"
+              "published",
+              "held"
             ]
           },
           "isVerified": {
@@ -6817,7 +6818,8 @@
           },
           "publishedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "shareUrl": {
             "type": "string"
@@ -6984,6 +6986,15 @@
       "SocialCommentDto": {
         "type": "object",
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "held",
+              "hidden",
+              "removed"
+            ]
+          },
           "id": {
             "type": "string"
           },

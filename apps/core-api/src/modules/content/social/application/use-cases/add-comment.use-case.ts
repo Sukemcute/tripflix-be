@@ -1,3 +1,4 @@
+import type { ContentGatePort } from '../ports/content-gate.port.js';
 import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException, Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
@@ -19,10 +20,17 @@ export class AddCommentUseCase {
     private readonly commentRepository: CommentRepository,
     private readonly outbox: ContentOutbox,
     private readonly userDirectory?: UserDirectoryPort,
+    private readonly gate?: ContentGatePort,
   ) {}
 
-  @Transactional('content')
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
+    const body = Comment.validateBody(command.body);
+    const shouldHold = this.gate?.precheck(body).shouldHold ?? false;
+    return this.createInTransaction({ ...command, body }, shouldHold);
+  }
+
+  @Transactional('content')
+  protected async createInTransaction(command: AddCommentCommand, shouldHold: boolean): Promise<CommentRecord> {
     const post = await this.postRepository.findByIdForUpdate(command.postId);
     if (!post) {
       throw new PostNotFoundException(command.postId);
@@ -67,14 +75,15 @@ export class AddCommentUseCase {
       ...(replyToName ? { replyToName } : {}),
       body,
       isEdited: false,
+      status: shouldHold ? 'held' : 'visible',
     });
 
     // Tăng bộ đếm bình luận của bài viết
-    await this.postRepository.incrementCounter(command.postId, 'commentCount', 1);
+    if (!shouldHold) await this.postRepository.incrementCounter(command.postId, 'commentCount', 1);
 
     // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
     await this.outbox.add({
-      type: 'content.comment.created',
+      type: shouldHold ? 'content.comment.held' : 'content.comment.created',
       userId: command.authorId,
       payload: {
         commentId: comment.id,

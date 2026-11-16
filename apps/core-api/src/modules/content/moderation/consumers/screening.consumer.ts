@@ -75,14 +75,14 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   }
   async route(event: EventEnvelope): Promise<void> {
     if (event.version !== 1) return;
-    if (['content.post.published', 'content.post.updated'].includes(event.type)) {
+    if (['content.post.published', 'content.post.updated', 'content.post.held'].includes(event.type)) {
       await this.screen.execute(
         event.eventId,
         'post',
         z.object({ postId: z.uuid() }).parse(event.payload).postId,
         event.occurredAt,
       );
-    } else if (['content.comment.created', 'content.comment.updated'].includes(event.type)) {
+    } else if (['content.comment.created', 'content.comment.updated', 'content.comment.held'].includes(event.type)) {
       await this.screen.execute(
         event.eventId,
         'comment',
