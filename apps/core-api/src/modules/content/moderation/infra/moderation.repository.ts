@@ -130,7 +130,7 @@ export class ModerationRepository {
         LEFT JOIN ${posts} p ON c.target_type = 'post' AND p.id = c.target_id
         LEFT JOIN ${comments} cm ON c.target_type = 'comment' AND cm.id = c.target_id
         WHERE c.status = 'pending'
-          AND coalesce(p.status, cm.status, '') IN ('published', 'visible', 'hidden')
+          AND coalesce(p.status, cm.status, '') IN ('published', 'visible', 'hidden', 'held')
       )
       SELECT
         (SELECT count(*)::int FROM pending) AS pending_total,
@@ -244,6 +244,19 @@ export class ModerationRepository {
         };
       }),
     );
+  }
+
+  async hasHeldRelease(target: TargetSnapshot): Promise<boolean> {
+    const [decision] = await this.db.select({ id: moderationActions.id }).from(moderationActions).where(and(
+      eq(moderationActions.actorType, 'staff'),
+      sql`${moderationActions.previousStatus} IN ('held', 'hidden', 'removed')`,
+      eq(moderationActions.contentVersion, target.version),
+      sql`${moderationActions.postStatus} IN ('published', 'visible')`,
+      target.targetType === 'post'
+        ? and(eq(moderationActions.targetType, 'post'), eq(moderationActions.postId, target.targetId))
+        : eq(moderationActions.commentId, target.targetId),
+    )).limit(1);
+    return Boolean(decision);
   }
 
   async hasStaffDecisionAfter(target: TargetSnapshot, occurredAt: string): Promise<boolean> {
@@ -418,7 +431,7 @@ export class ModerationRepository {
       if (options.view === 'pending') {
         conditions.push(
           eq(moderationCases.status, 'pending'),
-          sql`${visibility} IN ('published', 'visible', 'hidden')`,
+          sql`${visibility} IN ('published', 'visible', 'hidden', 'held')`,
         );
       } else if (options.view === 'reviewed') {
         conditions.push(

@@ -34,6 +34,9 @@ export interface ExploreObject {
   /** Mã gốc ở module nguồn (mã khách sạn, mã bài). */
   refId?: string;
   thumbnail?: string | null;
+  /** Bài: id tác giả và ngày đăng (ISO). Chỉ mục dựng trước khi có field này thì không có. */
+  authorId?: string | null;
+  createdAt?: string | null;
 }
 
 /** Một tài liệu trong chỉ mục của một nhánh. */

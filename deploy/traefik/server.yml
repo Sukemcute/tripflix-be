@@ -14,6 +14,13 @@ http:
         average: 30
         period: 1m
         burst: 10
+    # Trợ lý Tripi (POST /ai/chat): mỗi lượt gọi LLM nên chặt hơn API thường. 20 lượt/phút mỗi IP, dồn tối đa 5;
+    # hạn mức theo tài khoản hoặc khách nằm trong ai-service (TF31).
+    rate-limit-chat:
+      rateLimit:
+        average: 20
+        period: 1m
+        burst: 5
 
     redirect-to-apex:
       redirectRegex:
@@ -50,7 +57,7 @@ http:
       rule: Host(`{{ env "API_HOST" }}`) && Method(`POST`) && Path(`/ai/chat`)
       service: ai-service
       entryPoints: [websecure]
-      middlewares: [rate-limit-api, strip-ai-prefix]
+      middlewares: [rate-limit-chat, strip-ai-prefix]
       tls:
         certResolver: letsencrypt
 

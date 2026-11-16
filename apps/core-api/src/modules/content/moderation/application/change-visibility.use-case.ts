@@ -33,6 +33,10 @@ export class ChangeVisibilityUseCase {
     const initial = await this.repository.loadTarget(command.targetType, command.targetId);
     if (!initial) throw new NotFoundException('Không tìm thấy nội dung');
     const parentPost = await this.repository.lockPost(initial.postId);
+    const lockedTarget = await this.repository.loadTarget(command.targetType, command.targetId);
+    if (command.action === 'dismiss' && lockedTarget?.status === 'held' && !lockedTarget.deleted) {
+      command = { ...command, action: 'restore' };
+    }
     if (
       command.targetType === 'comment' &&
       command.action === 'restore' &&
@@ -55,6 +59,7 @@ export class ChangeVisibilityUseCase {
       body: string;
       parentCommentId: string | null;
       previousStatus: string;
+      wasPublic: boolean;
       status: string;
     }[] = [];
     let newStatus = target.status;
@@ -67,7 +72,7 @@ export class ChangeVisibilityUseCase {
             : command.action === 'remove'
               ? 'removed'
               : 'hidden';
-      if (command.action !== 'dismiss' && !['published', 'hidden', 'removed'].includes(target.status))
+      if (command.action !== 'dismiss' && !['published', 'held', 'hidden', 'removed'].includes(target.status))
         throw new ConflictException('Chỉ kiểm duyệt bài đã đăng');
       if (target.status === 'removed' && !['restore', 'dismiss'].includes(command.action))
         throw new ConflictException('Bài đã gỡ chỉ có thể khôi phục');
@@ -110,20 +115,22 @@ export class ChangeVisibilityUseCase {
         if (
           isChild &&
           command.action === 'remove' &&
-          record.status === 'hidden' &&
+          ['hidden', 'held'].includes(record.status) &&
           (record.cascadeRootCommentId !== root.id || record.hiddenByActionId !== root.hiddenByActionId)
         )
           continue;
         if (
           command.action === 'restore' &&
-          (!['hidden', 'removed'].includes(record.status) ||
+          (!['held', 'hidden', 'removed'].includes(record.status) ||
             (isChild &&
               (!root.hiddenByActionId ||
                 record.hiddenByActionId !== root.hiddenByActionId ||
                 record.cascadeRootCommentId !== root.id)))
         )
           continue;
-        if (command.action === 'hide' && record.status !== 'visible') {
+        if (isChild && record.status === 'held' &&
+          (record.cascadeRootCommentId !== root.id || record.hiddenByActionId !== root.hiddenByActionId)) continue;
+        if (command.action === 'hide' && !['visible', 'held'].includes(record.status)) {
           // Một quyết định ẩn riêng sau cascade phải ngăn lần restore gốc hiện lại phản hồi đó.
           if (!isChild && record.status === 'hidden' && record.cascadeRootCommentId) {
             await db
@@ -157,6 +164,7 @@ export class ChangeVisibilityUseCase {
             body: updated.body,
             parentCommentId: updated.parentCommentId,
             previousStatus: record.status,
+            wasPublic: Boolean(record.hiddenByActionId),
             status: updated.status,
           });
       }
@@ -199,7 +207,9 @@ export class ChangeVisibilityUseCase {
       const payload = { postId: target.postId, commentId: row.id, authorId: row.authorId };
       await this.outbox.add({
         type:
-          row.status === 'visible'
+          row.previousStatus === 'held' && !row.wasPublic && row.status === 'visible'
+            ? 'content.comment.created'
+            : row.status === 'visible'
             ? 'content.comment.restored'
             : row.status === 'removed'
               ? 'content.comment.deleted'
@@ -212,6 +222,12 @@ export class ChangeVisibilityUseCase {
                 body: row.body,
                 parentCommentId: row.parentCommentId,
                 postAuthorId: parentPost?.authorId,
+                ...(row.previousStatus === 'held' && !row.wasPublic ? {
+                  createdAt: new Date().toISOString(),
+                  parentCommentAuthorId: row.parentCommentId
+                    ? (await this.repository.db.select({ authorId: comments.authorId }).from(comments)
+                        .where(eq(comments.id, row.parentCommentId)))[0]?.authorId ?? null : null,
+                } : {}),
               }
             : row.status === 'removed'
               ? {

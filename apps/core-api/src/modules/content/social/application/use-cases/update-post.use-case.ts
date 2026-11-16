@@ -1,3 +1,5 @@
+import type { ContentGatePort } from '../ports/content-gate.port.js';
+import { assertPrecheckedPost, postGateText } from '../common/content-precheck.js';
 import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
@@ -27,16 +29,15 @@ export class UpdatePostUseCase {
     private readonly postRepository: PostRepository,
     private readonly outbox?: ContentOutbox,
     private readonly postMedia?: PostMediaPort,
+    private readonly gate?: ContentGatePort,
   ) {}
 
-  @Transactional('content')
   async execute(command: UpdatePostCommand): Promise<PostRecord> {
     const record = await this.postRepository.findById(command.postId);
     if (!record) {
       throw new PostNotFoundException(command.postId);
     }
 
-    const previousStatus = record.status;
 
     const domainPost = new Post({
       id: record.id,
@@ -81,7 +82,25 @@ export class UpdatePostUseCase {
       tripAttachment: command.tripAttachment,
     });
 
+    const shouldHold = record.status !== 'draft' && (this.gate?.precheck(postGateText({
+      title: domainPost.title, body: domainPost.body, hashtags: domainPost.hashtags,
+    })).shouldHold ?? false);
+    return this.updateInTransaction(command, record, domainPost, shouldHold);
+  }
+
+  @Transactional('content')
+  protected async updateInTransaction(
+    command: UpdatePostCommand, record: PostRecord, domainPost: Post, shouldHold: boolean,
+  ): Promise<PostRecord> {
+    const current = this.postRepository.findByIdForUpdate
+      ? await this.postRepository.findByIdForUpdate(record.id)
+      : await this.postRepository.findById(record.id);
+    if (!current) throw new PostNotFoundException(record.id);
+    assertPrecheckedPost(current, record);
+    const previousStatus = record.status;
+    const status = shouldHold && ['published', 'held'].includes(previousStatus) ? 'held' : previousStatus;
     const updated = await this.postRepository.update(command.postId, {
+      status,
       title: domainPost.title,
       body: domainPost.body,
       hashtags: domainPost.hashtags,
@@ -111,6 +130,10 @@ export class UpdatePostUseCase {
       });
     }
 
+    if (status === 'held' && this.outbox) {
+      await this.outbox.add({ type: 'content.post.held', userId: command.userId,
+        payload: { postId: updated.id, authorId: updated.authorId } });
+    }
     return updated;
   }
 }
