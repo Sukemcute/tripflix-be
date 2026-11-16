@@ -39,6 +39,8 @@ export interface ExplorePost {
   tripAttachment: { destinationName?: string; daysCount?: number; estimatedCostPerPerson?: number } | null;
   reactionTotal: number;
   commentCount: number;
+  authorId: string;
+  createdAt: Date;
 }
 
 type Page<T> = { items: T[]; nextCursor: string | null };
@@ -49,6 +51,8 @@ export interface ExploreCatalog {
   listPosts(cursor: string | null): Promise<Page<ExplorePost>>;
   /** Trong postIds, những bài còn hiện công khai. */
   findVisiblePostIds(postIds: string[]): Promise<Set<string>>;
+  /** Tên hiển thị theo id tác giả. Thật: AccessFacade.getDisplayNames. Id không có thì không có trong Map. */
+  getAuthorNames(authorIds: string[]): Promise<Map<string, string>>;
 }
 
 export interface SuggestStore {

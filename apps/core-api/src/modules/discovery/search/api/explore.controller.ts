@@ -68,7 +68,8 @@ export class ExploreController {
     description: [
       'Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.',
       '',
-      '- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.',
+      '- `postType`: `all` (mặc định), `plan`, `video`, `post`, `article`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần. `article` = `plan` + `post` nhưng bỏ mọi video, lọc ở server nên trang luôn đủ `limit`.',
+      '- Mỗi bài có `likes`, `comments`, `createdAt`, `author` để hiện thẻ. Không có trạng thái đã thích/đã lưu của người xem.',
       '- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.',
       '- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.',
       '- Không bài nào khớp đủ câu (vd "mùa thu hà nội", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.',

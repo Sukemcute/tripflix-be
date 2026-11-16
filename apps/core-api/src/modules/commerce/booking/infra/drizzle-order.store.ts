@@ -193,9 +193,9 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async findGuests(orderId: string) {
-    const rows = await this.db.select({ fullName: orderGuests.fullName, passengerType: orderGuests.passengerType }).from(orderGuests).where(eq(orderGuests.orderId, orderId));
+    const rows = await this.db.select({ fullName: orderGuests.fullName, passengerType: orderGuests.passengerType, birthdate: orderGuests.birthdate }).from(orderGuests).where(eq(orderGuests.orderId, orderId));
     const typeRank = (type: string | null) => (type === 'infant' ? 2 : type === 'child' ? 1 : 0);
-    return rows.map((row) => ({ fullName: row.fullName, passengerType: row.passengerType as PassengerType | null })).sort((a, b) => typeRank(a.passengerType) - typeRank(b.passengerType));
+    return rows.map((row) => ({ fullName: row.fullName, passengerType: row.passengerType as PassengerType | null, birthdate: row.birthdate })).sort((a, b) => typeRank(a.passengerType) - typeRank(b.passengerType));
   }
 
   async findGuestBirthdates(orderId: string) {

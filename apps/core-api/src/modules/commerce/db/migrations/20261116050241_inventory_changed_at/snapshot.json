@@ -1,0 +1,247 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "c46c960f-370a-4ac3-ac8b-7600ba8ff988",
+  "prevIds": [
+    "9e844a46-194a-44cf-ac50-223481cdd9ae"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "flight_inventory",
+        "changed_at"
+      ],
+      "writes": [
+        "s|col|commerce.flight_inventory.changed_at",
+        "n|col|commerce.flight_inventory.changed_at",
+        "e|col|commerce.flight_inventory.changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.flight_inventory",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "room_inventory",
+        "changed_at"
+      ],
+      "writes": [
+        "s|col|commerce.room_inventory.changed_at",
+        "n|col|commerce.room_inventory.changed_at",
+        "e|col|commerce.room_inventory.changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_inventory",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "room_rates",
+        "changed_at"
+      ],
+      "writes": [
+        "s|col|commerce.room_rates.changed_at",
+        "n|col|commerce.room_rates.changed_at",
+        "e|col|commerce.room_rates.changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_rates",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "flight_inventory",
+        "ix_flight_inventory_changed_at"
+      ],
+      "writes": [
+        "s|idx|commerce.ix_flight_inventory_changed_at",
+        "n|idx|commerce.ix_flight_inventory_changed_at",
+        "e|idx|commerce.ix_flight_inventory_changed_at",
+        "n|rel|commerce.ix_flight_inventory_changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.flight_inventory",
+        "n|sch|commerce",
+        "n|col|commerce.flight_inventory.changed_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "room_inventory",
+        "ix_room_inventory_changed_at"
+      ],
+      "writes": [
+        "s|idx|commerce.ix_room_inventory_changed_at",
+        "n|idx|commerce.ix_room_inventory_changed_at",
+        "e|idx|commerce.ix_room_inventory_changed_at",
+        "n|rel|commerce.ix_room_inventory_changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_inventory",
+        "n|sch|commerce",
+        "n|col|commerce.room_inventory.changed_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "room_rates",
+        "ix_room_rates_changed_at"
+      ],
+      "writes": [
+        "s|idx|commerce.ix_room_rates_changed_at",
+        "n|idx|commerce.ix_room_rates_changed_at",
+        "e|idx|commerce.ix_room_rates_changed_at",
+        "n|rel|commerce.ix_room_rates_changed_at"
+      ],
+      "reads": [
+        "n|tbl|commerce.room_rates",
+        "n|sch|commerce",
+        "n|col|commerce.room_rates.changed_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flight_inventory",
+        "name": "changed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "room_inventory",
+        "name": "changed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "room_rates",
+        "name": "changed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flight_inventory",
+        "name": "ix_flight_inventory_changed_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "changed_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "room_inventory",
+        "name": "ix_room_inventory_changed_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "changed_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "room_rates",
+        "name": "ix_room_rates_changed_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "changed_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}
