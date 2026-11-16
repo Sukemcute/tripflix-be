@@ -1935,6 +1935,44 @@
         ]
       }
     },
+    "/api/v1/users/{userId}/profile": {
+      "get": {
+        "operationId": "FollowsController_getProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      }
+    },
     "/api/v1/users/{authorId}/follow": {
       "get": {
         "operationId": "FollowsController_getStatus",
@@ -7468,6 +7506,36 @@
           "postId",
           "isBookmarked",
           "bookmarkCount"
+        ]
+      },
+      "PublicProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Bảo Lê"
+          },
+          "followerCount": {
+            "type": "number"
+          },
+          "followingCount": {
+            "type": "number"
+          },
+          "likeCount": {
+            "type": "number",
+            "description": "Tổng cảm xúc trên các bài công khai của người này"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "followerCount",
+          "followingCount",
+          "likeCount"
         ]
       },
       "FollowStatusDto": {
