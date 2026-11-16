@@ -38,7 +38,8 @@ const PARSERS: Record<string, (payload: unknown) => ParsedChange> = {
   },
   'content.comment.deleted.v1': (payload) => {
     const p = ContentCommentDeletedV1Schema.parse(payload);
-    return { ...pick(p), kind: 'deleted', actorId: p.deletedBy };
+    // Super admin xoá thì không gửi người xoá, giống hidden/restored.
+    return { ...pick(p), kind: 'deleted', actorId: p.isSuperAdmin ? null : p.deletedBy };
   },
   // Ẩn/hiện lại do kiểm duyệt: không gửi người làm để không lộ kiểm duyệt viên.
   'content.comment.hidden.v1': (payload) => {

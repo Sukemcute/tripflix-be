@@ -26,7 +26,7 @@ describe('toPostCommentChange (TF99)', () => {
     expect(toPostCommentChange(event('content.reaction.updated', { postId }))).toBeNull();
   });
 
-  it('ánh xạ 5 loại sự kiện, không gửi nội dung, không lộ kiểm duyệt viên', () => {
+  it('ánh xạ 5 loại sự kiện, không gửi nội dung, không lộ kiểm duyệt viên hay super admin xoá', () => {
     const commentId = randomUUID();
     const parentCommentId = randomUUID();
     const deletedBy = randomUUID();
@@ -35,8 +35,10 @@ describe('toPostCommentChange (TF99)', () => {
       [created({ commentId, parentCommentId }), { kind: 'created', actorId: authorId, parentCommentId }],
       [event('content.comment.updated', { ...base, parentCommentId, body: 'Sửa', updatedAt: now }),
         { kind: 'updated', actorId: authorId, parentCommentId }],
+      [event('content.comment.deleted', { ...base, parentCommentId, deletedBy: authorId, isSuperAdmin: false, deletedAt: now }),
+        { kind: 'deleted', actorId: authorId, parentCommentId }],
       [event('content.comment.deleted', { ...base, parentCommentId, deletedBy, isSuperAdmin: true, deletedAt: now }),
-        { kind: 'deleted', actorId: deletedBy, parentCommentId }],
+        { kind: 'deleted', actorId: null, parentCommentId }],
       [event('content.comment.hidden', base), { kind: 'hidden', actorId: null, parentCommentId: null }],
       [event('content.comment.restored', { ...base, parentCommentId, body: 'Hiện lại' }),
         { kind: 'restored', actorId: null, parentCommentId }],
