@@ -178,6 +178,35 @@ const POST_WATCHERS_SCHEMA = `
   CREATE INDEX idx_post_watch_jobs_available ON post_watch_jobs (available_at, comment_id) WHERE state = 'pending';
 `;
 
+// Push mobile (N3). inbox.updated_at chỉ đổi khi tiêu đề/nội dung đổi (dòng mới hoặc dòng gom có thêm người);
+// dòng cũ để NULL để lần triển khai đầu không đẩy lại thông báo cũ.
+const PUSH_SCHEMA = `
+  CREATE TABLE push_tokens (
+    token text PRIMARY KEY,
+    user_id uuid NOT NULL,
+    platform text NOT NULL CONSTRAINT ck_push_tokens_platform CHECK (platform IN ('android', 'ios')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id, updated_at DESC);
+
+  ALTER TABLE inbox ADD COLUMN updated_at timestamptz;
+  ALTER TABLE inbox ALTER COLUMN updated_at SET DEFAULT now();
+  CREATE FUNCTION touch_inbox_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
+  BEGIN
+    NEW.updated_at := now();
+    RETURN NEW;
+  END
+  $$;
+  CREATE TRIGGER trg_inbox_touch_updated_at BEFORE UPDATE OF title, body ON inbox
+    FOR EACH ROW WHEN (OLD.title IS DISTINCT FROM NEW.title OR OLD.body IS DISTINCT FROM NEW.body)
+    EXECUTE FUNCTION touch_inbox_updated_at();
+  CREATE INDEX idx_inbox_push_pending ON inbox (updated_at)
+    WHERE updated_at IS NOT NULL AND read_at IS NULL AND deleted_at IS NULL;
+
+  CREATE UNIQUE INDEX uq_deliveries_inbox_push ON deliveries (inbox_id) WHERE channel = 'push';
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
@@ -188,4 +217,5 @@ const NOTIFICATION_MIGRATIONS = [
   [7, SHARED_FOLLOWER_POSTS_SCHEMA],
   [8, THREAD_PARTICIPANTS_SCHEMA],
   [9, POST_WATCHERS_SCHEMA],
+  [10, PUSH_SCHEMA],
 ] as const;
