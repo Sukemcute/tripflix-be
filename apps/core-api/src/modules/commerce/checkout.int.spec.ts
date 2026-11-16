@@ -187,7 +187,7 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
 
     const res = await pay(user, order);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toMatchObject({ outcome: 'paid', confirmationCode: expect.stringMatching(/^TF-[A-Z2-9]{6}$/) });
+    expect(res.body).toMatchObject({ outcome: 'paid', confirmationCode: expect.stringMatching(/^TF-[A-Z2-9]{8}$/) });
     expect(await inventoryOf(checkIn)).toMatchObject({ held: before.held, sold: before.sold + 1 });
     const events = await pool.query(`select type, payload from commerce.outbox_events where type = 'commerce.order.paid' and payload->>'orderId' = $1`, [order.orderId]);
     expect(events.rows).toHaveLength(1);

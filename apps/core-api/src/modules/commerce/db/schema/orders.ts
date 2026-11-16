@@ -38,6 +38,8 @@ export const orders = commerceSchema.table(
     check('ck_orders_children', sql`${t.children} >= 0 and ${t.adults} + ${t.children} <= 9`),
     check('ck_orders_infants', sql`${t.infants} between 0 and ${t.adults}`),
     index('idx_orders_user_id').on(t.userId, t.createdAt),
+    // K3: mã xác nhận đọc cho khách nên không được trùng; trùng thì TX2 lỗi, job đối soát chạy lại với mã mới.
+    uniqueIndex('uq_orders_confirmation_code').on(t.confirmationCode),
     index('idx_orders_hold').on(t.status, t.holdExpiresAt),
     // Mỗi tài khoản một giỏ đang giữ: chống một người giữ nhiều giỏ để giam chỗ.
     uniqueIndex('uq_orders_one_pending_per_user').on(t.userId).where(sql`${t.status} = 'pending'`),

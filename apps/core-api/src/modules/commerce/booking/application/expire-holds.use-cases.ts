@@ -6,6 +6,8 @@ import { CheckoutUseCases } from './checkout.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type OrderStore, type PaymentRecord } from './ports.js';
 
 const EXPIRE_BATCH = 500;
+/** Một lượt chạy làm tối đa chừng này rồi nhường lượt sau (job chạy mỗi phút), để không chồng lên lượt kế. */
+const EXPIRE_RUN_BUDGET_MS = 45_000;
 
 /** Mã ghi vào khoản trừ khi bỏ ngang được; null là chưa rõ kết quả (thẻ đang chờ cổng, trang VNPay còn hạn), không được đụng. */
 function findAbandonCode(payment: PaymentRecord, redirectStartedBefore: Date): string | null {
@@ -33,17 +35,24 @@ export class ExpireHoldsUseCases {
     const out = { expired: 0, skipped: 0, errors: 0 };
     const now = this.now();
     const redirectStartedBefore = new Date(now.getTime() - VNPAY_PAYMENT_WINDOW_MINUTES * 60_000);
-    const orderIds = await this.orders.findExpiredHoldIds({ now, redirectGateway: VNPAY_GATEWAY, redirectStartedBefore, limit: EXPIRE_BATCH });
-    for (const orderId of orderIds) {
-      try {
-        if (await this.expireOrder(orderId, now, redirectStartedBefore)) out.expired++;
-        else out.skipped++;
-      } catch (error) {
-        out.errors++;
-        this.logger.error({ err: error, orderId }, 'Nhả chỗ lỗi, lần chạy sau thử lại');
+    const startedAt = Date.now();
+    // K1: lặp tới khi hết đơn quá hạn thay vì 500 đơn mỗi phút (đo 13/11: 1.200 giỏ mất 3 phút, job chỉ làm 14 giây).
+    // Dừng khi lô không đầy, khi cả lô không nhả được đơn nào (đơn đang bị khoá, lượt sau xét lại) hoặc hết thời gian.
+    for (;;) {
+      const orderIds = await this.orders.findExpiredHoldIds({ now, redirectGateway: VNPAY_GATEWAY, redirectStartedBefore, limit: EXPIRE_BATCH });
+      let expiredInBatch = 0;
+      for (const orderId of orderIds) {
+        try {
+          if (await this.expireOrder(orderId, now, redirectStartedBefore)) expiredInBatch++;
+          else out.skipped++;
+        } catch (error) {
+          out.errors++;
+          this.logger.error({ err: error, orderId }, 'Nhả chỗ lỗi, lần chạy sau thử lại');
+        }
       }
+      out.expired += expiredInBatch;
+      if (orderIds.length < EXPIRE_BATCH || expiredInBatch === 0 || Date.now() - startedAt > EXPIRE_RUN_BUDGET_MS) return out;
     }
-    return out;
   }
 
   /** Danh sách đọc không khoá nên xét lại mọi điều kiện sau khi khoá. */

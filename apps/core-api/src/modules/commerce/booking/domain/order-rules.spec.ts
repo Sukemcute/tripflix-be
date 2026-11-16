@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countAgeOn, findInvalidGuestFields, isAgeOfPassengerType, listGuestFieldErrors, listPassengerTypes } from './order-rules.js';
+import { CONFIRMATION_CODE_LENGTH, countAgeOn, createConfirmationCode, findInvalidGuestFields, isAgeOfPassengerType, listGuestFieldErrors, listPassengerTypes } from './order-rules.js';
 
 const contact = { fullName: 'Người Đặt', phone: '0901234567', email: null };
 const TODAY = '2026-12-01';
@@ -114,5 +114,13 @@ describe('câu báo lỗi theo từng trường', () => {
     expect(listGuestFieldErrors({ contact, guests: [], passengersRequired: 2, today: TODAY })).toEqual([
       { field: 'guests', message: 'Cần nhập đủ 2 hành khách.' },
     ]);
+  });
+});
+
+describe('mã xác nhận (K3)', () => {
+  it('đủ 8 ký tự, chỉ dùng chữ và số không dễ nhầm', () => {
+    const code = createConfirmationCode(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+    expect(CONFIRMATION_CODE_LENGTH).toBe(8);
+    expect(code).toMatch(/^TF-[A-HJ-NP-Z2-9]{8}$/);
   });
 });

@@ -12,6 +12,7 @@ import {
   buildChargeKey,
   buildCompensationRefundKey,
   buildLateSuccessRefundKey,
+  CONFIRMATION_CODE_LENGTH,
   createConfirmationCode,
   hasCompleteGuests,
   isHoldExpired,
@@ -265,7 +266,7 @@ export class PaymentUseCases {
       for (const cell of listSortedCells(items)) {
         if (!(await this.orders.sellCell(cell))) throw new Error(`Không chuyển được chỗ đã giữ sang đã bán: ${cell.productId} ${cell.date}`);
       }
-      const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(6)) }));
+      const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(CONFIRMATION_CODE_LENGTH)) }));
       await this.orders.setItemConfirmationCodes(codes);
       const paidAt = this.now();
       await this.orders.updateOrder(order.id, { status: 'paid', confirmationCode: codes[0]!.code, paidAt });
