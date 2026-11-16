@@ -230,9 +230,7 @@ export class RecordScreeningUseCase {
         rules,
         ai,
         aiUnavailable: ai === null,
-        reasonCode: rules.some((hit) => hit.code === 'SCAM_PATTERN')
-          ? 'SCAM'
-          : (rules[0]?.category ?? 'OTHER'),
+        reasonCode: verdict.autoHideReason ?? rules[0]?.category ?? 'OTHER',
       },
     });
     if (verdict.shouldAutoHide && target.status !== 'hidden') {
@@ -242,7 +240,7 @@ export class RecordScreeningUseCase {
         action: 'hide',
         actorId: SYSTEM_ACTOR_ID,
         actorType: 'system',
-        reasonCode: rules.some((hit) => hit.code === 'SCAM_PATTERN') ? 'SCAM' : 'OTHER',
+        reasonCode: verdict.autoHideReason ?? 'OTHER',
         caseId: item.id,
       });
       await this.repository.db

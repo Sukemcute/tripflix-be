@@ -1,6 +1,7 @@
 import { Transactional } from '@tripflix/db';
 import { InvalidPostStatusTransitionException, Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { PostShareLinks } from '../post-share-links.js';
 import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 
@@ -22,6 +23,7 @@ export class PublishPostUseCase {
     private readonly postRepository: PostRepository,
     private readonly outbox: ContentOutbox,
     private readonly commerceService?: CommerceServicePort,
+    private readonly shareLinks: PostShareLinks = new PostShareLinks(),
   ) {}
 
   async execute(command: PublishPostCommand): Promise<PublishPostResult> {
@@ -88,7 +90,7 @@ export class PublishPostUseCase {
       publishedAt,
     });
 
-    const shareUrl = `https://tripflix.vn/posts/${record.id}`;
+    const shareUrl = this.shareLinks.buildUrl(record.id, domainPost.postType);
 
     // Ghi sự kiện vào content.outbox_events trong cùng transaction DB
     await this.outbox.add({

@@ -310,7 +310,15 @@ export const ContentCommentHiddenV1Schema = z.object({
   commentId: z.uuid(),
   authorId: z.uuid(),
 });
-export const ContentCommentRestoredV1Schema = ContentCommentHiddenV1Schema;
+export const ContentCommentRestoredV1Schema = z.object({
+  postId: z.uuid(),
+  commentId: z.uuid(),
+  authorId: z.uuid(),
+  // Optional for v1 events emitted before restore included the comment content.
+  body: z.string().min(1).max(10_000).optional(),
+  parentCommentId: z.uuid().nullable().optional(),
+  postAuthorId: z.uuid().optional(),
+});
 export const ContentPostHiddenV1Schema = z.object({
   postId: z.uuid(),
   authorId: z.uuid(),

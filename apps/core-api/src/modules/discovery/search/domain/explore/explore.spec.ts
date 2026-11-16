@@ -178,7 +178,7 @@ describe('tìm', () => {
     const st2 = new Stats(src(objs.filter((x) => x.id !== 's2')));
     await st2.loadSeq(['dang', 'van', 'ngu']);
     expect(st2.isName('dang van ngu')).toBe(false);
-    const [u] = await understand('cafe hồ tây', new Stats(src(objs)));
+    const { u } = (await understand('cafe hồ tây', new Stats(src(objs))))[0]!;
     expect([u.names, u.place]).toEqual([['ho tay'], 'Hà Nội']);
   });
 
