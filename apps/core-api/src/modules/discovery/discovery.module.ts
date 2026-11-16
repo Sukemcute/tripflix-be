@@ -20,6 +20,7 @@ import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
+import { AdminVocabGapsController } from './search/api/admin-vocab-gaps.controller.js';
 import { AdminDiscoveryJobsController } from './jobs/admin-discovery-jobs.controller.js';
 import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
@@ -89,6 +90,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     HomeRecommendationsController,
     PostRecommendationsController,
     AdminIndexHealthController,
+    AdminVocabGapsController,
     AdminDiscoveryJobsController,
   ],
   providers: [

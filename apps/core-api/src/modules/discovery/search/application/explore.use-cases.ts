@@ -3,7 +3,9 @@ import { buildIndex } from '../domain/explore/build.js';
 import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
 import { paginate } from '../domain/stays.js';
+import { NS } from '../domain/explore/stats.js';
 import { destOf } from '../domain/explore/text.js';
+import { QUERY_TOTAL_KEYS, queryGrams, rankVocabGaps, type QueryGramRow, type VocabGap } from '../domain/explore/vocab-gaps.js';
 import type { ExploreObject } from '../domain/explore/types.js';
 import { EXPLORE_CATALOG, EXPLORE_STORE, type ExploreCatalog, type ExploreHotel, type ExplorePost, type ExploreStore } from './ports.js';
 
@@ -16,6 +18,24 @@ export type PostType = keyof typeof POST_TYPE_KINDS;
 export const POST_TYPES = Object.keys(POST_TYPE_KINDS) as PostType[];
 // ponytail: lấy tối đa chừng này bài khớp rồi cắt trang trong RAM; đủ cho vài nghìn bài, lớn hơn thì phân trang trong engine.
 const MAX_POST_RESULTS = 1_000;
+const DAY_MS = 24 * 3600 * 1000;
+/** Giữ đếm câu tìm chừng này ngày; endpoint admin xem tối đa chừng này. */
+export const QUERY_GRAMS_RETENTION_DAYS = 90;
+/** Ngày UTC dạng YYYY-MM-DD, `daysAgo` ngày trước `now`. */
+export const dayOf = (now: Date, daysAgo = 0) => new Date(now.getTime() - daysAgo * DAY_MS).toISOString().slice(0, 10);
+
+export interface VocabGapsQuery {
+  days: number;
+  limit: number;
+  minCount: number;
+}
+
+export interface VocabGapsPage {
+  days: number;
+  /** Số câu tìm đã đếm trong `days` ngày. */
+  queries: number;
+  items: VocabGap[];
+}
 
 export interface ExploreQuery {
   q: string;
@@ -203,6 +223,7 @@ export class ExploreUseCases {
   async search(query: ExploreQuery): Promise<ExploreResultPage> {
     const loc = query.loc ? { lat: query.loc.lat, lon: query.loc.lng } : null;
     const r = await searchExplore(this.store, query.q, { loc });
+    this.logQuery(query.q, r.understood);
     // Chỉ mục có thể trễ một chu kỳ job: bài vừa bị ẩn/xoá không được lọt ra kết quả.
     const all = [...r.sections.flatMap((s) => s.items), ...(r.fallback?.items ?? [])];
     const postIds = [...new Set(all.filter((i) => POST_KINDS.has(i.obj.kind)).map((i) => i.obj.refId ?? ''))];
@@ -234,6 +255,8 @@ export class ExploreUseCases {
   async searchPosts(query: PostSearchQuery): Promise<PostSearchPage> {
     const kinds: readonly string[] = POST_TYPE_KINDS[query.postType];
     const r = await searchExplore(this.store, query.q, { perSection: MAX_POST_RESULTS, fullKinds: kinds });
+    // Lật trang không phải một lượt tìm mới.
+    if (!query.cursor) this.logQuery(query.q, r.understood);
     const seen = new Set<string>();
     // Vùng Lộ trình có cả video kèm lộ trình: `article` bỏ mọi video. Kết quả thay thế lọc theo loại của bài nên không cần.
     const isWanted = (i: ExploreItem) => query.postType !== 'article' || i.obj.kind !== 'video';
@@ -260,6 +283,42 @@ export class ExploreUseCases {
       isFallback: isFallback && shown.length > 0,
       fallbackRelaxed: isFallback && shown.length > 0 ? fallback!.relaxed : [],
     };
+  }
+
+  /** Khoảng trống từ vựng `days` ngày gần nhất: n-gram người tìm dùng nhiều hơn hẳn nội dung, gom kiểu viết gần nhau. */
+  async vocabGaps(query: VocabGapsQuery, now = new Date()): Promise<VocabGapsPage> {
+    const rows = await this.store.listQueryGrams(dayOf(now, query.days - 1), query.minCount);
+    const hitsOf = (key: string) => rows.find((r) => r.gram === key)?.hits ?? 0;
+    const grams = rows.filter((r) => !r.gram.startsWith('#'));
+    const counts = await this.store.counts([
+      ...grams.map((r) => ({ ns: NS.ngram, key: r.gram })),
+      { ns: NS.ngramTotal, key: '1' },
+      { ns: NS.ngramTotal, key: '2' },
+    ]);
+    const content = new Map(counts.map((c) => [`${c.ns}:${c.key}`, c.n]));
+    const items = rankVocabGaps(
+      grams,
+      { 1: hitsOf(QUERY_TOTAL_KEYS[1]), 2: hitsOf(QUERY_TOTAL_KEYS[2]) },
+      {
+        count: (gram) => content.get(`${NS.ngram}:${gram}`) ?? 0,
+        totals: { 1: content.get(`${NS.ngramTotal}:1`) ?? 0, 2: content.get(`${NS.ngramTotal}:2`) ?? 0 },
+      },
+    );
+    return { days: query.days, queries: hitsOf(QUERY_TOTAL_KEYS.queries), items: items.slice(0, query.limit) };
+  }
+
+  /** Đếm n-gram của câu tìm cho vocabGaps. Bắn rồi quên: không làm chậm lượt tìm, lỗi chỉ ghi log. Không lưu người tìm. */
+  private logQuery(q: string, u: Understood): void {
+    const { grams, totals } = queryGrams(u);
+    const rows: QueryGramRow[] = [
+      { gram: QUERY_TOTAL_KEYS.queries, hits: 1, samples: [] },
+      { gram: QUERY_TOTAL_KEYS[1], hits: totals[1], samples: [] },
+      { gram: QUERY_TOTAL_KEYS[2], hits: totals[2], samples: [] },
+      ...grams.map((gram) => ({ gram, hits: 1, samples: [q.trim()] })),
+    ];
+    void this.store
+      .recordQueryGrams(dayOf(new Date()), rows)
+      .catch((error: unknown) => this.logger.warn(`Ghi đếm câu tìm lỗi: ${(error as Error).message}`));
   }
 
   private async authorNames(items: ExploreItem[]): Promise<AuthorNames> {
