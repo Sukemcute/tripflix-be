@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, desc, eq, getTableColumns, gt, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { alias, getTableConfig } from 'drizzle-orm/pg-core';
 import type { Db } from '@tripflix/db';
 import { isBeforeCursor } from './keyset-cursor.js';
-import { comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
+import { commentReactions, comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
 
 export type SampledCommentRecord = CommentRecord & {
   parentCommentBody: string | null;
+};
+
+export type CommentPageRecord = CommentRecord & {
+  replyCount: number;
+  isLiked: boolean;
 };
 
 export interface FindCommentsOptions {
@@ -186,7 +191,7 @@ export class CommentRepository {
     return rows.length;
   }
 
-  async findByPostId(options: FindCommentsOptions): Promise<CommentRecord[]> {
+  private pageConditions(options: FindCommentsOptions): SQL[] {
     const conditions = [
       eq(comments.postId, options.postId),
       isNull(comments.deletedAt),
@@ -206,11 +211,43 @@ export class CommentRepository {
         isBeforeCursor(comments, comments.createdAt, comments.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
+    return conditions;
+  }
 
+  async findByPostId(options: FindCommentsOptions): Promise<CommentRecord[]> {
     return this.db
       .select()
       .from(comments)
-      .where(and(...conditions))
+      .where(and(...this.pageConditions(options)))
+      .orderBy(desc(comments.createdAt), desc(comments.id))
+      .limit(options.limit);
+  }
+
+  /**
+   * Một trang bình luận kèm số trả lời còn hiển thị và người xem đã thích chưa, trong một câu truy vấn.
+   * Thay cho ba lượt gọi DB nối tiếp (trang, lượt thích, đếm trả lời): mỗi lượt tốn CPU của core-api dù Postgres trả rất nhanh.
+   */
+  async findPage(options: FindCommentsOptions): Promise<CommentPageRecord[]> {
+    // Drizzle có lúc in cột của bảng chính không kèm tên bảng ("id"): trong câu con, "id" sẽ trỏ nhầm vào bảng con.
+    // Ghi đủ schema.bảng.cột để câu con luôn trỏ về dòng của trang.
+    const { schema, name } = getTableConfig(comments);
+    const pageCommentId = sql`${sql.identifier(schema ?? 'public')}.${sql.identifier(name)}.${sql.identifier(comments.id.name)}`;
+    // Cùng điều kiện với countRepliesByParentIds: chỉ đếm trả lời còn hiển thị.
+    const replyCount = sql<number>`(
+      SELECT count(*)::int FROM ${comments} AS reply
+      WHERE reply.parent_comment_id = ${pageCommentId} AND reply.deleted_at IS NULL AND reply.status = 'visible'
+    )`;
+    const isLiked = options.viewerId
+      ? sql<boolean>`EXISTS (
+          SELECT 1 FROM ${commentReactions} AS liked
+          WHERE liked.comment_id = ${pageCommentId} AND liked.user_id = ${options.viewerId}
+        )`
+      : sql<boolean>`false`;
+
+    return this.db
+      .select({ ...getTableColumns(comments), replyCount, isLiked })
+      .from(comments)
+      .where(and(...this.pageConditions(options)))
       .orderBy(desc(comments.createdAt), desc(comments.id))
       .limit(options.limit);
   }

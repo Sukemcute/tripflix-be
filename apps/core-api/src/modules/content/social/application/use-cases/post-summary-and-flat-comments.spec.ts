@@ -11,6 +11,7 @@ import {
 } from '../index.js';
 import { PostSummaryController } from '../../api/post-summary.controller.js';
 import type { PostRecord } from '../../../db/schema/index.js';
+import { decodeCursor, encodeCursor } from '../common/cursor.js';
 
 describe('Post Summary and Flat Comments Use Cases', () => {
   beforeAll(async () => {
@@ -61,6 +62,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       create: vi.fn(),
       findById: vi.fn(),
       findByPostId: vi.fn().mockResolvedValue([]),
+      findPage: vi.fn().mockResolvedValue([]),
       countByPostId: vi.fn().mockResolvedValue(0),
       countRepliesByParentIds: vi.fn().mockResolvedValue(new Map()),
       hasDiscussionChangedSince: vi.fn().mockResolvedValue(false),
@@ -113,7 +115,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         limit: 100, // vượt quá 50
       });
 
-      expect(mockCommentRepo.findByPostId).toHaveBeenCalledWith(
+      expect(mockCommentRepo.findPage).toHaveBeenCalledWith(
         expect.objectContaining({
           postId,
           limit: 51, // Math.min(100, 50) + 1
@@ -129,16 +131,16 @@ describe('Post Summary and Flat Comments Use Cases', () => {
     });
 
     it('trả số trả lời của từng bình luận, bình luận không có trả lời là 0', async () => {
-      mockCommentRepo.findByPostId.mockResolvedValue([
-        { id: 'c1', postId, authorId, parentCommentId: null, body: 'Có trả lời', createdAt: new Date() },
-        { id: 'c2', postId, authorId, parentCommentId: null, body: 'Chưa ai trả lời', createdAt: new Date() },
+      mockCommentRepo.findPage.mockResolvedValue([
+        { id: 'c1', postId, authorId, parentCommentId: null, body: 'Có trả lời', createdAt: new Date(), replyCount: 3, isLiked: false },
+        { id: 'c2', postId, authorId, parentCommentId: null, body: 'Chưa ai trả lời', createdAt: new Date(), replyCount: 0, isLiked: false },
       ]);
-      mockCommentRepo.countRepliesByParentIds.mockResolvedValue(new Map([['c1', 3]]));
       const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
 
       const result = await useCase.execute({ postId });
 
-      expect(mockCommentRepo.countRepliesByParentIds).toHaveBeenCalledWith(['c1', 'c2']);
+      // Số trả lời lấy cùng câu truy vấn trang, không gọi thêm lượt đếm riêng.
+      expect(mockCommentRepo.countRepliesByParentIds).not.toHaveBeenCalled();
       expect(result.items.map((item) => [item.id, item.replyCount])).toEqual([
         ['c1', 3],
         ['c2', 0],
@@ -153,7 +155,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         limit: Number('invalid-limit'), // NaN
       });
 
-      expect(mockCommentRepo.findByPostId).toHaveBeenCalledWith(
+      expect(mockCommentRepo.findPage).toHaveBeenCalledWith(
         expect.objectContaining({
           limit: 21, // 20 + 1
         }),
@@ -165,7 +167,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         { id: 'c1', postId, authorId, parentCommentId: null, body: 'Gốc 1', createdAt: new Date() },
         { id: 'c2', postId, authorId, parentCommentId: 'c1', body: 'Reply 1', createdAt: new Date() },
       ];
-      mockCommentRepo.findByPostId.mockResolvedValue(mockFlatComments);
+      mockCommentRepo.findPage.mockResolvedValue(mockFlatComments);
       mockCommentRepo.countByPostId.mockResolvedValue(2);
 
       const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
@@ -176,7 +178,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         flat: true,
       });
 
-      expect(mockCommentRepo.findByPostId).toHaveBeenCalledWith(
+      expect(mockCommentRepo.findPage).toHaveBeenCalledWith(
         expect.objectContaining({
           postId,
           limit: 201,
@@ -222,6 +224,68 @@ describe('Post Summary and Flat Comments Use Cases', () => {
         viewerId: 'author-123',
       });
       expect(res.items).toBeDefined();
+    });
+
+    it('trang đầu đếm tổng một lần và mang tổng trong cursor; trang sau dùng lại, không đếm nữa', async () => {
+      const row = (id: string, createdAt: string) => ({
+        id, postId, authorId, parentCommentId: null, body: id, createdAt: new Date(createdAt), replyCount: 0, isLiked: false,
+      });
+      mockCommentRepo.countByPostId.mockResolvedValue(8000);
+      mockCommentRepo.findPage.mockResolvedValueOnce([
+        row('c3', '2026-11-16T08:00:03.000Z'),
+        row('c2', '2026-11-16T08:00:02.000Z'),
+        row('c1', '2026-11-16T08:00:01.000Z'),
+      ]);
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const first = await useCase.execute({ postId, limit: 2 });
+      expect(first.total).toBe(8000);
+      expect(decodeCursor(first.nextCursor!)).toEqual({ createdAt: new Date('2026-11-16T08:00:02.000Z'), id: 'c2', total: 8000 });
+
+      mockCommentRepo.findPage.mockResolvedValueOnce([row('c1', '2026-11-16T08:00:01.000Z')]);
+      const second = await useCase.execute({ postId, limit: 2, cursor: first.nextCursor! });
+
+      expect(second.total).toBe(8000);
+      expect(mockCommentRepo.countByPostId).toHaveBeenCalledTimes(1);
+      expect(mockCommentRepo.findPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursorCreatedAt: new Date('2026-11-16T08:00:02.000Z'), cursorId: 'c2' }),
+      );
+    });
+
+    it('cursor cũ không có total: đếm lại như trước', async () => {
+      mockCommentRepo.countByPostId.mockResolvedValue(42);
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const page = await useCase.execute({ postId, cursor: encodeCursor(new Date('2026-11-16T08:00:00.000Z'), 'c9') });
+
+      expect(page.total).toBe(42);
+      expect(mockCommentRepo.countByPostId).toHaveBeenCalledTimes(1);
+    });
+
+    it('trạng thái đã thích lấy từ câu truy vấn trang, truyền người xem xuống repository', async () => {
+      mockCommentRepo.findPage.mockResolvedValue([
+        { id: 'c1', postId, authorId, parentCommentId: null, body: 'Đã thích', createdAt: new Date(), replyCount: 0, isLiked: true },
+        { id: 'c2', postId, authorId, parentCommentId: null, body: 'Chưa thích', createdAt: new Date(), replyCount: 0, isLiked: false },
+      ]);
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const result = await useCase.execute({ postId, viewerId: 'viewer-1' });
+
+      expect(mockCommentRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ viewerId: 'viewer-1' }));
+      expect(result.items.map((item) => [item.id, item.isLiked])).toEqual([
+        ['c1', true],
+        ['c2', false],
+      ]);
+    });
+
+    it('bài không xem được: báo không tìm thấy, không trả bình luận nào dù trang đã được đọc song song', async () => {
+      mockPostRepo.findById.mockResolvedValueOnce({ ...mockPost, status: 'hidden' });
+      mockCommentRepo.findPage.mockResolvedValue([
+        { id: 'c1', postId, authorId, parentCommentId: null, body: 'Bí mật', createdAt: new Date(), replyCount: 0, isLiked: false },
+      ]);
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      await expect(useCase.execute({ postId, viewerId: 'stranger-456' })).rejects.toThrow(PostNotFoundException);
     });
   });
 
