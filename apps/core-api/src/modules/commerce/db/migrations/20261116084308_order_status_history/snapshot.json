@@ -1,0 +1,338 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "8a1bfd8a-5f34-42f9-8237-77c31e279571",
+  "prevIds": [
+    "97305e09-e64e-4b51-baee-5d4cc6c7b4bc"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "order_status_history"
+      ],
+      "writes": [
+        "s|tbl|commerce.order_status_history",
+        "n|tbl|commerce.order_status_history",
+        "e|tbl|commerce.order_status_history",
+        "n|rel|commerce.order_status_history",
+        "n|type|commerce.order_status_history",
+        "n|rel|commerce.order_status_history_pkey"
+      ],
+      "reads": [
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "orders",
+        "status_source"
+      ],
+      "writes": [
+        "s|col|commerce.orders.status_source",
+        "n|col|commerce.orders.status_source",
+        "e|col|commerce.orders.status_source"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "orders",
+        "status_request_id"
+      ],
+      "writes": [
+        "s|col|commerce.orders.status_request_id",
+        "n|col|commerce.orders.status_request_id",
+        "e|col|commerce.orders.status_request_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "order_status_history",
+        "idx_order_status_history_order_id"
+      ],
+      "writes": [
+        "s|idx|commerce.idx_order_status_history_order_id",
+        "n|idx|commerce.idx_order_status_history_order_id",
+        "e|idx|commerce.idx_order_status_history_order_id",
+        "n|rel|commerce.idx_order_status_history_order_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_status_history",
+        "n|sch|commerce",
+        "n|col|commerce.order_status_history.order_id",
+        "n|col|commerce.order_status_history.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "order_status_history"
+      ],
+      "writes": [
+        "s|fk|commerce.order_status_history.fk_order_status_history_order_id",
+        "n|fk|commerce.order_status_history.fk_order_status_history_order_id",
+        "e|fk|commerce.order_status_history.fk_order_status_history_order_id",
+        "n|con|commerce.order_status_history.fk_order_status_history_order_id"
+      ],
+      "reads": [
+        "n|tbl|commerce.order_status_history",
+        "n|sch|commerce",
+        "n|tbl|commerce.orders",
+        "n|sch|commerce",
+        "n|col|commerce.order_status_history.order_id",
+        "n|col|commerce.orders.id",
+        "e|uniqueness|commerce.orders.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "name": "order_status_history",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "id",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": {
+          "type": "always",
+          "name": "order_status_history_id_seq",
+          "increment": "1",
+          "startWith": "1",
+          "minValue": "1",
+          "maxValue": "9223372036854775807",
+          "cache": 1,
+          "cycle": false
+        },
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "order_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "from_status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "to_status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "request_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "status_source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "status_request_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "idx_order_status_history_order_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "order_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "fk_order_status_history_order_id",
+        "nameExplicit": true,
+        "columns": [
+          "order_id"
+        ],
+        "schemaTo": "commerce",
+        "tableTo": "orders",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "order_status_history",
+        "name": "order_status_history_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

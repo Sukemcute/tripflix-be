@@ -10,6 +10,9 @@ import { CheckoutUseCases } from './booking/application/checkout.use-cases.js';
 import { ExpireHoldsUseCases } from './booking/application/expire-holds.use-cases.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/ports.js';
 import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
+import { TraceContext } from './trace-context.js';
+import { CommerceMetrics } from './metrics/commerce-metrics.js';
+import { AdminMetricsController } from './metrics/admin-metrics.controller.js';
 import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
 import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
 import { ReconcileInventoryJob } from './booking/jobs/reconcile-inventory.job.js';
@@ -100,9 +103,11 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
     }),
   ],
-  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController],
+  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController, AdminMetricsController],
   providers: [
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
+    TraceContext,
+    CommerceMetrics,
     { provide: ORDER_STORE, useClass: DrizzleOrderStore },
     { provide: TODAY, useValue: todayInVietnam },
     { provide: READ_CALENDAR, inject: [COMMERCE_STORE, TODAY, CORE_ENV], useFactory: buildReadCalendar },
