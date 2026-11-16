@@ -138,6 +138,10 @@ services:
       WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
       # Web, admin gọi /notifications từ trình duyệt (TF46): cùng danh sách origin với core-api.
       WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
+      # Push mobile qua Expo (N3, PR #202). Bật khi app đã gửi Expo push token lên. Khoá FCM, APNs nằm trên Expo, không nằm ở đây.
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      # Chỉ cần khi bật "Enhanced Push Security" trên Expo. EXPO_PUSH_URL để mặc định trong code.
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
@@ -169,6 +173,26 @@ services:
       # ViSoBERT INT8 chạy cạnh OpenAI moderation, cần AI_TAG từ sha-eadf699. Bận hoặc quá 1,5 giây thì dùng riêng kết quả OpenAI.
       IS_VISOBERT_ENABLED: ${IS_VISOBERT_ENABLED:-false}
       LOG_LEVEL: INFO
+      # Tripi v3 (TF31): Controller (OpenAI) chọn công cụ, Responder (DeepSeek) viết câu trả lời.
+      # Giá USD mỗi 1 triệu token của gpt-5-nano, Bảo xác nhận lại khi đổi model. Không để giá rỗng:
+      # ai-service đọc "" thành lỗi và không khởi động, kéo theo /moderate.
+      CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
+      CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
+      CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
+      CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
+      CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
+      CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
+      # Băm IP của khách để tính hạn mức. Mỗi môi trường một chuỗi; đổi thì hạn mức khách tính lại từ đầu.
+      CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
+      # Hạn mức lượt, token, USD/ngày, lượt chạy cùng lúc để mặc định trong code; cần thì thêm CHAT_* vào đây.
+      CHAT_SYSTEM_DAILY_USD: ${CHAT_SYSTEM_DAILY_USD:-3}
+      # Khoá lượt, đếm lượt/phút, lượt và token/ngày của Tripi.
+      REDIS_URL: redis://redis:6379
+      # fastapi run chỉ tin X-Forwarded-For từ các địa chỉ này. Đặt bằng dải mạng compose (SERVER.md, mục Trợ lý Tripi);
+      # để mặc định 127.0.0.1 thì mọi khách chung IP của Traefik và chạm hạn mức khách rất nhanh.
+      FORWARDED_ALLOW_IPS: ${AI_FORWARDED_ALLOW_IPS:-127.0.0.1}
+    depends_on:
+      redis: { condition: service_healthy }
     cpus: 0.5
     # Bản thử của TF32: đỉnh khoảng 290 MiB khi gọi API, 640 MiB khi suy luận văn bản dài. 1g để có chỗ dư.
     mem_limit: 1g
