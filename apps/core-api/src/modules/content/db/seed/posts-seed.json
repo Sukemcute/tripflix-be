@@ -168,9 +168,7 @@
       "status": "published",
       "visibility": "public",
       "isVerified": true,
-      "mediaIds": [
-        "018d9f10-0000-7000-8000-000000000001"
-      ],
+      "mediaIds": [],
       "coverMediaId": null,
       "tripAttachment": {
         "bookingId": "018d9f30-0000-7000-8000-000000000001",
@@ -336,9 +334,7 @@
       "status": "published",
       "visibility": "public",
       "isVerified": true,
-      "mediaIds": [
-        "018d9f10-0000-7000-8000-000000000003"
-      ],
+      "mediaIds": [],
       "coverMediaId": null,
       "tripAttachment": {
         "bookingId": "018d9f30-0000-7000-8000-000000000003",
@@ -494,9 +490,7 @@
       "status": "published",
       "visibility": "public",
       "isVerified": true,
-      "mediaIds": [
-        "018d9f10-0000-7000-8000-000000000005"
-      ],
+      "mediaIds": [],
       "coverMediaId": null,
       "tripAttachment": {
         "bookingId": "018d9f30-0000-7000-8000-000000000005",
@@ -662,9 +656,7 @@
       "status": "published",
       "visibility": "public",
       "isVerified": false,
-      "mediaIds": [
-        "018d9f10-0000-7000-8000-000000000007"
-      ],
+      "mediaIds": [],
       "coverMediaId": null,
       "tripAttachment": {
         "hotelId": "P-vn-h-lao-cai-1",
