@@ -102,6 +102,8 @@ export interface OrderStore {
   limitLockWait(milliseconds: number): Promise<void>;
   /** Lỗi này có phải do chờ khoá quá giới hạn của limitLockWait không. */
   isLockWaitTimeout(error: unknown): boolean;
+  /** Lỗi deadlock của database (Postgres 40P01): transaction đã rollback, chạy lại được. */
+  isDeadlock(error: unknown): boolean;
   countOrdersCreatedSince(userId: string, since: Date): Promise<number>;
   findOrder(orderId: string): Promise<OrderRecord | null>;
   lockOrder(orderId: string): Promise<OrderRecord | null>;
@@ -109,6 +111,8 @@ export interface OrderStore {
   lockOrdersOfUser(userId: string, statuses: OrderStatus[]): Promise<OrderRecord[]>;
   /** Đơn quá hạn giữ, nhả được: pending, hoặc paying có khoản đang chờ OTP / đã quá hạn trang của cổng chuyển hướng. Đọc không khoá. */
   findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }): Promise<string[]>;
+  /** K4: các ô (từ fromDate) có held/sold khác tổng số lượng của đơn đang giữ/đã trả. Đọc trong một câu lệnh nên là một ảnh chụp nhất quán. */
+  findInventoryDrift(input: { fromDate: string; limit: number }): Promise<InventoryDrift[]>;
   /** FOR UPDATE SKIP LOCKED: hàng đang bị giữ thì trả null, không chờ. */
   lockOrderSkipLocked(orderId: string): Promise<OrderRecord | null>;
   lockPaymentSkipLocked(paymentId: string): Promise<PaymentRecord | null>;
@@ -169,3 +173,14 @@ export const ORDER_STORE = Symbol('COMMERCE_ORDER_STORE');
 /** Đồng hồ của server, thay được trong test. */
 export type Clock = () => Date;
 export const COMMERCE_CLOCK = Symbol('COMMERCE_CLOCK');
+
+/** Một ô tồn kho lệch với đơn: expected tính từ order_items của đơn pending/paying (held) và paid (sold). */
+export interface InventoryDrift {
+  productType: 'room' | 'flight';
+  productId: string;
+  date: string;
+  held: number;
+  expectedHeld: number;
+  sold: number;
+  expectedSold: number;
+}
