@@ -15,6 +15,7 @@ type JobGroup = (typeof GROUPS)[number];
 const MINUTE_MS = 60_000;
 /** Job admin đổi được chu kỳ. Dưới 1 phút vô nghĩa (job đọc chu kỳ mỗi phút) và mỗi lượt dựng lại toàn bộ chỉ mục. */
 const INTERVAL_LIMITS = { min: MINUTE_MS, max: 24 * 60 * MINUTE_MS };
+const CHANGEABLE_JOBS = 'explore, recommend_build';
 
 export const SetJobIntervalRequestSchema = z.object({
   intervalMs: z.number().int().min(INTERVAL_LIMITS.min, 'Ít nhất 1 phút').max(INTERVAL_LIMITS.max, 'Nhiều nhất 24 giờ').nullable(),
@@ -189,7 +190,7 @@ export class AdminDiscoveryJobsController {
     this.jobs = {
       explore: { group: 'search', intervalMs: EXPLORE_INDEX_INTERVAL_MS, canChangeInterval: true, instance: explore },
       suggest: { group: 'search', intervalMs: null, canChangeInterval: false, instance: suggest },
-      recommend_build: { group: 'recommend', intervalMs: BUILD_FEATURES_EVERY_MS, canChangeInterval: false, instance: build },
+      recommend_build: { group: 'recommend', intervalMs: BUILD_FEATURES_EVERY_MS, canChangeInterval: true, instance: build },
       recommend_purge: { group: 'recommend', intervalMs: PURGE_INTERACTIONS_EVERY_MS, canChangeInterval: false, instance: purge },
     };
   }
@@ -240,7 +241,7 @@ export class AdminDiscoveryJobsController {
 
   @Put(':job/interval')
   @Roles('superadmin')
-  @ApiOperation({ summary: 'Đổi chu kỳ tự chạy của job (hiện chỉ explore); có hiệu lực trong vòng 1 phút, không cần khởi động lại' })
+  @ApiOperation({ summary: 'Đổi chu kỳ tự chạy của job (explore, recommend_build); có hiệu lực trong vòng 1 phút, không cần khởi động lại' })
   @ApiParam({ name: 'job', enum: JOB_KEYS })
   @ApiBody({ type: SetJobIntervalRequestDto })
   @ApiOkResponse({ type: JobIntervalDto })
@@ -250,7 +251,7 @@ export class AdminDiscoveryJobsController {
     if (!JOB_KEYS.includes(job as JobKey)) throw new NotFoundException('Không có job này');
     const { intervalMs: defaultIntervalMs, canChangeInterval } = this.jobs[job as JobKey];
     if (!canChangeInterval || defaultIntervalMs === null) {
-      throw new BadRequestException({ message: 'Job này không đổi được chu kỳ', errors: [{ field: 'job', message: 'Chỉ đổi được: explore' }] });
+      throw new BadRequestException({ message: 'Job này không đổi được chu kỳ', errors: [{ field: 'job', message: `Chỉ đổi được: ${CHANGEABLE_JOBS}` }] });
     }
     const parsed = SetJobIntervalRequestSchema.safeParse(body);
     if (!parsed.success) {

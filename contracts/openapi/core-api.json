@@ -4471,7 +4471,7 @@
             "bearer": []
           }
         ],
-        "summary": "Đổi chu kỳ tự chạy của job (hiện chỉ explore); có hiệu lực trong vòng 1 phút, không cần khởi động lại",
+        "summary": "Đổi chu kỳ tự chạy của job (explore, recommend_build); có hiệu lực trong vòng 1 phút, không cần khởi động lại",
         "tags": [
           "Admin Discovery Jobs"
         ]

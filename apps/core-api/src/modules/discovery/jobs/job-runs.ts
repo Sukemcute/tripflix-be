@@ -35,6 +35,9 @@ export interface JobResult {
   error?: string;
 }
 
+/** Job có chu kỳ admin đổi được đọc lại chu kỳ mỗi nhịp này: đổi có hiệu lực trong vòng một nhịp, không cần khởi động lại. */
+export const SCHEDULE_TICK_MS = 60_000;
+
 const KEEP = 20;
 const TTL_SECONDS = 7 * 24 * 3600;
 const key = (job: JobKey) => `discovery:job-runs:${job}`;

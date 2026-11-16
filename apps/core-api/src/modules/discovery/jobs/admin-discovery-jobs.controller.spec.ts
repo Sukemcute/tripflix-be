@@ -90,6 +90,16 @@ describe('AdminDiscoveryJobsController', () => {
       expect(runs.getIntervalMs).toHaveBeenCalledTimes(1);
     });
 
+    it('PUT đổi chu kỳ recommend_build; GET nhóm recommend hiện chu kỳ đang dùng', async () => {
+      const { controller, runs } = setup();
+      expect(await controller.setInterval('recommend_build', { intervalMs: 3_600_000 })).toEqual({ job: 'recommend_build', intervalMs: 3_600_000, defaultIntervalMs: 600_000 });
+      expect(runs.setIntervalMs).toHaveBeenLastCalledWith('recommend_build', 3_600_000);
+      runs.getIntervalMs.mockResolvedValueOnce(3_600_000);
+      const [build, purge] = (await controller.list('recommend')).jobs;
+      expect(build).toMatchObject({ intervalMs: 3_600_000, defaultIntervalMs: 600_000, canChangeInterval: true });
+      expect(purge).toMatchObject({ intervalMs: 86_400_000, canChangeInterval: false });
+    });
+
     it('PUT đổi chu kỳ explore; null về mặc định', async () => {
       const { controller, runs } = setup();
       expect(await controller.setInterval('explore', { intervalMs: 1_800_000 })).toEqual({ job: 'explore', intervalMs: 1_800_000, defaultIntervalMs: 600_000 });
@@ -107,7 +117,7 @@ describe('AdminDiscoveryJobsController', () => {
     it('PUT job không đổi được chu kỳ -> 400, job lạ -> 404', async () => {
       const { controller } = setup();
       await expect(controller.setInterval('suggest', { intervalMs: 600_000 })).rejects.toBeInstanceOf(BadRequestException);
-      await expect(controller.setInterval('recommend_build', { intervalMs: 600_000 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(controller.setInterval('recommend_purge', { intervalMs: 600_000 })).rejects.toBeInstanceOf(BadRequestException);
       await expect(controller.setInterval('drop_db', { intervalMs: 600_000 })).rejects.toBeInstanceOf(NotFoundException);
     });
   });
