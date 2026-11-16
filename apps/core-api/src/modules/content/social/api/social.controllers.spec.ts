@@ -113,7 +113,6 @@ describe('Social API Controllers', () => {
         cursor: undefined,
         postType: undefined,
         hashtag: 'travel',
-        keyword: undefined,
         authorId: undefined,
         viewerId: null,
       });
