@@ -50,3 +50,10 @@
 - Đã merge develop tại 52d1757: lint/typecheck/unit test đạt 49/49 task; core-api 2467 pass, 4 skip có sẵn.
 - Integration content 76/76 là kết quả trước lần merge này. Docker hiện trả lỗi 500 nên chờ CI chạy lại integration cho HEAD mới.
 - PR #190 của Thành có cùng kiểm tra canBeViewedBy ở track-share; cần phối hợp thứ tự merge và giữ test của cả hai PR.
+
+## Sau review của Thành và merge #190/#192
+- Merge develop tại 53c09ae: chỉ conflict comment track-share, giữ comment nhắc held, giữ toàn bộ test hai bên. Hai migration content được giữ nguyên.
+- Test TF90 dùng outbox local với vi.fn() để bỏ cảnh báo unbound-method ở assertion outbox.
+- Lint/typecheck/unit: 49/49 task đạt, core-api 2478 pass, 4 skip; riêng social 199/199 pass.
+- Docker local vẫn lỗi 500; CI chạy integration lại cho bản này.
+- TF91 cần bổ sung held vào PostStatus/ALLOWED_ACTIONS của moderation-post-detail.tsx và nhãn trạng thái ở moderation-workspace.tsx (kế hoạch mục 9 đã ghi).
