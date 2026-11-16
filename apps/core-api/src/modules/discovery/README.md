@@ -110,10 +110,10 @@ Chọn địa điểm thì web gọi `/stays?placeId=<refId>`. Chọn khách s�
 | | |
 |---|---|
 | Vào | `{ q, loc?: { lat, lng } }`. `loc` chỉ dùng khi câu không nói nơi |
-| Ra | `{ understood, nearUser, sections: [{ kind, label, total, items }], suggest, dropped }`. `kind`: stay, plan, post, video (food, cafe, see rỗng tới khi có nguồn POI). Item: `id`, `kind`, `refId`, `title`, `subtitle`, `thumbnail`, `reason`, `priceFrom`, `days`, `location` |
+| Ra | `{ understood, nearUser, sections: [{ kind, label, total, items }], fallback, suggest, dropped }`. `sections` chỉ gồm mục khớp đủ câu (đúng nơi ≤ 40 km, không vượt ngân sách, khớp từ chính); vùng câu muốn rỗng thì `fallback: { forQuery, relaxed, dropped, items }` là kết quả thay thế sau khi nới điều kiện (`suggest`, `dropped` ở gốc: deprecated). `kind`: stay, plan, post, video (food, cafe, see rỗng tới khi có nguồn POI). Item: `id`, `kind`, `refId`, `title`, `subtitle`, `thumbnail`, `reason`, `priceFrom`, `days`, `location` |
 | Luồng | 1. Hiểu câu (`search/domain/explore/query.ts`): nơi, ý muốn, ngân sách, số ngày, tên riêng, cụm dính, sửa lỗi gõ — đọc bộ đếm cần cho câu từ `search_counts`.<br>2. Mỗi nhánh (song song) lấy ứng viên bằng SQL (`terms && …`, tên đường, tầm, số ngày, khung toạ độ quanh nơi) rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần bằng TS (`rank.ts`).<br>3. `content.getVisiblePosts` bỏ bài vừa ẩn |
 | Nạp dữ liệu | Job mỗi 10 phút (worker): đọc hết `listCatalog` + `listPosts`, dựng chỉ mục bằng TS, một transaction xoá rồi ghi lại (advisory lock), sau commit gỡ bài vừa bị ẩn (`dropHidden`). Dựng lại toàn bộ vì `listPosts` không báo bài bị ẩn; ~230 mục mất ~2 s. Bài bị ẩn/xoá rời chỉ mục trong vài giây nhờ consumer (TF33), nên `total` chỉ dư bài ẩn trong khoảng đó |
-| Đối chiếu | Port từ prototype Python `experiments/natural-search` (ngoài repo). `explore.parity.spec.ts` chạy 134 câu của prototype, kết quả trùng hoàn toàn (đặt `EXPLORE_PARITY_DIR`) |
+| Đối chiếu | Port từ prototype Python `experiments/natural-search` (ngoài repo). Từ 13/11 phần sửa lỗi gõ, gộp câu gốc + câu sửa và chấm điểm mềm đã khác bản Python, nên `explore.parity.spec.ts` (chỉ chạy khi đặt `EXPLORE_PARITY_DIR`) không còn khớp. Đo bằng `search/eval/typo-bench.ts` (`SEARCH_BENCH=1`) và `typo-regression.spec.ts` (chạy trong CI) |
 | Từ điển | `search/domain/explore/lexicon-rows.ts`. Thêm cách viết mới = thêm dòng; chỉ mục dựng lại ở chu kỳ job kế tiếp |
 
 Bảng khai báo trong `db/schema/`. Sinh migration: `pnpm db:generate discovery`. Không sửa migration đã merge.

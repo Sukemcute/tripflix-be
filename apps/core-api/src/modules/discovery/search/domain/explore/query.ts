@@ -45,12 +45,16 @@ export interface Understood {
 
 const replaceAll = (s: string, a: string, b: string) => s.split(a).join(b);
 
-export function parse(q: string, fix?: ReadonlyMap<string, string>, folded: string = fold(q)): Understood {
+/** 'ngày 3': số đứng sau chữ. Vừa có thể là chuyến 3 ngày, vừa có thể là "ngày thứ 3" (vlog), nên understand() giữ cả cách hiểu theo chữ. */
+const DAYS_AFTER = /\bngay (\d+)\b/;
+
+/** hasDaysSlot=false: không tách số ngày thành ô, giữ '3 ngày' làm từ tìm (cách hiểu theo chữ). */
+export function parse(q: string, fix?: ReadonlyMap<string, string>, folded: string = fold(q), options: { hasDaysSlot?: boolean } = {}): Understood {
   let t = ` ${folded} `;
   const [budget, raw] = budgetOf(t); // trước khi đổi teencode ('500k' không thành '500 khong')
   if (raw) t = replaceAll(t, raw, ' ');
   t = normTokens(t, fix);
-  const dm = DAYS.exec(t);
+  const dm = options.hasDaysSlot === false ? null : (DAYS.exec(t) ?? DAYS_AFTER.exec(t));
   const days = dm ? Number(dm[1] ?? dm[2]) : null;
   if (dm) t = replaceAll(t, dm[0], ' ');
   let place: string | null = null;
@@ -99,7 +103,27 @@ export function parse(q: string, fix?: ReadonlyMap<string, string>, folded: stri
 const RARE = 2; // từ có trong <= RARE tài liệu là "lạ"
 /** Dạng âm tiết tiếng Việt (đã bỏ dấu): phụ âm đầu? + nguyên âm + phụ âm cuối hợp lệ. */
 const SYLLABLE = /^(ngh|ng|nh|ch|gh|gi|kh|ph|qu|th|tr|[bcdghklmnpqrstvx])?[aeiouy]{1,3}(ch|ng|nh|[cmnpt])?$/;
-export const ALPHA = 0.7; // câu đã sửa nặng ALPHA, câu gốc nặng 1 - ALPHA
+/** Trọng số cách hiểu theo câu gốc khi đã có cách hiểu đã sửa (câu đã sửa nặng 1). Gộp kết quả: max(trọng số · rank). */
+export const ORIGINAL_WEIGHT = 0.6;
+/** Trọng số cách hiểu "theo chữ" của cụm số ngày ('3 ngày' là từ tìm, không phải ô số ngày), so với cách hiểu theo ô. */
+export const DAYS_TEXT_WEIGHT = 0.8;
+/** Mỗi lần sửa một chữ trừ chừng này vào log(df): sửa 2 chữ cần ứng viên phổ biến hơn ~e^TYPO_LAMBDA lần. */
+const TYPO_LAMBDA = 3;
+
+/** Khoảng cách Damerau-Levenshtein (bản OSA): thiếu, thừa, đổi một chữ, đảo hai chữ liền nhau đều tính 1. */
+export function editDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i ? (j ? 0 : i) : j)));
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i]![j] = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i]![j] = Math.min(d[i]![j]!, d[i - 2]![j - 2]! + 1);
+    }
+  }
+  return d[a.length]![b.length]!;
+}
+
+/** Số chữ được phép sai theo độ dài từ gõ: từ ngắn sai một chữ đã thành từ khác. */
+export const maxEdits = (len: number) => (len >= 8 ? 2 : len >= 4 ? 1 : 0);
 
 /** Độ giống như difflib.SequenceMatcher.ratio (Ratcliff/Obershelp): 2·M / (|a| + |b|). */
 export function ratio(a: string, b: string): number {
@@ -130,32 +154,79 @@ export function ratio(a: string, b: string): number {
   return a.length + b.length ? (2 * matches) / (a.length + b.length) : 1;
 }
 
-/** Như difflib.get_close_matches: tối đa n ứng viên có ratio >= cutoff, xếp (điểm, chữ) giảm dần. */
-function closeMatches(w: string, pool: readonly string[], n = 5, cutoff = 0.8): string[] {
-  return pool
-    .map((x) => [ratio(x, w), x] as const)
-    .filter(([s]) => s >= cutoff)
-    .sort((x, y) => y[0] - x[0] || (x[1] < y[1] ? 1 : x[1] > y[1] ? -1 : 0))
-    .slice(0, n)
-    .map(([, x]) => x);
-}
-
-/** Từ lạ/hiếm -> từ gần nhất trong toàn bộ từ vựng (mọi nhánh + lexicon), ưu tiên từ phổ biến hơn. 'trug' -> trung. */
+/**
+ * Từ lạ/hiếm -> từ gần nhất trong toàn bộ từ vựng (mọi nhánh + lexicon). 'trug' -> trung.
+ * Kênh nhiễu: điểm = log(df + 1) − TYPO_LAMBDA · số chữ sai. Từ chỉ có trong lexicon (df 0) vẫn là ứng viên nhưng
+ * không được ưu tiên hơn từ có trong dữ liệu: khi dữ liệu còn ít, độ giống quyết định trước, độ phổ biến sau.
+ */
 export async function typoFix(ws: readonly string[], st: Stats): Promise<Map<string, string>> {
-  // ponytail: chỉ xét ứng viên cùng chữ cái đầu và lệch <= 2 ký tự; sai chữ cái đầu thì chưa sửa — cần thì đổi sang SymSpell
+  // ponytail: chỉ xét ứng viên cùng chữ cái đầu; sai chữ cái đầu của tên nơi do placeFix lo, từ thường thì chưa sửa
   await st.load(ws.map((key) => ({ ns: NS.df, key })));
   const fix = new Map<string, string>();
   for (const w of ws) {
     const f = st.df(w);
-    if (w.length < 3 || f > RARE || LEX.vocab.has(w) || LEX.stop.has(w) || ABBR.test(w)) continue; // viết tắt -> không sửa
+    // Từ đã có trong dữ liệu (df > 0) là từ thật, kể cả khi hiếm: không sửa. Viết tắt -> không sửa.
+    if (w.length < 3 || f > 0 || LEX.vocab.has(w) || LEX.stop.has(w) || ABBR.test(w)) continue;
     await st.loadTypoPool(w);
-    const pool = st.typoCandidates(w).filter((c) => Math.abs(c.length - w.length) <= 2 && c !== w);
-    const dfc = (c: string) => st.df(c) || 50;
-    let best: string | null = null;
-    for (const c of closeMatches(w, pool)) if (best === null || dfc(c) > dfc(best)) best = c;
-    if (best && dfc(best) > Math.max(5, 10 * f)) fix.set(w, best);
+    const limit = Math.max(1, maxEdits(w.length));
+    let best: { c: string; score: number } | null = null;
+    for (const c of st.typoCandidates(w)) {
+      if (c === w || Math.abs(c.length - w.length) > limit) continue;
+      const d = editDistance(w, c);
+      if (d > limit || st.df(c) <= f) continue; // ứng viên phải phổ biến hơn từ gõ
+      const score = Math.log(st.df(c) + 1) - TYPO_LAMBDA * d;
+      if (!best || score > best.score || (score === best.score && c < best.c)) best = { c, score };
+    }
+    if (best) fix.set(w, best.c);
   }
   return fix;
+}
+
+/** Tên nơi trong lexicon (bí danh 'nha trang', 'dalat') + tên riêng nhập tay nhiều chữ: đích sửa cả cụm. */
+const PLACE_NAMES: ReadonlyArray<readonly [name: string, key: string]> = [
+  ...[...LEX.phrase].filter(([, hits]) => hits.some(([t]) => t === 'place')).map(([t]) => t),
+  ...[...LEX.names.keys()].filter((n) => n.includes(' ')),
+]
+  .filter((n) => n.split(' ').join('').length >= 4 && !ABBR.test(n))
+  .map((n) => [n, n.split(' ').join('')] as const);
+
+/**
+ * 'nha trag' -> 'nha trang', 'nah trang' -> 'nha trang', 'da lta' -> 'da lat': so cụm 1-3 từ (có ít nhất một từ lạ) với tên nơi,
+ * trên khoá bỏ khoảng trắng, cho sai tới maxEdits chữ. Tên nơi là tập nhỏ, cố định, không phụ thuộc dữ liệu: chạy được cả khi chỉ mục còn ít.
+ */
+export async function placeFix(folded: string, st: Stats): Promise<[text: string, fixed: Record<string, string>]> {
+  const ws = words(folded);
+  const alpha = (w: string) => /^[a-z]+$/.test(w);
+  await st.load(ws.filter(alpha).map((key) => ({ ns: NS.df, key })));
+  // Như typoFix: chỉ cụm có từ KHÔNG có trong dữ liệu mới là gõ sai ('hau giang', 'tran dang' có thật thì giữ).
+  const isStrange = (w: string) => alpha(w) && !st.df(w) && !LEX.vocab.has(w) && !LEX.stop.has(w) && !LEX.phrase.has(w);
+  const out: string[] = [];
+  const fixed: Record<string, string> = {};
+  for (let i = 0; i < ws.length; ) {
+    let taken = 0;
+    for (let k = Math.min(3, ws.length - i); k >= 1 && !taken; k--) {
+      const win = ws.slice(i, i + k);
+      const text = win.join(' ');
+      if (!win.every(alpha) || !win.some(isStrange) || LEX.phrase.has(text) || LEX.names.has(text)) continue;
+      const key = win.join('');
+      let best: { name: string; d: number } | null = null;
+      for (const [name, nk] of PLACE_NAMES) {
+        // Ngưỡng theo độ dài tên đích: gõ thiếu 2 chữ làm khoá ngắn đi, nhưng tên dài vẫn đủ phân biệt.
+        const limit = maxEdits(nk.length);
+        if (Math.abs(nk.length - key.length) > limit) continue;
+        const d = editDistance(key, nk);
+        if (d <= limit && (!best || d < best.d || (d === best.d && name.length > best.name.length))) best = { name, d };
+      }
+      if (best && best.name !== text) {
+        out.push(best.name);
+        fixed[text] = best.name;
+        taken = k;
+      }
+    }
+    if (!taken) out.push(ws[i]!);
+    i += taken || 1;
+  }
+  return [out.join(' '), fixed];
 }
 
 // ---------------- Ghép/tách chữ: so khớp sau khi bỏ khoảng trắng
@@ -241,18 +312,57 @@ export function nameSegment(seq: readonly string[], isName: (ph: string) => bool
   return out;
 }
 
-/** Hiểu câu: parse, sửa lỗi gõ, tách tên riêng, tách cụm dính, đánh dấu từ lạ. Trả [u, u0]; u0 = câu gốc nếu có sửa. */
-export async function understand(q: string, st: Stats): Promise<[Understood, Understood | null]> {
-  const [text, joined] = await squashFix(fold(q), st);
-  const u0 = parse(q, undefined, text);
-  await st.loadSeq(u0.seq);
-  const keep = new Set(nameSegment(u0.seq, (ph) => st.isName(ph)).filter((g) => g.length > 1).flat()); // chữ thuộc tên riêng: không sửa
+/** Một cách hiểu câu và độ tin của nó. */
+export interface Interpretation {
+  u: Understood;
+  weight: number;
+  isOriginal: boolean;
+}
+
+/**
+ * Hiểu câu: sửa ghép/tách, sửa tên nơi, parse, sửa lỗi gõ từng từ, tách tên riêng, tách cụm dính, đánh dấu từ lạ.
+ * Có sửa thì trả HAI cách hiểu: câu đã sửa (nặng 1) và câu gốc (nặng ORIGINAL_WEIGHT); bên tìm chạy cả hai rồi gộp kết quả,
+ * nên sửa nhầm không làm mất kết quả của câu gốc. Không sửa gì thì chỉ có câu gốc. Phần tử đầu là cách hiểu chính.
+ */
+export async function understand(q: string, st: Stats): Promise<Interpretation[]> {
+  const folded = fold(q);
+  const [squashed, joined] = await squashFix(folded, st);
+  const [text, placed] = await placeFix(squashed, st);
+  const u1 = parse(q, undefined, text);
+  await st.loadSeq(u1.seq);
+  const keep = new Set(nameSegment(u1.seq, (ph) => st.isName(ph)).filter((g) => g.length > 1).flat()); // chữ thuộc tên riêng: không sửa
   // Từ gõ có dấu và đúng dạng âm tiết là người dùng cố ý gõ ('dịp' không phải gõ sai của 'đi'), dù dữ liệu chưa có từ đó:
   // không sửa. Có dấu nhưng sai dạng ('trứg') vẫn sửa.
-  const typed = (w: string) => Object.hasOwn(u0.accents, w) && SYLLABLE.test(w);
-  const fix = await typoFix(u0.terms.filter((w) => !w.includes(' ') && !keep.has(w) && !typed(w)), st);
-  const u = fix.size ? parse(q, fix, text) : u0;
-  u.fixed = { ...joined, ...Object.fromEntries(fix) };
+  const typed = (w: string) => Object.hasOwn(u1.accents, w) && SYLLABLE.test(w);
+  const fix = await typoFix(u1.terms.filter((w) => !w.includes(' ') && !keep.has(w) && !typed(w)), st);
+  const fixed = { ...joined, ...placed, ...Object.fromEntries(fix) };
+  const hasFix = Object.keys(fixed).length > 0;
+  // Câu có số ngày: thêm cách hiểu theo chữ, giữ đúng thứ tự chữ đã gõ (cụm phải khớp liền, '3 ngày' ≠ 'ngày 3').
+  // '3 ngày' = chuyến 3 ngày: cách hiểu theo ô nặng hơn. 'ngày 3' = ngày thứ 3 (vlog): cách hiểu theo chữ nặng hơn.
+  // Cách hiểu theo ô luôn đứng trước, vì `understood` lấy từ cách hiểu đầu (FE dùng days cho nút "Bỏ số ngày").
+  const variants = async (fixArg: ReadonlyMap<string, string> | undefined, src: string, weight: number, isOriginal: boolean) => {
+    const u = await finish(parse(q, fixArg, src), st);
+    if (!isOriginal) u.fixed = fixed;
+    if (u.days === null) return [{ u, weight, isOriginal }];
+    const asText = await finish(parse(q, fixArg, src, { hasDaysSlot: false }), st);
+    if (!isOriginal) asText.fixed = fixed;
+    const t = ` ${src} `;
+    const lead = DAYS.exec(t);
+    const isDayIndex = !lead;
+    const phrase = isDayIndex ? `ngay ${u.days}` : lead[2] ? `${u.days} ngay` : null; // '3n2đ' là một từ, không cần cụm
+    if (phrase) asText.phrases.push(phrase);
+    const [slotW, textW] = isDayIndex ? [DAYS_TEXT_WEIGHT, 1] : [1, DAYS_TEXT_WEIGHT];
+    return [
+      { u, weight: weight * slotW, isOriginal },
+      { u: asText, weight: weight * textW, isOriginal },
+    ];
+  };
+  const original = await variants(undefined, folded, hasFix ? ORIGINAL_WEIGHT : 1, true);
+  return hasFix ? [...(await variants(fix.size ? fix : undefined, text, 1, false)), ...original] : original;
+}
+
+/** Phần hiểu câu sau parse: tên riêng, cụm dính, ý muốn giả trong tên đường, nơi theo tên riêng, từ lạ. */
+async function finish(u: Understood, st: Stats): Promise<Understood> {
   await st.loadSeq(u.seq);
   const segs = nameSegment(u.seq, (ph) => st.isName(ph));
   u.names = segs.filter((g) => g.length > 1).map((g) => g.join(' ')); // tên riêng: phải khớp nguyên cụm
@@ -275,7 +385,7 @@ export async function understand(q: string, st: Stats): Promise<[Understood, Und
   const single = u.terms.filter((w) => !w.includes(' '));
   await st.load(single.map((key) => ({ ns: NS.df, key })));
   u.unknown = single.filter((w) => !st.df(w)); // từ lạ -> ứng viên thêm vào lexicon
-  return [u, fix.size ? u0 : null];
+  return u;
 }
 
 /** Phần câu một nhánh hiểu: bỏ từ bổ nghĩa nhánh không dùng ('ngon' không có nghĩa với chỗ ở). mods=null: giữ hết. */
@@ -322,28 +432,9 @@ export function queryTerms(u: Understood, st: Stats | null): QueryTerm[] {
   return [...q].map(([t, w]) => [t, w, acc(t)]);
 }
 
-/**
- * Từ tìm của một nhánh. Có sửa lỗi gõ: ALPHA·câu đã sửa + (1-ALPHA)·câu gốc. BM25 tuyến tính theo trọng số
- * nên trộn trọng số từ = trộn điểm.
- */
-export async function blendedTerms(
-  u: Understood,
-  u0: Understood | null,
-  st: Stats,
-  mods: ReadonlySet<string> | null,
-): Promise<[Understood, QueryTerm[]]> {
+/** Từ tìm của một nhánh cho một cách hiểu. Câu gốc và câu đã sửa được tìm riêng rồi gộp kết quả (rank.ts), không trộn từ. */
+export async function branchTerms(u: Understood, st: Stats, mods: ReadonlySet<string> | null): Promise<[Understood, QueryTerm[]]> {
   const v = view(u, mods);
   await st.loadSeq(v.seq);
-  const qt = queryTerms(v, st);
-  if (!u0) return [v, qt];
-  const v0 = view(u0, mods);
-  await st.loadSeq(v0.seq);
-  const merged = new Map<string, [number, string[]]>();
-  for (const [terms, k] of [[qt, ALPHA], [queryTerms(v0, st), 1 - ALPHA]] as const) {
-    for (const [t, w, a] of terms) {
-      const m = merged.get(t) ?? [0, []];
-      merged.set(t, [m[0] + k * w, m[1].length ? m[1] : a]);
-    }
-  }
-  return [v, [...merged].map(([t, [w, a]]) => [t, w, a])];
+  return [v, queryTerms(v, st)];
 }

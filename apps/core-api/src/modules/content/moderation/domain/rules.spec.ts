@@ -139,12 +139,79 @@ describe('Luật xúc phạm và đe doạ', () => {
     expect(codesOf(text).filter((code) => code === 'PROFANITY' || code === 'THREAT')).toEqual([]);
   });
 
-  it('đe doạ vào hàng chờ với mức cao hơn xúc phạm nhưng không tự ẩn một mình', () => {
+  it('xúc phạm và đe doạ tự ẩn với lý do đúng (TF88)', () => {
     const threat = evaluateSeverity(evaluateRules('tao giết mày'), null, 0, config);
     const profanity = evaluateSeverity(evaluateRules('vcl ad óc chó'), null, 0, config);
-    expect(threat).toMatchObject({ suspicious: true, shouldAutoHide: false });
-    expect(profanity).toMatchObject({ suspicious: true, shouldAutoHide: false });
-    expect(threat.severity).toBeGreaterThan(profanity.severity);
+    expect(threat).toMatchObject({ suspicious: true, shouldAutoHide: true, autoHideReason: 'VIOLENCE' });
+    expect(profanity).toMatchObject({
+      suspicious: true,
+      shouldAutoHide: true,
+      autoHideReason: 'HARASSMENT',
+    });
+  });
+
+  it.each([
+    'đồ con chó',
+    'mày là con chó',
+    'địt cụ nhà mày',
+    'đéo mẹ cái homestay này',
+    'đụ mẹ',
+    'mẹ kiếp mày',
+  ])('nhận xúc phạm bổ sung (TF88): %s', (text) => {
+    expect(codesOf(text)).toContain('PROFANITY');
+  });
+
+  it.each([
+    'nhà có con chó dễ thương lắm',
+    'đó là con chó của chủ nhà',
+    'bốn con chó chạy trên bãi biển',
+    'mua hạt óc chó làm quà',
+    'sữa óc chó ở đây ngon',
+    'bánh óc chó nướng',
+    'thằng bé chơi với con chó cả buổi',
+  ])('không ẩn nhầm con vật, món ăn (TF88): %s', (text) => {
+    expect(codesOf(text)).not.toContain('PROFANITY');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config).shouldAutoHide).toBe(false);
+  });
+});
+describe('Luật nội dung phản động (TF88)', () => {
+  const config = { aiThreshold: 0.8, reportThreshold: 3 };
+  const codesOf = (text: string) => evaluateRules(text).map((hit) => hit.code);
+
+  it.each([
+    'Đả đảo cộng sản',
+    'đã đến lúc lật đổ chế độ',
+    'anh em hãy cùng lật đổ chính quyền',
+    'giải thể Đảng Cộng sản đi',
+    'mọi người nên ủng hộ Việt Tân',
+    'nhà nước Đề Ga muôn năm',
+    'đòi độc lập Tây Nguyên',
+    'Hoàng Sa là của Trung Quốc',
+    'Trường Sa thuộc về Trung Quốc',
+    'chính quyền ăn cướp đất dân',
+    'chế độ độc tài thối nát',
+    'cộng sản khốn nạn',
+    'hồ tặc',
+  ])('nhận và tự ẩn: %s', (text) => {
+    expect(codesOf(text)).toContain('EXTREMISM');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config)).toMatchObject({
+      shouldAutoHide: true,
+      autoHideReason: 'EXTREMISM',
+    });
+  });
+
+  it.each([
+    'Hoàng Sa, Trường Sa là của Việt Nam',
+    'tham quan bảo tàng Hồ Chí Minh rất đẹp',
+    'đi viếng lăng Bác buổi sáng',
+    'chuyến đi lật đổ mọi định kiến của mình về Tây Bắc',
+    'cà phê Tây Nguyên ngon nhất',
+    'khu di tích Đảng bộ tỉnh mở cửa miễn phí',
+    'đã đảo một vòng quanh hồ',
+    'lịch sử chiến tranh Việt Nam ở bảo tàng rất xúc động',
+    'Việt Tân là tên quán cơm gần khách sạn',
+  ])('không bắt nhầm: %s', (text) => {
+    expect(codesOf(text)).not.toContain('EXTREMISM');
   });
 });
 describe('Ngưỡng severity', () => {
@@ -162,6 +229,59 @@ describe('Ngưỡng severity', () => {
     expect(
       evaluateSeverity([], { ...ai, scores: { 'self-harm/intent': 0.79 } }, 0, config).shouldAutoHide,
     ).toBe(false);
+  });
+  it('AI gắn cờ xúc phạm, thù ghét hoặc ViSoBERT toxic thì tự ẩn (TF88)', () => {
+    const base = { id: 'x', model: 'omni+visobert', flagged: true };
+    expect(
+      evaluateSeverity(
+        [],
+        { ...base, categories: { harassment: true }, scores: { harassment: 0.85 } },
+        0,
+        config,
+      ),
+    ).toMatchObject({ shouldAutoHide: true, autoHideReason: 'HARASSMENT' });
+    expect(
+      evaluateSeverity([], { ...base, categories: { hate: true }, scores: { hate: 0.9 } }, 0, config)
+        .autoHideReason,
+    ).toBe('HARASSMENT');
+    expect(
+      evaluateSeverity(
+        [],
+        {
+          ...base,
+          categories: { 'visobert/toxic': true },
+          scores: { 'visobert/offensive': 0.6, 'visobert/hate': 0.39 },
+        },
+        0,
+        config,
+      ),
+    ).toMatchObject({ shouldAutoHide: true, autoHideReason: 'HARASSMENT' });
+    expect(
+      evaluateSeverity(
+        [],
+        { ...base, categories: { harassment: true }, scores: { harassment: 0.5 } },
+        0,
+        config,
+      ).shouldAutoHide,
+    ).toBe(false);
+    expect(
+      evaluateSeverity(
+        [],
+        { ...base, flagged: false, categories: { 'visobert/toxic': false }, scores: {} },
+        0,
+        config,
+      ).shouldAutoHide,
+    ).toBe(false);
+  });
+  it('lý do tự ẩn theo nhãn AI nguy hiểm nhất', () => {
+    const ai = {
+      id: 'x',
+      model: 'omni',
+      flagged: true,
+      categories: { sexual: true, harassment: true },
+      scores: { sexual: 0.95, harassment: 0.9 },
+    };
+    expect(evaluateSeverity([], ai, 0, config).autoHideReason).toBe('SEXUAL');
   });
   it('báo cáo tăng ưu tiên nhưng không tự ẩn nếu không có bằng chứng khác', () => {
     expect(evaluateSeverity([], null, 2, config).shouldAutoHide).toBe(false);

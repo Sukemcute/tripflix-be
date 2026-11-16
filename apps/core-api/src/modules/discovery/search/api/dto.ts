@@ -139,6 +139,21 @@ class ExploreSuggestItemDto extends ExploreItemDto {
   @ApiProperty({ example: 'Ở đâu', description: 'Tên vùng của mục gợi ý' }) section!: string;
 }
 
+const RELAX_VALUES = ['place', 'budget', 'terms'] as const;
+const RELAX_DESCRIPTION = 'Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu';
+
+class ExploreFallbackItemDto extends ExploreSuggestItemDto {
+  @ApiProperty({ enum: RELAX_VALUES, isArray: true, example: ['budget'], description: RELAX_DESCRIPTION }) relaxed!: Array<(typeof RELAX_VALUES)[number]>;
+}
+
+class ExploreFallbackDto {
+  @ApiProperty({ example: 'resort phú quốc dưới 300k', description: 'Câu người dùng gõ: FE hiện "Kết quả thay thế cho “…”"' }) forQuery!: string;
+  @ApiProperty({ enum: RELAX_VALUES, isArray: true, example: ['budget'], description: `Gộp trên các mục. ${RELAX_DESCRIPTION}` })
+  relaxed!: Array<(typeof RELAX_VALUES)[number]>;
+  @ApiProperty({ type: [String], example: ['dịp', 'lễ'], description: 'Từ trong câu mà các mục thay thế không khớp (dạng người dùng gõ)' }) dropped!: string[];
+  @ApiProperty({ type: [ExploreFallbackItemDto], description: 'Mục gần nhất sau khi nới điều kiện, theo vùng câu muốn' }) items!: ExploreFallbackItemDto[];
+}
+
 export class ExploreSectionDto {
   @ApiProperty({ example: 'stay', description: 'food · cafe · see · stay · plan · post · video' }) kind!: string;
   @ApiProperty({ example: 'Ở đâu' }) label!: string;
@@ -161,9 +176,16 @@ export class ExploreResponseDto {
   @ApiProperty({ type: ExploreUnderstoodDto, description: 'Máy hiểu câu thế nào (hiện dạng chip)' }) understood!: ExploreUnderstoodDto;
   @ApiProperty({ description: 'true = đã xếp theo vị trí người dùng (câu không nói nơi)' }) nearUser!: boolean;
   @ApiProperty({ type: [ExploreSectionDto], description: 'Vùng câu nhắm tới đứng đầu, vùng rỗng xuống cuối' }) sections!: ExploreSectionDto[];
-  @ApiProperty({ type: [ExploreSuggestItemDto], description: 'Các gợi ý khác khi vùng muốn tìm không có kết quả phù hợp' })
+  @ApiProperty({
+    type: ExploreFallbackDto,
+    nullable: true,
+    description:
+      'Kết quả thay thế: vùng câu muốn không có mục nào khớp đủ câu (đúng nơi, không vượt ngân sách, khớp từ) nên nới điều kiện. null nếu có kết quả chính hoặc không có gì liên quan',
+  })
+  fallback!: ExploreFallbackDto | null;
+  @ApiProperty({ type: [ExploreSuggestItemDto], deprecated: true, description: 'Đã thay bằng `fallback.items` (cùng mục, không có `relaxed`)' })
   suggest!: ExploreSuggestItemDto[];
-  @ApiProperty({ type: [String], example: ['dịp', 'lễ'], description: 'Từ đã bỏ qua để ra gợi ý khác' }) dropped!: string[];
+  @ApiProperty({ type: [String], example: ['dịp', 'lễ'], deprecated: true, description: 'Đã thay bằng `fallback.dropped`' }) dropped!: string[];
 }
 
 // ---------------- POST /api/search/posts (tìm bài trên app và web Cảm hứng)
@@ -204,7 +226,9 @@ export class SearchPostsResponseDto {
   dropped!: string[];
   @ApiProperty({
     description:
-      'true: không bài nào khớp đủ câu nên `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách; ngân sách vẫn lọc cứng). FE nên báo "không thấy <dropped>, gợi ý theo ..."',
+      'true: không bài nào khớp đủ câu nên `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). FE nên báo "Kết quả thay thế cho “q”"',
   })
   isFallback!: boolean;
+  @ApiProperty({ enum: RELAX_VALUES, isArray: true, example: ['budget'], description: `Chỉ có giá trị khi \`isFallback = true\`. ${RELAX_DESCRIPTION}` })
+  fallbackRelaxed!: Array<(typeof RELAX_VALUES)[number]>;
 }

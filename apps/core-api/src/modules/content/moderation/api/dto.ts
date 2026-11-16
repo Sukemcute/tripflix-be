@@ -193,6 +193,20 @@ export class FailedScanPageDto {
   @ApiProperty({ type: [FailedScanDto] }) items!: FailedScanDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
 }
+export class ModerationStatsDto {
+  @ApiProperty({ description: 'Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending' }) pendingTotal!: number;
+  @ApiProperty({ description: 'Hồ sơ chờ duyệt có severity ≥ urgentSeverity' }) pendingUrgent!: number;
+  @ApiProperty() pendingPosts!: number;
+  @ApiProperty() pendingComments!: number;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) oldestPendingAt!: string | null;
+  @ApiProperty({ description: 'Số lần tự ẩn trong 24 giờ qua' }) autoHidden24h!: number;
+  @ApiProperty({ description: 'Số báo cáo mới trong 24 giờ qua' }) reports24h!: number;
+  @ApiProperty() pendingAppeals!: number;
+  @ApiProperty({ description: 'Scan đã hết lượt thử, cần staff xem' }) failedScans!: number;
+  @ApiProperty({ description: 'Scan đang chờ thử lại tự động' }) deferredScans!: number;
+  @ApiProperty() urgentSeverity!: number;
+  @ApiProperty({ format: 'date-time' }) generatedAt!: string;
+}
 export class ScanRetryDto {
   @ApiProperty() eventId!: string;
   @ApiProperty() status!: string;

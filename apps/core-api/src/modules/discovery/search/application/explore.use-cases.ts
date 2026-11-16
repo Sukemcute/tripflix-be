@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { buildIndex } from '../domain/explore/build.js';
-import { searchExplore, type ExploreItem } from '../domain/explore/rank.js';
+import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
 import { paginate } from '../domain/stays.js';
 import { destOf } from '../domain/explore/text.js';
@@ -37,8 +37,10 @@ export interface PostSearchPage {
   nextCursor: string | null;
   /** Từ trong câu mà dữ liệu không có (chỉ có khi `isFallback`), để FE nói "không thấy 'mùa thu', gợi ý theo Hà Nội". */
   dropped: string[];
-  /** true: không bài nào khớp đủ câu, `items` là gợi ý theo phần câu hiểu được (nơi, ý muốn, ngân sách). */
+  /** true: không bài nào khớp đủ câu, `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). */
   isFallback: boolean;
+  /** Điều kiện đã nới khi `isFallback` (vượt ngân sách, khác nơi, bỏ từ); rỗng nếu không. */
+  fallbackRelaxed: Relax[];
 }
 
 export interface ExploreResultItem {
@@ -74,8 +76,22 @@ export interface ExploreResultPage {
   };
   nearUser: boolean;
   sections: ExploreResultSection[];
+  /** Kết quả thay thế khi vùng câu muốn không có mục nào khớp đủ câu; null nếu có kết quả chính hoặc không có gì liên quan. */
+  fallback: ExploreFallbackPage | null;
+  /** @deprecated dùng `fallback.items`. */
   suggest: Array<ExploreResultItem & { section: string }>;
+  /** @deprecated dùng `fallback.dropped`. */
   dropped: string[];
+}
+
+export interface ExploreFallbackPage {
+  /** Câu người dùng gõ, để FE nói "Kết quả thay thế cho …". */
+  forQuery: string;
+  /** Điều kiện đã nới, gộp trên các mục. */
+  relaxed: Relax[];
+  /** Từ trong câu mà các mục thay thế không khớp. */
+  dropped: string[];
+  items: Array<ExploreResultItem & { section: string; relaxed: Relax[] }>;
 }
 
 export function hotelToObject(h: ExploreHotel): ExploreObject {
@@ -170,17 +186,24 @@ export class ExploreUseCases {
     const loc = query.loc ? { lat: query.loc.lat, lon: query.loc.lng } : null;
     const r = await searchExplore(this.store, query.q, { loc });
     // Chỉ mục có thể trễ một chu kỳ job: bài vừa bị ẩn/xoá không được lọt ra kết quả.
-    const all = [...r.sections.flatMap((s) => s.items), ...r.suggest];
+    const all = [...r.sections.flatMap((s) => s.items), ...(r.fallback?.items ?? [])];
     const postIds = [...new Set(all.filter((i) => POST_KINDS.has(i.obj.kind)).map((i) => i.obj.refId ?? ''))];
     const visible = postIds.length ? await this.catalog.findVisiblePostIds(postIds) : new Set<string>();
     const isShown = (i: ExploreItem) => !POST_KINDS.has(i.obj.kind) || visible.has(i.obj.refId ?? '');
+    const fallback = r.fallback && {
+      forQuery: query.q,
+      relaxed: r.fallback.relaxed,
+      dropped: r.fallback.dropped,
+      items: r.fallback.items.filter(isShown).map((i) => ({ ...toItem(i), section: i.section ?? '', relaxed: i.relaxed ?? [] })),
+    };
     return {
       understood: understoodOf(r.understood),
       nearUser: r.nearUser,
       // total đếm trên chỉ mục: bài bị ẩn được gỡ trong vài giây (dropHidden), giữa lúc đó total có thể dư.
       sections: r.sections.map((s) => ({ kind: s.kind, label: s.label, total: s.total, items: s.items.filter(isShown).map(toItem) })),
-      suggest: r.suggest.filter(isShown).map((i) => ({ ...toItem(i), section: i.section ?? '' })),
-      dropped: r.dropped,
+      fallback: fallback?.items.length ? fallback : null,
+      suggest: r.fallback ? r.fallback.items.filter(isShown).map((i) => ({ ...toItem(i), section: i.section ?? '' })) : [],
+      dropped: fallback?.items.length ? fallback.dropped : [],
     };
   }
 
@@ -196,10 +219,11 @@ export class ExploreUseCases {
       .filter((s) => kinds.includes(s.kind))
       .flatMap((s) => s.items)
       .filter((i) => !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)));
-    // Không bài nào khớp đủ câu ('mùa thu hà nội' khi chưa ai viết về mùa thu): dùng gợi ý theo phần hiểu được (Hà Nội), như /search.
-    const isFallback = found.length === 0 && r.suggest.length > 0;
+    // Không bài nào khớp đủ câu ('mùa thu hà nội' khi chưa ai viết về mùa thu, lộ trình vượt ngân sách): dùng kết quả thay thế, như /search.
+    const fallback = found.length === 0 ? r.fallback : null;
+    const isFallback = Boolean(fallback?.items.length);
     const candidates = isFallback
-      ? r.suggest.filter((i) => (query.postType === 'all' ? POST_KINDS.has(i.obj.kind) : kinds.includes(i.obj.kind)) && !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)))
+      ? fallback!.items.filter((i) => (query.postType === 'all' ? POST_KINDS.has(i.obj.kind) : kinds.includes(i.obj.kind)) && !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)))
       : found;
     const visible = candidates.length ? await this.catalog.findVisiblePostIds(candidates.map((i) => i.obj.refId ?? '')) : new Set<string>();
     const shown = candidates.filter((i) => visible.has(i.obj.refId ?? ''));
@@ -209,8 +233,9 @@ export class ExploreUseCases {
       items: page.items.map((i) => toItem({ ...i, reason: postReason(i) })),
       total: shown.length,
       nextCursor: page.nextCursor,
-      dropped: isFallback && shown.length > 0 ? r.dropped : [],
+      dropped: isFallback && shown.length > 0 ? fallback!.dropped : [],
       isFallback: isFallback && shown.length > 0,
+      fallbackRelaxed: isFallback && shown.length > 0 ? fallback!.relaxed : [],
     };
   }
 

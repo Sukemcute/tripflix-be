@@ -5,6 +5,7 @@ import { ClsModule } from 'nestjs-cls';
 import type { PostRecord } from '../../../db/schema/index.js';
 import { PostMediaNotAllowedException, type PostMediaInfo } from '../../domain/index.js';
 import { PostImagesResolver } from '../common/post-images.js';
+import { PostShareLinks } from '../post-share-links.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { PostImage, PostMediaPort } from '../ports/post-media.port.js';
 import { CreateDraftUseCase } from './create-draft.use-case.js';
@@ -101,7 +102,13 @@ describe('Ảnh của bài viết (vlog)', () => {
     const postRepository = { findById: vi.fn(async () => samplePost({ mediaIds: ['v1'] })) };
     const addOutboxEvent = vi.fn();
     const outbox: ContentOutbox = { add: addOutboxEvent };
-    const useCase = new PublishPostUseCase(postRepository as never, outbox, undefined, createPostMedia({ v1: readyVideo }));
+    const useCase = new PublishPostUseCase(
+      postRepository as never,
+      outbox,
+      undefined,
+      new PostShareLinks(),
+      createPostMedia({ v1: readyVideo }),
+    );
 
     await expect(useCase.execute({ postId, userId: authorId })).rejects.toThrow(PostMediaNotAllowedException);
     expect(addOutboxEvent).not.toHaveBeenCalled();
