@@ -3,8 +3,18 @@ import { escapeHtml, renderEmailShell } from './html.js';
 import type { EmailMessage } from './mailer.js';
 
 export function buildRegistrationCodeEmail(payload: AccessRegistrationCodeRequestedV1): EmailMessage {
-  const intro = 'Nhập mã này trên màn hình đăng ký Tripflix. Mã có hiệu lực trong 10 phút.';
-  const warning = 'Không chia sẻ mã với người khác. Nếu bạn không yêu cầu đăng ký, hãy bỏ qua email này.';
+  const isLogin = payload.purpose === 'login';
+  const subject = isLogin ? 'Mã xác thực đăng nhập Tripflix' : 'Mã xác thực đăng ký Tripflix';
+  const heading = isLogin ? 'Mã xác thực đăng nhập' : 'Mã xác thực đăng ký';
+  const intro = isLogin
+    ? 'Nhập mã này trên màn hình đăng nhập Tripflix. Mã có hiệu lực trong 10 phút.'
+    : 'Nhập mã này trên màn hình đăng ký Tripflix. Mã có hiệu lực trong 10 phút.';
+  const warning = isLogin
+    ? 'Không chia sẻ mã với người khác. Nếu bạn không thực hiện đăng nhập, hãy đổi mật khẩu ngay.'
+    : 'Không chia sẻ mã với người khác. Nếu bạn không yêu cầu đăng ký, hãy bỏ qua email này.';
+  const footerNote = isLogin
+    ? 'Email này được gửi tự động khi bạn thực hiện đăng nhập tài khoản Tripflix.'
+    : 'Email này được gửi tự động khi bạn thực hiện đăng ký tài khoản Tripflix.';
 
   const content = [
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">${escapeHtml(intro)}</p>`,
@@ -22,14 +32,14 @@ export function buildRegistrationCodeEmail(payload: AccessRegistrationCodeReques
 
   return {
     to: payload.email,
-    subject: 'Mã xác thực đăng ký Tripflix',
+    subject,
     text: `${intro}\n\nMã xác thực: ${payload.code}\n\n${warning}`,
     html: renderEmailShell({
-      title: 'Mã xác thực đăng ký Tripflix',
+      title: subject,
       badge: { text: 'MÃ XÁC THỰC', bg: '#D9F4F1', color: '#006C63' },
-      heading: 'Mã xác thực đăng ký',
+      heading,
       content,
-      footerNote: 'Email này được gửi tự động khi bạn thực hiện đăng ký tài khoản Tripflix.',
+      footerNote,
     }),
   };
 }

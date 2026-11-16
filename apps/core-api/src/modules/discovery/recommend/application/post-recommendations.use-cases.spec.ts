@@ -34,7 +34,8 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
 
   const store = {
     listActiveAlgos: vi.fn(async () => opts.algos ?? ALGOS),
-    listInteractedPostIds: vi.fn(async () => ['h00']),
+    listInteractedPostIds: vi.fn(async (_u: string, _until: Date) => ['h00']),
+    listOwnRecentPostIds: vi.fn(async (_q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]> => []),
     findUserFeatures: vi.fn(async (key: string) => (key === 'tag_affinity@v0' ? { tags: { dalat: 1 }, places: { 'da-lat': 1 } } : {})),
     listHotCandidates: vi.fn(async (q: CandidateQuery) => without(hot, q)),
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
@@ -77,7 +78,7 @@ const query = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>
 const ids = (page: { items: Array<{ post: { id: string } }> }) => page.items.map((i) => i.post.id);
 
 describe('PostRecommendationUseCases', () => {
-  it('có user: for_you đưa bài hợp gu lên đầu, bỏ bài đã tương tác, chèn ~5% explore, ghi đã phục vụ', async () => {
+  it('có user: for_you đưa bài hợp gu lên đầu, đẩy bài đã tương tác xuống, chèn ~5% explore, ghi đã phục vụ', async () => {
     const { useCases, servedAdd, store } = setup();
     const page = await useCases.recommend(query());
     expect(page.algo).toBe('for_you');
@@ -88,8 +89,33 @@ describe('PostRecommendationUseCases', () => {
     expect(page.items.filter((i) => i.source === 'explore')).toHaveLength(1);
     expect(page.items.find((i) => i.source === 'explore')!.post.id).toMatch(/^e0/);
     expect(servedAdd).toHaveBeenCalledWith(U, ids(page), NOW);
-    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'hot@v0', limit: 150, excludePostIds: ['h00'] }));
-    expect(store.listFreshCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, hours: 48 }));
+    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'hot@v0', limit: 150, excludePostIds: [] }));
+    expect(store.listFreshCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, hours: 48, excludePostIds: [] }));
+    expect(store.listExplorePool).toHaveBeenCalledWith(expect.objectContaining({ excludePostIds: ['h00'] }));
+  });
+
+  it('bài đã thả tim không biến mất: kho ít bài thì vẫn hiện, nằm cuối danh sách', async () => {
+    const { useCases, store } = setup();
+    store.listInteractedPostIds.mockResolvedValue(['h00', 'h01']);
+    store.listHotCandidates.mockImplementation(async (q: CandidateQuery) =>
+      ['h00', 'h01', 'h02', 'h03'].filter((id) => !q.excludePostIds.includes(id)).map((id, i) => cand(id, { score: 1 - i / 10 })),
+    );
+    store.listFreshCandidates.mockResolvedValue([]);
+    store.listExplorePool.mockResolvedValue([]);
+    const page = await useCases.recommend(query({ mode: 'trending' }));
+    expect(ids(page)).toEqual(['h02', 'h03', 'h00', 'h01']);
+  });
+
+  it('thả tim giữa phiên: trang sau không xô lệch, tương tác chốt theo lúc tải trang đầu', async () => {
+    const { useCases, store } = setup();
+    const reactedAt = NOW.getTime() + 30_000;
+    store.listInteractedPostIds.mockImplementation(async (_u: string, until: Date) => (until.getTime() >= reactedAt ? ['h00', 'h15'] : ['h00']));
+    const first = await useCases.recommend(query({ mode: 'trending' }));
+    const expected = ids(await useCases.recommend(query({ mode: 'trending', cursor: first.nextCursor })));
+    expect(expected).toContain('h15');
+    const later = new Date(NOW.getTime() + 60_000);
+    expect(ids(await useCases.recommend(query({ mode: 'trending', cursor: first.nextCursor, now: later })))).toEqual(expected);
+    expect(store.listInteractedPostIds).toHaveBeenLastCalledWith(U, NOW);
   });
 
   it('2 trang liên tiếp không trùng bài; trang sau giữ thuật toán của trang đầu', async () => {
@@ -155,7 +181,7 @@ describe('PostRecommendationUseCases', () => {
     expect(ids(await useCases.recommend(query({ cursor: first.nextCursor, now: later })))).toEqual(ids(second));
   });
 
-  it('bài đã xem ở phiên trước: đẩy xuống cuối chứ không bỏ; xem hết thì vẫn còn bài', async () => {
+  it('bài đã xem ở phiên trước: phạt điểm chứ không bỏ; xem hết thì vẫn còn bài', async () => {
     const { useCases, seenAt } = setup();
     const all = ['d1', 'f1', ...Array.from({ length: 30 }, (_, i) => `h${String(i).padStart(2, '0')}`), ...Array.from({ length: 10 }, (_, i) => `e0${i}`)];
     const yesterday = NOW.getTime() - 24 * 3600_000;
@@ -163,6 +189,31 @@ describe('PostRecommendationUseCases', () => {
     const page = await useCases.recommend(query());
     expect(ids(page)[0]).toBe('h05');
     expect(page.items).toHaveLength(10);
+  });
+
+  it('bài vừa tự đăng (chưa qua job) lên đầu feed của chính người đăng, không lặp ở trang sau', async () => {
+    const { useCases, store } = setup();
+    store.listOwnRecentPostIds.mockResolvedValue(['mine']);
+    const first = await useCases.recommend(query({ postType: 'video' }));
+    expect(ids(first)[0]).toBe('mine');
+    expect(first.items[0]).toMatchObject({ source: 'own', reason: { code: 'own_post' } });
+    expect(store.listOwnRecentPostIds).toHaveBeenCalledWith({ userId: U, since: new Date(NOW.getTime() - 3600_000), until: NOW, postType: 'video' });
+    const second = await useCases.recommend(query({ postType: 'video', cursor: first.nextCursor }));
+    expect(ids(second)).not.toContain('mine');
+  });
+
+  it('bài tự đăng đã là ứng viên (job đã chạy): vẫn lên đầu, không trùng', async () => {
+    const { useCases, store } = setup();
+    store.listOwnRecentPostIds.mockResolvedValue(['h00']);
+    const page = await useCases.recommend(query({ mode: 'trending' }));
+    expect(ids(page)[0]).toBe('h00');
+    expect(ids(page).filter((id) => id === 'h00')).toHaveLength(1);
+  });
+
+  it('khách không đọc bài tự đăng', async () => {
+    const { useCases, store } = setup();
+    await useCases.recommend(query({ userId: null }));
+    expect(store.listOwnRecentPostIds).not.toHaveBeenCalled();
   });
 
   it('bài đã ẩn sau lần job gần nhất thì bỏ khỏi trang', async () => {

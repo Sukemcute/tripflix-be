@@ -275,6 +275,26 @@ export class DrizzleRecommendStore implements RecommendStore {
     return rows.flatMap((r) => (r.id ? [r.id] : []));
   }
 
+  async listOwnRecentPostIds(q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]> {
+    const t = recommendInteractions;
+    const rows = await this.db
+      .select({ id: t.targetId })
+      .from(t)
+      .where(
+        and(
+          eq(t.actorType, 'user'),
+          eq(t.actorId, q.userId),
+          eq(t.kind, 'publish'),
+          eq(t.isRemoved, false),
+          gt(t.occurredAt, q.since),
+          lte(t.occurredAt, q.until),
+          q.postType ? sql`${t.detail}->>'postType' = ${q.postType}` : undefined,
+        ),
+      )
+      .orderBy(desc(t.occurredAt));
+    return rows.flatMap((r) => (r.id ? [r.id] : []));
+  }
+
   async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
     if (!postIds.length) return [];
     const { postId, authorId, postType, tags, placeId } = recommendPosts;

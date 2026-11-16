@@ -101,6 +101,37 @@
         ]
       }
     },
+    "/api/auth/login-code": {
+      "post": {
+        "operationId": "AuthController_requestLoginCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginCodeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -4159,7 +4190,7 @@
     },
     "/api/recommendations/posts": {
       "get": {
-        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không trả bài đã tương tác. Người đăng nhập: bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài) bị đẩy xuống cuối, không bị bỏ; gọi lại cùng cursor ra cùng trang.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
         "operationId": "PostRecommendationsController_recommendPosts",
         "parameters": [
           {
@@ -5675,6 +5706,44 @@
           "createdAt"
         ]
       },
+      "LoginCodeDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "khang@example.com"
+          },
+          "encPassword": {
+            "type": "string",
+            "description": "Mật khẩu đã mã hoá bằng khoá của GET /auth/password-key, dạng \"#TFPWD:1:<keyId>:<ts>:<dữ liệu>\". Gửi trường này thay cho trường mật khẩu thường tương ứng, không gửi cả hai."
+          },
+          "password": {
+            "type": "string",
+            "description": "Cách cũ, gửi mật khẩu gốc. Bị từ chối khi server bật AUTH_PASSWORD_ENCRYPTION_REQUIRED."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "LoginCodeResultDto": {
+        "type": "object",
+        "properties": {
+          "loginChallengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resendAfterSeconds": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây phải đợi trước khi xin mã lại cho email này"
+          }
+        },
+        "required": [
+          "loginChallengeId",
+          "resendAfterSeconds"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -5693,6 +5762,16 @@
           "deviceName": {
             "type": "string",
             "example": "Pixel 8"
+          },
+          "loginChallengeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID thử thách mã xác thực đăng nhập từ POST /auth/login-code"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$",
+            "description": "Mã xác thực 8 chữ số gửi qua email"
           }
         },
         "required": [
@@ -10000,7 +10079,8 @@
               "matches_place",
               "matches_interest",
               "trending",
-              "explore"
+              "explore",
+              "own_post"
             ]
           },
           "text": {
@@ -10026,9 +10106,10 @@
               "hot",
               "taste",
               "fresh",
-              "explore"
+              "explore",
+              "own"
             ],
-            "description": "Nguồn ứng viên: hot (điểm nóng), fresh (đăng trong 48 giờ), explore (~5% ngẫu nhiên để đo)"
+            "description": "Nguồn ứng viên: hot (điểm nóng), fresh (đăng trong 48 giờ), explore (~5% ngẫu nhiên để đo), own (bài người xem vừa đăng)"
           },
           "reason": {
             "$ref": "#/components/schemas/RecommendReasonDto"

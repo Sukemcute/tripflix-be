@@ -167,9 +167,11 @@ describe('tag_affinity_v0', () => {
     expect(guest[0]!.reason.code).toBe('trending');
   });
 
-  it('tối đa 2 bài/tác giả, dư dồn cuối; hoà điểm phá bằng postId', () => {
-    const candidates = ['a', 'b', 'c', 'd'].map((id) => cand(id, { authorId: id === 'd' ? 'other' : 'same', score: 0.5 }));
-    expect(popularRankerV0.rank({ candidates, userFeatures: null, now: NOW }).map((r) => r.postId)).toEqual(['a', 'b', 'd', 'c']);
+  it('ranker chỉ chấm điểm phù hợp: không áp luật tác giả (việc của feed-policy); hoà điểm phá bằng postId', () => {
+    const candidates = ['c', 'a', 'd', 'b'].map((id) => cand(id, { authorId: id === 'd' ? 'other' : 'same', score: 0.5 }));
+    const out = popularRankerV0.rank({ candidates, userFeatures: null, now: NOW });
+    expect(out.map((r) => r.postId)).toEqual(['a', 'b', 'c', 'd']);
+    expect(out.map((r) => r.authorId)).toEqual(['same', 'same', 'same', 'other']);
   });
 
   it('chỉ trả đúng ứng viên được đưa vào: lọc hết thì rỗng', () => {
