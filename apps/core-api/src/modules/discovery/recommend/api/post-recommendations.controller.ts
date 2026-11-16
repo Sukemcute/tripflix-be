@@ -1,8 +1,12 @@
-import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Inject, Query, ServiceUnavailableException } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiOkResponse, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { z } from 'zod';
-import { InvalidRecommendCursorError, PostRecommendationUseCases } from '../application/post-recommendations.use-cases.js';
+import {
+  InvalidRecommendCursorError,
+  PostRecommendationUseCases,
+  ReelsFeedNotWiredError,
+} from '../application/post-recommendations.use-cases.js';
 
 export const PostRecommendationQuerySchema = z.object({
   mode: z.enum(['for_you', 'trending']).default('for_you'),
@@ -37,6 +41,24 @@ export class PostRecommendationsDto {
   @ApiProperty({ type: [PostRecommendationItemDto] }) items!: PostRecommendationItemDto[];
   @ApiProperty({ example: 'for_you', description: 'Thuật toán đã dùng (khách hoặc cấu hình lỗi thì là trending)' }) algo!: string;
   @ApiProperty({ type: String, nullable: true, description: 'Gửi lại ở `cursor` để lấy trang sau; null là hết' }) nextCursor!: string | null;
+}
+
+export const ReelRecommendationQuerySchema = z.object({
+  mode: z.enum(['for_you', 'trending']).default('trending'),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+  cursor: z.string().max(512).optional(),
+});
+
+export class ReelRecommendationItemDto {
+  @ApiProperty({ type: Object, description: 'Thẻ Reels phát được từ FeedFacade.getByIds' }) card!: Record<string, unknown>;
+  @ApiProperty({ enum: ['hot', 'taste', 'fresh', 'explore', 'own'] }) source!: string;
+  @ApiProperty({ type: RecommendReasonDto }) reason!: RecommendReasonDto;
+}
+
+export class ReelRecommendationsDto {
+  @ApiProperty({ type: [ReelRecommendationItemDto] }) items!: ReelRecommendationItemDto[];
+  @ApiProperty({ example: 'trending' }) algo!: string;
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
 }
 
 /** Gợi ý bài viết (video/vlog) theo gu người dùng hoặc thịnh hành. Đăng nhập tuỳ chọn. */
@@ -85,6 +107,45 @@ export class PostRecommendationsController {
     } catch (error) {
       if (error instanceof InvalidRecommendCursorError) {
         throw new BadRequestException({ message: 'Tham số không hợp lệ', errors: [{ field: 'cursor', message: error.message }] });
+      }
+      throw error;
+    }
+  }
+
+  @Get('reels')
+  @OptionalAuthenticated()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Gợi ý Reels phát được (trending hoặc for_you)',
+    description:
+      'Xếp hạng video bằng discovery (gồm điểm xu hướng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.',
+  })
+  @ApiQuery({ name: 'mode', required: false, enum: ['for_you', 'trending'] })
+  @ApiQuery({ name: 'limit', required: false, example: 10, description: '1–20, mặc định 10' })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiBadRequestResponse({ description: 'Tham số sai hoặc `cursor` không do server cấp' })
+  @ApiOkResponse({ type: ReelRecommendationsDto })
+  async recommendReels(@Query() query: Record<string, unknown>, @OptionalCurrentUser() user: AuthUser | undefined) {
+    const parsed = ReelRecommendationQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Tham số không hợp lệ',
+        errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+      });
+    }
+    try {
+      return await this.recommendations.recommendReels({
+        mode: parsed.data.mode,
+        limit: parsed.data.limit,
+        cursor: parsed.data.cursor ?? null,
+        userId: user?.userId ?? null,
+      });
+    } catch (error) {
+      if (error instanceof InvalidRecommendCursorError) {
+        throw new BadRequestException({ message: 'Tham số không hợp lệ', errors: [{ field: 'cursor', message: error.message }] });
+      }
+      if (error instanceof ReelsFeedNotWiredError) {
+        throw new ServiceUnavailableException(error.message);
       }
       throw error;
     }

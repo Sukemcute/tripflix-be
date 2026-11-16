@@ -1,5 +1,6 @@
 import type { Db } from '@tripflix/db';
-import { and, desc, eq, gt, inArray, lte, notInArray, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, lte, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   recommendAlgos,
   recommendInteractions,
@@ -9,7 +10,7 @@ import {
   recommendUserFeatures,
 } from '../../db/schema/index.js';
 import type { CandidateQuery, InteractionCounts, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
-import { splitKey, type Candidate, type CandidateSource, type Kind, type PostMeta, type RawRow } from '../domain/contracts.js';
+import { splitKey, type Candidate, type CandidateSource, type Kind, type PostInteractionSample, type PostMeta, type RawRow } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 
 const CHUNK = 1000;
@@ -135,6 +136,41 @@ export class DrizzleRecommendStore implements RecommendStore {
       counts.set(r.postId, entry);
     }
     return counts;
+  }
+
+  async listPostInteractionSamples(now: Date): Promise<Map<string, PostInteractionSample[]>> {
+    const t = recommendInteractions;
+    const reg = alias(recommendInteractions, 'reg');
+    const postIdExpr = sql<string>`case when ${t.kind} = 'order_item' then ${t.detail}->>'sourcePostId' else ${t.targetId} end`;
+    // Tuổi tài khoản theo ngày, chặn ở 7 vì từ 7 ngày trọng số đã là 1: mỗi bài chỉ còn vài dòng mỗi loại.
+    const ageDaysExpr = sql<number | null>`case when ${reg.occurredAt} is null then null
+      else least(7, greatest(0, floor(extract(epoch from (${now.toISOString()}::timestamptz - ${reg.occurredAt})) / 86400)))::int end`;
+    const rows = await this.db
+      .select({ postId: postIdExpr, kind: t.kind, actorAgeDays: ageDaysExpr, count: sql<number>`count(*)::int` })
+      .from(t)
+      .leftJoin(reg, and(eq(t.actorType, 'user'), eq(reg.actorType, 'user'), eq(reg.actorId, t.actorId), eq(reg.kind, 'registered')))
+      .where(
+        and(
+          eq(recommendInteractions.isRemoved, false),
+          gt(recommendInteractions.occurredAt, daysBefore(now, 30)),
+          lte(recommendInteractions.occurredAt, now),
+          or(
+            and(eq(recommendInteractions.targetType, 'post'), isNotNull(recommendInteractions.targetId)),
+            and(eq(recommendInteractions.kind, 'order_item'), sql`${recommendInteractions.detail}->>'sourcePostId' is not null`),
+          ),
+        ),
+      )
+      // Theo vị trí cột: biểu thức có tham số (now) viết lại trong GROUP BY sẽ thành tham số khác, Postgres không khớp.
+      .groupBy(sql.raw('1, 2, 3'));
+
+    const out = new Map<string, PostInteractionSample[]>();
+    for (const r of rows) {
+      if (!r.postId) continue;
+      const list = out.get(r.postId) ?? [];
+      list.push({ kind: r.kind as Kind, actorAgeDays: r.actorAgeDays, count: r.count });
+      out.set(r.postId, list);
+    }
+    return out;
   }
 
   async replacePostScores(builderKey: string, scores: Array<{ postId: string; postType: string; score: number; features: Record<string, unknown> }>) {
