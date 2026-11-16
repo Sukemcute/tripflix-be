@@ -24,7 +24,7 @@ const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? id;
  */
 export const tagAffinityRankerV0: Ranker = {
   name: 'tag_affinity_v0',
-  accepts: { postBuilders: ['hot@v0'], userBuilders: ['tag_affinity@v0'] },
+  accepts: { postBuilders: ['hot@v0', 'hot@v1'], userBuilders: ['tag_affinity@v0'] },
   rank({ candidates, userFeatures }, params = {}) {
     const wTag = num(params.wTag, 0.5);
     const wPlace = num(params.wPlace, 0.2);
@@ -62,7 +62,7 @@ export const tagAffinityRankerV0: Ranker = {
 /** popular_v0: sắp theo hot, bỏ qua gu người dùng. */
 export const popularRankerV0: Ranker = {
   name: 'popular_v0',
-  accepts: { postBuilders: ['hot@v0'], userBuilders: ['none@v0', 'tag_affinity@v0'] },
+  accepts: { postBuilders: ['hot@v0', 'hot@v1'], userBuilders: ['none@v0', 'tag_affinity@v0'] },
   rank({ candidates }) {
     return sortByFinal(
       candidates.map((c) => ({

@@ -10,6 +10,7 @@ import {
   RECOMMEND_STORE,
   SERVED_STORE,
   type RecommendCardPost,
+  type RecommendReelCard,
   type RecentPostsStore,
   type RecommendCatalog,
   type RecommendStore,
@@ -25,7 +26,7 @@ const FRESH_HOURS = 48;
 const EXPLORE_POOL_LIMIT = 500;
 const EXPLORE_DAYS = 30;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
-const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v0', userBuilder: 'none@v0', ranker: 'popular_v0' };
+const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
 
 export interface PostRecommendationQuery {
   mode: RecommendMode;
@@ -47,6 +48,20 @@ export interface PostRecommendationPage {
   algo: string;
   nextCursor: string | null;
 }
+
+export interface ReelRecommendationItem {
+  card: RecommendReelCard;
+  source: CandidateSource;
+  reason: { code: string; text: string };
+}
+
+export interface ReelRecommendationPage {
+  items: ReelRecommendationItem[];
+  algo: string;
+  nextCursor: string | null;
+}
+
+export class ReelsFeedNotWiredError extends Error {}
 
 /** Bài gợi ý trước mốc này tính là "phiên trước" và bị phạt điểm; bài gợi ý trong phiên giữ chỗ. */
 const SESSION_MS = 30 * 60_000;
@@ -102,6 +117,40 @@ export class PostRecommendationUseCases {
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
     const now = q.now ?? new Date();
+    const { pageItems, algo, nextCursor } = await this.selectRankedPage(q, now);
+
+    const items = await this.hydrate(pageItems);
+    if (q.userId) await this.recordSeen(q.userId, pageItems.map((i) => i.postId), now);
+    for (const item of items) {
+      this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.post.id }, 'recommend.served');
+    }
+
+    return { items, algo: algo.name, nextCursor };
+  }
+
+  /**
+   * Gợi ý Reels (TF23): xếp hạng video bằng discovery rồi gọi FeedFacade.getByIds để lấy thẻ phát được,
+   * giữ đúng thứ tự và bỏ bài chưa xử lý xong hoặc đã ẩn.
+   */
+  async recommendReels(q: Omit<PostRecommendationQuery, 'postType'>): Promise<ReelRecommendationPage> {
+    if (!this.catalog.getReelCardsByIds) {
+      throw new ReelsFeedNotWiredError('FeedFacade.getByIds chưa được nối vào RecommendCatalog');
+    }
+    const now = q.now ?? new Date();
+    const { pageItems, algo, nextCursor } = await this.selectRankedPage({ ...q, postType: 'video' }, now);
+
+    const items = await this.hydrateReels(pageItems, q.userId);
+    if (q.userId && items.length) {
+      await this.recordSeen(q.userId, items.map((i) => i.card.postId), now);
+    }
+    for (const item of items) {
+      this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.card.postId }, 'recommend.served');
+    }
+
+    return { items, algo: algo.name, nextCursor };
+  }
+
+  private async selectRankedPage(q: PostRecommendationQuery, now: Date) {
     const cursor = q.cursor ? decodeCursor(q.cursor) : null;
     // Khách không có gu: for_you của khách là trending.
     const algoName = cursor?.algo ?? (q.userId ? q.mode : 'trending');
@@ -160,20 +209,28 @@ export class PostRecommendationUseCases {
     const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
     const pageItems = interleave(rankedTake, explore, q.limit);
 
-    const items = await this.hydrate(pageItems);
-    if (q.userId) await this.recordSeen(q.userId, pageItems.map((i) => i.postId), now);
-    for (const item of items) {
-      this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.post.id }, 'recommend.served');
-    }
-
     // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
     const nextOffset = offset + rankedTake.length;
     const hasMore = ranked.length > nextOffset || explorePool.length > (page + 1) * slots;
     return {
-      items,
-      algo: algo.name,
+      pageItems,
+      algo,
       nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset, seenBefore }) : null,
     };
+  }
+
+  /** Bỏ bài đã ẩn hoặc không phát được sau khi qua FeedFacade.getByIds, giữ thứ tự xếp hạng. */
+  private async hydrateReels(ranked: RankedItem[], viewerId: string | null): Promise<ReelRecommendationItem[]> {
+    if (!ranked.length || !this.catalog.getReelCardsByIds) return [];
+    const cards = await this.catalog.getReelCardsByIds(
+      ranked.map((r) => r.postId),
+      viewerId,
+    );
+    const byId = new Map(cards.map((c) => [c.postId, c]));
+    return ranked.flatMap((r) => {
+      const card = byId.get(r.postId);
+      return card ? [{ card, source: r.source, reason: r.reason }] : [];
+    });
   }
 
   /** Bỏ bài đã ẩn sau lần job gần nhất, giữ thứ tự xếp hạng. */

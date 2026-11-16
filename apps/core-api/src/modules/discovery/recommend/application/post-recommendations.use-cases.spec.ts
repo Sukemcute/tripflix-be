@@ -1,7 +1,7 @@
 import type { Candidate } from '../domain/contracts.js';
 import type { AlgoRow } from '../domain/registry.js';
 import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
-import { InvalidRecommendCursorError, PostRecommendationUseCases } from './post-recommendations.use-cases.js';
+import { InvalidRecommendCursorError, PostRecommendationUseCases, ReelsFeedNotWiredError } from './post-recommendations.use-cases.js';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
 const U = 'u1';
@@ -254,5 +254,45 @@ describe('PostRecommendationUseCases', () => {
 
   it('cursor không do server cấp → lỗi', async () => {
     await expect(setup().useCases.recommend(query({ cursor: 'rác' }))).rejects.toBeInstanceOf(InvalidRecommendCursorError);
+  });
+
+  it('recommendReels: gọi getReelCardsByIds đúng thứ tự, bỏ bài không phát được và chỉ ghi served cho bài trả về', async () => {
+    const servedAdd = vi.fn(async () => undefined);
+    const { useCases, catalog } = setup({ served: { add: servedAdd } });
+    const getReelCardsByIds = vi.fn(async (postIds: string[]) =>
+      postIds
+        .filter((id) => id !== 'h02')
+        .reverse()
+        .map((postId) => ({
+          postId,
+          author: { id: `a-${postId}`, name: null, avatarUrl: null, isKol: false },
+          video: { url: `https://cdn/${postId}.m3u8` },
+          title: postId,
+          caption: '',
+          region: null,
+          tags: [],
+          linkedProductIds: [],
+          tripAttachment: null,
+          counts: { likes: 0, comments: 0, saves: 0, shares: 0 },
+          viewerState: null,
+          reason: null,
+        })),
+    );
+    (catalog as unknown as RecommendCatalog).getReelCardsByIds = getReelCardsByIds;
+
+    const page = await useCases.recommendReels({ mode: 'trending', limit: 5, cursor: null, userId: U, now: NOW });
+    expect(getReelCardsByIds).toHaveBeenCalledWith(expect.any(Array), U);
+    const returnedIds = page.items.map((i) => i.card.postId);
+    expect(returnedIds).toHaveLength(4);
+    expect(returnedIds).not.toContain('h02');
+    // Thứ tự phải khớp thứ tự xếp hạng ban đầu, không bị đảo theo kết quả mock .reverse()
+    expect(returnedIds).toEqual((getReelCardsByIds.mock.calls[0]![0] as string[]).filter((id) => id !== 'h02'));
+    expect(servedAdd).toHaveBeenCalledWith(U, returnedIds, NOW);
+  });
+
+  it('recommendReels khi chưa nối FeedFacade → ReelsFeedNotWiredError', async () => {
+    await expect(setup().useCases.recommendReels({ mode: 'trending', limit: 5, cursor: null, userId: null, now: NOW })).rejects.toBeInstanceOf(
+      ReelsFeedNotWiredError,
+    );
   });
 });

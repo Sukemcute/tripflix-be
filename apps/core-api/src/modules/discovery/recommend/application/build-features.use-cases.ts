@@ -70,7 +70,11 @@ export class BuildFeaturesUseCases {
     const { postBuilders, userBuilders } = await this.activeBuilders();
     const failedBuilders: string[] = [];
 
-    const counts = await this.store.countPostInteractions(now);
+    const needsSamples = postBuilders.some((b) => b.key === 'hot@v1');
+    const [counts, samples] = await Promise.all([
+      this.store.countPostInteractions(now),
+      needsSamples ? this.store.listPostInteractionSamples(now) : Promise.resolve(null),
+    ]);
     const items = posts.map((p) => ({
       postId: p.postId,
       authorId: p.authorId,
@@ -80,6 +84,7 @@ export class BuildFeaturesUseCases {
       publishedAt: p.publishedAt.toISOString(),
       interactions: counts.get(p.postId)?.d30 ?? {},
       interactions24h: counts.get(p.postId)?.h24 ?? {},
+      ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
     }));
     for (const builder of postBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {
