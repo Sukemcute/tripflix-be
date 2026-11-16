@@ -147,6 +147,15 @@ const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date
 /** Sắp xếp ô theo (sản phẩm, ngày) trước khi giữ: hai giỏ chạy cùng lúc khoá theo cùng thứ tự nên không deadlock. */
 const sortCells = (cells: InventoryCell[]) => [...cells].sort((a, b) => a.productId.localeCompare(b.productId) || a.date.localeCompare(b.date));
 
+/**
+ * Thứ tự chạm ô khi vừa nhả giỏ cũ vừa giữ giỏ mới: một danh sách sắp theo (sản phẩm, ngày), cùng ô thì nhả trước
+ * để chỗ vừa trả dùng lại được ngay. Mọi transaction khoá ô theo cùng thứ tự nên không chờ vòng nhau.
+ */
+export const listCellLockOrder = (releases: InventoryCell[], holds: InventoryCell[]) =>
+  [...releases.map((cell) => ({ cell, isRelease: true })), ...holds.map((cell) => ({ cell, isRelease: false }))].sort(
+    (a, b) => a.cell.productId.localeCompare(b.cell.productId) || a.cell.date.localeCompare(b.cell.date) || Number(b.isRelease) - Number(a.isRelease),
+  );
+
 /** Mọi ô của đơn, đúng thứ tự khoá ở trên: giữ, nhả và bán chạy cùng lúc đều không deadlock. */
 export const listSortedCells = (items: OrderItemRecord[]) => sortCells(items.flatMap(cellsOf));
 
@@ -171,6 +180,8 @@ export class CheckoutUseCases {
       throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
     }
     const orderId = await this.holdAndCreateOrder(userId, input)
+      // Deadlock (K2): Postgres huỷ một bên, transaction đã rollback sạch nên chạy lại một lần là đủ an toàn.
+      .catch((error: unknown) => (this.orders.isDeadlock(error) ? this.holdAndCreateOrder(userId, input) : Promise.reject(error)))
       .catch((error: unknown) => {
         if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
         throw error;
@@ -204,16 +215,19 @@ export class CheckoutUseCases {
       throw new CommerceError('conflict', 'Bạn có một đơn đang thanh toán, vui lòng chờ kết quả trước khi giữ giỏ mới.');
     }
     // Mỗi tài khoản một giỏ đang giữ: giữ giỏ mới thì nhả giỏ cũ.
-    for (const old of active.filter((o) => o.status === 'pending')) {
-      await this.releaseOrder(old.id, 'cancelled', 'Đã giữ giỏ mới');
-    }
-
-    for (const cell of sortCells(priced.flatMap((p) => p.cells))) {
-      if (!(await this.orders.holdCell(cell))) {
+    // K2: ô nhả và ô giữ khoá chung một thứ tự (sản phẩm, ngày). Trước đây nhả hết giỏ cũ rồi mới giữ giỏ mới nên thứ tự
+    // khoá bị phá, đụng người đặt khác là deadlock và trả 500 (tái hiện 19/20 lượt ngày 13/11).
+    const oldOrders = active.filter((o) => o.status === 'pending');
+    const releases = (await Promise.all(oldOrders.map((o) => this.orders.findItems(o.id)))).flatMap((items) => items.flatMap(cellsOf));
+    for (const { cell, isRelease } of listCellLockOrder(releases, priced.flatMap((p) => p.cells))) {
+      if (isRelease) {
+        await this.orders.releaseCell(cell);
+      } else if (!(await this.orders.holdCell(cell))) {
         const item = priced.find((p) => p.productId === cell.productId)!;
         throw new CommerceError('conflict', `${item.productName} ngày ${cell.date} không đủ chỗ.`, 'items', { reason: 'SOLD_OUT', productId: cell.productId, date: cell.date });
       }
     }
+    for (const old of oldOrders) await this.orders.updateOrder(old.id, { status: 'cancelled', cancelReason: 'Đã giữ giỏ mới', cancelledAt: now });
     const total = priced.reduce((sum, p) => sum + p.lineTotal, 0);
     const orderId = await this.orders.insertOrder({
       userId,

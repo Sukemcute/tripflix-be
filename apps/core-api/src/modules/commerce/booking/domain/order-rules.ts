@@ -124,9 +124,14 @@ export function hasCompleteGuests(input: { contactName: string | null; contactPh
 export const isHoldExpired = (holdExpiresAt: Date, now: Date) => holdExpiresAt.getTime() <= now.getTime();
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/**
+ * Số ký tự sau "TF-". K3: 6 ký tự (~1 tỉ mã) thì 50.000 đơn đã có ~69% khả năng trùng; 8 ký tự (~1.100 tỉ) còn ~0,1%
+ * ở 50.000 đơn, và chỉ mục duy nhất chặn phần còn lại (trùng thì ghi lỗi, đối soát chạy lại với mã mới).
+ */
+export const CONFIRMATION_CODE_LENGTH = 8;
 /** Mã xác nhận đọc được qua điện thoại: bỏ các ký tự dễ nhầm (0/O, 1/I). random là nguồn byte ngẫu nhiên. */
 export function createConfirmationCode(randomBytes: Uint8Array): string {
-  return `TF-${Array.from(randomBytes.slice(0, 6), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('')}`;
+  return `TF-${Array.from(randomBytes.slice(0, CONFIRMATION_CODE_LENGTH), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('')}`;
 }
 
 /** Khoá gửi sang cổng cho lần trả thứ attempt của đơn: cùng lần trả thì cùng khoá, cổng không trừ hai lần. */

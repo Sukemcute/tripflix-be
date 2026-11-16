@@ -139,6 +139,21 @@ Làm trên AWS Console, chọn region `ap-southeast-1` (Singapore). Dưới đâ
 
 Kiểm tra bằng cách yêu cầu mã đăng ký, nhập mã nhận qua email, xác nhận tài khoản được tạo, sau đó kiểm luồng quên mật khẩu.
 
+### Push mobile qua Expo
+
+`notification-service` gửi push qua Expo Push API khi `PUSH_ENABLED=true`. Mặc định tắt. Chỉ bật sau khi app đã gửi Expo push token lên. Server không giữ khoá FCM hay APNs: khoá FCM v1 (Android) và khoá APNs (iOS) tải lên Expo bằng `eas credentials`.
+
+```bash
+cd ~/tripflix-be
+grep -q '^PUSH_ENABLED=' deploy/.env.server || echo 'PUSH_ENABLED=false' >> deploy/.env.server
+sed -i 's/^PUSH_ENABLED=.*/PUSH_ENABLED=true/' deploy/.env.server
+dc --profile mail up -d --wait notification-service
+dc --profile mail exec -T notification-service node -e "console.log(process.env.PUSH_ENABLED)"   # phải in true
+```
+
+- `EXPO_ACCESS_TOKEN` chỉ cần khi bật "Enhanced Push Security" trên Expo. Dán vào `.env.server`, không gửi qua chat.
+- Tắt: đặt lại `PUSH_ENABLED=false` rồi chạy lại lệnh `up` ở trên.
+
 ## Giai đoạn 5: AI (TF14 tóm tắt, TF32 kiểm duyệt, TF31 trợ lý Tripi)
 
 Ba service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-label-worker` gắn nhãn bình luận, `ai-service` nhận `POST /moderate` từ core-api và `POST /chat` từ app.
@@ -254,6 +269,41 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.tripflix.io.vn/ai/c
 ```
 
 3. Chạy app với `EXPO_PUBLIC_AI_URL=https://api.tripflix.io.vn/ai`. Tắt trợ lý khẩn cấp: xoá router `ai-chat` trong `traefik/server.yml` rồi chạy lại gateway; chỉ tắt DeepSeek: đặt `CHAT_LLM_ENABLED=false` rồi chạy lại `ai-service`.
+
+#### Tripi v3: hai agent và hạn mức
+
+Mỗi lượt chat gọi 2 LLM: Controller (OpenAI, mặc định `gpt-5-nano`) chọn công cụ, Responder (DeepSeek) viết câu trả lời. Hạn mức lượt, token và chi tiêu nằm trong Redis của stack. Giá token của Controller và `CHAT_SYSTEM_DAILY_USD=3` lấy mặc định trong `compose.server.yaml`. Không đặt giá rỗng trong `.env.server`.
+
+1. Trong `.env.server` cần `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` (không gửi qua chat), `CHAT_IDENTITY_SALT` và `AI_FORWARDED_ALLOW_IPS`. Hai biến sau lấy như sau:
+
+```bash
+cd ~/tripflix-be
+# Salt băm IP khách: sinh một lần cho mỗi môi trường, không đổi (đổi thì hạn mức khách tính lại từ đầu).
+grep -q '^CHAT_IDENTITY_SALT=.' deploy/.env.server || echo "CHAT_IDENTITY_SALT=$(openssl rand -hex 32)" >> deploy/.env.server
+# Dải mạng compose có Traefik. ai-service chỉ tin X-Forwarded-For từ dải này.
+net=$(docker inspect tripflix-server-traefik-1 -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}')
+subnet=$(docker network inspect "$net" -f '{{(index .IPAM.Config 0).Subnet}}'); echo "$subnet"
+grep -q '^AI_FORWARDED_ALLOW_IPS=' deploy/.env.server || echo "AI_FORWARDED_ALLOW_IPS=$subnet" >> deploy/.env.server
+```
+
+- Đặt cả dải mạng thay vì IP của Traefik, vì IP Traefik đổi mỗi lần tạo lại container, còn dải mạng giữ nguyên tới khi mạng bị xoá (`dc down`). Sau `dc down` thì lấy lại dải mạng như trên.
+- Vẫn an toàn vì ai-service không mở cổng ra ngoài, và Traefik bỏ `X-Forwarded-For` do client tự gửi.
+- Không đặt thì mọi khách chung IP của Traefik và chạm hạn mức khách rất nhanh.
+
+2. Chép `compose.server.yaml` và `traefik/server.yml` mới lên máy, đổi `AI_TAG`, rồi chạy lại AI. Traefik đọc `server.yml` một lần lúc khởi động (không bật `watch`), nên sửa router hay middleware thì phải restart gateway, mất kết nối vài giây:
+
+```bash
+dc --profile ai up -d --wait ai-service
+dc --profile gateway restart traefik
+dc --profile ai exec -T ai-service printenv FORWARDED_ALLOW_IPS   # phải là dải mạng, không phải 127.0.0.1
+```
+
+3. Gọi thử từ app khi chưa đăng nhập (khách được chat, 5 lượt/ngày). Log `ai-service` ghi mã người dùng hoặc IP đã băm, token, chi phí, không ghi nội dung tin nhắn.
+4. Đo tải trên staging trước khi mở cho người dùng: 10 rồi 30 lượt chat cùng lúc, trong lúc gửi bình luận để core gọi `/moderate` (hai việc chung một tiến trình, nửa nhân). Đạt khi p95 của `/moderate` vẫn dưới timeout của core-api và `ai-service` không bị khởi động lại vì hết RAM. Khi đo, hạ `CHAT_SYSTEM_DAILY_USD` (ví dụ `0.5`) trong `.env.server` rồi chạy lại `ai-service`.
+
+### Giữ log
+
+Log của mọi container dùng driver `json-file`, xoay theo dung lượng: 3 file × 10 MB mỗi container (`x-logging`). Quy định: log chat của ai-service giữ tối đa 14 ngày. Với lượng chat hiện tại thì 30 MB bị xoay trước 14 ngày, nên chưa cần thêm gì. Khi lượng chat tăng tới mức 30 MB giữ được lâu hơn 14 ngày, cần thêm bước xoá theo ngày.
 
 ## Giai đoạn 6: chuyển mã video (`video-worker`)
 

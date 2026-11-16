@@ -59,7 +59,7 @@ export class ListCommentsUseCase {
     }
 
     if (query.focusCommentId !== undefined) {
-      const records = await this.findFocusThread(query.postId, query.focusCommentId);
+      const records = await this.findFocusThread(query.postId, query.focusCommentId, query.viewerId, query.isStaff);
       return { items: await this.enrich(records, query.viewerId), nextCursor: null, total: records.length };
     }
 
@@ -76,9 +76,13 @@ export class ListCommentsUseCase {
         cursorId: decoded?.id,
         parentCommentId: query.parentCommentId,
         flat: query.flat,
+        ...(query.viewerId ? { viewerId: query.viewerId } : {}),
+        ...(query.isStaff ? { isStaff: true } : {}),
       }),
       this.commentRepository.countByPostId(query.postId, {
         flat: query.flat,
+        ...(query.viewerId ? { viewerId: query.viewerId } : {}),
+        ...(query.isStaff ? { isStaff: true } : {}),
         parentCommentId: query.parentCommentId,
       }),
     ]);
@@ -92,10 +96,11 @@ export class ListCommentsUseCase {
     return { items: await this.enrich(rawItems, query.viewerId), nextCursor, total };
   }
 
-  private async findFocusThread(postId: string, commentId: string): Promise<CommentRecord[]> {
+  private async findFocusThread(postId: string, commentId: string, viewerId?: string, isStaff = false): Promise<CommentRecord[]> {
     if (!z.uuid().safeParse(commentId).success) return [];
     const comment = await this.commentRepository.findById(commentId);
-    if (!comment || comment.postId !== postId || comment.deletedAt || comment.status !== 'visible') return [];
+    if (!comment || comment.postId !== postId || comment.deletedAt ||
+      (comment.status !== 'visible' && !(comment.status === 'held' && (isStaff || viewerId === comment.authorId)))) return [];
     if (!comment.parentCommentId) return [comment];
     const parent = await this.commentRepository.findById(comment.parentCommentId);
     if (!parent || parent.postId !== postId || parent.deletedAt || parent.status !== 'visible') return [];

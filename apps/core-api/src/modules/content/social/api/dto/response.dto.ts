@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TripAttachmentDto } from './post.dto.js';
 
 export class PostViewerContextDto {
@@ -63,9 +63,9 @@ export class SocialPostDetailDto {
 }
 export class PublishedPostDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ enum: ['published'] }) status!: string;
+  @ApiProperty({ enum: ['published', 'held'] }) status!: string;
   @ApiProperty() isVerified!: boolean;
-  @ApiProperty({ format: 'date-time' }) publishedAt!: string;
+  @ApiProperty({ format: 'date-time', type: String, nullable: true }) publishedAt!: string | null;
   @ApiProperty() shareUrl!: string;
 }
 export class DeletedSocialItemDto {
@@ -78,6 +78,7 @@ export class SharedPostDto {
   @ApiProperty() shareCount!: number;
 }
 export class SocialCommentDto {
+  @ApiPropertyOptional({ enum: ['visible', 'held', 'hidden', 'removed'] }) status?: string;
   @ApiProperty() id!: string;
   @ApiProperty() postId!: string;
   @ApiProperty() authorId!: string;

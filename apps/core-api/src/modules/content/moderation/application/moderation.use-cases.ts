@@ -181,10 +181,14 @@ export class RecordScreeningUseCase {
       !target ||
       target.deleted ||
       target.version !== snapshot.version ||
-      (!['published', 'visible'].includes(target.status) &&
+      (!['published', 'visible', 'held'].includes(target.status) &&
         !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden))
     )
       return;
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
     if (occurredAt && (await this.repository.hasStaffDecisionAfter(target, occurredAt))) return;
     const attempts = (previousScan?.attempts ?? 0) + 1;
     const scanStatus =
@@ -221,7 +225,7 @@ export class RecordScreeningUseCase {
     const rules = evaluateRules(target.text, this.config.allowedDomains);
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
-    if (!verdict.suspicious) return;
+    if (!verdict.suspicious && target.status !== 'held') return;
     const item = await this.repository.upsertCase(target, {
       sources: [...(rules.length ? ['rule'] : []), ...(ai?.flagged ? ['ai'] : [])],
       severity: verdict.severity,
@@ -233,7 +237,7 @@ export class RecordScreeningUseCase {
         reasonCode: verdict.autoHideReason ?? rules[0]?.category ?? 'OTHER',
       },
     });
-    if (verdict.shouldAutoHide && target.status !== 'hidden') {
+    if (verdict.shouldAutoHide && !['hidden', 'held'].includes(target.status)) {
       await this.visibility.execute({
         targetType: target.targetType,
         targetId: target.targetId,
@@ -271,9 +275,14 @@ export class ScreenContentUseCase {
       return;
     }
     if (
-      !['published', 'visible'].includes(target.status) &&
+      !['published', 'visible', 'held'].includes(target.status) &&
       !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden)
     ) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
+    if (target.status === 'held') await this.record.execute(eventId, target, null, occurredAt);
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
       await this.repository.supersedeScan(eventId);
       return;
     }

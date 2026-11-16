@@ -12,6 +12,8 @@ import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/p
 import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
 import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
 import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
+import { ReconcileInventoryJob } from './booking/jobs/reconcile-inventory.job.js';
+import { ReconcileInventoryUseCases } from './booking/application/reconcile-inventory.use-cases.js';
 import { CommerceFacade } from './commerce.facade.js';
 import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
 import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
@@ -133,8 +135,10 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     PaymentUseCases,
     VnpayUseCases,
     ExpireHoldsUseCases,
+    ReconcileInventoryUseCases,
     OpenCalendarJob,
     ExpireHoldsJob,
+    ReconcileInventoryJob,
     CommerceCleanupJob,
     PaymentJobs,
     CommerceFacade,

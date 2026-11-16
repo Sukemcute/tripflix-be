@@ -15,6 +15,7 @@ describe('ScreenContentUseCase', () => {
       deleted: false,
     };
     const repository = {
+      hasHeldRelease: vi.fn().mockResolvedValue(false),
       loadTarget: vi.fn().mockResolvedValue(target),
       scan: vi.fn().mockResolvedValue(undefined),
     };

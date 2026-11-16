@@ -25,7 +25,7 @@ function createInput(productId = 'room-1', checkIn = '2026-12-01'): CheckoutInpu
 }
 
 function setup(holdPromise: Promise<string>) {
-  const orders = { isLockWaitTimeout: vi.fn<OrderStore['isLockWaitTimeout']>().mockReturnValue(false) };
+  const orders = { isLockWaitTimeout: vi.fn<OrderStore['isLockWaitTimeout']>().mockReturnValue(false), isDeadlock: vi.fn<OrderStore['isDeadlock']>().mockReturnValue(false) };
   const useCases = new CheckoutUseCases(
     orders as unknown as OrderStore,
     new MemoryCommerceStore(),
@@ -133,5 +133,25 @@ describe('CheckoutUseCases: cổng giữ chỗ', () => {
     await expect(Promise.all(next)).resolves.toEqual([view, view, view]);
     expect(hold).toHaveBeenCalledTimes(6);
     expect(getCheckout).toHaveBeenCalledWith('user-next-2', 'order-next', { isNewOrder: true });
+  });
+});
+
+describe('CheckoutUseCases: deadlock khi giữ chỗ (K2)', () => {
+  it('gặp deadlock thì chạy lại đúng một lần, lần sau thành công', async () => {
+    const { useCases, hold, view } = setup(Promise.resolve('order-1'));
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+    hold.mockReset().mockRejectedValueOnce(deadlock).mockResolvedValueOnce('order-1');
+    (useCases as unknown as { orders: { isDeadlock: (e: unknown) => boolean } }).orders.isDeadlock = (e) => e === deadlock;
+    await expect(useCases.checkout('user-1', createInput())).resolves.toEqual(view);
+    expect(hold).toHaveBeenCalledTimes(2);
+  });
+
+  it('deadlock hai lần liên tiếp thì báo lỗi, không lặp mãi', async () => {
+    const { useCases, hold } = setup(Promise.resolve('order-1'));
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+    hold.mockReset().mockRejectedValue(deadlock);
+    (useCases as unknown as { orders: { isDeadlock: (e: unknown) => boolean } }).orders.isDeadlock = (e) => e === deadlock;
+    await expect(useCases.checkout('user-1', createInput())).rejects.toBe(deadlock);
+    expect(hold).toHaveBeenCalledTimes(2);
   });
 });

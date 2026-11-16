@@ -261,6 +261,76 @@ describe('Social Application Use Cases', () => {
   });
 
   describe('UpdatePostUseCase & DeletePostUseCase', () => {
+    it('vẫn sửa được bài khi bộ đếm đổi trong lúc chờ kiểm media (TF91)', async () => {
+      const post = samplePostRecord({ status: 'published' });
+      let current = post;
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockPostRepo.findByIdForUpdate = vi.fn(async () => current);
+      mockPostRepo.update.mockImplementation(async (_id: string, data: Partial<PostRecord>) => ({
+        ...current,
+        ...data,
+      }));
+      const postMedia = {
+        findMediaInfo: vi.fn(async () => {
+          await Promise.resolve();
+          // Một tương tác khác đã commit khi tác giả đang chờ kiểm media. incrementCounter và
+          // updateReactionCounts thật đều ghi updatedAt mới, nên mock cũng đổi updatedAt.
+          current = {
+            ...post,
+            reactionCounts: { like: 1 },
+            reactionTotal: 1,
+            commentCount: 2,
+            shareCount: 3,
+            bookmarkCount: 4,
+            updatedAt: new Date(post.updatedAt.getTime() + 1_000),
+          };
+          return new Map();
+        }),
+        getImages: vi.fn(async () => new Map()),
+      };
+      const useCase = new UpdatePostUseCase(mockPostRepo, mockOutbox, postMedia);
+      const result = await useCase.execute({
+        postId,
+        userId: authorId,
+        body: 'Nội dung tác giả vừa sửa',
+        mediaIds: ['media-2'],
+      });
+
+      expect(postMedia.findMediaInfo).toHaveBeenCalledWith(['media-2']);
+      expect(result).toMatchObject({
+        body: 'Nội dung tác giả vừa sửa',
+        mediaIds: ['media-2'],
+        reactionCounts: { like: 1 },
+        reactionTotal: 1,
+        commentCount: 2,
+        shareCount: 3,
+        bookmarkCount: 4,
+      });
+    });
+
+    it.each([
+      { status: 'hidden' as const },
+      { title: 'Tiêu đề đã được sửa ở phiên khác' },
+      { body: 'Nội dung đã được sửa ở phiên khác' },
+      { hashtags: ['noi-dung-moi'] },
+      { visibility: 'private' as const },
+      { mediaIds: ['media-khac'] },
+      { coverMediaId: '018d9f10-1234-7000-8000-00000000c0de' },
+      { tripAttachment: { hotelName: 'Khách sạn khác' } },
+      { deletedAt: new Date('2026-11-16T08:00:00Z') },
+    ])('vẫn báo 409 và không ghi khi bản đã kiểm bị thay đổi: %j (TF91)', async (change) => {
+      const post = samplePostRecord({ status: 'published' });
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockPostRepo.findByIdForUpdate = vi.fn().mockResolvedValue({ ...post, ...change });
+      const outbox = { add: vi.fn() };
+      const useCase = new UpdatePostUseCase(mockPostRepo, outbox);
+
+      await expect(useCase.execute({ postId, userId: authorId, body: 'Bản sửa mới' }))
+        .rejects.toMatchObject({ status: 409 });
+      expect(mockPostRepo.update).not.toHaveBeenCalled();
+      expect(outbox.add).not.toHaveBeenCalled();
+    });
+
     it('chỉnh sửa bài đăng thành công', async () => {
       const post = samplePostRecord();
       mockPostRepo.findById.mockResolvedValue(post);
