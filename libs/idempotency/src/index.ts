@@ -2,6 +2,7 @@ export { createIdempotencyKeysTable, type IdempotencyKeysTable } from './table.j
 export {
   DrizzleIdempotencyStore,
   MemoryIdempotencyStore,
+  STALE_PROCESSING_SECONDS,
   type IdempotencyBeginResult,
   type IdempotencyStore,
 } from './store.js';

@@ -100,6 +100,39 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect((await store.countPostInteractions(NOW)).get(p)).toEqual({ d30: { reaction: 2, comment: 1 }, h24: { reaction: 1, comment: 1 } });
   });
 
+  it('listPostInteractionSamples: lấy cả order_item theo sourcePostId và tính tuổi tài khoản từ registered', async () => {
+    const p = randomUUID();
+    const youngUser = randomUUID();
+    const oldUser = randomUUID();
+    await store.upsertInteractions(
+      [
+        row({ actorId: youngUser, kind: 'registered', refId: youngUser, targetType: null, targetId: null, occurredAt: hoursAgo(48).toISOString() }),
+        row({ actorId: youngUser, refId: p, targetId: p, occurredAt: hoursAgo(2).toISOString() }),
+        row({
+          actorId: oldUser,
+          kind: 'order_item',
+          refId: `${randomUUID()}:0`,
+          targetType: 'room',
+          targetId: randomUUID(),
+          detail: { sourcePostId: p },
+          occurredAt: hoursAgo(3).toISOString(),
+        }),
+        row({ actorId: oldUser, refId: 'removed', targetId: p, isRemoved: true }),
+        row({ actorId: oldUser, refId: 'future', targetId: p, occurredAt: hoursAgo(-1).toISOString() }),
+      ],
+      meta(),
+    );
+
+    const samples = (await store.listPostInteractionSamples(NOW)).get(p) ?? [];
+    expect(samples).toHaveLength(2);
+    expect(samples).toEqual(
+      expect.arrayContaining([
+        { kind: 'reaction', actorAgeDays: 2, count: 1 },
+        { kind: 'order_item', actorAgeDays: null, count: 1 },
+      ]),
+    );
+  });
+
   it('ứng viên hot phá hoà cố định; fresh gồm bài chưa có điểm; bỏ bài loại trừ', async () => {
     const author = randomUUID();
     const ids = [randomUUID(), randomUUID(), randomUUID()].sort();

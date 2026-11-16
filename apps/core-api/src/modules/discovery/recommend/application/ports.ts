@@ -1,4 +1,4 @@
-import type { Candidate, Kind, PostBuildOutput, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
+import type { Candidate, Kind, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 import type { AlgoRow } from '../domain/registry.js';
 
@@ -27,6 +27,23 @@ export interface RecommendCatalog {
   listHotelProvinces(cursor: string | null): Promise<Page<{ id: string; provinceSlug: string }>>;
   /** Trong postIds, bài còn hiện công khai kèm nội dung thẻ. Thật: ContentFacade.getVisiblePosts. */
   getVisiblePosts(postIds: string[]): Promise<RecommendCardPost[]>;
+  /** Trong postIds, thẻ Reels phát được theo đúng thứ tự (lọc bài ẩn/chưa transcode xong). Thật: FeedFacade.getByIds. */
+  getReelCardsByIds?(postIds: string[], viewerId: string | null): Promise<RecommendReelCard[]>;
+}
+
+export interface RecommendReelCard {
+  postId: string;
+  author: { id: string; name: string | null; avatarUrl: string | null; isKol: boolean };
+  video: Record<string, unknown>;
+  title: string;
+  caption: string;
+  region: string | null;
+  tags: string[];
+  linkedProductIds: string[];
+  tripAttachment: Record<string, unknown> | null;
+  counts: { likes: number; comments: number; saves: number; shares: number };
+  viewerState: { liked: boolean; saved: boolean } | null;
+  reason: { code: string; text: string } | null;
 }
 
 export interface RecommendCardPost {
@@ -98,6 +115,8 @@ export interface RecommendStore {
   replacePosts(posts: RecommendPostRow[]): Promise<boolean>;
   /** Đếm tương tác theo bài, 30 ngày và 24 giờ, bỏ is_removed, chỉ occurred_at ≤ now. */
   countPostInteractions(now: Date): Promise<InteractionCounts>;
+  /** Đọc tương tác 30 ngày gắn với bài (gồm cả order_item qua detail.sourcePostId) kèm tuổi tài khoản (dùng cho hot@v1). */
+  listPostInteractionSamples(now: Date): Promise<Map<string, PostInteractionSample[]>>;
   /** Thay toàn bộ điểm của một post builder (một lô gồm mọi bài). */
   replacePostScores(builderKey: string, scores: Array<PostBuildOutput & { postType: string }>): Promise<void>;
   /** Người có dòng thô trong 30 ngày tới now. */

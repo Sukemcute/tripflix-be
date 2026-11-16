@@ -1,5 +1,6 @@
-import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
+import { isBeforeCursor } from './keyset-cursor.js';
 import {
   bookmarks,
   posts,
@@ -79,10 +80,7 @@ export class BookmarkRepository {
 
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(
-        or(
-          lt(bookmarks.createdAt, options.cursorCreatedAt),
-          and(eq(bookmarks.createdAt, options.cursorCreatedAt), lt(bookmarks.id, options.cursorId)),
-        )!,
+        isBeforeCursor(bookmarks, bookmarks.createdAt, bookmarks.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
 

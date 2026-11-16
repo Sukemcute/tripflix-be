@@ -4249,6 +4249,65 @@
         ]
       }
     },
+    "/api/recommendations/reels": {
+      "get": {
+        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
+        "operationId": "PostRecommendationsController_recommendReels",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 10",
+            "schema": {
+              "example": 10
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "for_you",
+                "trending"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReelRecommendationsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số sai hoặc `cursor` không do server cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gợi ý Reels phát được (trending hoặc for_you)",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/v1/admin/search/index-health": {
       "get": {
         "operationId": "AdminIndexHealthController_check",
@@ -10325,6 +10384,57 @@
             "type": "string",
             "nullable": true,
             "description": "Gửi lại ở `cursor` để lấy trang sau; null là hết"
+          }
+        },
+        "required": [
+          "items",
+          "algo",
+          "nextCursor"
+        ]
+      },
+      "ReelRecommendationItemDto": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "description": "Thẻ Reels phát được từ FeedFacade.getByIds"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "taste",
+              "fresh",
+              "explore",
+              "own"
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RecommendReasonDto"
+          }
+        },
+        "required": [
+          "card",
+          "source",
+          "reason"
+        ]
+      },
+      "ReelRecommendationsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReelRecommendationItemDto"
+            }
+          },
+          "algo": {
+            "type": "string",
+            "example": "trending"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [

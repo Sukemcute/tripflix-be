@@ -23,6 +23,14 @@ export const KINDS = [
 ] as const;
 export type Kind = (typeof KINDS)[number];
 
+export interface PostInteractionSample {
+  kind: Kind;
+  /** Tuổi tài khoản tại thời điểm tính điểm (ngày); null nếu chưa có dòng registered (mặc định trọng số 1). */
+  actorAgeDays: number | null;
+  /** Số tương tác cùng (loại, tuổi tài khoản): store gom sẵn trong SQL để không kéo từng dòng vào bộ nhớ. */
+  count: number;
+}
+
 export interface PostBuildItem {
   postId: string;
   authorId: string;
@@ -34,6 +42,8 @@ export interface PostBuildItem {
   /** 30 ngày, bỏ dòng isRemoved. */
   interactions: Partial<Record<Kind, number>>;
   interactions24h: Partial<Record<Kind, number>>;
+  /** Tương tác chi tiết kèm tuổi tài khoản trong 30 ngày (dùng cho hot@v1); nếu thiếu thì fallback về interactions. */
+  interactionSamples?: PostInteractionSample[];
 }
 
 /** score 0..1, chuẩn hoá trên cả lô. */
