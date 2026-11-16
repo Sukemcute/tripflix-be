@@ -18,6 +18,16 @@ catalog:
   '@nestjs/swagger': ^12.1.0
   '@nestjs/testing': ^12.3.2
   '@nestjs/websockets': 12.3.2
+  # Tracing (TF99): chỉ nạp khi có OTEL_EXPORTER_OTLP_ENDPOINT, xem libs/observability.
+  '@opentelemetry/api': ^1.10.0
+  '@opentelemetry/exporter-trace-otlp-proto': ^0.301.2
+  '@opentelemetry/instrumentation': ^0.301.2
+  '@opentelemetry/instrumentation-express': ^0.73.0
+  '@opentelemetry/instrumentation-http': ^0.301.2
+  '@opentelemetry/instrumentation-ioredis': ^0.73.0
+  '@opentelemetry/instrumentation-pg': ^0.78.0
+  '@opentelemetry/instrumentation-pino': ^0.71.0
+  '@opentelemetry/sdk-node': ^0.301.2
   '@socket.io/redis-adapter': ^8.3.0
   '@testcontainers/postgresql': ^12.2.1
   '@testcontainers/redis': ^12.2.1
