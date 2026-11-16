@@ -29,6 +29,8 @@ import { envSchema, type Env } from './env.js';
 import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
 import { FollowerPostWorker } from './inbox/follower-post.worker.js';
 import { InboxController } from './inbox/inbox.controller.js';
+import { PostWatchController } from './inbox/post-watch.controller.js';
+import { PostWatchWorker } from './inbox/post-watch.worker.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
 import { PostNotificationRepository } from './inbox/post-notification.repository.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
@@ -150,7 +152,7 @@ export class InfraModule {}
       }),
     }),
   ],
-  controllers: [HealthController, MeController, InboxController],
+  controllers: [HealthController, MeController, InboxController, PostWatchController],
   providers: [
     NotificationConsumer,
     DeadLetterReplayJob,
@@ -158,6 +160,7 @@ export class InfraModule {}
     RealtimeGateway,
     InboxRepository,
     FollowerPostWorker,
+    PostWatchWorker,
     CommentNotificationRepository,
     PostNotificationRepository,
     ReactionNotificationRepository,

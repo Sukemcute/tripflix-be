@@ -3,6 +3,7 @@ import type pg from 'pg';
 import type { InboxRow } from '../inbox/inbox.repository.js';
 import { DB } from '../tokens.js';
 import { canCreatePostInteraction, lockPostNotifications } from './post-notification.repository.js';
+import { enqueuePostWatchJob, recordPostWatcher } from './post-watch.worker.js';
 
 interface CommentRecipient {
   userId: string;
@@ -67,7 +68,7 @@ export class CommentNotificationRepository {
   }
 
   /**
-   * N2: ghi người tham gia luồng rồi báo cho những người còn lại trong luồng.
+   * N2: ghi người tham gia luồng rồi báo cho những người còn lại trong luồng. N1: ghi người theo dõi bài, xếp job cho bình luận gốc.
    * Người trong `excludedUserIds` (người viết, chủ bài, người được trả lời trực tiếp) đã có dòng riêng từ `create`.
    * Mỗi người một dòng gom theo luồng khi chưa đọc; dòng gom giữ id bình luận mới nhất nên xoá bình luận đó thì ẩn cả dòng.
    */
@@ -78,6 +79,7 @@ export class CommentNotificationRepository {
     authorDisplayName?: string;
     parentCommentId: string | null;
     parentCommentAuthorId?: string | null;
+    postAuthorId?: string;
     excludedUserIds: string[];
     eventId: string;
     occurredAt: string;
@@ -95,7 +97,14 @@ export class CommentNotificationRepository {
          SELECT $1, user_id, $3 FROM unnest($2::uuid[]) AS user_id ON CONFLICT DO NOTHING`,
         [rootId, joiners, input.occurredAt],
       );
-      if (!input.parentCommentId) return [];
+      // N1: người bình luận theo dõi bài (giữ trạng thái đã tắt); bình luận gốc thì xếp job báo người theo dõi.
+      await recordPostWatcher(client, input.postId, input.authorId, input.occurredAt);
+      if (!input.parentCommentId) {
+        if (input.postAuthorId) {
+          await enqueuePostWatchJob(client, { ...input, postAuthorId: input.postAuthorId });
+        }
+        return [];
+      }
 
       const recipients = await client.query<{ user_id: string }>(
         'SELECT user_id FROM thread_participants WHERE parent_comment_id = $1 AND NOT (user_id = ANY($2::uuid[]))',

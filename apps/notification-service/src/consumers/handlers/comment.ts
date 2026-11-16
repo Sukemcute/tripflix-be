@@ -53,6 +53,7 @@ export function createCommentHandlers(options: {
         authorDisplayName: comment.authorDisplayName,
         parentCommentId: comment.parentCommentId,
         parentCommentAuthorId: comment.parentCommentAuthorId,
+        postAuthorId: comment.postAuthorId,
         excludedUserIds: [...recipients.keys()],
         eventId: event.eventId,
         occurredAt: event.occurredAt,

@@ -152,6 +152,32 @@ const THREAD_PARTICIPANTS_SCHEMA = `
   );
 `;
 
+// Người theo dõi bài đã bình luận (N1) và job báo bình luận gốc mới theo lô.
+const POST_WATCHERS_SCHEMA = `
+  CREATE TABLE post_watchers (
+    post_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    is_muted boolean NOT NULL DEFAULT false,
+    changed_at timestamptz NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+  );
+  CREATE TABLE post_watch_jobs (
+    comment_id uuid PRIMARY KEY,
+    post_id uuid NOT NULL,
+    post_author_id uuid NOT NULL,
+    author_id uuid NOT NULL,
+    author_display_name text,
+    event_id text NOT NULL,
+    occurred_at timestamptz NOT NULL,
+    cursor uuid,
+    state text NOT NULL DEFAULT 'pending'
+      CONSTRAINT ck_post_watch_jobs_state CHECK (state IN ('pending', 'done', 'failed', 'cancelled')),
+    attempts integer NOT NULL DEFAULT 0,
+    available_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX idx_post_watch_jobs_available ON post_watch_jobs (available_at, comment_id) WHERE state = 'pending';
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
@@ -161,4 +187,5 @@ const NOTIFICATION_MIGRATIONS = [
   [6, FOLLOWER_POST_JOBS_SCHEMA],
   [7, SHARED_FOLLOWER_POSTS_SCHEMA],
   [8, THREAD_PARTICIPANTS_SCHEMA],
+  [9, POST_WATCHERS_SCHEMA],
 ] as const;
