@@ -5555,6 +5555,25 @@
           "mock-gateway"
         ]
       }
+    },
+    "/api/admin/commerce/metrics": {
+      "get": {
+        "operationId": "AdminMetricsController_getMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Số đo 5 giây gần nhất của từng instance và tổng; isAvailable=false khi Redis không đọc được"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
     }
   },
   "info": {
