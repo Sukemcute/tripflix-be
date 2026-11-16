@@ -840,6 +840,20 @@ describe('Social Application Use Cases', () => {
         }),
       );
     });
+
+    it.each(['held', 'hidden', 'removed', 'draft'] as const)(
+      'không cho chia sẻ bài %s của người khác, không tăng shareCount, không ghi outbox (TF90)',
+      async (status) => {
+        mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status, shareCount: 10 }));
+        const useCase = new TrackShareUseCase(mockPostRepo, mockOutbox, new PostShareLinks('https://tripflix.io.vn'));
+
+        // Người đã đăng nhập khác tác giả và khách chưa đăng nhập đều không chia sẻ được.
+        await expect(useCase.execute({ postId, userId: otherUserId })).rejects.toBeInstanceOf(PostNotFoundException);
+        await expect(useCase.execute({ postId })).rejects.toBeInstanceOf(PostNotFoundException);
+        expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
+        expect(mockOutbox.add).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('AdminModeratePostUseCase', () => {
