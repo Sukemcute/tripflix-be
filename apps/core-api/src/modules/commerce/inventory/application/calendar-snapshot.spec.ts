@@ -1,4 +1,4 @@
-import { CalendarSnapshot, hasBulkLoad, type CalendarBulkSource } from './calendar-snapshot.js';
+import { CalendarSnapshot, hasBulkLoad, type CalendarBulkSource, type CalendarDeltaSource } from './calendar-snapshot.js';
 import type { ReadCalendar } from './ports.js';
 import type { FlightDay, RoomDay } from '../domain/sales-rules.js';
 
@@ -80,5 +80,59 @@ describe('CalendarSnapshot', () => {
   it('chỉ bật với store có hàm nạp cả lịch', () => {
     expect(hasBulkLoad({ loadAllRoomDays: () => null, loadAllFlightDays: () => null })).toBe(true);
     expect(hasBulkLoad({ loadRoomDays: () => null })).toBe(false);
+  });
+});
+
+describe('CalendarSnapshot nạp phần thay đổi (L1)', () => {
+  function deltaSetup() {
+    let clock = 0;
+    const calls = { bulk: 0, delta: [] as string[] };
+    const changes = new Map<string, RoomDay[]>();
+    const source: CalendarBulkSource & CalendarDeltaSource = {
+      loadAllRoomDays: async () => {
+        calls.bulk += 1;
+        return new Map([['A', [room('2026-12-01'), room('2026-12-03')]]]);
+      },
+      loadAllFlightDays: async () => new Map(),
+      databaseNow: async () => new Date(Date.UTC(2026, 11, 1, 0, 0, clock / 1000)).toISOString(),
+      loadChangedRoomDays: async (_from, since) => {
+        calls.delta.push(since);
+        return changes;
+      },
+      loadChangedFlightDays: async () => new Map(),
+    };
+    const fallback: ReadCalendar = { loadRoomDays: async () => new Map(), loadFlightDays: async () => new Map() };
+    const snapshot = new CalendarSnapshot({ fallback, source, today: () => '2026-12-01', refreshMs: 10_000, fullReloadMs: 60_000, overlapMs: 5_000, now: () => clock });
+    return { snapshot, calls, changes, tick: (ms: number) => (clock += ms) };
+  }
+
+  it('lượt sau chỉ nạp ô đổi, ghi đè ngày cũ và chèn ngày mới đúng thứ tự', async () => {
+    const { snapshot, calls, changes, tick } = deltaSetup();
+    await snapshot.refresh();
+    changes.set('A', [room('2026-12-01', 2), room('2026-12-02')]);
+    changes.set('B', [room('2026-12-05')]);
+    tick(10_000);
+    await snapshot.refresh();
+    expect(calls.bulk).toBe(1);
+    // Mốc đọc lùi overlapMs so với giờ database của lượt trước.
+    expect(calls.delta).toEqual(['2026-11-30T23:59:55.000Z']);
+    const got = await snapshot.loadRoomDays(['A', 'B'], '2026-12-01', '2026-12-31');
+    expect(got.get('A')!.map((d) => [d.date, d.held])).toEqual([
+      ['2026-12-01', 2],
+      ['2026-12-02', 0],
+      ['2026-12-03', 0],
+    ]);
+    expect(got.get('B')!.map((d) => d.date)).toEqual(['2026-12-05']);
+  });
+
+  it('quá fullReloadMs thì nạp lại cả lịch', async () => {
+    const { snapshot, calls, tick } = deltaSetup();
+    await snapshot.refresh();
+    tick(30_000);
+    await snapshot.refresh();
+    tick(31_000);
+    await snapshot.refresh();
+    expect(calls.bulk).toBe(2);
+    expect(calls.delta).toHaveLength(1);
   });
 });

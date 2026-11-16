@@ -19,7 +19,7 @@ import {
   type GuestInput,
 } from '../domain/order-rules.js';
 import { CellGate } from './cell-gate.js';
-import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore } from './ports.js';
+import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore, type RefundRecord } from './ports.js';
 
 export interface CheckoutItemInput {
   /** Mã loại phòng hoặc mã hạng ghế (productId trong danh mục). */
@@ -226,6 +226,14 @@ export class CheckoutUseCases {
     return orderId;
   }
 
+  findRoomTypes(ids: string[]): Promise<RoomTypeRecord[]> {
+    return this.catalog.catalog.findRoomTypesByIds(ids);
+  }
+
+  findFlights(ids: string[]): Promise<FlightRecord[]> {
+    return this.catalog.catalog.findFlightsByIds(ids);
+  }
+
   /** Hành trình của các chuyến bay trong đơn, theo mã sản phẩm. */
   async findFlightRoutes(productIds: string[]) {
     if (!productIds.length) return new Map<string, { fromAirport: string; toAirport: string; departTime: string | null; arriveTime: string | null }>();
@@ -407,10 +415,23 @@ export class CheckoutUseCases {
     return { orderId, status: 'cancelled' };
   }
 
-  async getCheckout(userId: string, orderId: string, options: { isNewOrder?: boolean } = {}): Promise<CheckoutView> {
-    const order = await this.ownOrder(userId, orderId);
-    const items = await this.orders.findItems(orderId);
-    const [refunds, guestBirthdates] = options.isNewOrder ? [[], []] : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
+  /**
+   * `known`: dữ liệu transaction vừa ghi đã có trong tay (trả tiền xong), dựng luôn không đọc lại database.
+   * Đo tải 16/11: đọc lại tốn 4 lượt gọi nối tiếp, khi Node quá tải mỗi lượt phải xếp hàng.
+   */
+  async getCheckout(
+    userId: string,
+    orderId: string,
+    options: { isNewOrder?: boolean; known?: { order: OrderRecord; items: OrderItemRecord[]; refunds: RefundRecord[]; guestBirthdates: (string | null)[] } } = {},
+  ): Promise<CheckoutView> {
+    const known = options.known?.order.id === orderId && options.known.order.userId === userId ? options.known : undefined;
+    const order = known?.order ?? (await this.ownOrder(userId, orderId));
+    const items = known?.items ?? (await this.orders.findItems(orderId));
+    const [refunds, guestBirthdates] = known
+      ? [known.refunds, known.guestBirthdates]
+      : options.isNewOrder
+        ? [[], []]
+        : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
     const passengerTypes = listRequiredPassengers(order, items);
     const passengersRequired = passengerTypes.length;
     return {
