@@ -13,6 +13,7 @@
 |---|---|---|
 | Đi hết trang không thiếu, không lặp dòng cùng mili giây | Đạt | `keyset-cursor.int.spec.ts`: bình luận, 3 danh sách bài, bài đã lưu, đồng bộ `updatedAt` (4 ca fail trước khi sửa, pass sau khi sửa) |
 | Dòng cursor bị sửa giữa hai trang không làm nhảy cóc | Đạt | `keyset-cursor.int.spec.ts` › "dòng của cursor đã đổi thời gian" |
+| Kiểm trên app thật | Đạt | core-api build từ nhánh này, `run.sh paging` (25 người gửi dồn dập rồi đi hết trang): 656 trang, total 13.106, thấy 13.106, thiếu 0, lặp 0; có 24 bình luận chung mili giây (trước khi sửa: thiếu 5/11.506 với 14 bình luận chung mili giây) |
 | Không làm truy vấn chậm hơn | Đạt | EXPLAIN trang giữa bài 10.000 bình luận: câu con là InitPlan tra khoá chính (0,02 ms), tổng 2,51 ms so với 2,47 ms trước khi sửa |
 
 ## Kết quả kiểm tra
@@ -25,7 +26,7 @@
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/core-api exec vitest run --config vitest.int.config.ts src/modules/content/social/infra/keyset-cursor.int.spec.ts`.
-2. Trên nhánh benchmark: `bash tools/bench/comments/run.sh paging` với core-api build từ nhánh này: phân trang thiếu 0.
+2. Trên nhánh benchmark (`thanh/TF99-benchmark-binh-luan`): build và chạy core-api từ nhánh này, `bash tools/bench/comments/run.sh paging`, xem dòng "phân trang" trong log: thiếu 0, lặp 0.
 
 ## Ảnh / video
 - Không đính kèm.
