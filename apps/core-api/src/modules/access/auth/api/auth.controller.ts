@@ -39,6 +39,9 @@ import { REGISTRATION_CODE_COOLDOWN_SECONDS } from '../domain/registration.js';
 import {
   GoogleLoginDto,
   GoogleLoginRequestSchema,
+  LoginCodeDto,
+  LoginCodeRequestSchema,
+  LoginCodeResultDto,
   LoginDto,
   PasswordKeyDto,
   RefreshDto,
@@ -107,6 +110,20 @@ export class AuthController {
   @ApiCreatedResponse({ type: UserDto })
   register(@Body(new ZodBody(RegisterRequestSchema)) body: z.infer<typeof RegisterRequestSchema>, @Req() req: Request) {
     return this.auth.register(body, readRequestMeta(req));
+  }
+
+  @Post('login-code')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Header('Cache-Control', 'no-store')
+  @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
+  @ApiBody({ type: LoginCodeDto })
+  @ApiAcceptedResponse({ type: LoginCodeResultDto })
+  async requestLoginCode(
+    @Body(new ZodBody(LoginCodeRequestSchema)) body: z.infer<typeof LoginCodeRequestSchema>,
+    @Req() req: Request,
+  ): Promise<LoginCodeResultDto> {
+    const loginChallengeId = await this.auth.requestLoginCode(body, readRequestMeta(req));
+    return { loginChallengeId, resendAfterSeconds: REGISTRATION_CODE_COOLDOWN_SECONDS };
   }
 
   @Post('login')

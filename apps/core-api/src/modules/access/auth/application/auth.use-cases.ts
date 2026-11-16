@@ -189,11 +189,40 @@ export class AuthUseCases {
     if (blocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, blocked.retryAfterSeconds);
   }
 
-  async login(
-    input: { email: string; password: string; deviceName?: string | undefined },
+  async requestLoginCode(input: { email: string; password: string }, meta: RequestMeta): Promise<string> {
+    const { email, user } = await this.verifyPasswordCredentials(input, meta);
+    const cooldown = await this.actionLimiter.consume(`login-code:cooldown:${email}`, 1, REGISTRATION_CODE_COOLDOWN_SECONDS);
+    if (cooldown.isBlocked) {
+      throw new AccessError('too_many_attempts', REGISTRATION_CODE_COOLDOWN_MESSAGE, cooldown.retryAfterSeconds);
+    }
+    await this.checkRegistrationLimit(
+      [`login-code:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
+      [`login-code:email:${email}`, 5, REGISTER_WINDOW_SECONDS],
+    );
+    const id = randomUUID();
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    const codeHash = await this.hasher.hash(code);
+    await this.saveLoginCode(user, id, code, codeHash);
+    return id;
+  }
+
+  @Transactional('access')
+  private async saveLoginCode(user: UserRecord, id: string, code: string, codeHash: string): Promise<void> {
+    const expiresAt = new Date(this.now().getTime() + REGISTRATION_CODE_TTL_MS);
+    await this.store.registrationChallenges.save({ email: `login:${user.email}`, id, codeHash, expiresAt });
+    const payload: AccessRegistrationCodeRequestedV1 = {
+      email: user.email,
+      code,
+      expiresAt: expiresAt.toISOString(),
+      purpose: 'login',
+    };
+    await this.store.outbox.add({ type: 'access.registration_code_requested', userId: user.id, payload });
+  }
+
+  private async verifyPasswordCredentials(
+    input: { email: string; password: string },
     meta: RequestMeta,
-    browserProof?: BrowserProof,
-  ): Promise<TokenPair> {
+  ): Promise<{ email: string; user: UserRecord }> {
     const email = normalizeEmail(input.email);
     const limit = await this.limiter.check(email, meta.ip);
     if (limit.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_ATTEMPTS_MESSAGE, limit.retryAfterSeconds);
@@ -216,10 +245,47 @@ export class AuthUseCases {
       throw new AccessError('invalid_credentials', INVALID_CREDENTIALS_MESSAGE);
     }
 
+    return { email, user };
+  }
+
+  async login(
+    input: {
+      email: string;
+      password: string;
+      deviceName?: string | undefined;
+      loginChallengeId?: string | undefined;
+      code?: string | undefined;
+    },
+    meta: RequestMeta,
+    browserProof?: BrowserProof,
+  ): Promise<TokenPair> {
+    const { email, user } = await this.verifyPasswordCredentials(input, meta);
+
+    if (input.loginChallengeId !== undefined || input.code !== undefined) {
+      if (!input.loginChallengeId || !input.code) {
+        throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+      }
+      await this.checkRegistrationLimit(
+        [`login-code-verify:ip:${meta.ip}`, 30, 600],
+        [`login-code-verify:id:${input.loginChallengeId}`, 5, 600],
+      );
+      const challenge = await this.store.registrationChallenges.findUsable(`login:${email}`, input.loginChallengeId, this.now());
+      if (!challenge || !(await this.hasher.verify(challenge.codeHash, input.code))) {
+        throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+      }
+    }
+
     await this.limiter.reset(email);
     const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'login') : undefined;
     const refreshToken = createRefreshToken(browserKey);
-    const session = await this.openSession(user, hashRefreshToken(refreshToken), input.deviceName ?? null, meta);
+    const session = await this.openSession(
+      user,
+      hashRefreshToken(refreshToken),
+      input.deviceName ?? null,
+      meta,
+      'password',
+      input.loginChallengeId,
+    );
     return this.issueTokenPair(user, session.id, refreshToken);
   }
 
@@ -407,7 +473,14 @@ export class AuthUseCases {
     deviceName: string | null,
     meta: RequestMeta,
     provider: 'password' | 'google' = 'password',
+    loginChallengeId?: string,
   ): Promise<SessionRecord> {
+    if (
+      loginChallengeId &&
+      !(await this.store.registrationChallenges.consume(`login:${user.email}`, loginChallengeId, this.now()))
+    ) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
     const created = await this.store.sessions.insert({
       userId: user.id,
       refreshTokenHash,
