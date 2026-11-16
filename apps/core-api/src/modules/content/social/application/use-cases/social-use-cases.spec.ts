@@ -239,7 +239,8 @@ describe('Social Application Use Cases', () => {
       const postMedia = {
         findMediaInfo: vi.fn(async () => {
           await Promise.resolve();
-          // Một tương tác khác đã commit khi tác giả đang chờ kiểm media.
+          // Một tương tác khác đã commit khi tác giả đang chờ kiểm media. incrementCounter và
+          // updateReactionCounts thật đều ghi updatedAt mới, nên mock cũng đổi updatedAt.
           current = {
             ...post,
             reactionCounts: { like: 1 },
@@ -247,6 +248,7 @@ describe('Social Application Use Cases', () => {
             commentCount: 2,
             shareCount: 3,
             bookmarkCount: 4,
+            updatedAt: new Date(post.updatedAt.getTime() + 1_000),
           };
           return new Map();
         }),
@@ -277,7 +279,10 @@ describe('Social Application Use Cases', () => {
       { title: 'Tiêu đề đã được sửa ở phiên khác' },
       { body: 'Nội dung đã được sửa ở phiên khác' },
       { hashtags: ['noi-dung-moi'] },
-      { updatedAt: new Date('2026-11-16T08:00:00Z') },
+      { visibility: 'private' as const },
+      { mediaIds: ['media-khac'] },
+      { coverMediaId: '018d9f10-1234-7000-8000-00000000c0de' },
+      { tripAttachment: { hotelName: 'Khách sạn khác' } },
       { deletedAt: new Date('2026-11-16T08:00:00Z') },
     ])('vẫn báo 409 và không ghi khi bản đã kiểm bị thay đổi: %j (TF91)', async (change) => {
       const post = samplePostRecord({ status: 'published' });
