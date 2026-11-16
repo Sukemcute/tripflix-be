@@ -234,7 +234,11 @@ export class RecordScreeningUseCase {
         rules,
         ai,
         aiUnavailable: ai === null,
-        reasonCode: verdict.autoHideReason ?? rules[0]?.category ?? 'OTHER',
+        // Lý do theo luật nặng nhất, không theo luật khớp trước: "ib zalo 09… chuyển khoản cọc" là SCAM, không phải spam.
+        reasonCode:
+          verdict.autoHideReason ??
+          [...rules].sort((left, right) => right.weight - left.weight)[0]?.category ??
+          'OTHER',
       },
     });
     if (verdict.shouldAutoHide && !['hidden', 'held'].includes(target.status)) {

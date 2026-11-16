@@ -705,6 +705,27 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await reasonOf(clean.id)).toBeUndefined();
     expect(await count()).toBe(1);
   });
+
+  it('dụ chuyển khoản ngoài app không có STK: không tự ẩn, hồ sơ mức 65, lý do SCAM (TF100)', async () => {
+    const comment = await cases.add.execute({
+      postId,
+      authorId: AUTHOR,
+      body: 'ib zalo 0912 345 678 chuyển khoản cọc giữ phòng nha',
+    });
+    const snapshot = await cases.repository.loadTarget('comment', comment.id);
+    await cases.screen.execute(randomUUID(), snapshot!, null);
+
+    const status = (await pool.query('select status from content.comments where id=$1', [comment.id])).rows[0]
+      .status;
+    const item = (
+      await pool.query(
+        "select severity, flags->>'reasonCode' as reason from content.moderation_cases where target_id=$1",
+        [comment.id],
+      )
+    ).rows[0];
+    expect(status).toBe('visible');
+    expect(item).toMatchObject({ severity: 65, reason: 'SCAM' });
+  });
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
     const root = await add();
     const snapshot = await cases.repository.loadTarget('comment', root.id);
