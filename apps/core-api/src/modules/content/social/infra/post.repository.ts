@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import {
   posts,
@@ -22,7 +22,6 @@ export interface FindPublicPostsOptions {
   authorId?: string;
   postType?: PostType;
   hashtag?: string;
-  keyword?: string;
 }
 
 export interface FindUserPostsOptions {
@@ -118,10 +117,6 @@ export class PostRepository {
     }
     if (options.hashtag) {
       conditions.push(sql`${posts.hashtags} @> ${JSON.stringify([options.hashtag])}::jsonb`);
-    }
-    if (options.keyword) {
-      const kw = `%${options.keyword}%`;
-      conditions.push(or(ilike(posts.title, kw), ilike(posts.body, kw))!);
     }
 
     if (options.cursorCreatedAt && options.cursorId) {
