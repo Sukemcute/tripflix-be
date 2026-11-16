@@ -1,6 +1,6 @@
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { loadEnv } from '@tripflix/config';
-import { DEFAULT_POOL_SIZE, MODULES, buildDrizzleToken, createDb, createPool, createTransactionalPlugins } from '@tripflix/db';
+import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, DEFAULT_POOL_SIZE, MODULES, buildDrizzleToken, createDb, createPool, createTransactionalPlugins } from '@tripflix/db';
 import { Redis } from 'ioredis';
 import { ClsModule } from 'nestjs-cls';
 import { coreEnvSchema, dbUrlOf, type CoreEnv } from './env.js';
@@ -21,7 +21,7 @@ const DRIZZLE_TOKENS = MODULES.map((m) => buildDrizzleToken(m));
         Object.fromEntries(
           MODULES.map((m) => [
             m,
-            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}` }),
+            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}`, statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS }),
           ]),
         ) as DbPools,
     },
