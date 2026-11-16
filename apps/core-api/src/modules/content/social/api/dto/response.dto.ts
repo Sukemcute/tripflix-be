@@ -24,7 +24,7 @@ export class SocialPostDto {
   @ApiProperty() title!: string;
   @ApiProperty() body!: string;
   @ApiProperty({ type: [String] }) hashtags!: string[];
-  @ApiProperty({ enum: ['draft', 'published', 'hidden', 'removed', 'deleted'] }) status!: string;
+  @ApiProperty({ enum: ['draft', 'published', 'held', 'hidden', 'removed', 'deleted'] }) status!: string;
   @ApiProperty({ enum: ['public', 'private'] }) visibility!: string;
   @ApiProperty() isVerified!: boolean;
   @ApiProperty({ type: [String] }) mediaIds!: string[];
