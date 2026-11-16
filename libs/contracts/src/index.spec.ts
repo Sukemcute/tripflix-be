@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import {
   CommerceOrderPaidV1Schema,
+  ContentCommentCreatedV1Schema,
+  ContentCommentDeletedV1Schema,
+  ContentCommentHiddenV1Schema,
+  ContentCommentRestoredV1Schema,
+  ContentCommentUpdatedV1Schema,
   DiscoverySearchPerformedV1Schema,
   DiscoveryStaysSearchedV1Schema,
   eventEnvelopeSchema,
@@ -87,5 +92,27 @@ describe('TF28: sự kiện tìm kiếm của discovery', () => {
   it('từ chối ngày sai định dạng và quá 10 nơi', () => {
     expect(DiscoveryStaysSearchedV1Schema.safeParse({ ...stays, checkIn: '01/12/2026' }).success).toBe(false);
     expect(DiscoverySearchPerformedV1Schema.safeParse({ ...search, placeIds: Array(11).fill('x') }).success).toBe(false);
+  });
+});
+
+describe('TF99: postVisibility trong sự kiện bình luận', () => {
+  const ids = { commentId: randomUUID(), postId: randomUUID(), authorId: randomUUID() };
+  const now = new Date().toISOString();
+  const cases = [
+    [ContentCommentCreatedV1Schema, { ...ids, postAuthorId: randomUUID(), parentCommentId: null, body: 'Đẹp quá', createdAt: now }],
+    [ContentCommentUpdatedV1Schema, { ...ids, parentCommentId: null, body: 'Đẹp quá', updatedAt: now }],
+    [ContentCommentDeletedV1Schema, { ...ids, parentCommentId: null, deletedBy: ids.authorId, isSuperAdmin: false, deletedAt: now }],
+    [ContentCommentHiddenV1Schema, ids],
+    [ContentCommentRestoredV1Schema, ids],
+  ] as const;
+
+  it.each(cases)('nhận sự kiện cũ không có postVisibility, giữ giá trị public/private', (schema, payload) => {
+    expect(schema.parse(payload)).not.toHaveProperty('postVisibility');
+    expect(schema.parse({ ...payload, postVisibility: 'public' })).toMatchObject({ postVisibility: 'public' });
+    expect(schema.parse({ ...payload, postVisibility: 'private' })).toMatchObject({ postVisibility: 'private' });
+  });
+
+  it.each(cases)('từ chối giá trị postVisibility lạ', (schema, payload) => {
+    expect(schema.safeParse({ ...payload, postVisibility: 'friends' }).success).toBe(false);
   });
 });

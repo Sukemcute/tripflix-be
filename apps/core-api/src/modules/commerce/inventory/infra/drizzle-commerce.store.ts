@@ -205,6 +205,24 @@ class DrizzleCalendarRepository implements CalendarRepository {
     return this.loadInChunks(ids, (chunk) => this.loadFlightDays(chunk, from, LAST_DATE));
   }
 
+  /** Giờ hiện tại của database: mốc cho lượt nạp phần thay đổi, không phụ thuộc đồng hồ máy chạy API. */
+  async databaseNow(): Promise<string> {
+    const result = await this.db.execute<{ now: string }>(sql`select clock_timestamp()::text as now`);
+    return result.rows[0]!.now;
+  }
+
+  /** Các ngày (từ `from`) có lịch hoặc giá ghi sau `since`. Đọc theo index changed_at nên chỉ chạm số dòng vừa đổi (L1). */
+  async loadChangedRoomDays(from: string, since: string) {
+    const changed = sql`(${roomInventory.roomTypeId}, ${roomInventory.date}) in (
+      select room_type_id, date from commerce.room_inventory where changed_at > ${since}::timestamptz
+      union select room_type_id, date from commerce.room_rates where changed_at > ${since}::timestamptz)`;
+    return this.selectRoomDays(and(gte(roomInventory.date, from), changed));
+  }
+
+  async loadChangedFlightDays(from: string, since: string) {
+    return this.selectFlightDays(and(gte(flightInventory.date, from), sql`${flightInventory.changedAt} > ${since}::timestamptz`));
+  }
+
   private async loadInChunks<T>(ids: string[], load: (chunk: string[]) => Promise<Map<string, T[]>>) {
     const out = new Map<string, T[]>();
     for (let i = 0; i < ids.length; i += BULK_CHUNK_SIZE) {

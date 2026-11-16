@@ -142,6 +142,16 @@ const SHARED_FOLLOWER_POSTS_SCHEMA = `
   );
 `;
 
+// Người theo dõi luồng trả lời (N2): tác giả bình luận gốc và mọi người đã trả lời trong luồng.
+const THREAD_PARTICIPANTS_SCHEMA = `
+  CREATE TABLE thread_participants (
+    parent_comment_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    joined_at timestamptz NOT NULL,
+    PRIMARY KEY (parent_comment_id, user_id)
+  );
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
@@ -150,4 +160,5 @@ const NOTIFICATION_MIGRATIONS = [
   [5, POST_MODERATION_NOTIFICATIONS_SCHEMA],
   [6, FOLLOWER_POST_JOBS_SCHEMA],
   [7, SHARED_FOLLOWER_POSTS_SCHEMA],
+  [8, THREAD_PARTICIPANTS_SCHEMA],
 ] as const;

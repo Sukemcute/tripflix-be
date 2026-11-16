@@ -142,12 +142,15 @@ export const roomInventory = commerceSchema.table(
     ctd: boolean('ctd').notNull().default(false),
     minLos: smallint('min_los').notNull().default(1),
     maxLos: smallint('max_los').notNull().default(14),
+    /** Lần ghi cuối, trigger trong database đặt bằng clock_timestamp(): lịch trong bộ nhớ chỉ nạp lại ô đã đổi (L1). */
+    changedAt: timestamp('changed_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ name: 'pk_room_inventory', columns: [t.roomTypeId, t.date] }),
     foreignKey({ name: 'fk_room_inventory_room_type_id', columns: [t.roomTypeId], foreignColumns: [roomTypes.id] }),
     check('ck_room_inventory_not_oversold', sql`${t.held} >= 0 and ${t.sold} >= 0 and ${t.held} + ${t.sold} <= ${t.total}`),
     check('ck_room_inventory_los', sql`${t.minLos} >= 1 and ${t.maxLos} >= ${t.minLos}`),
+    index('ix_room_inventory_changed_at').on(t.changedAt),
   ],
 );
 
@@ -158,11 +161,14 @@ export const roomRates = commerceSchema.table(
     roomTypeId: text('room_type_id').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     price: bigint('price', { mode: 'number' }).notNull(),
+    /** Lần ghi cuối, trigger trong database đặt bằng clock_timestamp(): lịch trong bộ nhớ chỉ nạp lại ô đã đổi (L1). */
+    changedAt: timestamp('changed_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ name: 'pk_room_rates', columns: [t.roomTypeId, t.date] }),
     foreignKey({ name: 'fk_room_rates_room_type_id', columns: [t.roomTypeId], foreignColumns: [roomTypes.id] }),
     check('ck_room_rates_price', sql`${t.price} > 0`),
+    index('ix_room_rates_changed_at').on(t.changedAt),
   ],
 );
 
@@ -210,12 +216,15 @@ export const flightInventory = commerceSchema.table(
     sold: integer('sold').notNull().default(0),
     price: bigint('price', { mode: 'number' }).notNull(),
     stopSell: boolean('stop_sell').notNull().default(false),
+    /** Lần ghi cuối, trigger trong database đặt bằng clock_timestamp(): lịch trong bộ nhớ chỉ nạp lại ô đã đổi (L1). */
+    changedAt: timestamp('changed_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ name: 'pk_flight_inventory', columns: [t.flightId, t.date] }),
     foreignKey({ name: 'fk_flight_inventory_flight_id', columns: [t.flightId], foreignColumns: [flights.id] }),
     check('ck_flight_inventory_not_oversold', sql`${t.held} >= 0 and ${t.sold} >= 0 and ${t.held} + ${t.sold} <= ${t.total}`),
     check('ck_flight_inventory_price', sql`${t.price} > 0`),
+    index('ix_flight_inventory_changed_at').on(t.changedAt),
   ],
 );
 

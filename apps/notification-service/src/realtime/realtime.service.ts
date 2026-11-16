@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Server } from 'socket.io';
-import { sessionRoom, userRoom } from './realtime.constants.js';
+import { postRoom, sessionRoom, userRoom } from './realtime.constants.js';
 
 /**
  * Đẩy dữ liệu xuống client đang mở /ws. Các handler sự kiện gọi qua đây, không đụng Socket.IO trực tiếp.
@@ -24,6 +24,13 @@ export class RealtimeService {
       return false;
     }
     this.server.to(userRoom(userId)).emit(event, data);
+    return true;
+  }
+
+  /** Gửi tới mọi socket đang mở bài (TF99). Trả false khi Socket.IO chưa sẵn sàng. */
+  emitToPost(postId: string, event: string, data: unknown): boolean {
+    if (!this.server) return false;
+    this.server.to(postRoom(postId)).emit(event, data);
     return true;
   }
 

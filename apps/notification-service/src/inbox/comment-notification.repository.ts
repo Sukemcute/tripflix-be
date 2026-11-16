@@ -9,6 +9,18 @@ interface CommentRecipient {
   isReplyRecipient: boolean;
 }
 
+export const THREAD_REPLY_TYPE = 'comment.thread_replied';
+
+export interface ThreadNotification {
+  row: InboxRow;
+  isNew: boolean;
+}
+
+export function threadReplyBody(actorName: string, actorCount: number): string {
+  const others = actorCount > 1 ? ` và ${actorCount - 1} người khác` : '';
+  return `${actorName}${others} đã trả lời trong luồng bạn tham gia.`;
+}
+
 @Injectable()
 export class CommentNotificationRepository {
   constructor(@Inject(DB) private readonly pool: pg.Pool) {}
@@ -52,6 +64,97 @@ export class CommentNotificationRepository {
       );
       return rows;
     }, input.postId);
+  }
+
+  /**
+   * N2: ghi người tham gia luồng rồi báo cho những người còn lại trong luồng.
+   * Người trong `excludedUserIds` (người viết, chủ bài, người được trả lời trực tiếp) đã có dòng riêng từ `create`.
+   * Mỗi người một dòng gom theo luồng khi chưa đọc; dòng gom giữ id bình luận mới nhất nên xoá bình luận đó thì ẩn cả dòng.
+   */
+  async notifyThread(input: {
+    commentId: string;
+    postId: string;
+    authorId: string;
+    authorDisplayName?: string;
+    parentCommentId: string | null;
+    parentCommentAuthorId?: string | null;
+    excludedUserIds: string[];
+    eventId: string;
+    occurredAt: string;
+  }): Promise<ThreadNotification[]> {
+    return this.withCommentLock(input.commentId, async (client) => {
+      if (!(await canCreatePostInteraction(client, input.postId, input.occurredAt))) return [];
+      const deleted = await client.query('SELECT 1 FROM deleted_notification_comments WHERE comment_id = $1', [input.commentId]);
+      if (deleted.rowCount) return [];
+      const rootId = input.parentCommentId ?? input.commentId;
+      const joiners = input.parentCommentId
+        ? [input.parentCommentAuthorId, input.authorId].filter((id): id is string => Boolean(id))
+        : [input.authorId];
+      await client.query(
+        `INSERT INTO thread_participants (parent_comment_id, user_id, joined_at)
+         SELECT $1, user_id, $3 FROM unnest($2::uuid[]) AS user_id ON CONFLICT DO NOTHING`,
+        [rootId, joiners, input.occurredAt],
+      );
+      if (!input.parentCommentId) return [];
+
+      const recipients = await client.query<{ user_id: string }>(
+        'SELECT user_id FROM thread_participants WHERE parent_comment_id = $1 AND NOT (user_id = ANY($2::uuid[]))',
+        [rootId, [...input.excludedUserIds, input.authorId]],
+      );
+      if (!recipients.rowCount) return [];
+      const actorName = input.authorDisplayName ?? (await client.query<{ name: string }>(
+        `SELECT COALESCE(NULLIF(btrim(display_name), ''), 'Một người dùng') AS name FROM user_directory WHERE user_id = $1`,
+        [input.authorId],
+      )).rows[0]?.name ?? 'Một người dùng';
+
+      const notifications: ThreadNotification[] = [];
+      for (const { user_id: userId } of recipients.rows) {
+        const notification = await this.upsertThreadRow(client, { ...input, rootId, userId, actorName });
+        if (notification) notifications.push(notification);
+      }
+      return notifications;
+    }, input.postId);
+  }
+
+  private async upsertThreadRow(
+    client: pg.PoolClient,
+    input: {
+      commentId: string; postId: string; authorId: string; rootId: string; userId: string;
+      actorName: string; eventId: string; occurredAt: string;
+    },
+  ): Promise<ThreadNotification | null> {
+    const link = `/trips/${input.postId}?comment=${input.commentId}`;
+    const key = `${input.userId}:${THREAD_REPLY_TYPE}:${input.rootId}:`;
+    const unread = (await client.query<{ id: string; data: { commentId?: string; actorIds?: string[] } }>(
+      `SELECT id, data FROM inbox WHERE group_key COLLATE "C" >= $1 AND group_key COLLATE "C" < $2
+         AND read_at IS NULL AND deleted_at IS NULL AND NOT is_post_interaction_suppressed
+       ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE`,
+      [key, key + '~'],
+    )).rows[0];
+
+    if (unread) {
+      // Sự kiện gửi lại: dòng đã có bình luận này thì không đổi gì.
+      if (unread.data.commentId === input.commentId) return null;
+      const actorIds = [...new Set([...(unread.data.actorIds ?? []), input.authorId])];
+      const { rows } = await client.query<InboxRow>(
+        `UPDATE inbox SET body = $2, link = $3, comment_id = $4, interaction_occurred_at = $5,
+           data = data || $6::jsonb
+         WHERE id = $1 RETURNING *`,
+        [unread.id, threadReplyBody(input.actorName, actorIds.length), link, input.commentId, input.occurredAt,
+          JSON.stringify({ commentId: input.commentId, actorIds })],
+      );
+      return rows[0] ? { row: rows[0], isNew: false } : null;
+    }
+
+    const { rows } = await client.query<InboxRow>(
+      `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id, comment_id, group_key, interaction_occurred_at)
+       VALUES ($1, $2, 'Có trả lời mới trong luồng', $3, $4, $5::jsonb, $6, $7, $8, $9)
+       ON CONFLICT DO NOTHING RETURNING *`,
+      [input.userId, THREAD_REPLY_TYPE, threadReplyBody(input.actorName, 1), link,
+        JSON.stringify({ postId: input.postId, commentId: input.commentId, parentCommentId: input.rootId, actorIds: [input.authorId] }),
+        input.eventId, input.commentId, key + input.eventId, input.occurredAt],
+    );
+    return rows[0] ? { row: rows[0], isNew: true } : null;
   }
 
   async hide(commentId: string, deletedAt: string): Promise<string[]> {

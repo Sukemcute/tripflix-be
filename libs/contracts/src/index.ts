@@ -165,6 +165,13 @@ export const ContentCommentReactionUpdatedV1Schema = z.object({
   likeCount: z.int().nonnegative(),
 });
 
+/**
+ * Quyền xem của bài lúc phát sự kiện bình luận (TF99). Tuỳ chọn để nhận sự kiện cũ;
+ * notification-service chỉ phát realtime vào phòng bài khi giá trị là 'public'.
+ */
+export const PostVisibilitySchema = z.enum(['public', 'private']);
+export type PostVisibility = z.infer<typeof PostVisibilitySchema>;
+
 /** content.comment.created v1: có bình luận mới dưới bài viết (hỗ trợ thông báo và AI worker tổng hợp). */
 export const ContentCommentCreatedV1Schema = z.object({
   commentId: z.uuid(),
@@ -178,6 +185,7 @@ export const ContentCommentCreatedV1Schema = z.object({
   authorDisplayName: z.string().min(1).optional(),
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentCreatedV1 = z.infer<typeof ContentCommentCreatedV1Schema>;
 
@@ -189,6 +197,7 @@ export const ContentCommentUpdatedV1Schema = z.object({
   parentCommentId: z.uuid().nullable(),
   body: z.string().min(1).max(10_000),
   updatedAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentUpdatedV1 = z.infer<typeof ContentCommentUpdatedV1Schema>;
 
@@ -201,6 +210,7 @@ export const ContentCommentDeletedV1Schema = z.object({
   deletedBy: z.uuid(),
   isSuperAdmin: z.boolean(),
   deletedAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentDeletedV1 = z.infer<typeof ContentCommentDeletedV1Schema>;
 
@@ -310,6 +320,7 @@ export const ContentCommentHiddenV1Schema = z.object({
   postId: z.uuid(),
   commentId: z.uuid(),
   authorId: z.uuid(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export const ContentCommentRestoredV1Schema = z.object({
   postId: z.uuid(),
@@ -319,6 +330,7 @@ export const ContentCommentRestoredV1Schema = z.object({
   body: z.string().min(1).max(10_000).optional(),
   parentCommentId: z.uuid().nullable().optional(),
   postAuthorId: z.uuid().optional(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export const ContentPostHiddenV1Schema = z.object({
   postId: z.uuid(),

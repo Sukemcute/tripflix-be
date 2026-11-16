@@ -519,6 +519,18 @@ describe('PaymentUseCases: ghi ý định hoàn cho VNPay đã cấu hình', () 
     expect(client.refund).not.toHaveBeenCalled();
   });
 
+  it('pay vừa chốt đơn: dựng response từ dữ liệu TX2, không đọc lại đơn hay khoản trừ', async () => {
+    const { useCases, checkout, gateway, payment, order } = setup();
+    vi.spyOn(useCases, 'prepareCharge').mockResolvedValue({ kind: 'charge', gatewayKey: payment.gatewayKey, amount: payment.amount });
+    gateway.charge.mockResolvedValue({ status: 'succeeded', ref: 'pi_1' });
+    const view = { order: { ...order, status: 'paid' as const }, items: [], guestBirthdates: [], payment: { ...payment, status: 'succeeded' as const, gatewayBankCode: 'VCB', gatewayPaidAt: PAYMENT_DATE } };
+    vi.spyOn(useCases, 'applyResult').mockResolvedValue({ kind: 'paid', view });
+    checkout.getCheckout.mockResolvedValue({ confirmationCode: order.confirmationCode } as Awaited<ReturnType<CheckoutUseCases['getCheckout']>>);
+
+    expect(await useCases.pay(order.userId, order.id, { paymentToken: 'tok', expectedTotal: payment.amount, acceptedPolicyVersion: 'v' })).toMatchObject({ outcome: 'paid', bankCode: 'VCB', paidAt: PAYMENT_DATE.toISOString() });
+    expect(checkout.getCheckout).toHaveBeenCalledExactlyOnceWith(order.userId, order.id, { known: { order: view.order, items: [], refunds: [], guestBirthdates: [] } });
+  });
+
   it('huỷ đã hoàn: trả metadata ngân hàng và thời gian bằng các trường optional hiện có', async () => {
     const { useCases, client, order } = setup();
     client.refund.mockResolvedValue({ status: 'succeeded', ref: 'refund-123', gatewayBankCode: 'NCB', gatewayRefundedAt: NOW });
