@@ -94,7 +94,8 @@ export interface UserBuilder {
   build(items: UserBuildItem[], now: Date): Promise<UserBuildOutput[]>;
 }
 
-export type CandidateSource = 'hot' | 'taste' | 'fresh' | 'explore';
+/** own: bài người xem tự đăng gần đây (đề xuất mục 6.3), đọc thẳng bảng thô, không chờ job. */
+export type CandidateSource = 'hot' | 'taste' | 'fresh' | 'explore' | 'own';
 
 export interface Candidate extends PostMeta {
   score: number;
@@ -104,6 +105,7 @@ export interface Candidate extends PostMeta {
 
 export interface RankedItem {
   postId: string;
+  authorId: string;
   score: number;
   source: CandidateSource;
   /** vd tagMatch, placeMatch, hot, final */
@@ -112,7 +114,7 @@ export interface RankedItem {
 }
 
 export interface RankInput {
-  /** Đã lọc: bỏ bài đã tương tác, đã phục vụ, bài ẩn. */
+  /** Không lọc theo lịch sử người dùng: phạt/cộng điểm theo người là việc của feed-policy.ts. */
   candidates: Candidate[];
   userFeatures: Record<string, unknown> | null;
   now: Date;

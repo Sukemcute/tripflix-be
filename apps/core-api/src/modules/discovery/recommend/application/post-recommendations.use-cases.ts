@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domain/candidates.js';
 import type { CandidateSource, RankedItem } from '../domain/contracts.js';
+import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import {
@@ -47,7 +48,7 @@ export interface PostRecommendationPage {
   nextCursor: string | null;
 }
 
-/** Bài gợi ý trước mốc này tính là "phiên trước" và bị đẩy xuống cuối; bài gợi ý trong phiên giữ chỗ. */
+/** Bài gợi ý trước mốc này tính là "phiên trước" và bị phạt điểm; bài gợi ý trong phiên giữ chỗ. */
 const SESSION_MS = 30 * 60_000;
 
 /** Cursor do server cấp: giữ thuật toán, offset và mốc "phiên trước" của trang đầu. */
@@ -58,9 +59,8 @@ interface Cursor {
   seenBefore: number;
 }
 
-/** Bài đã xem ở phiên trước xuống cuối, giữ thứ tự xếp hạng trong từng nhóm. Kho ít bài thì vẫn còn bài để xem. */
-const demoteSeen = (ranked: RankedItem[], seen: Set<string>): RankedItem[] =>
-  seen.size ? [...ranked.filter((r) => !seen.has(r.postId)), ...ranked.filter((r) => seen.has(r.postId))] : ranked;
+/** Bài tự đăng trong khoảng này trước trang đầu được đưa lên đầu feed của chính người đăng. */
+const OWN_RECENT_MS = 60 * 60_000;
 
 export class InvalidRecommendCursorError extends Error {}
 
@@ -84,7 +84,10 @@ function decodeCursor(raw: string): Cursor {
   throw new InvalidRecommendCursorError('cursor không hợp lệ');
 }
 
-/** Gợi ý bài viết (đề xuất recommend-offline mục 6): không đọc bảng thô, không ghi Postgres. */
+/**
+ * Gợi ý bài viết (đề xuất recommend-offline mục 6): ứng viên → ranker → chính sách theo người xem (mục 6.3) → trộn explore.
+ * Không ghi Postgres. Không bỏ bài nào vì lịch sử người dùng, chỉ phạt/cộng điểm.
+ */
 @Injectable()
 export class PostRecommendationUseCases {
   private readonly logger = new Logger(PostRecommendationUseCases.name);
@@ -110,29 +113,48 @@ export class PostRecommendationUseCases {
     // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
     const sessionAt = seenBefore + SESSION_MS;
 
-    const [interacted, seenIds, longTaste, recent] = q.userId
+    // Mọi tín hiệu người xem chốt theo trang đầu (sessionAt): tương tác giữa phiên không làm trang sau xô lệch.
+    const [interacted, seenIds, longTaste, recent, ownRecent] = q.userId
       ? await Promise.all([
-          this.store.listInteractedPostIds(q.userId, now),
+          this.store.listInteractedPostIds(q.userId, new Date(sessionAt)),
           this.listSeen(q.userId, new Date(seenBefore)),
           this.store.findUserFeatures(algo.userBuilder.key, q.userId),
           algo.userBuilder.key === 'tag_affinity@v0' ? this.listRecent(q.userId, new Date(sessionAt)) : [],
+          this.store.listOwnRecentPostIds({
+            userId: q.userId,
+            since: new Date(sessionAt - OWN_RECENT_MS),
+            until: new Date(sessionAt),
+            postType: q.postType,
+          }),
         ])
-      : [[], [], null, []];
+      : [[], [], null, [], []];
     const userFeatures = await this.withSessionTaste(longTaste, recent, sessionAt);
     const seen = new Set(seenIds);
-    const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: interacted, now };
+    // Nguồn ứng viên không loại bài theo lịch sử người dùng (mục 6.3); riêng explore bỏ bài đã gặp vì dành cho bài mới.
+    const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: [], now };
     const [hot, fresh] = await Promise.all([
       this.store.listHotCandidates({ ...base, limit: HOT_LIMIT }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
     ]);
     const candidates = mergeCandidates(hot, fresh);
     const inCandidates = new Set(candidates.map((c) => c.postId));
-    const explorePool = (await this.store.listExplorePool({ ...base, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS })).filter(
+    const explorePool = (
+      await this.store.listExplorePool({ ...base, excludePostIds: interacted, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS })
+    ).filter(
       (c) => !inCandidates.has(c.postId) && !seen.has(c.postId),
     );
 
     const slots = exploreSlots(q.limit);
-    const ranked = demoteSeen(algo.ranker.rank({ candidates, userFeatures, now }), seen);
+    // Bài vừa đăng chưa qua job thì chưa là ứng viên: thêm thẳng, tầng chính sách đưa lên đầu.
+    const ownExtra: RankedItem[] = ownRecent
+      .filter((postId) => !inCandidates.has(postId))
+      .map((postId) => ({ postId, authorId: q.userId!, score: 0, source: 'own', breakdown: {}, reason: OWN_POST_REASON }));
+    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now }), ...ownExtra], {
+      userId: q.userId,
+      seen,
+      interacted: new Set(interacted),
+      ownRecent: new Set(ownRecent),
+    });
     const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, page * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
     const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
@@ -145,7 +167,6 @@ export class PostRecommendationUseCases {
     }
 
     // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
-    // ponytail: bài vừa tương tác rời danh sách ngay nên trang sau có thể hụt một bài; chấp nhận ở v0.
     const nextOffset = offset + rankedTake.length;
     const hasMore = ranked.length > nextOffset || explorePool.length > (page + 1) * slots;
     return {

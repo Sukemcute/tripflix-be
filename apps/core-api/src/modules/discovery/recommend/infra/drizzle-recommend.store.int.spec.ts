@@ -138,6 +138,28 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.findUserFeatures('tag_affinity@v0', U)).toEqual({ tags: { bien: 1 } });
   });
 
+  it('bài tự đăng gần đây: chỉ dòng publish của người đó trong (since, until], mới nhất trước, lọc theo loại bài', async () => {
+    const [older, newer, vlog, tooOld, removed] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
+    const publish = (postId: string, h: number, over: Partial<RawRow> = {}) =>
+      row({ kind: 'publish', refId: postId, targetId: postId, detail: { postType: 'video' }, occurredAt: hoursAgo(h).toISOString(), ...over });
+    await store.upsertInteractions(
+      [
+        publish(older, 0.5),
+        publish(newer, 0.1),
+        publish(vlog, 0.2, { detail: { postType: 'vlog' } }),
+        publish(tooOld, 2),
+        publish(removed, 0.3, { isRemoved: true }),
+        publish(randomUUID(), 0.1, { actorId: randomUUID() }),
+        row({ refId: 'r', targetId: randomUUID(), occurredAt: hoursAgo(0.1).toISOString() }),
+      ],
+      meta(),
+    );
+    const q = { userId: U, since: hoursAgo(1), until: NOW, postType: null };
+    expect(await store.listOwnRecentPostIds(q)).toEqual([newer, vlog, older]);
+    expect(await store.listOwnRecentPostIds({ ...q, postType: 'video' })).toEqual([newer, older]);
+    expect(await store.listOwnRecentPostIds({ ...q, until: hoursAgo(0.15) })).toEqual([vlog, older]);
+  });
+
   it('số liệu admin: dòng nạp 10 phút/24 giờ, bài, người có gu, mốc builder; tra tag/nơi bài', async () => {
     const p = randomUUID();
     await store.replacePosts([{ postId: p, authorId: randomUUID(), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', isVerified: false, publishedAt: hoursAgo(2) }]);

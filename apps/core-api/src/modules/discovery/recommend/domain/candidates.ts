@@ -33,6 +33,7 @@ export function pickExplore(pool: Candidate[], seed: { userKey: string; day: str
     .slice(skip, skip + count)
     .map(({ c }) => ({
       postId: c.postId,
+      authorId: c.authorId,
       score: round4(c.score),
       source: 'explore' as const,
       breakdown: { hot: round4(c.score) },
