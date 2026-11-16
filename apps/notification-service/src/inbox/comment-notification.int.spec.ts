@@ -79,7 +79,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
 
   it('báo cho tác giả lượt trả lời được nhắm tới và mở lượt trả lời mới', async () => {
     const replyToAuthorId = randomUUID();
-    const payload = comment({ authorDisplayName: 'Trang', replyToCommentId: randomUUID(), replyToAuthorId });
+    const payload = comment({ authorDisplayName: 'Trang', replyToCommentId: randomUUID(), replyToAuthorId, postVisibility: 'public' });
     await router.route(event('content.comment.created', payload));
     const { items } = await inbox.listForUser(replyToAuthorId, { limit: 20 });
     expect(items).toEqual([expect.objectContaining({
@@ -140,7 +140,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     function reply(authorId: string, replyToAuthorId: string, authorDisplayName: string): ContentCommentCreatedV1 {
       return comment({
         postId, postAuthorId, authorId, authorDisplayName, parentCommentId: rootId, parentCommentAuthorId: a,
-        replyToCommentId: randomUUID(), replyToAuthorId,
+        replyToCommentId: randomUUID(), replyToAuthorId, postVisibility: 'public',
       });
     }
 
@@ -152,6 +152,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     it('A bình luận, B trả lời A, D trả lời B: B nhận trả lời trực tiếp, A nhận dòng luồng, không ai nhận trùng', async () => {
       await router.route(event('content.comment.created', comment({
         commentId: rootId, postId, postAuthorId, authorId: a, parentCommentId: null, parentCommentAuthorId: null,
+        postVisibility: 'public',
       })));
       await router.route(event('content.comment.created', reply(b, a, 'Bình')));
       emitToUser.mockClear();
@@ -198,6 +199,18 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
       await router.route(deletion(latest));
       expect(await threadRows(a)).toEqual([expect.objectContaining({ id: read!.id })]);
       expect(await inbox.countUnread(a)).toBe(1);
+    });
+
+    it('bài private hoặc sự kiện thiếu postVisibility thì không báo người trong luồng', async () => {
+      const otherPost = randomUUID();
+      const [root, x, y] = [randomUUID(), randomUUID(), randomUUID()];
+      const base = { postId: otherPost, parentCommentId: root, parentCommentAuthorId: x };
+      for (const postVisibility of ['private', undefined] as const) {
+        await router.route(event('content.comment.created', comment({ ...base, authorId: y, replyToAuthorId: x, postVisibility })));
+        await router.route(event('content.comment.created', comment({ ...base, authorId: randomUUID(), replyToAuthorId: y, postVisibility })));
+      }
+      expect(await threadRows(x)).toEqual([]);
+      expect((await pool.query('SELECT 1 FROM thread_participants WHERE parent_comment_id = $1', [root])).rowCount).toBe(0);
     });
   });
 });

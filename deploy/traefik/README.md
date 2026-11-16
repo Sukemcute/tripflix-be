@@ -19,10 +19,12 @@
 | Middleware | Áp cho | Giới hạn mỗi IP |
 |---|---|---|
 | `rate-limit-auth` | `POST /api/auth/login`, `/register`, `/google`, `/password/forgot`, `/password/reset`, `/service-token` | Trung bình 30 request/phút, dồn tối đa 10 |
+| `rate-limit-chat` | `POST /ai/chat` (trợ lý Tripi) | Trung bình 20 request/phút, dồn tối đa 5 |
 | `rate-limit-api` | Mọi đường còn lại | Trung bình 50 request/giây, dồn tối đa 100 |
 
 - Vượt giới hạn: gateway trả `429` ngay, request không tới service.
 - Mỗi router đếm riêng: `rate-limit-api` của `/api` và của `/ai` là hai bộ đếm khác nhau.
+- `rate-limit-chat` chỉ chặn dồn dập theo IP. Hạn mức theo người dùng (lượt/phút, lượt và token/ngày, khách ít hơn) nằm trong ai-service, trả `429` kèm `Retry-After`.
 - Bộ đếm nằm trong bộ nhớ Traefik: đủ cho một gateway. Chạy nhiều bản Traefik thì cần bộ đếm chung (tuỳ chọn `redis` của `rateLimit`).
 - IP lấy từ kết nối tới Traefik. Khi đặt Traefik sau load balancer, CDN: thêm `sourceCriterion.ipStrategy.depth: 1` cho hai middleware và `--entrypoints.web.forwardedHeaders.trustedIPs=<dải IP của load balancer>`, nếu không mọi người dùng sẽ chung IP của load balancer.
 

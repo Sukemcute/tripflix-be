@@ -21,6 +21,7 @@ import { ReactionNotificationRepository } from '../grouping/reaction-notificatio
 import { CommentNotificationRepository } from '../inbox/comment-notification.repository.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
 import { DirectoryRepository } from '../directory/directory.repository.js';
+import { PushWorker } from '../push/push.worker.js';
 import { POST_COMMENTS_CHANGED_EVENT, PostCommentSignals } from '../realtime/post-comment-signals.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ENV, MAILER, PROCESSED_EVENTS, REDIS } from '../tokens.js';
@@ -73,6 +74,7 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
     @Inject(PostNotificationRepository) private readonly posts: PostNotificationRepository,
     @Inject(FollowerPostWorker) private readonly followerPosts: FollowerPostWorker,
     @Inject(ReactionNotificationRepository) private readonly reactions: ReactionNotificationRepository,
+    @Inject(PushWorker) private readonly push: PushWorker,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -102,6 +104,9 @@ export class NotificationConsumer implements OnApplicationBootstrap, OnApplicati
       streams: [STREAMS.access, STREAMS.content, STREAMS.commerce],
       handler: async (event) => {
         disconnectRevokedUser(event, this.realtime);
+        // N3: tài khoản bị khoá thì thôi đẩy push tới mọi máy của người đó.
+        const locked = event.type === 'access.user.locked' ? AccessUserLockedV1Schema.safeParse(event.payload) : undefined;
+        if (locked?.success) await this.push.removeUserTokens(locked.data.userId);
         // TF99: báo người đang mở bài trước khi ghi inbox, để bình luận hiện nhanh.
         this.postSignals.handle(event);
         await router.route(event);

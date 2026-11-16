@@ -39,6 +39,14 @@ export const envSchema = baseEnvSchema
     NOTIFICATION_CONSUMER_NAME: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
     // Giãn nhịp quét để Redis không bị truy vấn liên tục khi SMTP lỗi.
     NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+    // Push mobile (N3) qua Expo Push API. Tắt mặc định tới khi app có Expo push token.
+    PUSH_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    EXPO_PUSH_URL: z.url().default('https://exp.host/--/api/v2/push/send'),
+    // Chỉ cần khi bật "Enhanced Push Security" trên Expo.
+    EXPO_ACCESS_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   })
   .superRefine((env, ctx) => {
     if (env.FOLLOWER_NOTIFICATION_SECRET && !env.FOLLOWER_CORE_URL) {
