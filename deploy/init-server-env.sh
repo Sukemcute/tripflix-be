@@ -51,6 +51,9 @@ GOOGLE_CLIENT_IDS=
 SMTP_URL=
 MAIL_FROM=Tripflix <no-reply@tripflix.io.vn>
 WEB_APP_URL=
+# Push mobile qua Expo: bật khi app đã gửi Expo push token lên. EXPO_ACCESS_TOKEN chỉ cần khi bật Enhanced Push Security.
+PUSH_ENABLED=false
+EXPO_ACCESS_TOKEN=
 
 # Tag image trên GHCR, mỗi app một biến vì CI chỉ build app có thay đổi. Nên đổi sang sha-<7 ký tự> để biết chính xác bản đang chạy.
 CORE_API_TAG=develop
@@ -58,8 +61,12 @@ NOTIFICATION_TAG=develop
 
 # AI (profile ai, deploy/SERVER.md Giai đoạn 5): tóm tắt dùng DeepSeek, kiểm duyệt dùng OpenAI. Secret tạo bằng auth:create-service-client.
 AI_TAG=develop
-# Trợ lý Tripi (POST /ai/chat): true thì gọi DeepSeek để hiểu câu hỏi, tốn tiền theo mỗi câu chat.
+# Trợ lý Tripi (POST /ai/chat): true thì gọi LLM (Controller OpenAI, Responder DeepSeek), tốn tiền theo mỗi câu chat.
 CHAT_LLM_ENABLED=false
+# Giá token của Controller và trần chi tiêu/ngày lấy mặc định trong compose.server.yaml; chỉ thêm CHAT_* khi cần đổi.
+CHAT_IDENTITY_SALT=$(openssl rand -hex 32)
+# Dải mạng compose, xem deploy/SERVER.md mục Trợ lý Tripi. Trống thì ai-service chỉ tin 127.0.0.1.
+AI_FORWARDED_ALLOW_IPS=
 
 # Chuyển mã video (profile video, deploy/SERVER.md Giai đoạn 6), bản Go. Cần key AWS ở trên.
 VIDEO_WORKER_TAG=develop
