@@ -16,7 +16,7 @@
 ## Kiểm tra
 - Lint/typecheck/unit trước lượt kiểm cuối: 49/49 task, core-api 2485 pass, 4 skip có sẵn.
 - Test luật gate gồm lừa đảo/đe doạ, câu bình thường, chửi tục không giữ nhanh và mời chuyển khoản không số tài khoản.
-- `pre-publication.int.spec.ts`: 7 kịch bản Postgres cho held, dismiss đồng thời, cascade, publishAt, updated event, AI down, chống re-hide, rollback. Test gate kiểm `isTransactionActive() === false`.
+- `pre-publication.int.spec.ts`: 8 kịch bản Postgres cho held, dismiss đồng thời, cascade, publishAt, updated event, AI down, chống re-hide, rollback. Test gate kiểm `isTransactionActive() === false`.
 - Local integration chưa chạy được: Docker báo không tìm thấy container runtime, kể cả sau restart. Chờ CI xác minh; chưa coi integration đạt.
 
 ## Cách kiểm lại
@@ -27,3 +27,5 @@
 ## Ảnh hưởng
 - Social: Thành; moderation: Trang; contracts dùng chung: Dũng. Kế hoạch và hướng chỉnh social/Admin đã được Thành duyệt, Thành review PR.
 - FE Admin có PR TF91 riêng, hỗ trợ held ở chi tiết bài, bộ lọc, nhãn hàng chờ và nút cho hiển thị.
+
+- Lượt kiểm cuối sau xử lý chặn comment dưới bài held và khôi phục bài chưa từng public: 49/49 task pass, core-api 2485 pass, 4 skip. Bổ sung integration case held -> hide -> restore xuất bản lần đầu.

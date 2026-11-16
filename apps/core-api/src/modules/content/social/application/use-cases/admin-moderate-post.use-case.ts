@@ -72,7 +72,10 @@ export class AdminModeratePostUseCase {
       deletedAt: record.deletedAt,
     });
 
-    const releasingHeld = previousStatus === 'held' && command.action === 'restore';
+    const heldHistory = command.action === 'restore' && !record.publishedAt && previousStatus !== 'held'
+      ? (await this.moderationActionRepository.findByPostId(record.id)) ?? [] : [];
+    const releasingHeld = command.action === 'restore' && (previousStatus === 'held' ||
+      heldHistory.some((action) => action.targetType === 'post' && action.previousStatus === 'held'));
     domainPost.moderate(command.action, releasingHeld ? 'published' : undefined);
     const newStatus = domainPost.status;
 

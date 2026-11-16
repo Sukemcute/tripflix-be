@@ -202,6 +202,16 @@ describe('TF91 giữ trước khi public trên Postgres thật', () => {
     expect((await cases.comments.findById(held.id))?.status).toBe('held');
   });
 
+  it('bài held bị ẩn rồi restore vẫn xuất bản lần đầu, không trở về draft', async () => {
+    await pool.query("update content.posts set status='held', published_at=null where id=$1", [postId]);
+    await expect(cases.add.execute({ postId, authorId: AUTHOR, body: 'Reply' })).rejects.toThrow();
+    await decide('post', postId, 'hide');
+    await decide('post', postId, 'restore');
+    const record = (await pool.query('select status, published_at from content.posts where id=$1', [postId])).rows[0];
+    expect(record.status).toBe('published'); expect(record.published_at).toBeInstanceOf(Date);
+    expect(await events('content.post.published', postId)).toHaveLength(1);
+  });
+
   it('outbox lỗi rollback cả held, bộ đếm và cascade', async () => {
     const c = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Đẹp' });
     failOutbox = true;

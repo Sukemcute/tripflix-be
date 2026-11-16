@@ -38,7 +38,7 @@ export class AddCommentUseCase {
 
     // Người dùng chỉ có thể bình luận vào bài viết mà mình có quyền xem (chặn draft, private, removed, hidden)
     const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
-    if (!domainPost.canBeViewedBy(command.authorId)) {
+    if (post.status === 'held' || !domainPost.canBeViewedBy(command.authorId)) {
       throw new PostNotFoundException(command.postId);
     }
 

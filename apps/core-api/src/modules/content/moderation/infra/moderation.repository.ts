@@ -249,7 +249,7 @@ export class ModerationRepository {
   async hasHeldRelease(target: TargetSnapshot): Promise<boolean> {
     const [decision] = await this.db.select({ id: moderationActions.id }).from(moderationActions).where(and(
       eq(moderationActions.actorType, 'staff'),
-      eq(moderationActions.previousStatus, 'held'),
+      sql`${moderationActions.previousStatus} IN ('held', 'hidden', 'removed')`,
       eq(moderationActions.contentVersion, target.version),
       sql`${moderationActions.postStatus} IN ('published', 'visible')`,
       target.targetType === 'post'
