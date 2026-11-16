@@ -1,5 +1,5 @@
 import { Transactional } from '@tripflix/db';
-import { PostNotFoundException } from '../../domain/index.js';
+import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { PostShareLinks } from '../post-share-links.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
@@ -26,6 +26,11 @@ export class TrackShareUseCase {
   async execute(command: TrackShareCommand): Promise<TrackShareResult> {
     const post = await this.postRepository.findById(command.postId);
     if (!post || post.status === 'deleted') {
+      throw new PostNotFoundException(command.postId);
+    }
+    // Bài bị ẩn, gỡ, riêng tư hay bản nháp của người khác: người chia sẻ không xem được thì cũng không tăng lượt chia sẻ.
+    const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
+    if (!domainPost.canBeViewedBy(command.userId)) {
       throw new PostNotFoundException(command.postId);
     }
 
