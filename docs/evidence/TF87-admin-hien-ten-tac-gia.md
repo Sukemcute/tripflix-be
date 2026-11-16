@@ -20,13 +20,14 @@
 - `pnpm turbo run lint typecheck test --affected`: 49/49 task thành công.
   - core-api: 102 file test pass (1 skip có sẵn), 2339 test pass, 1 skip có sẵn. Lint 0 lỗi.
 - `social-use-cases.spec.ts`: 45/45 pass, trong đó có 4 test mới.
+- 2026-11-16, sau khi merge `develop` mới (có TF88, TF89, TF93, #179): `pnpm turbo run lint typecheck test --affected` 49/49 task thành công; core-api 2430 test pass, 4 skip có sẵn.
 
 ## Cách kiểm lại
 1. `pnpm turbo run lint typecheck test --affected`
 2. Chạy stack local, đăng nhập admin, mở màn kiểm duyệt bài đăng: cột Tác giả hiện tên hiển thị thay vì `User xxxxxxxx`.
 
 ## Ảnh / video
-- Ảnh trước khi sửa (cột Tác giả hiện `User 7bcb56b4`) đính kèm trong PR.
+- Chưa có ảnh chụp. Lỗi trước khi sửa: cột Tác giả hiện `User 7bcb56b4`. Kiểm bằng bước 2 ở mục "Cách kiểm lại" sau khi merge.
 
 ## Ảnh hưởng tới phần của người khác
 - Có: `content/social` (chủ: Thành, backup: Trang) và `content.module.ts`. Đã báo Thành. Không đổi API, sự kiện hay schema.
