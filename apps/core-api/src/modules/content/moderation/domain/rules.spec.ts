@@ -207,12 +207,16 @@ describe('Chửi tục xét dấu (TF93)', () => {
     expect(evaluateSeverity(evaluateRules(text), null, 0, config).autoHideReason).toBe('HARASSMENT');
   });
 
-  it.each(['thang cho chu resort', 'du ma cai dich vu', 'mat lon', 'dit me lua khach', 'dm ad'])(
-    'vẫn bắt chửi tục gõ không dấu: %s',
-    (text) => {
-      expect(codesOf(text)).toContain('PROFANITY');
-    },
-  );
+  it.each([
+    'thang cho chu resort',
+    'du ma cai dich vu',
+    'mat lon',
+    'dit me lua khach',
+    'dm ad',
+    'duma cai dich vu',
+  ])('vẫn bắt chửi tục gõ không dấu: %s', (text) => {
+    expect(codesOf(text)).toContain('PROFANITY');
+  });
 });
 describe('Luật nội dung phản động (TF88)', () => {
   const config = { aiThreshold: 0.8, reportThreshold: 3 };
