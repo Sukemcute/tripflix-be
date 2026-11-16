@@ -10,7 +10,7 @@ import type { RealtimeService } from '../../realtime/realtime.service.js';
 import type { EventHandler } from './event-handler.js';
 
 export function createCommentHandlers(options: {
-  comments: Pick<CommentNotificationRepository, 'create' | 'hide'>;
+  comments: Pick<CommentNotificationRepository, 'create' | 'hide'> & Partial<Pick<CommentNotificationRepository, 'notifyThread'>>;
   inbox: Pick<InboxRepository, 'countUnread'> | undefined;
   realtime: Pick<RealtimeService, 'emitToUser'> | undefined;
   log: (message: string, event: EventEnvelope) => void;
@@ -46,6 +46,23 @@ export function createCommentHandlers(options: {
         recipients.set(replyRecipient, true);
       }
       recipients.delete(comment.authorId);
+      const threadRows = await options.comments.notifyThread?.({
+        commentId: comment.commentId,
+        postId: comment.postId,
+        authorId: comment.authorId,
+        authorDisplayName: comment.authorDisplayName,
+        parentCommentId: comment.parentCommentId,
+        parentCommentAuthorId: comment.parentCommentAuthorId,
+        excludedUserIds: [...recipients.keys()],
+        eventId: event.eventId,
+        occurredAt: event.occurredAt,
+      });
+      await Promise.all(
+        (threadRows ?? []).map(({ row, isNew }) => isNew
+          ? emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })
+          // Dòng gom được cập nhật: web tải lại inbox và badge như với cảm xúc.
+          : emit(event, row.user_id, 'notification.read', {})),
+      );
       if (!recipients.size) return true;
       const rows = await options.comments.create({
         commentId: comment.commentId,
