@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplica
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
 import { ExpireHoldsUseCases } from '../application/expire-holds.use-cases.js';
+import { TraceContext } from '../../trace-context.js';
 
 const EVERY_MS = 60_000;
 
@@ -15,6 +16,7 @@ export class ExpireHoldsJob implements OnApplicationBootstrap, OnApplicationShut
   constructor(
     private readonly expireHolds: ExpireHoldsUseCases,
     @Inject(CORE_ENV) private readonly env: CoreEnv,
+    @Inject(TraceContext) private readonly trace: TraceContext,
   ) {}
 
   onApplicationBootstrap() {
@@ -31,7 +33,7 @@ export class ExpireHoldsJob implements OnApplicationBootstrap, OnApplicationShut
     if (this.isRunning) return;
     this.isRunning = true;
     try {
-      const result = await this.expireHolds.expireHolds();
+      const result = await this.trace.runJob('expire-holds', () => this.expireHolds.expireHolds());
       if (result.expired || result.errors) this.logger.log(result, 'Nhả chỗ quá hạn');
     } catch (error) {
       this.logger.error({ err: error }, 'Nhả chỗ quá hạn lỗi');

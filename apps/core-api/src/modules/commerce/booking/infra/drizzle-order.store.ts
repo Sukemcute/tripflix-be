@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { TraceContext } from '../../trace-context.js';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
@@ -59,7 +60,16 @@ const POSTGRES_DEADLOCK_DETECTED = '40P01';
 
 @Injectable()
 export class DrizzleOrderStore implements OrderStore {
-  constructor(@InjectTransactionHost('commerce') private readonly host: OrderDbHost) {}
+  constructor(
+    @InjectTransactionHost('commerce') private readonly host: OrderDbHost,
+    @Inject(TraceContext) private readonly trace: TraceContext,
+  ) {}
+
+  /** Ghi kèm ai đổi trạng thái trong cùng câu lệnh; trigger chép sang order_status_history (D1). */
+  private statusTrace() {
+    const { source, requestId } = this.trace.current();
+    return { statusSource: source, statusRequestId: requestId };
+  }
 
   private get db(): Db {
     return this.host.tx;
@@ -191,7 +201,7 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }) {
-    const [row] = await this.db.insert(orders).values(order).returning({ id: orders.id });
+    const [row] = await this.db.insert(orders).values({ ...order, ...this.statusTrace() }).returning({ id: orders.id });
     return row!.id;
   }
 
@@ -220,7 +230,10 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async updateOrder(orderId: string, patch: Parameters<OrderStore['updateOrder']>[1]) {
-    await this.db.update(orders).set({ ...patch, updatedAt: new Date() }).where(eq(orders.id, orderId));
+    await this.db
+      .update(orders)
+      .set({ ...patch, ...(patch.status !== undefined && this.statusTrace()), updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
   }
 
   async replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null; passengerType: PassengerType | null }[]) {
