@@ -12,7 +12,6 @@ export interface ListPostsQuery {
   authorId?: string;
   postType?: PostType;
   hashtag?: string;
-  keyword?: string;
   viewerId?: string | null;
 }
 
@@ -50,7 +49,6 @@ export class ListPostsUseCase {
       authorId: query.authorId,
       postType: query.postType,
       hashtag: query.hashtag,
-      keyword: query.keyword,
     });
 
     const hasMore = records.length > limit;

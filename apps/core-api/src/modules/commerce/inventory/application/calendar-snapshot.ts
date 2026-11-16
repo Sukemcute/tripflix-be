@@ -8,6 +8,18 @@ export interface CalendarBulkSource {
   loadAllFlightDays(from: string): Promise<Map<string, FlightDay[]>>;
 }
 
+/** Nguồn nạp được phần thay đổi theo cột changed_at (L1). Không có thì snapshot nạp cả lịch mỗi lượt như trước. */
+export interface CalendarDeltaSource {
+  databaseNow(): Promise<string>;
+  loadChangedRoomDays(from: string, since: string): Promise<Map<string, RoomDay[]>>;
+  loadChangedFlightDays(from: string, since: string): Promise<Map<string, FlightDay[]>>;
+}
+
+const hasDeltaLoad = (source: unknown): source is CalendarDeltaSource =>
+  typeof (source as Partial<CalendarDeltaSource>).databaseNow === 'function' &&
+  typeof (source as Partial<CalendarDeltaSource>).loadChangedRoomDays === 'function' &&
+  typeof (source as Partial<CalendarDeltaSource>).loadChangedFlightDays === 'function';
+
 export const hasBulkLoad = (calendar: unknown): calendar is CalendarBulkSource =>
   typeof (calendar as Partial<CalendarBulkSource>).loadAllRoomDays === 'function' && typeof (calendar as Partial<CalendarBulkSource>).loadAllFlightDays === 'function';
 
@@ -15,6 +27,10 @@ interface Loaded {
   from: string;
   rooms: Map<string, RoomDay[]>;
   flights: Map<string, FlightDay[]>;
+  /** Giờ database ngay trước lượt nạp gần nhất; lượt sau đọc các dòng đổi sau (mốc này - overlapMs). */
+  cursor: string | null;
+  /** Lúc nạp cả lịch gần nhất (đồng hồ tiến trình), để định kỳ nạp lại toàn bộ cho chắc. */
+  fullAt: number;
 }
 
 /** Ngày đầu tiên có trong danh sách đã sắp theo ngày mà >= date. */
@@ -27,6 +43,22 @@ function findFirstIndex(days: { date: string }[], date: string): number {
     else high = mid;
   }
   return low;
+}
+
+/** Ghi đè hoặc chèn các ngày vừa đổi vào danh sách đã sắp theo ngày. Chạy đồng bộ nên người đọc không thấy bản dở dang. */
+function mergeDays<T extends { date: string }>(target: Map<string, T[]>, changed: Map<string, T[]>): void {
+  for (const [id, days] of changed) {
+    const list = target.get(id);
+    if (!list) {
+      target.set(id, days);
+      continue;
+    }
+    for (const day of days) {
+      const i = findFirstIndex(list, day.date);
+      if (list[i]?.date === day.date) list[i] = day;
+      else list.splice(i, 0, day);
+    }
+  }
 }
 
 function pickDays<T extends { date: string }>(source: Map<string, T[]>, ids: string[], from: string, toInclusive: string): Map<string, T[]> {
@@ -43,7 +75,10 @@ function pickDays<T extends { date: string }>(source: Map<string, T[]>, ids: str
 }
 
 /**
- * Lịch trống và giá trong bộ nhớ cho các trang chỉ đọc (tìm khách sạn, chi tiết khách sạn), nạp lại cả lịch mỗi vài giây.
+ * Lịch trống và giá trong bộ nhớ cho các trang chỉ đọc (tìm khách sạn, chi tiết khách sạn).
+ * Mỗi `refreshMs` chỉ nạp các ô có changed_at mới hơn lượt trước (đọc chồng `overlapMs` để không sót transaction
+ * commit muộn); cứ `fullReloadMs` thì nạp lại cả lịch. Trước L1, lượt nào cũng nạp cả lịch: dữ liệu x10 mất ~8 giây
+ * và Postgres tốn gần 4 nhân dù không có khách.
  * Giữ chỗ và thanh toán không dùng lớp này: chúng khoá và kiểm tồn kho thật trong transaction, nên số hiển thị cũ
  * vài giây không làm bán quá. Chưa nạp xong, hoặc hỏi ngày trước mốc đã nạp, thì đọc thẳng database.
  * Nạp lỗi thì giữ bản cũ (trang tìm vẫn chạy khi database chập chờn) và thử lại ở lượt sau.
@@ -59,6 +94,11 @@ export class CalendarSnapshot implements ReadCalendar, OnModuleInit, OnModuleDes
       source: CalendarBulkSource;
       today: () => string;
       refreshMs: number;
+      /** Mặc định 15 phút. */
+      fullReloadMs?: number;
+      /** Mặc định 60 giây: transaction ghi lịch kéo dài hơn mức này mà commit muộn thì đợi lượt nạp cả lịch. */
+      overlapMs?: number;
+      now?: () => number;
       onError?: (error: unknown) => void;
     },
   ) {}
@@ -88,7 +128,7 @@ export class CalendarSnapshot implements ReadCalendar, OnModuleInit, OnModuleDes
     return this.loaded !== null;
   }
 
-  /** Nạp lại cả lịch từ hôm nay; lượt trước chưa xong thì dùng chung, không chạy chồng. */
+  /** Nạp lại (phần đổi hoặc cả lịch); lượt trước chưa xong thì dùng chung, không chạy chồng. */
   refresh(): Promise<void> {
     this.refreshing ??= this.load().finally(() => {
       this.refreshing = null;
@@ -98,9 +138,23 @@ export class CalendarSnapshot implements ReadCalendar, OnModuleInit, OnModuleDes
 
   private async load(): Promise<void> {
     const from = this.options.today();
+    const source = this.options.source;
+    const now = this.options.now ?? Date.now;
+    const loaded = this.loaded;
     try {
-      const [rooms, flights] = await Promise.all([this.options.source.loadAllRoomDays(from), this.options.source.loadAllFlightDays(from)]);
-      this.loaded = { from, rooms, flights };
+      const canDelta = hasDeltaLoad(source) && loaded?.cursor != null && now() - loaded.fullAt < (this.options.fullReloadMs ?? 15 * 60_000);
+      // Mốc lấy trước khi đọc: dòng ghi trong lúc đang đọc sẽ được lượt sau đọc lại.
+      const cursor = hasDeltaLoad(source) ? await source.databaseNow() : null;
+      if (canDelta && loaded && cursor) {
+        const since = new Date(Date.parse(loaded.cursor!) - (this.options.overlapMs ?? 60_000)).toISOString();
+        const [rooms, flights] = await Promise.all([source.loadChangedRoomDays(loaded.from, since), source.loadChangedFlightDays(loaded.from, since)]);
+        mergeDays(loaded.rooms, rooms);
+        mergeDays(loaded.flights, flights);
+        loaded.cursor = cursor;
+        return;
+      }
+      const [rooms, flights] = await Promise.all([source.loadAllRoomDays(from), source.loadAllFlightDays(from)]);
+      this.loaded = { from, rooms, flights, cursor, fullAt: now() };
     } catch (error) {
       this.options.onError?.(error);
     }

@@ -1064,16 +1064,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "keyword",
-            "required": false,
-            "in": "query",
-            "deprecated": true,
-            "description": "Đã ngừng dùng: tìm bài qua POST /api/search/posts (discovery). Vẫn nhận để client cũ không lỗi (tìm ILIKE trong tiêu đề và nội dung); sẽ gỡ ở bản sau",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -2131,6 +2121,7 @@
               "enum": [
                 "draft",
                 "published",
+                "held",
                 "hidden",
                 "removed",
                 "deleted"
@@ -4103,7 +4094,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`, `article`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần. `article` = `plan` + `post` nhưng bỏ mọi video, lọc ở server nên trang luôn đủ `limit`.\n- Mỗi bài có `likes`, `comments`, `createdAt`, `author` để hiện thẻ. Không có trạng thái đã thích/đã lưu của người xem.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -6593,6 +6584,7 @@
             "enum": [
               "draft",
               "published",
+              "held",
               "hidden",
               "removed",
               "deleted"
@@ -9451,6 +9443,31 @@
           "fixed"
         ]
       },
+      "ExploreAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "example": "Minh Anh",
+            "description": "Tên hiển thị; null nếu không tìm thấy người dùng"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null (như feed)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ]
+      },
       "ExploreItemDto": {
         "type": "object",
         "properties": {
@@ -9506,6 +9523,34 @@
                 "$ref": "#/components/schemas/ExploreLocationDto"
               }
             ]
+          },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
           }
         },
         "required": [
@@ -9518,7 +9563,11 @@
           "reason",
           "priceFrom",
           "days",
-          "location"
+          "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author"
         ]
       },
       "ExploreSectionDto": {
@@ -9609,6 +9658,34 @@
               }
             ]
           },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
+          },
           "section": {
             "type": "string",
             "example": "Ở đâu",
@@ -9641,6 +9718,10 @@
           "priceFrom",
           "days",
           "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author",
           "section",
           "relaxed"
         ]
@@ -9750,6 +9831,34 @@
               }
             ]
           },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
+          },
           "section": {
             "type": "string",
             "example": "Ở đâu",
@@ -9767,6 +9876,10 @@
           "priceFrom",
           "days",
           "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author",
           "section"
         ]
       },
@@ -9846,10 +9959,11 @@
               "all",
               "plan",
               "video",
-              "post"
+              "post",
+              "article"
             ],
             "default": "all",
-            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường"
+            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)"
           },
           "cursor": {
             "type": "string",

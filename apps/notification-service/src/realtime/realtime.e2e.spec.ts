@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -158,5 +159,40 @@ describe('WebSocket /ws (TF26A)', () => {
     realtime.disconnectSession('s-3-phone');
     await expect(reason).resolves.toBe('io server disconnect');
     expect(web.connected).toBe(true);
+  });
+
+  describe('TF99: phòng bài post:<postId>', () => {
+    const watch = (s: ClientSocket, postId: unknown) => s.timeout(3_000).emitWithAck('post.watch', { postId });
+
+    it('vào phòng thì nhận tín hiệu bình luận, rời phòng thì thôi', async () => {
+      const postId = randomUUID();
+      const s = await connectAs({ sub: 'u-watch' });
+      await expect(watch(s, postId)).resolves.toEqual({ ok: true });
+      const got = waitEvent(s, 'post.comments.changed');
+      expect(realtime.emitToPost(postId, 'post.comments.changed', { postId, kind: 'created' })).toBe(true);
+      await expect(got).resolves.toEqual({ postId, kind: 'created' });
+
+      await expect(s.timeout(3_000).emitWithAck('post.unwatch', { postId })).resolves.toEqual({ ok: true });
+      const none = expectNoEvent(s, 'post.comments.changed');
+      realtime.emitToPost(postId, 'post.comments.changed', { postId, kind: 'created' });
+      await expect(none).resolves.toBeUndefined();
+    });
+
+    it('từ chối postId không phải uuid và bài thứ 4', async () => {
+      const s = await connectAs({ sub: 'u-limit' });
+      await expect(watch(s, 'not-a-uuid')).resolves.toEqual({ ok: false, code: 'invalid' });
+      const postIds = [randomUUID(), randomUUID(), randomUUID()];
+      for (const postId of postIds) await expect(watch(s, postId)).resolves.toEqual({ ok: true });
+      await expect(watch(s, postIds[0])).resolves.toEqual({ ok: true });
+      await expect(watch(s, randomUUID())).resolves.toEqual({ ok: false, code: 'too_many' });
+    });
+
+    it('socket khác không vào phòng thì không nhận', async () => {
+      const postId = randomUUID();
+      const outsider = await connectAs({ sub: 'u-outsider' });
+      const none = expectNoEvent(outsider, 'post.comments.changed');
+      realtime.emitToPost(postId, 'post.comments.changed', { postId });
+      await expect(none).resolves.toBeUndefined();
+    });
   });
 });

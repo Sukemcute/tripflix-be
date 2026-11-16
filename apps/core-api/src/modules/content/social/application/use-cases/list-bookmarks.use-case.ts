@@ -2,7 +2,8 @@ import { decodeCursor, encodeCursor } from '../common/cursor.js';
 import { Post } from '../../domain/index.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import type { PostRecord, PostType } from '../../../db/schema/index.js';
+import type { ReactionRepository } from '../../infra/reaction.repository.js';
+import type { PostRecord, PostType, ReactionType } from '../../../db/schema/index.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 
 export interface ListBookmarksQuery {
@@ -14,6 +15,10 @@ export interface ListBookmarksQuery {
 
 export type EnrichedBookmarkPostItem = PostRecord & {
   authorName: string | null;
+  viewerContext: {
+    myReaction: ReactionType | null;
+    isBookmarked: boolean;
+  };
 };
 
 export interface ListBookmarksResult {
@@ -27,6 +32,7 @@ export class ListBookmarksUseCase {
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly postRepository: PostRepository,
     private readonly userDirectory?: UserDirectoryPort,
+    private readonly reactionRepository?: ReactionRepository,
   ) {}
 
   async execute(query: ListBookmarksQuery): Promise<ListBookmarksResult> {
@@ -66,12 +72,22 @@ export class ListBookmarksUseCase {
       }
     }
 
+    // Cùng dạng viewerContext với /v1/posts: thiếu thì tab Đã lưu hiện tim trắng và nút lưu tắt sau khi tải lại.
+    const myReactions =
+      items.length > 0 && this.reactionRepository
+        ? await this.reactionRepository.findByPostsAndUser(
+            items.map((p) => p.id),
+            query.userId,
+          )
+        : new Map<string, ReactionType>();
+
     const enrichedItems: EnrichedBookmarkPostItem[] = items.map((post) => {
       const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
       return {
         ...post,
         tripAttachment: domainPost.getMaskedTripAttachment(),
         authorName: authorNames.get(post.authorId) ?? null,
+        viewerContext: { myReaction: myReactions.get(post.id) ?? null, isBookmarked: true },
       };
     });
 
