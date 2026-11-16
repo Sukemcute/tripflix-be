@@ -6,6 +6,8 @@ import { canCreatePostInteraction, lockPostNotifications } from './post-notifica
 
 export const POST_WATCH_TYPE = 'comment.watched_post';
 export const POST_WATCH_PAGE_SIZE = 200;
+// Một lượt giữ khoá tối đa ~400 ms rồi nhả, nhịp 500 ms vẫn chạy lượt kế tiếp.
+export const POST_WATCH_ROUND_BUDGET_MS = 400;
 
 interface PostWatchJob {
   comment_id: string;
@@ -43,7 +45,7 @@ export async function enqueuePostWatchJob(
 }
 
 /**
- * N1: báo bình luận gốc mới cho người theo dõi bài, mỗi lượt một lô theo user_id.
+ * N1: báo bình luận gốc mới cho người theo dõi bài, theo lô user_id.
  * Mỗi người một dòng gom theo bài khi chưa đọc. Không phát realtime, giống thông báo bài mới của follower.
  */
 @Injectable()
@@ -84,36 +86,45 @@ export class PostWatchWorker implements OnApplicationBootstrap, OnModuleDestroy 
     return Boolean(result.rowCount);
   }
 
-  /** Xử lý một lô của một job. Trả true khi có job được xử lý. */
-  async runOnce(): Promise<boolean> {
+  /**
+   * Chạy liên tục các lô đang chờ tới khi hết job hoặc hết thời gian của lượt, để bài nóng không dồn hàng đợi.
+   * Trả số lô đã xử lý (0 khi không có việc hoặc replica khác đang giữ khoá).
+   */
+  async runOnce(budgetMs = POST_WATCH_ROUND_BUDGET_MS): Promise<number> {
+    const deadline = Date.now() + budgetMs;
     const client = await this.pool.connect();
     let locked = false;
     let unlockError: Error | undefined;
+    let pages = 0;
     try {
       const lock = await client.query<{ acquired: boolean }>(
         "SELECT pg_try_advisory_lock(hashtext('notification.post-watch-worker')) AS acquired",
       );
       locked = lock.rows[0]?.acquired === true;
-      if (!locked) return false;
-      const { rows: [job] } = await client.query<PostWatchJob>(
-        `SELECT * FROM post_watch_jobs WHERE state = 'pending' AND available_at <= now()
-         ORDER BY available_at, comment_id LIMIT 1`,
-      );
-      if (!job) return false;
-      try {
-        await this.processPage(client, job);
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        await client.query(
-          `UPDATE post_watch_jobs SET attempts = attempts + 1,
-             state = CASE WHEN attempts >= 7 THEN 'failed' ELSE state END,
-             available_at = now() + make_interval(secs => $2)
-           WHERE comment_id = $1 AND state = 'pending'`,
-          [job.comment_id, Math.min(300, 2 ** (job.attempts + 1))],
+      if (!locked) return 0;
+      while (pages === 0 || Date.now() < deadline) {
+        const { rows: [job] } = await client.query<PostWatchJob>(
+          `SELECT * FROM post_watch_jobs WHERE state = 'pending' AND available_at <= now()
+           ORDER BY available_at, comment_id LIMIT 1`,
         );
-        this.logger.warn({ err: error, commentId: job.comment_id, attempt: job.attempts + 1 }, 'Không ghi được lô thông báo bài đang theo dõi');
+        if (!job) break;
+        try {
+          await this.processPage(client, job);
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          // Lùi available_at nên vòng lặp sang job khác, không kẹt ở job lỗi.
+          await client.query(
+            `UPDATE post_watch_jobs SET attempts = attempts + 1,
+               state = CASE WHEN attempts >= 7 THEN 'failed' ELSE state END,
+               available_at = now() + make_interval(secs => $2)
+             WHERE comment_id = $1 AND state = 'pending'`,
+            [job.comment_id, Math.min(300, 2 ** (job.attempts + 1))],
+          );
+          this.logger.warn({ err: error, commentId: job.comment_id, attempt: job.attempts + 1 }, 'Không ghi được lô thông báo bài đang theo dõi');
+        }
+        pages += 1;
       }
-      return true;
+      return pages;
     } finally {
       if (locked) {
         try {

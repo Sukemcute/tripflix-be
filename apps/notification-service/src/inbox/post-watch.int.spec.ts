@@ -46,7 +46,7 @@ describe('N1: theo dõi bài đã bình luận trên PostgreSQL', () => {
     const postAuthorId = randomUUID();
     const root = (authorId: string, authorDisplayName: string): ContentCommentCreatedV1 => ({
       commentId: randomUUID(), postId, postAuthorId, authorId, authorDisplayName, parentCommentId: null,
-      parentCommentAuthorId: null, body: 'Bình luận thử', createdAt: occurredAt,
+      parentCommentAuthorId: null, body: 'Bình luận thử', createdAt: occurredAt, postVisibility: 'public',
     });
     const reply = (authorId: string, parent: ContentCommentCreatedV1): ContentCommentCreatedV1 => ({
       ...root(authorId, 'Người trả lời'), parentCommentId: parent.commentId, parentCommentAuthorId: parent.authorId,
@@ -152,14 +152,56 @@ describe('N1: theo dõi bài đã bình luận trên PostgreSQL', () => {
     );
     const fromE = root(randomUUID(), 'Em');
     await router.route(event('content.comment.created', fromE));
-    let rounds = 0;
-    while (await worker.runOnce()) rounds += 1;
-    expect(rounds).toBe(3);
+    // Một lượt chạy hết 3 lô thay vì mỗi lượt một lô.
+    expect(await worker.runOnce(60_000)).toBe(3);
+    expect(await worker.runOnce()).toBe(0);
     const { rows } = await pool.query<{ n: number; users: number }>(
       'SELECT count(*)::int AS n, count(DISTINCT user_id)::int AS users FROM inbox WHERE type = $1 AND comment_id = $2',
       [POST_WATCH_TYPE, fromE.commentId],
     );
     expect(rows[0]).toEqual({ n: watcherCount, users: watcherCount });
     expect((await pool.query('SELECT state FROM post_watch_jobs WHERE comment_id = $1', [fromE.commentId])).rows[0].state).toBe('done');
+  });
+
+  it('bài nóng nhiều bình luận gốc: một lượt chạy hết mọi job đang chờ', async () => {
+    const { postId, root } = post();
+    const a = randomUUID();
+    await router.route(event('content.comment.created', root(a, 'An')));
+    await drain();
+    const jobCount = 30;
+    for (let i = 0; i < jobCount; i += 1) {
+      await router.route(event('content.comment.created', root(randomUUID(), `Người ${i}`)));
+    }
+    // Ngân sách rộng để máy CI chậm không cắt lượt; ngân sách mặc định kiểm ở test kế.
+    expect(await worker.runOnce(60_000)).toBe(jobCount);
+    const { rows } = await pool.query<{ state: string; n: number }>(
+      "SELECT state, count(*)::int AS n FROM post_watch_jobs WHERE post_id = $1 GROUP BY state", [postId],
+    );
+    expect(rows).toEqual([{ state: 'done', n: jobCount + 1 }]);
+    const [row] = await watchRows(a);
+    expect((row!.data as { actorIds: string[] }).actorIds).toHaveLength(jobCount);
+    expect(await inbox.countUnread(a)).toBe(1);
+  });
+
+  it('hết giờ của lượt thì dừng, lượt sau làm tiếp', async () => {
+    const { root } = post();
+    for (let i = 0; i < 3; i += 1) await router.route(event('content.comment.created', root(randomUUID(), `Người ${i}`)));
+    // Ngân sách 0 ms: vẫn làm ít nhất một lô rồi nhả khoá.
+    expect(await worker.runOnce(0)).toBe(1);
+    expect(await worker.runOnce(60_000)).toBe(2);
+  });
+
+  it('bài private hoặc sự kiện thiếu postVisibility thì không theo dõi, không tạo job', async () => {
+    const { postId, root } = post();
+    const a = randomUUID();
+    await router.route(event('content.comment.created', root(a, 'An')));
+    const { postVisibility: _omit, ...missing } = root(randomUUID(), 'Thiếu');
+    await router.route(event('content.comment.created', { ...root(randomUUID(), 'Riêng'), postVisibility: 'private' }));
+    await router.route(event('content.comment.created', missing));
+    await drain();
+    expect(await watchRows(a)).toEqual([]);
+    const { rows } = await pool.query('SELECT user_id FROM post_watchers WHERE post_id = $1', [postId]);
+    expect(rows).toEqual([{ user_id: a }]);
+    expect((await pool.query('SELECT count(*)::int AS n FROM post_watch_jobs WHERE post_id = $1', [postId])).rows[0].n).toBe(1);
   });
 });
