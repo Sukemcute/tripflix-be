@@ -5358,6 +5358,50 @@
         ]
       }
     },
+    "/api/checkout/{id}/vnpay-cancel": {
+      "post": {
+        "operationId": "VnpayCheckoutController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chuỗi ngẫu nhiên (UUID) tạo một lần cho mỗi thao tác; gửi lại đúng chuỗi đó khi thử lại để không xử lý hai lần",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelVnpayResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
     "/api/payments/vnpay/ipn": {
       "get": {
         "operationId": "VnpayCallbackController_ipn",
@@ -12245,6 +12289,30 @@
         "required": [
           "paymentUrl",
           "expiresAt"
+        ]
+      },
+      "CancelVnpayResultDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paying",
+              "paid",
+              "cancelled",
+              "expired"
+            ],
+            "description": "pending: đã huỷ lần trả, trả lại hoặc huỷ giỏ được"
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
         ]
       },
       "VnpayReturnResultDto": {
