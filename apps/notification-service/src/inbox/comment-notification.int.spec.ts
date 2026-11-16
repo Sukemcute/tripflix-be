@@ -73,7 +73,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     expect(items).toEqual([expect.objectContaining({
       body: 'Trang đã trả lời bình luận của bạn.',
       link: `/trips/${payload.postId}?comment=${payload.commentId}`,
-      data: { postId: payload.postId, commentId: payload.commentId, parentCommentId: payload.parentCommentId },
+      data: { postId: payload.postId, commentId: payload.commentId, parentCommentId: payload.parentCommentId, excerpt: 'Nội dung thử' },
     })]);
   });
 
@@ -163,7 +163,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
         title: 'Có trả lời mới trong luồng',
         body: 'Dương đã trả lời trong luồng bạn tham gia.',
         link: `/trips/${postId}?comment=${fromD.commentId}`,
-        data: { postId, commentId: fromD.commentId, parentCommentId: rootId, actorIds: [d] },
+        data: { postId, commentId: fromD.commentId, parentCommentId: rootId, actorIds: [d], excerpt: 'Nội dung thử' },
       })]);
       expect((await inbox.listForUser(b, { limit: 20 })).items.map((item) => item.type)).toEqual(['comment.replied']);
       expect(await inbox.countUnread(d)).toBe(0);
