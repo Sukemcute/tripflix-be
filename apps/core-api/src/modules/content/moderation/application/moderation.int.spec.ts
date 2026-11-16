@@ -24,6 +24,7 @@ import { ModerationActionRepository } from '../../social/infra/moderation-action
 import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
 import { AddCommentUseCase } from '../../social/application/use-cases/add-comment.use-case.js';
 import { DeleteCommentUseCase } from '../../social/application/use-cases/delete-comment.use-case.js';
+import { EditCommentUseCase } from '../../social/application/use-cases/edit-comment.use-case.js';
 import { GetPostSummaryUseCase } from '../../social/application/use-cases/get-post-summary.use-case.js';
 import { SavePostSummaryUseCase } from '../../social/application/use-cases/save-post-summary.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
@@ -75,6 +76,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       screen: new RecordScreeningUseCase(repository, visibility, CONFIG),
       add: new AddCommentUseCase(posts, comments, outbox),
       delete: new DeleteCommentUseCase(comments, posts, outbox),
+      edit: new EditCommentUseCase(comments, outbox, posts),
       saveSummary: new SavePostSummaryUseCase(posts, summaries),
       getSummary: new GetPostSummaryUseCase(posts, summaries, comments),
     };
@@ -267,6 +269,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
         .map((comment) => ({
           postId,
           postAuthorId: AUTHOR,
+          postVisibility: 'public',
           commentId: comment.id,
           authorId: comment.authorId,
           parentCommentId: comment.parentCommentId,
@@ -705,6 +708,42 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await reasonOf(clean.id)).toBeUndefined();
     expect(await count()).toBe(1);
   });
+  it('mọi sự kiện bình luận mang postVisibility để realtime phát vào phòng của bài (TF101)', async () => {
+    const comment = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Cảnh đẹp quá' });
+    await cases.edit.execute({ commentId: comment.id, userId: AUTHOR, body: 'Cảnh đẹp quá trời' });
+    await hide(comment.id);
+    await hide(comment.id, 'restore');
+    const profane = await cases.add.execute({ postId, authorId: AUTHOR, body: 'đm thằng chủ homestay' });
+    const snapshot = await cases.repository.loadTarget('comment', profane.id);
+    await cases.screen.execute(randomUUID(), snapshot!, null);
+    await cases.delete.execute({ commentId: comment.id, userId: AUTHOR });
+
+    const { rows } = await pool.query(
+      `select type, payload->>'postVisibility' as visibility from content.outbox_events
+       where type in ('content.comment.created', 'content.comment.updated', 'content.comment.hidden',
+                      'content.comment.restored', 'content.comment.deleted')`,
+    );
+    const types = new Set(rows.map((row: { type: string }) => row.type));
+    expect(types).toEqual(
+      new Set([
+        'content.comment.created',
+        'content.comment.updated',
+        'content.comment.hidden',
+        'content.comment.restored',
+        'content.comment.deleted',
+      ]),
+    );
+    expect(rows.filter((row: { visibility: string | null }) => row.visibility !== 'public')).toEqual([]);
+
+    await pool.query("update content.posts set visibility='private' where id=$1", [postId]);
+    const privateComment = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Riêng tư' });
+    const privateEvent = await pool.query(
+      "select payload->>'postVisibility' as visibility from content.outbox_events where payload->>'commentId'=$1",
+      [privateComment.id],
+    );
+    expect(privateEvent.rows[0].visibility).toBe('private');
+  });
+
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
     const root = await add();
     const snapshot = await cases.repository.loadTarget('comment', root.id);

@@ -89,6 +89,8 @@ export class AddCommentUseCase {
         commentId: comment.id,
         postId: command.postId,
         postAuthorId: post.authorId,
+        // notification chỉ phát realtime vào phòng của bài khi biết bài public (TF99, TF101).
+        postVisibility: post.visibility,
         authorId: command.authorId,
         ...(authorDisplayName ? { authorDisplayName } : {}),
         parentCommentId: threadRootId,
