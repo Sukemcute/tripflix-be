@@ -29,3 +29,15 @@
 - FE Admin có PR TF91 riêng, hỗ trợ held ở chi tiết bài, bộ lọc, nhãn hàng chờ và nút cho hiển thị.
 
 - Lượt kiểm cuối sau xử lý chặn comment dưới bài held và khôi phục bài chưa từng public: 49/49 task pass, core-api 2485 pass, 4 skip. Bổ sung integration case held -> hide -> restore xuất bản lần đầu.
+
+
+## Review của Thành: tránh 409 khi chỉ bộ đếm đổi
+- `assertPrecheckedPost` chỉ so `status`, `title`, `body`, `hashtags`, `updatedAt`, `deletedAt`. Không so bộ đếm; cập nhật media/visibility qua use case vẫn được bảo vệ bằng `updatedAt`.
+- Test tái hiện tại `UpdatePostUseCase`: đang await kiểm media thì cả reaction/comment/share/bookmark count đổi, sửa bài vẫn thành công và không ghi đè bộ đếm. Trên bản cũ: 1 fail / 6 pass; sau sửa: 7/7 pass.
+- Sáu ca thay đổi từng trường được so vẫn trả 409, không update và không ghi outbox.
+- `pnpm turbo run lint typecheck test --affected`: 49/49 task đạt, core-api 2492 pass, 4 skip có sẵn.
+- CI trước review (bdd780b) đã đạt core-api integration 187/187, gồm 8/8 test TF91; CI sẽ kiểm lại commit sửa guard.
+
+## Theo dõi TF92 / FE tác giả
+- Giữ `replyToCommentId`, `replyToAuthorId`, `authorDisplayName` cho bình luận held khi phát created lúc nhả. Test người được trả lời cấp 2 nhận đúng thông báo và tên tác giả.
+- `PublishedPostDto.publishedAt` có thể null khi held. FE-05/FE-06 cần đọc status và có fallback khi hiển thị; đây là lưu ý hợp đồng, không yêu cầu đổi field hiện tại.
