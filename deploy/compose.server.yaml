@@ -53,6 +53,9 @@ services:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     logging: *logging
+    # Mặc định 100. Mỗi bản core-api mở tối đa 33 kết nối (5 module), notification-service 10, cộng pool commerce tự tăng
+    # theo tải: 200 đủ cho 2–3 bản core-api. Đổi giá trị này phải tạo lại container: `up -d postgres` (deploy-api.sh không làm).
+    command: ['postgres', '-c', 'max_connections=200']
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       DB_PASS_ACCESS: ${DB_PASS_ACCESS:?}

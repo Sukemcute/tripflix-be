@@ -56,6 +56,20 @@ export function createPool({ url, max, applicationName, statementTimeoutMs, idle
   return pool;
 }
 
+/**
+ * Đổi số kết nối tối đa của pool lúc đang chạy, kẹp trong [min, max] (tự tăng pool theo tải, Dũng đồng ý 16/11).
+ * pg-pool đọc options.max mỗi lần cấp kết nối nên tăng có hiệu lực ngay; request đang xếp hàng được cấp luôn.
+ * Giảm thì kết nối rảnh vượt mức tự đóng sau idleTimeoutMillis, kết nối đang dùng không bị cắt. Trả số đã áp dụng.
+ */
+export function setPoolMax(pool: pg.Pool, requested: number, bounds: { min: number; max: number }): number {
+  const next = Math.min(bounds.max, Math.max(bounds.min, Math.floor(requested)));
+  if (pool.options.max === next) return next;
+  pool.options.max = next;
+  // Hàm nội bộ của pg-pool: cấp ngay kết nối mới cho request đang chờ, không đợi tới lượt trả kết nối kế tiếp.
+  (pool as unknown as { _pulseQueue?: () => void })._pulseQueue?.();
+  return next;
+}
+
 /** Lỗi đã được báo cho câu truy vấn đang chạy hoặc câu kế tiếp; listener chỉ để Node không coi là lỗi không bắt. */
 function ignoreCheckedOutClientError(): void {}
 
