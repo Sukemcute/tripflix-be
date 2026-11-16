@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import { getRefundStatus, type RefundSummaryStatus } from '../../booking/domain/refund-summary.js';
 import type { OutboxWriter } from '@tripflix/outbox';
@@ -20,6 +20,8 @@ import {
 import { quoteCancellation, type CancelQuote, type CancelPolicyItem } from '../../booking/domain/cancel-policy.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
 import { addDays } from '../../inventory/domain/sales-rules.js';
+import { TraceContext } from '../../trace-context.js';
+import { CommerceMetrics } from '../../metrics/commerce-metrics.js';
 import { PAYMENT_GATEWAY, type ChargeResult, type PaymentGateway } from './gateway.port.js';
 import { ACCEPTED_REFUND_REF, REFUND_GATEWAYS, SUBMITTED_REFUND_REF, type RefundClient, type RefundGateways, type RefundInput, type RefundOutcome, type RefundQueryOutcome } from './refund-gateways.port.js';
 
@@ -87,9 +89,28 @@ export class PaymentUseCases {
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
     @Inject(CheckoutUseCases) private readonly checkout: CheckoutUseCases,
     @Inject(REFUND_GATEWAYS) private readonly refundGateways: RefundGateways = new Map(),
+    // Không có (test dựng tay) thì sự kiện không mang traceId, như trước.
+    @Optional() @Inject(TraceContext) private readonly trace?: TraceContext,
+    @Optional() @Inject(CommerceMetrics) private readonly metrics?: CommerceMetrics,
   ) {}
 
+  /** D1: mã request (hoặc lượt job) đi cùng sự kiện, để từ sự kiện lần ngược về log HTTP. */
+  private traceId(): string | undefined {
+    return this.trace?.current().requestId ?? undefined;
+  }
+
   async pay(userId: string, orderId: string, input: PayInput): Promise<PayResult> {
+    try {
+      const result = await this.payOnce(userId, orderId, input);
+      this.metrics?.countPayment(result.outcome);
+      return result;
+    } catch (error) {
+      this.metrics?.countPayment(error instanceof CommerceError ? (error.code === 'payment_failed' ? 'failed' : 'rejected') : 'error');
+      throw error;
+    }
+  }
+
+  private async payOnce(userId: string, orderId: string, input: PayInput): Promise<PayResult> {
     const prepared = await this.prepareCharge(userId, orderId, input, { gatewayName: this.gateway.name, buildKey: buildChargeKey });
     if (prepared.kind === 'price_changed') {
       throw new CommerceError('conflict', 'Giá đã thay đổi, vui lòng xác nhận giá mới.', 'expectedTotal', { reason: 'PRICE_CHANGED', oldTotal: prepared.oldTotal, newTotal: prepared.newTotal });
@@ -277,6 +298,7 @@ export class PaymentUseCases {
       await this.outbox.add({
         type: 'commerce.order.paid',
         userId: order.userId,
+        traceId: this.traceId(),
         payload: {
           orderId: order.id,
           userId: order.userId,
@@ -371,6 +393,7 @@ export class PaymentUseCases {
     await this.outbox.add({
       type: 'commerce.order.cancelled',
       userId: order.userId,
+      traceId: this.traceId(),
       payload: {
         orderId,
         userId: order.userId,

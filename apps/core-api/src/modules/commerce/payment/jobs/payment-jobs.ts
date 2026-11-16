@@ -7,6 +7,7 @@ import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../../../platform/tokens.js';
 import { commerceOutboxEvents } from '../../db/schema/index.js';
 import { PaymentUseCases } from '../application/payment.use-cases.js';
+import { TraceContext } from '../../trace-context.js';
 
 const RECONCILE_EVERY_MS = 30_000;
 
@@ -26,6 +27,7 @@ export class PaymentJobs implements OnApplicationBootstrap, OnApplicationShutdow
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(DB_POOLS) private readonly pools: DbPools,
     @Inject(REDIS) private readonly redis: Redis,
+    @Inject(TraceContext) private readonly trace: TraceContext,
   ) {}
 
   onApplicationBootstrap() {
@@ -50,7 +52,7 @@ export class PaymentJobs implements OnApplicationBootstrap, OnApplicationShutdow
     if (this.isReconciling) return;
     this.isReconciling = true;
     try {
-      const result = await this.payment.reconcile();
+      const result = await this.trace.runJob('payment-reconcile', () => this.payment.reconcile());
       if (result.settled || result.refunds || result.errors) this.logger.log(result, 'Đối soát thanh toán');
     } catch (error) {
       this.logger.error({ err: error }, 'Đối soát thanh toán lỗi');

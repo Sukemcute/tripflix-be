@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { loadEnv } from '@tripflix/config';
 import { DEFAULT_POOL_SIZE, MODULES, buildDrizzleToken, createDb, createPool, createTransactionalPlugins } from '@tripflix/db';
@@ -5,6 +6,7 @@ import { Redis } from 'ioredis';
 import { ClsModule } from 'nestjs-cls';
 import { coreEnvSchema, dbUrlOf, type CoreEnv } from './env.js';
 import { HealthController } from './health.controller.js';
+import { TRACE_SOURCE_KEY } from './trace.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from './tokens.js';
 
 const DRIZZLE_TOKENS = MODULES.map((m) => buildDrizzleToken(m));
@@ -51,12 +53,41 @@ export class PlatformCoreModule implements OnApplicationShutdown {
   }
 }
 
+interface TracedRequest {
+  id?: unknown;
+  method?: string;
+  url?: string;
+  originalUrl?: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+
+/**
+ * Mã request dùng chung cho log và CLS: pino gán req.id nếu chạy trước; không thì lấy header hoặc tạo mới rồi ghi vào
+ * header để pino (genReqId đọc x-request-id) dùng đúng mã này.
+ */
+export function resolveRequestId(req: TracedRequest): string {
+  const header = req.headers['x-request-id'];
+  const id = typeof req.id === 'string' && req.id ? req.id : typeof header === 'string' && header ? header : randomUUID();
+  req.headers['x-request-id'] = id;
+  return id;
+}
+
 /** Hạ tầng dùng chung cho cả core-api: PlatformCoreModule, @Transactional theo module, /health. */
 @Global()
 @Module({
   imports: [
     PlatformCoreModule,
-    ClsModule.forRoot({ global: true, plugins: createTransactionalPlugins([PlatformCoreModule]) }),
+    ClsModule.forRoot({
+      global: true,
+      plugins: createTransactionalPlugins([PlatformCoreModule]),
+      // Mỗi request một ngữ cảnh, mã trùng x-request-id của log HTTP (nestjs-pino), để sự kiện và lịch sử đơn nối về log.
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req: TracedRequest) => resolveRequestId(req),
+        setup: (cls, req: TracedRequest) => cls.set(TRACE_SOURCE_KEY, `${req.method} ${(req.originalUrl ?? req.url ?? '').split('?')[0]}`),
+      },
+    }),
   ],
   controllers: [HealthController],
   exports: [PlatformCoreModule],

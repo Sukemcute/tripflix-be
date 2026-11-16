@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { CommerceMetrics, type HoldOutcome } from '../../metrics/commerce-metrics.js';
 import { Transactional } from '@tripflix/db';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type RoomTypeRecord, type Today } from '../../inventory/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
@@ -147,6 +148,16 @@ const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date
 /** Sắp xếp ô theo (sản phẩm, ngày) trước khi giữ: hai giỏ chạy cùng lúc khoá theo cùng thứ tự nên không deadlock. */
 const sortCells = (cells: InventoryCell[]) => [...cells].sort((a, b) => a.productId.localeCompare(b.productId) || a.date.localeCompare(b.date));
 
+/** Lý do giữ chỗ thất bại, để đếm (D1): hết chỗ, đông người, quá lượt, đầu vào sai, hay lỗi hệ thống. */
+function classifyHoldError(error: unknown): HoldOutcome {
+  if (!(error instanceof CommerceError)) return 'error';
+  const reason = error.details?.reason;
+  if (reason === 'SOLD_OUT') return 'sold_out';
+  if (reason === 'LOCK_BUSY' || reason === 'LOCK_TIMEOUT') return 'lock_busy';
+  if (error.code === 'rate_limited') return 'rate_limited';
+  return 'rejected';
+}
+
 /**
  * Thứ tự chạm ô khi vừa nhả giỏ cũ vừa giữ giỏ mới: một danh sách sắp theo (sản phẩm, ngày), cùng ô thì nhả trước
  * để chỗ vừa trả dùng lại được ngay. Mọi transaction khoá ô theo cùng thứ tự nên không chờ vòng nhau.
@@ -170,11 +181,24 @@ export class CheckoutUseCases {
     @Inject(COMMERCE_STORE) private readonly catalog: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
+    // Không có (test dựng tay) thì không đếm.
+    @Optional() @Inject(CommerceMetrics) private readonly metrics?: CommerceMetrics,
   ) {}
 
   private readonly holdGate = new CellGate({ maxPerKey: MAX_CONCURRENT_HOLDS_PER_CELL, maxWaiting: MAX_WAITING_HOLDS, waitMs: HOLD_LOCK_WAIT_MS });
 
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutView> {
+    try {
+      const view = await this.holdAndView(userId, input);
+      this.metrics?.countHold('created');
+      return view;
+    } catch (error) {
+      this.metrics?.countHold(classifyHoldError(error));
+      throw error;
+    }
+  }
+
+  private async holdAndView(userId: string, input: CheckoutInput): Promise<CheckoutView> {
     const cells = [...new Set(input.items.map((i) => `${i.productId}|${i.checkIn}`))];
     if (!(await this.holdGate.acquire(cells))) {
       throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
