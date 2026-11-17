@@ -7,7 +7,8 @@ import { NS } from '../domain/explore/stats.js';
 import { destOf } from '../domain/explore/text.js';
 import { QUERY_TOTAL_KEYS, queryGrams, rankVocabGaps, type QueryGramRow, type VocabGap } from '../domain/explore/vocab-gaps.js';
 import type { ExploreObject } from '../domain/explore/types.js';
-import { EXPLORE_CATALOG, EXPLORE_STORE, type ExploreCatalog, type ExploreHotel, type ExplorePost, type ExploreStore } from './ports.js';
+import { POI_ATTRIBUTION, type PointOfInterestSeed } from '../domain/points-of-interest.js';
+import { EXPLORE_CATALOG, EXPLORE_STORE, PLACES_STORE, type PlacesStore, type ExploreCatalog, type ExploreHotel, type ExplorePost, type ExploreStore } from './ports.js';
 
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_PAGES = 1_000;
@@ -47,6 +48,22 @@ export interface PostSearchQuery {
   postType: PostType;
   cursor?: string;
   limit: number;
+}
+
+/** Loại chỗ, điểm cho tab tìm riêng (khách sạn, điểm tham quan, quán ăn, quán nước). */
+export const PLACE_KINDS = ['stay', 'see', 'food', 'cafe'] as const;
+export type PlaceKind = (typeof PLACE_KINDS)[number];
+
+export interface PlaceSearchQuery {
+  q: string;
+  kind: PlaceKind;
+  cursor?: string;
+  limit: number;
+}
+
+export interface PlaceSearchPage extends PostSearchPage {
+  /** Dòng ghi nguồn khi trang có điểm OpenStreetMap (ODbL); null nếu không. */
+  attribution: string | null;
 }
 
 export interface PostSearchPage {
@@ -143,6 +160,33 @@ export function hotelToObject(h: ExploreHotel): ExploreObject {
   };
 }
 
+// Tag OSM tiếng Anh: thêm chữ tiếng Việt để câu "bảo tàng đà nẵng" khớp.
+const POI_TAG_WORDS: Record<string, string> = {
+  beach: 'biển bãi biển',
+  viewpoint: 'ngắm cảnh check in',
+  museum: 'bảo tàng',
+  park: 'công viên',
+  market: 'chợ',
+  temple: 'chùa đền nhà thờ',
+  indoor: 'trong nhà',
+};
+
+/** Điểm OSM -> nhánh Ăn uống (food, cafe) hoặc Tham quan (see). Chỗ ở ngoài Tripflix thì null: không trộn với khách sạn đặt được. */
+export function pointToObject(p: PointOfInterestSeed, city: string): ExploreObject | null {
+  if (p.kind === 'lodging') return null;
+  return {
+    id: `poi:${p.id}`,
+    refId: p.id,
+    kind: p.kind,
+    src: 'osm',
+    title: p.name,
+    text: [city, ...p.tags.map((t) => POI_TAG_WORDS[t] ?? t)].filter(Boolean).join(' · '),
+    place: destOf(city) ?? (city || null),
+    lat: p.lat,
+    lon: p.lng,
+  };
+}
+
 /** Bài video -> nhánh Video; bài có lộ trình (số ngày) -> Lộ trình; còn lại -> Bài viết. */
 export function postToObject(p: ExplorePost): ExploreObject {
   const trip = p.tripAttachment;
@@ -218,6 +262,7 @@ export class ExploreUseCases {
   constructor(
     @Inject(EXPLORE_STORE) private readonly store: ExploreStore,
     @Inject(EXPLORE_CATALOG) private readonly catalog: ExploreCatalog,
+    @Inject(PLACES_STORE) private readonly places: Pick<PlacesStore, 'listPlaces' | 'listPoints'>,
   ) {}
 
   async search(query: ExploreQuery): Promise<ExploreResultPage> {
@@ -285,6 +330,27 @@ export class ExploreUseCases {
     };
   }
 
+  /** Tìm một loại chỗ, điểm (tab riêng của trang tìm), có phân trang. Cùng engine với search(). */
+  async searchPlaces(query: PlaceSearchQuery): Promise<PlaceSearchPage> {
+    const r = await searchExplore(this.store, query.q, { perSection: MAX_POST_RESULTS, fullKinds: [query.kind] });
+    if (!query.cursor) this.logQuery(query.q, r.understood);
+    const found = r.sections.find((s) => s.kind === query.kind)?.items ?? [];
+    const relaxed = found.length === 0 ? (r.fallback?.items.filter((i) => i.obj.kind === query.kind) ?? []) : [];
+    const isFallback = relaxed.length > 0;
+    const candidates = isFallback ? relaxed : found;
+    const page = paginate(candidates, query.cursor, query.limit);
+    return {
+      understood: understoodOf(r.understood),
+      items: page.items.map((i) => toResultItem(i, new Map())),
+      total: candidates.length,
+      nextCursor: page.nextCursor,
+      dropped: isFallback ? r.fallback!.dropped : [],
+      isFallback,
+      fallbackRelaxed: isFallback ? r.fallback!.relaxed : [],
+      attribution: page.items.some((i) => i.obj.src === 'osm') ? POI_ATTRIBUTION : null,
+    };
+  }
+
   /** Khoảng trống từ vựng `days` ngày gần nhất: n-gram người tìm dùng nhiều hơn hẳn nội dung, gom kiểu viết gần nhau. */
   async vocabGaps(query: VocabGapsQuery, now = new Date()): Promise<VocabGapsPage> {
     const rows = await this.store.listQueryGrams(dayOf(now, query.days - 1), query.minCount);
@@ -326,13 +392,17 @@ export class ExploreUseCases {
     return ids.length ? this.catalog.getAuthorNames(ids) : new Map();
   }
 
-  /** Dựng lại toàn bộ chỉ mục từ commerce + content. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */
+  /** Dựng lại toàn bộ chỉ mục từ commerce + content + điểm OSM. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */
   async rebuildIndex(): Promise<number | null> {
-    const [hotels, posts] = await Promise.all([
+    const [hotels, posts, places, points] = await Promise.all([
       readAll((c) => this.catalog.listHotels(c)),
       readAll((c) => this.catalog.listPosts(c)),
+      this.places.listPlaces(),
+      this.places.listPoints(),
     ]);
-    const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject)]);
+    const placeName = new Map(places.map((p) => [p.id, p.name]));
+    const pois = points.flatMap((p) => pointToObject(p, placeName.get(p.cityId) ?? '') ?? []);
+    const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject), ...pois]);
     if (!(await this.store.replaceAll(index))) return null;
     // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
     // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.

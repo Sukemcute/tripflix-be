@@ -1,10 +1,8 @@
-import { POI_CITIES, POINTS_OF_INTEREST } from './points-of-interest.data.js';
 import { normalizeText } from './normalize-text.js';
 
 /**
  * Điểm tham quan, ăn uống, chỗ ở có toạ độ cho trợ lý Tripi xếp lộ trình (TF31, plan B1).
- * Dữ liệu tĩnh sinh từ OpenStreetMap như PLACES, AIRPORTS: đọc trong bộ nhớ, không cần bảng.
- * shortcut: vài trăm điểm cho 7 thành phố demo, chưa có bảng; khi cần sửa trên admin hoặc thêm nhiều nơi thì chuyển sang bảng.
+ * Lưu ở bảng discovery.points_of_interest; file points-of-interest.data.ts (sinh từ OpenStreetMap) là nguồn nạp lúc worker khởi động.
  */
 export type PoiKind = 'see' | 'food' | 'cafe' | 'lodging';
 export const POI_KINDS: readonly PoiKind[] = ['see', 'food', 'cafe', 'lodging'];
@@ -16,6 +14,7 @@ export interface PointOfInterestSeed {
   kind: PoiKind;
   lat: number;
   lng: number;
+  /** id nơi trong discovery.places (cột place_id). */
   cityId: string;
   tags: string[];
   popularity: number;
@@ -43,35 +42,45 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * EARTH_KM * Math.asin(Math.sqrt(h));
 }
 
-// Tên người dùng hay gọi khác tên chuẩn (đã bỏ dấu, viết thường).
-const CITY_ALIASES: Record<string, string> = {
-  'tp hcm': 'ho-chi-minh',
-  tphcm: 'ho-chi-minh',
-  hcm: 'ho-chi-minh',
-  'sai gon': 'ho-chi-minh',
-  'tp ho chi minh': 'ho-chi-minh',
-  hn: 'ha-noi',
-};
-
-/** Thành phố khớp theo tên không dấu, id hoặc tên gọi khác ("Vũng Tàu", "vung-tau", "TP.HCM", "Sài Gòn"). */
-function findCity(name: string) {
-  const wanted = normalizeText(name); // "vung-tau" và "TP.HCM" thành "vung tau", "tp hcm"
-  const id = CITY_ALIASES[wanted];
-  return POI_CITIES.find((c) => c.id === id || normalizeText(c.name) === wanted || normalizeText(c.id) === wanted);
+/** Nút của cây nơi mà /api/places cần (bảng discovery.places). */
+export interface PoiPlace {
+  id: string;
+  name: string;
+  parentId: string | null;
+  aliases: readonly string[];
+  lat: number | null;
+  lng: number | null;
 }
 
-/** Lọc theo thành phố hoặc toạ độ, loại và bán kính; xếp theo độ phổ biến rồi khoảng cách. */
-export function findPointsOfInterest(query: PoiQuery, points: readonly PointOfInterestSeed[] = POINTS_OF_INTEREST): PoiResult[] {
-  const city = query.city ? findCity(query.city) : undefined;
-  if (query.city && !city) return [];
-  const centre = query.near ?? (city ? { lat: city.lat, lng: city.lng } : undefined);
-  if (!centre) return [];
+/** Nơi khớp theo id, tên hoặc bí danh, không phân biệt dấu ("Vũng Tàu", "vung-tau", "TP.HCM", "Sài Gòn"). */
+function findPlace(name: string, places: readonly PoiPlace[]): PoiPlace | undefined {
+  const wanted = normalizeText(name); // "vung-tau" và "TP.HCM" thành "vung tau", "tp hcm"
+  return places.find((p) => [p.id, p.name, ...p.aliases].some((n) => normalizeText(n) === wanted));
+}
+
+/** Nơi và các nơi con trực tiếp (tỉnh → điểm đến; cây v1 chỉ có hai tầng). */
+const subtree = (id: string, places: readonly PoiPlace[]) => new Set([id, ...places.filter((p) => p.parentId === id).map((p) => p.id)]);
+
+/**
+ * Lọc theo nơi (gồm nơi con: "Lâm Đồng" ra điểm của Đà Lạt) hoặc toạ độ, loại và bán kính; xếp theo độ phổ biến rồi khoảng cách.
+ * Nơi không có toạ độ (tỉnh) thì không lọc bán kính. Điểm đến chưa có điểm riêng (Sài Gòn dưới TP.HCM) thì dùng điểm của tỉnh cha.
+ */
+export function findPointsOfInterest(query: PoiQuery, points: readonly PointOfInterestSeed[], places: readonly PoiPlace[]): PoiResult[] {
+  const place = query.city ? findPlace(query.city, places) : undefined;
+  if (query.city && !place) return [];
+  const parent = place?.parentId ? places.find((p) => p.id === place.parentId) : undefined;
+  let ids = place ? subtree(place.id, places) : null;
+  if (ids && parent && !points.some((p) => ids!.has(p.cityId))) ids = subtree(parent.id, places);
+  const at = (p?: PoiPlace) => (p?.lat != null && p.lng != null ? { lat: p.lat, lng: p.lng } : undefined);
+  const centre = query.near ?? at(place) ?? (place && !at(place) && parent ? at(parent) : undefined);
+  if (!centre && !place) return [];
   const kinds = new Set(query.kinds?.length ? query.kinds : POI_KINDS);
+  const nameOf = new Map(places.map((p) => [p.id, p.name]));
   return points
-    .filter((p) => kinds.has(p.kind) && (!city || p.cityId === city.id))
-    .map((p) => ({ point: p, km: distanceKm(centre, p) }))
+    .filter((p) => kinds.has(p.kind) && (!ids || ids.has(p.cityId)))
+    .map((p) => ({ point: p, km: centre ? distanceKm(centre, p) : 0 }))
     .filter(({ km }) => km <= query.radiusKm)
     .sort((a, b) => b.point.popularity - a.point.popularity || a.km - b.km)
     .slice(0, query.limit)
-    .map(({ point: { cityId, ...rest } }) => ({ ...rest, city: POI_CITIES.find((c) => c.id === cityId)?.name ?? '' }));
+    .map(({ point: { cityId, ...rest } }) => ({ ...rest, city: nameOf.get(cityId) ?? '' }));
 }

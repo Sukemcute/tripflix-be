@@ -82,8 +82,10 @@ async function fetchCity(city) {
     const lat = e.lat ?? e.center?.lat;
     const lng = e.lon ?? e.center?.lon;
     const [kind, tags] = kindAndTags(t);
-    if (!kind || !name || lat == null || lng == null || seen.has(`${kind}:${name}`)) continue;
-    seen.add(`${kind}:${name}`);
+    // "An Lạc Tâm", "An lac tam", "An Lac Tam 3" là một chuỗi: so tên bỏ dấu, hoa thường, số.
+    const key = `${kind}:${dedupeKey(name)}`;
+    if (!kind || !name || lat == null || lng == null || seen.has(key)) continue;
+    seen.add(key);
     byKind[kind].push({
       id: `osm:${e.type}/${e.id}`,
       name: String(name).slice(0, 120),
@@ -95,9 +97,22 @@ async function fetchCity(city) {
       popularity: popularity(t),
     });
   }
+  // Quán gần như không có Wikipedia nên cùng điểm: xếp theo tên thì chỉ lấy quán tên "1998", "Ah Mei"...
+  // Gần trung tâm hơn thì gần chỗ khách du lịch hay đi hơn.
+  const offCentre = (p) => Math.hypot(p.lat - city.lat, (p.lng - city.lng) * Math.cos((city.lat * Math.PI) / 180));
   return Object.entries(byKind).flatMap(([kind, list]) =>
-    list.sort((a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name)).slice(0, LIMITS[kind]),
+    list.sort((a, b) => b.popularity - a.popularity || offCentre(a) - offCentre(b)).slice(0, LIMITS[kind]),
   );
+}
+
+function dedupeKey(name) {
+  return String(name)
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/[^a-z]+/g, ' ')
+    .trim() || String(name);
 }
 
 const all = [];
