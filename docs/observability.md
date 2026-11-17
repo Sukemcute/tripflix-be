@@ -21,7 +21,7 @@ $env:ANALYTICS_PROMETHEUS_URL='http://localhost:9095'
 $env:ANALYTICS_TEMPO_URL='http://localhost:3205'
 ```
 
-Sau đó chạy backend theo README với biến database/Redis của môi trường đó. Admin dùng `ADMIN_CORE_API_URL` và `ADMIN_ORIGIN` hiện có. Đăng nhập bằng tài khoản superadmin; moderator và member nhận HTTP 403 ở API. Không cần seed lại hoặc chạy migration cho tính năng này.
+Sau đó chạy backend theo README với biến database/Redis của môi trường đó. Admin dùng `ADMIN_CORE_API_URL` và `ADMIN_ORIGIN` hiện có. Đăng nhập bằng tài khoản superadmin; moderator và member nhận HTTP 403 ở API. Observability không thêm migration. Sau khi ghép AI usage từ BE #228, cần chạy `pnpm db:migrate` theo quy trình triển khai để tạo bảng `analytics.ai_usage_events`; không cần seed lại.
 
 ## Thu thập
 

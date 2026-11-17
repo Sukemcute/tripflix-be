@@ -4,6 +4,8 @@ import { Test } from '@nestjs/testing';
 import { AuthModule, InvalidAccessTokenError, MemorySidBlocklist } from '@tripflix/auth';
 import request from 'supertest';
 import { AnalyticsModule } from '../../analytics.module.js';
+import { AI_USAGE_STORE } from '../../ai-usage/application/ai-usage.use-cases.js';
+import { AiUsageConsumer } from '../../ai-usage/consumers/ai-usage.consumer.js';
 import { TELEMETRY_ENV } from '../application/observability.service.js';
 
 describe('observability HTTP authorization', () => {
@@ -30,6 +32,10 @@ describe('observability HTTP authorization', () => {
     })
       .overrideProvider(TELEMETRY_ENV)
       .useValue({})
+      .overrideProvider(AI_USAGE_STORE)
+      .useValue({ summarize: async () => [] })
+      .overrideProvider(AiUsageConsumer)
+      .useValue({})
       .compile();
     app = module.createNestApplication();
     app.setGlobalPrefix('api');
@@ -39,10 +45,15 @@ describe('observability HTTP authorization', () => {
     await app.close();
   });
 
-  for (const path of ['', '/traces', `/traces/${'a'.repeat(32)}`]) {
+  for (const path of [
+    '/observability',
+    '/observability/traces',
+    `/observability/traces/${'a'.repeat(32)}`,
+    '/ai-usage',
+  ]) {
     it(`requires a staff session and superadmin role for ${path || 'overview'}`, async () => {
       const client = request(app.getHttpServer());
-      const url = `/api/analytics/observability${path}`;
+      const url = `/api/analytics${path}`;
       await client.get(url).expect(401);
       await client.get(url).set('Authorization', 'Bearer invalid').expect(401);
       await client.get(url).set('Authorization', 'Bearer member').expect(403);
@@ -65,5 +76,13 @@ describe('observability HTTP authorization', () => {
       .get('/api/analytics/observability/traces/bad-id')
       .set('Authorization', 'Bearer superadmin')
       .expect(400);
+  });
+  it('keeps the merged AI usage endpoint available beside observability', async () => {
+    const report = await request(app.getHttpServer())
+      .get('/api/analytics/ai-usage')
+      .set('Authorization', 'Bearer superadmin')
+      .expect(200);
+    expect(report.headers['cache-control']).toBe('no-store');
+    expect(report.body.total).toMatchObject({ calls: 0, costUsd: 0 });
   });
 });

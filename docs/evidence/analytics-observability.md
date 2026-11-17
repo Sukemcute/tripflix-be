@@ -13,6 +13,11 @@
 
 ## Kiểm tra
 
+- Ghép BE #228 đã merge ngày 2026-11-17: giữ `AiUsageController`, `AiUsageUseCases`, `AiUsageConsumer`, store và migration `init_ai_usage`, thêm observability bên cạnh. Chỉ có một consumer `core-analytics` trên `stream:ai`.
+- Test PostgreSQL riêng `ai-usage.int.spec.ts` **1/1 pass**: chạy migration thật bằng user `tf_analytics`, hai lần giao cùng `eventId` đồng thời chỉ ghi một dòng; kiểm tổng token/chi phí theo feature/model/ngày Việt Nam. Không dùng hoặc sửa dữ liệu database đang chạy.
+- Test HTTP module kết hợp kiểm tra cả AI usage và observability: giữ API của Bảo và chặn 401/403 cho quyền không hợp lệ. OpenAPI sinh lại từ source của cả hai phần.
+- Kiểm tra sau khi giải conflict: `pnpm contracts:build` và **49/49** tác vụ lint/typecheck/test thành công; core-api **2627 pass**, 4 skip có sẵn. Migration/schema AI usage giữ nguyên so với develop.
+
 - Sau khi merge `origin/develop` ngày 2026-11-17 (`191232b`), sinh lại contracts thành công; lint/typecheck/test **49/49 tác vụ thành công**, core-api **2593 test pass**, 4 skip có sẵn; notification-service **122 test pass**.
 
 - `pnpm turbo run lint typecheck test --affected`: **49 tác vụ thành công**; riêng core-api **2553 test pass**, 4 test skip có sẵn.
@@ -25,7 +30,7 @@
 
 ## Ảnh hưởng
 
-- Phối hợp AI usage của Bảo: thay đổi này không thêm consumer, bảng hoặc migration analytics. Khi có ingest chung, gộp handler `ai.usage.recorded` vào consumer group `core-analytics` trên `stream:ai`, giữ chống trùng `eventId`; không chạy hai consumer với bộ handler khác nhau trong cùng group. PR AI usage chưa có link tại thời điểm đối chiếu.
+- Phối hợp AI usage của Bảo: [BE #228](https://github.com/Sukemcute/tripflix-be/pull/228) đã merge và được giữ nguyên khi ghép develop. Observability không thêm consumer/bảng/migration. Khi có ingest chung, gộp handler `ai.usage.recorded` vào consumer group `core-analytics` trên `stream:ai`, giữ chống trùng `eventId`; không chạy hai consumer với bộ handler khác nhau trong cùng group.
 - BE PR #226 (`thanh/TF99-opentelemetry-tracing`) cũng thêm bootstrap OpenTelemetry trong thư viện dùng chung. Cần thống nhất bootstrap trước khi merge cả hai; không bật thêm `--import @tripflix/observability/register` cùng NodeSDK khởi tạo trong PR này.
 
 - Trang: module Analytics.
