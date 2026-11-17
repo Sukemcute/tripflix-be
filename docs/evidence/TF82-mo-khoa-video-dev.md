@@ -12,8 +12,8 @@
 ## Đối chiếu "Xong khi"
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
-| Local không có khoá vẫn phát được video `dev/` | Chờ chạy trên AWS | `curl` `.m3u8` dưới `dev/` ra 200 |
-| Video staging vẫn khoá | Chờ chạy trên AWS | `curl` `.m3u8` dưới `staging/` không cookie ra 403 |
+| Local không có khoá vẫn phát được video `dev/` | Đạt (CloudFront) | 17/11 sau `./set-dev-video.sh open`: behavior `dev/* *.m3u8 *.ts`; `curl` `dev/phong/videos/.../360p/index.m3u8` không cookie ra 200 |
+| Video staging vẫn khoá | Đạt | `curl` `staging/videos/.../360p/index.m3u8` không cookie ra 403 |
 | Chạy lại hoặc chạy các script TF82 khác không phá cấu hình | Đạt | Thử jq trên cấu hình mẫu, xem dưới |
 
 ## Kết quả kiểm tra
