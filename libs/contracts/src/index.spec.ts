@@ -6,6 +6,8 @@ import {
   ContentCommentHiddenV1Schema,
   ContentCommentRestoredV1Schema,
   ContentCommentUpdatedV1Schema,
+  ContentPostBookingClickedV1Schema,
+  ContentPostViewedV1Schema,
   DiscoverySearchPerformedV1Schema,
   DiscoveryStaysSearchedV1Schema,
   eventEnvelopeSchema,
@@ -114,5 +116,42 @@ describe('TF99: postVisibility trong sự kiện bình luận', () => {
 
   it.each(cases)('từ chối giá trị postVisibility lạ', (schema, payload) => {
     expect(schema.safeParse({ ...payload, postVisibility: 'friends' }).success).toBe(false);
+  });
+});
+
+describe('TF23: sự kiện xem và bấm đặt từ Reels', () => {
+  const postId = randomUUID();
+  const view = {
+    postId,
+    viewerId: null,
+    anonId: randomUUID(),
+    watchedMs: 20_000,
+    durationSec: 43,
+    isQualified: true,
+    surface: 'reels',
+  };
+
+  it('tên loại sự kiện khớp regex phong bì', () => {
+    const type = eventEnvelopeSchema.shape.type;
+    expect(type.safeParse('content.post.viewed').success).toBe(true);
+    expect(type.safeParse('content.post.booking_clicked').success).toBe(true);
+  });
+
+  it('nhận lượt xem của khách, chưa biết thời lượng', () => {
+    expect(ContentPostViewedV1Schema.safeParse(view).success).toBe(true);
+    expect(ContentPostViewedV1Schema.safeParse({ ...view, anonId: null, durationSec: null }).success).toBe(true);
+  });
+
+  it('từ chối thời gian xem âm, quá 10 phút, hoặc nơi xem lạ', () => {
+    expect(ContentPostViewedV1Schema.safeParse({ ...view, watchedMs: -1 }).success).toBe(false);
+    expect(ContentPostViewedV1Schema.safeParse({ ...view, watchedMs: 600_001 }).success).toBe(false);
+    expect(ContentPostViewedV1Schema.safeParse({ ...view, surface: 'home' }).success).toBe(false);
+  });
+
+  it('bấm đặt nhận mã khách sạn dạng chuỗi hoặc null', () => {
+    const click = { postId, viewerId: randomUUID(), anonId: null, hotelId: 'P-osm-vinh-long-040', surface: 'reels_trip_plan' };
+    expect(ContentPostBookingClickedV1Schema.safeParse(click).success).toBe(true);
+    expect(ContentPostBookingClickedV1Schema.safeParse({ ...click, hotelId: null }).success).toBe(true);
+    expect(ContentPostBookingClickedV1Schema.safeParse({ ...click, hotelId: '' }).success).toBe(false);
   });
 });
