@@ -1,0 +1,2648 @@
+{
+  "da-lat": {
+    "food": [
+      {
+        "name": "Bánh căn Lệ",
+        "area": "Đường Yersin",
+        "note": "Thử bánh căn trứng cút, chấm cùng nước mắm xíu mại."
+      },
+      {
+        "name": "Bánh mì xíu mại Hoàng Diệu",
+        "area": "Đường Hoàng Diệu",
+        "note": "Bẻ bánh mì từng miếng nhỏ, chấm khi xíu mại còn nóng."
+      },
+      {
+        "name": "Lẩu gà lá é Tao Ngộ",
+        "area": "Đường Ba Tháng Tư",
+        "note": "Cho lá é vào sau cùng để giữ mùi thơm."
+      },
+      {
+        "name": "Nem nướng Bà Hùng",
+        "area": "Đường Phan Đình Phùng",
+        "note": "Cuốn nem cùng rau xanh, chấm vừa đủ sốt đậu."
+      },
+      {
+        "name": "Chợ đêm Đà Lạt",
+        "area": "Khu Hòa Bình",
+        "note": "Hỏi giá từng món trước khi gọi thêm đồ nướng."
+      },
+      {
+        "name": "Kem bơ Thanh Thảo",
+        "area": "Đường Nguyễn Văn Trỗi",
+        "note": "Một ly kem bơ khá đầy, ăn sau bữa nhẹ."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Tiệm cà phê Túi Mơ To",
+        "area": "Hẻm Sào Nam",
+        "note": "Chọn buổi sáng trời trong để nhìn rõ nhà kính."
+      },
+      {
+        "name": "Cà phê Tùng",
+        "area": "Khu Hòa Bình",
+        "note": "Ngồi nghe nhạc Trịnh, gọi cà phê phin cho đúng điệu."
+      },
+      {
+        "name": "Là Việt Coffee",
+        "area": "Đường Nguyễn Công Trứ",
+        "note": "Hỏi loại hạt đang có trước khi chọn cách pha."
+      },
+      {
+        "name": "Still Cafe",
+        "area": "Đường Nguyễn Trãi",
+        "note": "Ghé ngày thường để thong thả chụp góc sân nhỏ."
+      },
+      {
+        "name": "Tiệm cà phê Cheo Veooo",
+        "area": "Đường Hoàng Hoa Thám",
+        "note": "Mang áo khoác mỏng, ngồi ngoài hiên chiều khá lạnh."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Hồ Xuân Hương",
+        "area": "Trung tâm Đà Lạt",
+        "note": "Đi bộ ven hồ sáng sớm, nhớ mang giày thoải mái."
+      },
+      {
+        "name": "Ga Đà Lạt",
+        "area": "Đường Quang Trung",
+        "note": "Xem lịch tàu Trại Mát trước khi lên kế hoạch."
+      },
+      {
+        "name": "Quảng trường Lâm Viên",
+        "area": "Đường Trần Quốc Toản",
+        "note": "Đợi nắng dịu rồi chụp hình cùng nụ hoa kính."
+      },
+      {
+        "name": "Thác Datanla",
+        "area": "Đèo Prenn",
+        "note": "Chọn giày bám tốt vì lối xuống thác có đoạn ướt."
+      },
+      {
+        "name": "Thiền viện Trúc Lâm Đà Lạt",
+        "area": "Núi Phụng Hoàng",
+        "note": "Mặc đồ kín đáo, giữ giọng nhỏ trong sân chùa."
+      },
+      {
+        "name": "Đồi chè Cầu Đất",
+        "area": "Khu Cầu Đất",
+        "note": "Đến lúc bình minh, chuẩn bị áo ấm nếu săn mây."
+      },
+      {
+        "name": "Núi Langbiang",
+        "area": "Lạc Dương",
+        "note": "Kiểm tra thời tiết trước, trời quang mới ngắm xa được."
+      }
+    ]
+  },
+  "hoi-an": {
+    "food": [
+      {
+        "name": "Bánh mì Phượng",
+        "area": "Đường Phan Châu Trinh",
+        "note": "Nói rõ mức cay khi gọi bánh mì thập cẩm."
+      },
+      {
+        "name": "Bánh mì Madam Khánh",
+        "area": "Đường Trần Cao Vân",
+        "note": "Mua mang đi rồi tìm chỗ mát ăn ngay."
+      },
+      {
+        "name": "Cơm gà Bà Buội",
+        "area": "Đường Phan Châu Trinh",
+        "note": "Ăn kèm đu đủ chua để đỡ ngấy phần cơm."
+      },
+      {
+        "name": "Cao lầu Thanh",
+        "area": "Đường Thái Phiên",
+        "note": "Trộn đều rau sống với sợi mì trước khi ăn."
+      },
+      {
+        "name": "Bánh bao bánh vạc Bông Hồng Trắng",
+        "area": "Đường Hai Bà Trưng",
+        "note": "Chấm nhẹ nước mắm để cảm nhận nhân tôm thơm."
+      },
+      {
+        "name": "Chợ Hội An",
+        "area": "Đường Trần Phú",
+        "note": "Chọn vài món nhỏ để còn bụng thử chè."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Mót Hội An",
+        "area": "Đường Trần Phú",
+        "note": "Nhấp trà thảo mộc chậm, giữ cốc gọn khi đi phố."
+      },
+      {
+        "name": "Faifo Coffee",
+        "area": "Đường Trần Phú",
+        "note": "Lên sân thượng khi nắng nhẹ để ngắm mái ngói."
+      },
+      {
+        "name": "Reaching Out Tea House",
+        "area": "Đường Trần Phú",
+        "note": "Thử giao tiếp bằng thẻ, tận hưởng không gian yên tĩnh."
+      },
+      {
+        "name": "Hoi An Roastery",
+        "area": "Phố cổ Hội An",
+        "note": "Chọn cà phê rang tại chỗ, ngồi nghỉ giữa lịch dạo."
+      },
+      {
+        "name": "U Café",
+        "area": "Đường Huyền Trân Công Chúa",
+        "note": "Ngắm sông từ ban công, chiều xuống gió khá dễ chịu."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Chùa Cầu",
+        "area": "Phố cổ Hội An",
+        "note": "Chụp từ hai đầu cầu sẽ thấy rõ mái cổ."
+      },
+      {
+        "name": "Nhà cổ Tấn Ký",
+        "area": "Đường Nguyễn Thái Học",
+        "note": "Nghe thuyết minh để hiểu những dấu lũ trên tường."
+      },
+      {
+        "name": "Hội quán Phúc Kiến",
+        "area": "Đường Trần Phú",
+        "note": "Dành thời gian xem chi tiết chạm khắc trong sân."
+      },
+      {
+        "name": "Rừng dừa Bảy Mẫu",
+        "area": "Cẩm Thanh",
+        "note": "Mặc áo phao khi đi thúng, giữ điện thoại chắc tay."
+      },
+      {
+        "name": "Làng rau Trà Quế",
+        "area": "Khu Trà Quế",
+        "note": "Xin phép người làm vườn trước khi bước vào luống."
+      },
+      {
+        "name": "Làng gốm Thanh Hà",
+        "area": "Thanh Hà",
+        "note": "Thử xoay bàn gốm, đừng ngại nhờ hướng dẫn thêm."
+      },
+      {
+        "name": "Bãi biển An Bàng",
+        "area": "Cẩm An",
+        "note": "Chọn sáng sớm đi dạo, tránh đứng gần mép sóng mạnh."
+      }
+    ]
+  },
+  "phu-quoc": {
+    "food": [
+      {
+        "name": "Bún quậy Kiến Xây",
+        "area": "Dương Đông",
+        "note": "Tự pha nước chấm từng chút, nếm rồi mới thêm ớt."
+      },
+      {
+        "name": "Bún kèn Út Lượm",
+        "area": "Đường Ba Mươi Tháng Tư",
+        "note": "Trộn nước cốt với rau, ăn lúc bún còn ấm."
+      },
+      {
+        "name": "Chợ đêm Phú Quốc",
+        "area": "Đường Bạch Đằng",
+        "note": "So giá hải sản vài hàng trước khi chọn món."
+      },
+      {
+        "name": "Chợ Dương Đông",
+        "area": "Khu cầu Nguyễn Trung Trực",
+        "note": "Ghé buổi sáng tìm bánh và đồ ăn địa phương."
+      },
+      {
+        "name": "Làng chài Hàm Ninh",
+        "area": "Hàm Ninh",
+        "note": "Chốt cách cân ghẹ trước khi nhờ quán chế biến."
+      },
+      {
+        "name": "Chợ An Thới",
+        "area": "An Thới",
+        "note": "Tìm hàng đông khách địa phương để ăn sáng gọn."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Chuồn Chuồn Bistro & Bar",
+        "area": "Đồi Sao Mai",
+        "note": "Chọn bàn ngoài trời khi trời tạnh để nhìn Dương Đông."
+      },
+      {
+        "name": "Aroi Dessert Café",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Dừng nghỉ sau buổi đi biển, gọi đồ lạnh vừa phải."
+      },
+      {
+        "name": "Shri Phú Quốc",
+        "area": "Bãi Trường",
+        "note": "Đến sớm hơn hoàng hôn để chọn chỗ nhìn biển."
+      },
+      {
+        "name": "Istanbul Beach Club",
+        "area": "Bãi Trường",
+        "note": "Cất dép gọn bên ghế rồi ngồi thư giãn trên cát."
+      },
+      {
+        "name": "Ocvan Kitchen & Beach Bar",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Hỏi chỗ ngồi có bóng râm trước khi gọi nước."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Dinh Cậu",
+        "area": "Dương Đông",
+        "note": "Đi bậc đá chậm, tránh chen lên lúc đông người."
+      },
+      {
+        "name": "Bãi Sao",
+        "area": "An Thới",
+        "note": "Tắm trong vùng an toàn, mang túi đựng đồ ướt."
+      },
+      {
+        "name": "Nhà tù Phú Quốc",
+        "area": "An Thới",
+        "note": "Dành một buổi tìm hiểu, giữ thái độ trang nghiêm."
+      },
+      {
+        "name": "Chùa Hộ Quốc",
+        "area": "Dương Tơ",
+        "note": "Leo bậc lúc trời mát và mặc trang phục lịch sự."
+      },
+      {
+        "name": "Cầu Hôn",
+        "area": "Thị trấn Hoàng Hôn",
+        "note": "Canh chiều ít mây để chụp đường chân trời rõ."
+      },
+      {
+        "name": "Bãi Khem",
+        "area": "An Thới",
+        "note": "Đi dạo trên bãi cát, gom rác trước khi về."
+      },
+      {
+        "name": "Suối Tranh",
+        "area": "Dương Tơ",
+        "note": "Hỏi tình hình nước trước chuyến đi để khỏi hụt hẫng."
+      }
+    ]
+  },
+  "ha-giang": {
+    "food": [
+      {
+        "name": "Chợ Đồng Văn",
+        "area": "Thị trấn Đồng Văn",
+        "note": "Tìm cháo ấu tẩu nấu sẵn, ăn nóng từng thìa."
+      },
+      {
+        "name": "Chợ phiên Mèo Vạc",
+        "area": "Trung tâm Mèo Vạc",
+        "note": "Dậy sớm xem chợ, thử thắng cố nếu hợp khẩu vị."
+      },
+      {
+        "name": "Chợ phiên Sà Phìn",
+        "area": "Sà Phìn",
+        "note": "Hỏi lịch họp chợ rồi mới sắp xếp đường đi."
+      },
+      {
+        "name": "Chợ phiên Lũng Phìn",
+        "area": "Lũng Phìn",
+        "note": "Mua bánh tam giác mạch nóng, bẻ nhỏ ăn dọc đường."
+      },
+      {
+        "name": "Chợ phiên Quản Bạ",
+        "area": "Tam Sơn",
+        "note": "Chọn xôi ngũ sắc cho bữa sáng trước chặng đèo."
+      },
+      {
+        "name": "Chợ đêm Mèo Vạc",
+        "area": "Thị trấn Mèo Vạc",
+        "note": "Gọi ít đồ nướng trước để thử độ hợp miệng."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cà phê Phố Cổ Đồng Văn",
+        "area": "Phố cổ Đồng Văn",
+        "note": "Ngồi tầng trên nhìn phố, nhớ bước nhẹ trên sàn gỗ."
+      },
+      {
+        "name": "Cafe Cực Bắc",
+        "area": "Lô Lô Chải",
+        "note": "Uống trà nóng rồi thong thả ngắm những mái trình tường."
+      },
+      {
+        "name": "Cafe Tam Giác Mạch",
+        "area": "Thị trấn Đồng Văn",
+        "note": "Nghỉ chân giữa lịch tham quan, tranh thủ sạc điện thoại."
+      },
+      {
+        "name": "Cafe A Sử",
+        "area": "Phố cổ Đồng Văn",
+        "note": "Chọn góc yên tĩnh nghe nhạc, giữ tiếng nói vừa đủ."
+      },
+      {
+        "name": "Cafe Núi Cấm",
+        "area": "Khu Núi Cấm",
+        "note": "Lên lúc trời sáng, quan sát đường nếu đi xe máy."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Cột cờ Lũng Cú",
+        "area": "Lũng Cú",
+        "note": "Mang nước vừa đủ, nghỉ từng đoạn khi leo bậc."
+      },
+      {
+        "name": "Đèo Mã Pì Lèng",
+        "area": "Cung Đồng Văn đến Mèo Vạc",
+        "note": "Dừng đúng điểm quan sát, đừng đỗ xe ở khúc cua."
+      },
+      {
+        "name": "Sông Nho Quế",
+        "area": "Khu hẻm Tu Sản",
+        "note": "Mặc áo phao đầy đủ trước khi xuống thuyền ngắm hẻm."
+      },
+      {
+        "name": "Dinh thự họ Vương",
+        "area": "Sà Phìn",
+        "note": "Nghe chuyện ngôi nhà trước khi chụp những góc sân đá."
+      },
+      {
+        "name": "Phố cổ Đồng Văn",
+        "area": "Thị trấn Đồng Văn",
+        "note": "Dạo buổi tối se lạnh, thử nghe sinh hoạt quanh chợ."
+      },
+      {
+        "name": "Làng Lô Lô Chải",
+        "area": "Chân núi Rồng",
+        "note": "Xin phép trước khi chụp người dân và bên trong nhà."
+      },
+      {
+        "name": "Dốc Thẩm Mã",
+        "area": "Lũng Thầu",
+        "note": "Đứng trong khu dừng nghỉ để chụp toàn cảnh con dốc."
+      }
+    ]
+  },
+  "sa-pa": {
+    "food": [
+      {
+        "name": "Cốn Sủi Ông Há",
+        "area": "Đường Điện Biên Phủ",
+        "note": "Đảo nhẹ phần sốt để sợi mì thấm đều hơn."
+      },
+      {
+        "name": "Thắng cố A Quỳnh",
+        "area": "Đường Thạch Sơn",
+        "note": "Hỏi nguyên liệu trước khi gọi nồi thắng cố chung."
+      },
+      {
+        "name": "Nhà hàng A Phủ",
+        "area": "Đường Fansipan",
+        "note": "Gọi lợn bản vừa phần, ăn cùng rau cho cân vị."
+      },
+      {
+        "name": "Cá hồi Vua Sa Pa",
+        "area": "Đường Lê Văn Tám",
+        "note": "Chọn một kiểu chế biến trước để tránh gọi quá nhiều."
+      },
+      {
+        "name": "Chợ đêm Sa Pa",
+        "area": "Đường N1",
+        "note": "Ngồi gần bếp nướng cho ấm nhưng giữ áo khỏi khói."
+      },
+      {
+        "name": "Chợ Sa Pa",
+        "area": "Đường Điện Biên Phủ",
+        "note": "Ăn sáng sớm rồi mua ít trái cây theo mùa."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Viettrekking Coffee",
+        "area": "Đường Hoàng Liên",
+        "note": "Theo dõi mây buổi sáng để chọn lúc ngắm thung lũng."
+      },
+      {
+        "name": "Coóng Coffee",
+        "area": "Đường đi Cát Cát",
+        "note": "Chọn bàn hướng núi, giữ áo khoác bên mình khi ngồi."
+      },
+      {
+        "name": "Cộng Cà Phê Sa Pa",
+        "area": "Đường Xuân Viên",
+        "note": "Thử cà phê cốt dừa sau buổi dạo quanh nhà thờ."
+      },
+      {
+        "name": "The Haven Sapa Camp Site",
+        "area": "Đồi Vọng Cảnh",
+        "note": "Ghé uống nước ngắm núi, hỏi đường xuống trước khi tối."
+      },
+      {
+        "name": "La Dao Spa & Coffee House",
+        "area": "Tả Van",
+        "note": "Nghỉ chân bên ruộng, gọi trà nóng nếu trời trở lạnh."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Đỉnh Fansipan",
+        "area": "Dãy Hoàng Liên Sơn",
+        "note": "Chuẩn bị áo ấm vì nhiệt độ trên đỉnh giảm nhanh."
+      },
+      {
+        "name": "Bản Cát Cát",
+        "area": "Thung lũng Mường Hoa",
+        "note": "Mang giày mềm, đường tham quan có nhiều bậc dốc."
+      },
+      {
+        "name": "Bản Tả Van",
+        "area": "Thung lũng Mường Hoa",
+        "note": "Đi chậm qua bản, tránh giẫm vào ruộng của người dân."
+      },
+      {
+        "name": "Nhà thờ đá Sa Pa",
+        "area": "Trung tâm Sa Pa",
+        "note": "Chụp từ quảng trường, giữ lối vào thông thoáng cho người đi."
+      },
+      {
+        "name": "Núi Hàm Rồng",
+        "area": "Sau nhà thờ đá",
+        "note": "Leo sớm khi còn sức, mang nước cho chặng lên cao."
+      },
+      {
+        "name": "Thác Bạc",
+        "area": "Đường lên đèo Ô Quy Hồ",
+        "note": "Áo mưa mỏng giúp đỡ ướt khi đứng gần dòng thác."
+      },
+      {
+        "name": "Đèo Ô Quy Hồ",
+        "area": "Đèo Hoàng Liên",
+        "note": "Chỉ dừng nơi rộng, sương dày thì giảm tốc ngay."
+      }
+    ]
+  },
+  "ha-long": {
+    "food": [
+      {
+        "name": "Chả mực Bà Ngân",
+        "area": "Chợ Hạ Long 1",
+        "note": "Ăn chả mực nóng cùng xôi trắng cho rõ vị."
+      },
+      {
+        "name": "Bánh cuốn chả mực Gốc Bàng",
+        "area": "Đường Nhà Hát",
+        "note": "Gọi bánh tráng mới, chấm ít nước mắm trước đã."
+      },
+      {
+        "name": "Bún bề bề Khánh Tuyền",
+        "area": "Khu Giếng Đồn",
+        "note": "Thêm chanh sau khi nếm nước dùng để giữ vị ngọt."
+      },
+      {
+        "name": "Chợ Hạ Long 2",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Dạo khu ăn uống trước rồi chọn món còn nóng."
+      },
+      {
+        "name": "Chợ đêm Hạ Long",
+        "area": "Bãi Cháy",
+        "note": "Thống nhất giá và phần ăn trước khi ngồi xuống."
+      },
+      {
+        "name": "Ốc Thủy Chung",
+        "area": "Khu Cái Dăm",
+        "note": "Chọn vài loại ốc hấp để thử độ tươi trước."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Sữa Chua Cô Nghi",
+        "area": "Đường Văn Lang",
+        "note": "Ăn sữa chua từng thìa cùng trân châu còn ấm."
+      },
+      {
+        "name": "Gió Coffee",
+        "area": "Đường Hạ Long",
+        "note": "Tìm góc thoáng ngắm biển, tránh ngồi nắng gắt giữa trưa."
+      },
+      {
+        "name": "Thông Zeo Hạ Long",
+        "area": "Đường Hải Quân",
+        "note": "Ghé chiều mát để tận hưởng không gian nhiều cây xanh."
+      },
+      {
+        "name": "La Luna Coffee",
+        "area": "Khu Bãi Cháy",
+        "note": "Rủ bạn chia bánh, dành thời gian nghỉ trước chặng tối."
+      },
+      {
+        "name": "Cộng Cà Phê Hạ Long",
+        "area": "Khu Bãi Cháy",
+        "note": "Chọn đồ uống ít ngọt nếu vừa ăn nhiều món vặt."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Bảo tàng Quảng Ninh",
+        "area": "Đường Trần Quốc Nghiễn",
+        "note": "Xem giờ mở cửa trước, dành thời gian cho gian than."
+      },
+      {
+        "name": "Vịnh Hạ Long",
+        "area": "Khu cảng Tuần Châu",
+        "note": "Chọn tuyến phù hợp thời gian, mặc áo phao trên tàu."
+      },
+      {
+        "name": "Hang Sửng Sốt",
+        "area": "Đảo Bồ Hòn",
+        "note": "Theo lối chỉ dẫn trong hang, hạn chế chạm thạch nhũ."
+      },
+      {
+        "name": "Đảo Ti Tốp",
+        "area": "Vịnh Hạ Long",
+        "note": "Leo bậc chậm để còn sức ngắm vịnh từ đỉnh."
+      },
+      {
+        "name": "Núi Bài Thơ",
+        "area": "Khu Hồng Gai",
+        "note": "Kiểm tra lối vào được phép trước khi tính chuyện leo."
+      },
+      {
+        "name": "Chùa Long Tiên",
+        "area": "Đường Lê Quý Đôn",
+        "note": "Ghé lúc vắng, giữ trang phục gọn gàng và kín đáo."
+      },
+      {
+        "name": "Cầu Bãi Cháy",
+        "area": "Cửa Lục",
+        "note": "Ngắm cầu từ bờ kè khi đèn vừa bật sáng."
+      }
+    ]
+  },
+  "ninh-binh": {
+    "food": [
+      {
+        "name": "Cơm cháy Ninh Bình tại chợ Rồng",
+        "area": "Trung tâm Ninh Bình",
+        "note": "Chọn cơm cháy giòn, hỏi sốt ăn kèm có cay không."
+      },
+      {
+        "name": "Nhà hàng dê Chính Thư",
+        "area": "Trường Yên",
+        "note": "Gọi dê tái chanh trước, chia phần nhỏ cho cả bàn."
+      },
+      {
+        "name": "Nhà hàng dê Đức Dê",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Ăn dê cùng lá thơm, hỏi rõ khẩu phần mỗi đĩa."
+      },
+      {
+        "name": "Miến lươn Bà Phấn",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Thử miến nước buổi sáng để bụng nhẹ khi đi thuyền."
+      },
+      {
+        "name": "Bún mọc Tố Như",
+        "area": "Quốc lộ 10, Kim Sơn",
+        "note": "Chấm mọc riêng rồi thêm rau theo khẩu vị."
+      },
+      {
+        "name": "Chợ Tam Cốc",
+        "area": "Khu bến thuyền Tam Cốc",
+        "note": "Mua đồ ăn nhẹ trước khi bắt đầu lịch đạp xe."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Chookie's Beer Garden",
+        "area": "Tam Cốc",
+        "note": "Ngồi sân vườn khi trời mát, gọi nước rồi nghỉ chân."
+      },
+      {
+        "name": "Brick Coffee Shop",
+        "area": "Tam Cốc",
+        "note": "Chọn bàn trong nhà nếu nắng trưa đang gay gắt."
+      },
+      {
+        "name": "COCO.A Cafe Tam Coc",
+        "area": "Tam Cốc",
+        "note": "Chọn bánh nhỏ với cà phê, ngồi nghỉ giữa buổi đạp xe."
+      },
+      {
+        "name": "The Alley Tam Coc",
+        "area": "Tam Cốc",
+        "note": "Ghé dùng cà phê sáng trước khi ra bến thuyền."
+      },
+      {
+        "name": "Coffee Lan",
+        "area": "Bờ sông Tam Cốc",
+        "note": "Ngồi nhìn thuyền qua sông, giữ đồ gọn bên bàn."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Khu du lịch sinh thái Tràng An",
+        "area": "Tràng An",
+        "note": "Chọn tuyến thuyền theo hang muốn xem, mang mũ che nắng."
+      },
+      {
+        "name": "Tam Cốc",
+        "area": "Ninh Hải",
+        "note": "Đi thuyền sáng sớm để tránh nắng chiếu thẳng vào mặt."
+      },
+      {
+        "name": "Hang Múa",
+        "area": "Khê Đầu Hạ",
+        "note": "Đế giày chắc giúp leo bậc đá dễ chịu hơn nhiều."
+      },
+      {
+        "name": "Cố đô Hoa Lư",
+        "area": "Trường Yên",
+        "note": "Tìm hiểu hai đền vua trước để chuyến thăm ý nghĩa."
+      },
+      {
+        "name": "Chùa Bái Đính",
+        "area": "Gia Sinh",
+        "note": "Chuẩn bị nhiều thời gian vì khu chùa khá rộng."
+      },
+      {
+        "name": "Vườn quốc gia Cúc Phương",
+        "area": "Nho Quan",
+        "note": "Mặc quần dài, mang thuốc chống côn trùng khi đi rừng."
+      },
+      {
+        "name": "Đầm Vân Long",
+        "area": "Gia Vân",
+        "note": "Giữ yên lặng trên thuyền để dễ quan sát chim hơn."
+      }
+    ]
+  },
+  "hue": {
+    "food": [
+      {
+        "name": "Bún bò Huế Mệ Kéo",
+        "area": "Đường Bạch Đằng",
+        "note": "Dậy sớm ăn tô bún, thêm sa tế từng chút."
+      },
+      {
+        "name": "Cơm hến Hoa Đông",
+        "area": "Cồn Hến",
+        "note": "Trộn kỹ cơm với hến, để riêng ớt nếu ăn nhẹ."
+      },
+      {
+        "name": "Bánh khoái Lạc Thiện",
+        "area": "Đường Đinh Tiên Hoàng",
+        "note": "Cuốn bánh với rau, chấm nước lèo khi còn ấm."
+      },
+      {
+        "name": "Bánh bèo Bà Đỏ",
+        "area": "Đường Nguyễn Bỉnh Khiêm",
+        "note": "Gọi khay nhỏ trước để còn thử bánh nậm lọc."
+      },
+      {
+        "name": "Chè Hẻm",
+        "area": "Đường Hùng Vương",
+        "note": "Chọn vài loại chè ít ngọt rồi chia nhau nếm."
+      },
+      {
+        "name": "Chợ Đông Ba",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Hỏi giá trước, chọn món làm tại chỗ cho nóng."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cà phê Muối",
+        "area": "Đường Đặng Thái Thân",
+        "note": "Khuấy nhẹ lớp kem muối để vị cà phê cân bằng."
+      },
+      {
+        "name": "Vĩ Dạ Xưa",
+        "area": "Đường Nguyễn Sinh Cung",
+        "note": "Ngồi trong vườn nghe gió, gọi trà nếu muốn thanh vị."
+      },
+      {
+        "name": "Tân Cà Phê",
+        "area": "Đường Phạm Hồng Thái",
+        "note": "Ghé sáng ngày thường, chọn góc dễ nhìn sinh hoạt phố."
+      },
+      {
+        "name": "Root Coffee",
+        "area": "Đường Nguyễn Công Trứ",
+        "note": "Thử cà phê pha thủ công nếu thích vị nhẹ hơn."
+      },
+      {
+        "name": "Trà Cung Đình Đức Phượng",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Nhâm nhi trà nóng chậm, ăn kèm bánh vừa đủ."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Đại Nội Huế",
+        "area": "Kinh thành Huế",
+        "note": "Đi từ sáng để có đủ thời gian xem các điện."
+      },
+      {
+        "name": "Lăng Minh Mạng",
+        "area": "Hương Thọ",
+        "note": "Mang mũ rộng vành, lối đi ngoài trời khá nhiều."
+      },
+      {
+        "name": "Lăng Khải Định",
+        "area": "Thủy Bằng",
+        "note": "Đứng ngắm khảm sành kỹ rồi mới chụp toàn cảnh."
+      },
+      {
+        "name": "Lăng Tự Đức",
+        "area": "Thủy Xuân",
+        "note": "Tản bộ quanh hồ trước khi vào những khu nhà chính."
+      },
+      {
+        "name": "Chùa Thiên Mụ",
+        "area": "Đồi Hà Khê",
+        "note": "Ngắm sông từ sân chùa, giữ yên tĩnh khi tham quan."
+      },
+      {
+        "name": "Làng hương Thủy Xuân",
+        "area": "Đường Huyền Trân Công Chúa",
+        "note": "Mua ít hương ủng hộ rồi xin chụp cùng bó màu."
+      },
+      {
+        "name": "Cầu Trường Tiền",
+        "area": "Sông Hương",
+        "note": "Đi bộ buổi tối, giữ điện thoại chắc khi đứng ngắm."
+      }
+    ]
+  },
+  "nha-trang": {
+    "food": [
+      {
+        "name": "Nem nướng Đặng Văn Quyên",
+        "area": "Đường Phan Bội Châu",
+        "note": "Cuốn nem cùng bánh tráng giòn, chấm sốt vừa tay."
+      },
+      {
+        "name": "Bún cá Nguyên Loan",
+        "area": "Đường Ngô Gia Tự",
+        "note": "Ăn thử chả cá trước khi thêm nước mắm vào tô."
+      },
+      {
+        "name": "Bánh căn Bà Thừa",
+        "area": "Đường Yersin",
+        "note": "Chờ bánh vừa ra khuôn rồi chấm ngay cho giòn."
+      },
+      {
+        "name": "Bánh xèo chảo 85",
+        "area": "Đường Tô Hiến Thành",
+        "note": "Chia một chiếc trước để còn thử các món khác."
+      },
+      {
+        "name": "Bò nướng Lạc Cảnh",
+        "area": "Đường Nguyễn Bỉnh Khiêm",
+        "note": "Trở thịt thường xuyên để mặt ngoài không cháy quá."
+      },
+      {
+        "name": "Chợ Đầm",
+        "area": "Khu Bến Chợ",
+        "note": "Dạo khu ăn uống, chọn món nhẹ trước khi mua quà."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Rainforest Nha Trang",
+        "area": "Đường Võ Trứ",
+        "note": "Chọn tầng thấp nếu muốn tránh leo nhiều cầu thang."
+      },
+      {
+        "name": "Jungle Coffee",
+        "area": "Đường Lê Quý Đôn",
+        "note": "Ngồi giữa cây xanh, mang áo mỏng nếu ngại lạnh máy."
+      },
+      {
+        "name": "An Cafe",
+        "area": "Đường Lê Đại Hành",
+        "note": "Gọi cà phê phin rồi nghỉ một nhịp giữa ngày."
+      },
+      {
+        "name": "Iced Coffee",
+        "area": "Đường Nguyễn Thiện Thuật",
+        "note": "Thử bánh cùng cà phê cho bữa xế gọn nhẹ."
+      },
+      {
+        "name": "Cộng Cà Phê Nha Trang",
+        "area": "Đường Nguyễn Thiện Thuật",
+        "note": "Chọn ly cốt dừa mát sau buổi đi bộ ven biển."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Tháp Bà Ponagar",
+        "area": "Đường Hai Tháng Tư",
+        "note": "Che vai và đầu gối trước khi vào khu tháp."
+      },
+      {
+        "name": "Hòn Chồng",
+        "area": "Khu Vĩnh Phước",
+        "note": "Bám lối khô khi đi qua những phiến đá ven biển."
+      },
+      {
+        "name": "Chùa Long Sơn",
+        "area": "Đường Hai Mươi Ba Tháng Mười",
+        "note": "Nghỉ giữa chặng bậc thang, giữ sức khi lên tượng."
+      },
+      {
+        "name": "Nhà thờ Núi Nha Trang",
+        "area": "Đường Thái Nguyên",
+        "note": "Xem giờ được tham quan để tránh làm phiền buổi lễ."
+      },
+      {
+        "name": "Viện Hải dương học",
+        "area": "Cầu Đá",
+        "note": "Dành thời gian đọc bảng loài thay vì chỉ chụp ảnh."
+      },
+      {
+        "name": "Bãi biển Trần Phú",
+        "area": "Đường Trần Phú",
+        "note": "Tắm ở nơi có cứu hộ và quan sát cờ cảnh báo."
+      },
+      {
+        "name": "Đảo Hòn Mun",
+        "area": "Vịnh Nha Trang",
+        "note": "Không giẫm san hô, kiểm tra điều kiện biển trước khi lặn."
+      }
+    ]
+  },
+  "da-nang": {
+    "food": [
+      {
+        "name": "Mì Quảng Bà Mua",
+        "area": "Đường Trần Bình Trọng",
+        "note": "Nếm nước dùng trước, thêm bánh tráng để tô mì giòn."
+      },
+      {
+        "name": "Bánh tráng cuốn thịt heo Trần",
+        "area": "Đường Hải Phòng",
+        "note": "Cuốn nhiều rau, chấm mắm nêm ít rồi tăng dần."
+      },
+      {
+        "name": "Bún chả cá Bà Lữ",
+        "area": "Đường Hùng Vương",
+        "note": "Gọi tô nhỏ nếu còn muốn khám phá món khác."
+      },
+      {
+        "name": "Bánh xèo Bà Dưỡng",
+        "area": "Kiệt Hoàng Diệu",
+        "note": "Tìm đúng kiệt rồi cuốn bánh khi vỏ còn giòn."
+      },
+      {
+        "name": "Bê thui Cầu Mống Rô",
+        "area": "Đường Bắc Sơn",
+        "note": "Ăn thịt cùng rau sống, chấm nhẹ mắm để đỡ mặn."
+      },
+      {
+        "name": "Chợ Cồn",
+        "area": "Đường Ông Ích Khiêm",
+        "note": "Đi bụng vừa đói để thử nhiều món trong chợ."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cộng Cà Phê Đà Nẵng",
+        "area": "Đường Bạch Đằng",
+        "note": "Ngồi nhìn sông Hàn, thử cà phê dừa lúc trời nóng."
+      },
+      {
+        "name": "43 Factory Coffee Roaster",
+        "area": "Đường Ngô Thì Sĩ",
+        "note": "Hỏi vị hạt hôm đó để chọn ly hợp gu."
+      },
+      {
+        "name": "The Cups Coffee",
+        "area": "Đường Nguyễn Văn Linh",
+        "note": "Dừng nghỉ trước chuyến đi tiếp, chọn bàn gần cửa sổ."
+      },
+      {
+        "name": "Reply 1988 Cafe",
+        "area": "Đường Lê Hồng Phong",
+        "note": "Gọi nước rồi ngắm đồ trang trí mang màu hoài niệm."
+      },
+      {
+        "name": "Nia Coffee",
+        "area": "Đường Phan Thành Tài",
+        "note": "Tìm bàn trong bóng cây, ngồi thư giãn giữa buổi."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Ngũ Hành Sơn",
+        "area": "Khu Hòa Hải",
+        "note": "Đi giày bám tốt, bậc đá trong động dễ trơn."
+      },
+      {
+        "name": "Chùa Linh Ứng Sơn Trà",
+        "area": "Bán đảo Sơn Trà",
+        "note": "Giữ khoảng cách với khỉ, cất kín thức ăn mang theo."
+      },
+      {
+        "name": "Bà Nà Hills",
+        "area": "Hòa Ninh",
+        "note": "Mang áo khoác nhẹ vì trên núi có thể lạnh."
+      },
+      {
+        "name": "Cầu Rồng",
+        "area": "Sông Hàn",
+        "note": "Kiểm tra lịch phun lửa và chọn chỗ đứng khô ráo."
+      },
+      {
+        "name": "Bãi biển Mỹ Khê",
+        "area": "Đường Võ Nguyên Giáp",
+        "note": "Ra biển lúc nắng nhẹ, tuân theo khu vực tắm."
+      },
+      {
+        "name": "Bảo tàng Điêu khắc Chăm Đà Nẵng",
+        "area": "Đường Hai Tháng Chín",
+        "note": "Đọc giới thiệu từng phòng để hiểu các phong cách tượng."
+      },
+      {
+        "name": "Đỉnh Bàn Cờ",
+        "area": "Bán đảo Sơn Trà",
+        "note": "Hỏi quy định đường lên trước, tránh đi khi sương dày."
+      }
+    ]
+  },
+  "moc-chau": {
+    "food": [
+      {
+        "name": "Bê chao Mộc Châu Quán 64",
+        "area": "Quốc lộ 6",
+        "note": "Ăn bê chao nóng, chấm ít tương gừng cho thơm."
+      },
+      {
+        "name": "Bê chao Đông Hải",
+        "area": "Khu Chiềng Đi",
+        "note": "Gọi phần vừa ăn để miếng bê luôn nóng giòn."
+      },
+      {
+        "name": "Cá hồi Vườn Đào",
+        "area": "Khu Vườn Đào",
+        "note": "Chọn vài món cá hồi khác cách chế biến để chia."
+      },
+      {
+        "name": "Chợ Mộc Châu",
+        "area": "Trung tâm Mộc Châu",
+        "note": "Tìm xôi nóng lót dạ trước buổi đi đồi chè."
+      },
+      {
+        "name": "Nhà hàng Xuân Bắc 181",
+        "area": "Quốc lộ 6",
+        "note": "Thử bê chao cùng rau cải, gọi vừa đủ ăn nóng."
+      },
+      {
+        "name": "Chợ thị trấn Nông trường Mộc Châu",
+        "area": "Khu Nông trường",
+        "note": "Mua sữa và bánh cho bữa nhẹ trên đường."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Vivu Café",
+        "area": "Đường Trần Huy Liệu",
+        "note": "Chọn buổi chiều dịu nắng, ngồi ngoài trời cho thoáng."
+      },
+      {
+        "name": "Tom's Garden Coffee & more",
+        "area": "Đường Tô Hiệu",
+        "note": "Ghé lúc trời khô để tận hưởng góc vườn nhỏ."
+      },
+      {
+        "name": "Mộc Coffee",
+        "area": "Đường Nguyễn Hoài Xuân",
+        "note": "Uống ly cà phê ấm trước hành trình sáng sớm."
+      },
+      {
+        "name": "Green Coffee",
+        "area": "Trung tâm Mộc Châu",
+        "note": "Hẹn bạn nghỉ giữa chuyến, gọi đồ uống theo khẩu vị."
+      },
+      {
+        "name": "Ngõ Suối Cafe",
+        "area": "Ngõ Trần Huy Liệu",
+        "note": "Đi chậm trong ngõ, chọn góc ngồi nghe tiếng nước."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Đồi chè trái tim",
+        "area": "Khu Tân Lập",
+        "note": "Đi theo lối có sẵn, đừng bước lên hàng chè."
+      },
+      {
+        "name": "Thác Dải Yếm",
+        "area": "Mường Sang",
+        "note": "Mang áo mưa nhẹ vì gần thác có nhiều hơi nước."
+      },
+      {
+        "name": "Rừng thông bản Áng",
+        "area": "Đông Sang",
+        "note": "Đạp xe quanh hồ lúc sáng để tránh nắng trưa."
+      },
+      {
+        "name": "Thung lũng mận Nà Ka",
+        "area": "Khu Tân Lập",
+        "note": "Hỏi mùa hoa hay quả trước khi lên lịch ghé."
+      },
+      {
+        "name": "Đỉnh Pha Luông",
+        "area": "Khu biên giới Pha Luông",
+        "note": "Tìm người dẫn đường và kiểm tra điều kiện trước chuyến leo."
+      },
+      {
+        "name": "Cầu kính Bạch Long",
+        "area": "Mường Sang",
+        "note": "Làm theo hướng dẫn trên cầu, giữ đồ cá nhân gọn."
+      },
+      {
+        "name": "Hang Dơi Mộc Châu",
+        "area": "Trung tâm Mộc Châu",
+        "note": "Bước chậm ở đoạn tối, không chiếu đèn vào dơi."
+      }
+    ]
+  },
+  "cao-bang": {
+    "food": [
+      {
+        "name": "Bánh cuốn Bà Xuân",
+        "area": "Đường Kim Đồng",
+        "note": "Chấm bánh bằng nước canh nóng, thêm măng ớt vừa miệng."
+      },
+      {
+        "name": "Phở chua Cao Bằng tại chợ Xanh",
+        "area": "Trung tâm Cao Bằng",
+        "note": "Trộn kỹ phần sốt chua trước khi ăn miếng đầu."
+      },
+      {
+        "name": "Chợ ẩm thực Cao Bằng",
+        "area": "Đường Hoàng Đình Giong",
+        "note": "Dạo một vòng xem hàng rồi mới chọn món chính."
+      },
+      {
+        "name": "Chợ Trùng Khánh",
+        "area": "Trung tâm Trùng Khánh",
+        "note": "Hỏi hạt dẻ theo mùa, thử hạt nóng trước khi mua."
+      },
+      {
+        "name": "Chợ Bảo Lạc",
+        "area": "Thị trấn Bảo Lạc",
+        "note": "Thưởng thức bát phở sáng trong lúc xem chợ vùng cao."
+      },
+      {
+        "name": "Chợ Quảng Uyên",
+        "area": "Trung tâm Quảng Uyên",
+        "note": "Tìm bánh áp chao vào hôm lạnh để ăn nóng."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Tộc cà phê",
+        "area": "Đường Kim Đồng",
+        "note": "Thử cà phê nóng trước buổi dạo bộ quanh phố."
+      },
+      {
+        "name": "Nâng Café",
+        "area": "Khu Sông Hiến",
+        "note": "Chọn chỗ có ánh sáng tự nhiên để ngồi đọc sách."
+      },
+      {
+        "name": "Ly Eck – Café",
+        "area": "Phố Hòa Bình, Quảng Uyên",
+        "note": "Nghỉ một chặng sau đường dài, gọi nước rồi thả lỏng."
+      },
+      {
+        "name": "Cafe Mộc",
+        "area": "Đường Nước Giáp",
+        "note": "Ngồi góc gỗ yên tĩnh, nhâm nhi đồ uống chậm rãi."
+      },
+      {
+        "name": "Gilu's Garden",
+        "area": "Khu Phố Thầu",
+        "note": "Ưu tiên ngày khô ráo để ngồi ngoài vườn thoải mái."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Thác Bản Giốc",
+        "area": "Đàm Thủy",
+        "note": "Mang túi chống nước, hơi thác có thể làm ướt máy."
+      },
+      {
+        "name": "Động Ngườm Ngao",
+        "area": "Đàm Thủy",
+        "note": "Theo lối sáng trong động, cẩn thận đoạn nền ẩm."
+      },
+      {
+        "name": "Khu di tích Pác Bó",
+        "area": "Trường Hà",
+        "note": "Giữ gìn cảnh quan, đừng xuống suối rửa đồ cá nhân."
+      },
+      {
+        "name": "Núi Mắt Thần",
+        "area": "Trà Lĩnh",
+        "note": "Hỏi tình trạng đường vào vì mùa mưa có thể ngập."
+      },
+      {
+        "name": "Hồ Thang Hen",
+        "area": "Quốc Toản",
+        "note": "Ngắm mặt hồ buổi sớm, chuẩn bị thuốc chống côn trùng."
+      },
+      {
+        "name": "Làng đá Khuổi Ky",
+        "area": "Đàm Thủy",
+        "note": "Xin phép chủ nhà trước khi vào xem kiến trúc đá."
+      },
+      {
+        "name": "Đèo Mã Phục",
+        "area": "Quốc lộ 3",
+        "note": "Dừng nơi có khoảng rộng, tránh chụp ảnh giữa lòng đường."
+      }
+    ]
+  },
+  "quy-nhon": {
+    "food": [
+      {
+        "name": "Bánh xèo tôm nhảy Gia Vỹ",
+        "area": "Đường Diên Hồng",
+        "note": "Ăn bánh vừa đổ xong để cảm nhận lớp vỏ giòn."
+      },
+      {
+        "name": "Bún chả cá Ngọc Liên",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Thêm rau trước, nếm nước dùng rồi mới cho tương."
+      },
+      {
+        "name": "Bánh hỏi cháo lòng Diên Hồng",
+        "area": "Đường Diên Hồng",
+        "note": "Chia cháo và bánh hỏi thành phần nhỏ cho dễ ăn."
+      },
+      {
+        "name": "Bánh bèo Bà Xê",
+        "area": "Đường Nguyễn Tất Thành",
+        "note": "Gọi ít chén trước, thêm nước mắm từng chút một."
+      },
+      {
+        "name": "Chợ Đầm Quy Nhơn",
+        "area": "Đường Hoàng Hoa Thám",
+        "note": "Tìm quầy ăn sáng đông người, giữ túi gọn bên mình."
+      },
+      {
+        "name": "Phố ẩm thực Ngô Văn Sở",
+        "area": "Đường Ngô Văn Sở",
+        "note": "Rủ nhóm chia nhiều món, tránh gọi trùng món quá sớm."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Surf Bar",
+        "area": "Đường Xuân Diệu",
+        "note": "Đến khi cát bớt nóng, ngồi nghe sóng với ly mát."
+      },
+      {
+        "name": "S-Blue",
+        "area": "Đường Xuân Diệu",
+        "note": "Chọn chỗ hướng biển lúc chiều, hỏi giá nước trước."
+      },
+      {
+        "name": "Cà phê 1990",
+        "area": "Đường Ba Mươi Mốt Tháng Ba",
+        "note": "Ngắm góc trang trí cũ, gọi cà phê cho buổi thong dong."
+      },
+      {
+        "name": "Adiuvat Coffee Roasters",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Trao đổi gu rang với nhân viên trước khi chọn hạt."
+      },
+      {
+        "name": "Marina the Garden",
+        "area": "Đường Nguyễn Thị Định",
+        "note": "Ghé buổi sáng nhẹ nắng để ngồi góc sân vườn."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Kỳ Co",
+        "area": "Nhơn Lý",
+        "note": "Xem sóng và gió trước khi chọn đường ra bãi."
+      },
+      {
+        "name": "Eo Gió",
+        "area": "Nhơn Lý",
+        "note": "Đi men lối có lan can, giữ mũ khi gió mạnh."
+      },
+      {
+        "name": "Hòn Khô",
+        "area": "Nhơn Hải",
+        "note": "Mang dép bám chân, tránh giẫm lên san hô gần bờ."
+      },
+      {
+        "name": "Ghềnh Ráng Tiên Sa",
+        "area": "Đường Hàn Mặc Tử",
+        "note": "Đi bộ chiều mát, bậc xuống bãi đá cần bước chậm."
+      },
+      {
+        "name": "Tháp Đôi",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Chụp từ khoảng sân rộng để lấy trọn hai tháp."
+      },
+      {
+        "name": "Đồi cát Phương Mai",
+        "area": "Nhơn Hội",
+        "note": "Mang nước uống, tránh đi chân trần lúc cát đang nóng."
+      },
+      {
+        "name": "Tịnh xá Ngọc Hòa",
+        "area": "Nhơn Lý",
+        "note": "Mặc đồ lịch sự, đứng ngắm tượng từ khu sân."
+      }
+    ]
+  },
+  "phu-yen": {
+    "food": [
+      {
+        "name": "Bánh canh hẹ Bưu Điện",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Ăn lúc tô còn nóng để hẹ dậy mùi thơm."
+      },
+      {
+        "name": "Cơm gà Tuyết Nhung",
+        "area": "Đường Lê Thánh Tôn",
+        "note": "Gọi thêm dưa chua để cân vị béo của cơm."
+      },
+      {
+        "name": "Mắt cá ngừ Bà Tám",
+        "area": "Đường Lê Duẩn",
+        "note": "Đợi thố bớt sôi rồi thử phần nước thuốc bắc."
+      },
+      {
+        "name": "Bánh xèo tôm nhảy Lê Thánh Tôn",
+        "area": "Đường Lê Thánh Tôn",
+        "note": "Cuốn bánh nhỏ với rau, chấm vừa đủ nước mắm."
+      },
+      {
+        "name": "Chợ Tuy Hòa",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Để bụng thử bánh địa phương ở khu ăn uống."
+      },
+      {
+        "name": "Hải sản đầm Ô Loan",
+        "area": "Khu cầu An Hải",
+        "note": "Hỏi rõ giá sò huyết và cách tính trước khi gọi."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cà phê Huy Tùng",
+        "area": "Đường Nguyễn Thị Minh Khai",
+        "note": "Ngồi sân vườn buổi sáng, thử cà phê đậm kiểu địa phương."
+      },
+      {
+        "name": "PHD Photo & Coffee",
+        "area": "Khu Tuy Hòa",
+        "note": "Chọn lúc ít khách để chụp ảnh rồi ngồi nghỉ."
+      },
+      {
+        "name": "No Name Coffee",
+        "area": "Khu Tuy Hòa",
+        "note": "Dành một khoảng yên tĩnh sau buổi đi biển nhiều gió."
+      },
+      {
+        "name": "Koi Cafe Tuy Hòa",
+        "area": "Khu Tuy Hòa",
+        "note": "Ngồi ngắm cá từ bàn, tránh chạm tay xuống hồ."
+      },
+      {
+        "name": "Cà phê Tùng",
+        "area": "Đường Tản Đà",
+        "note": "Thử ly phin chậm rãi trước khi dạo phố Tuy Hòa."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Gành Đá Đĩa",
+        "area": "An Ninh Đông",
+        "note": "Bước trên đá khô, tránh mép có sóng đánh mạnh."
+      },
+      {
+        "name": "Bãi Xép",
+        "area": "An Chấn",
+        "note": "Lên gành lúc trời mát để nhìn bãi biển rõ hơn."
+      },
+      {
+        "name": "Mũi Điện",
+        "area": "Hòa Tâm",
+        "note": "Khởi hành sớm, mang nước cho đoạn đi bộ lên hải đăng."
+      },
+      {
+        "name": "Tháp Nhạn",
+        "area": "Núi Nhạn",
+        "note": "Ghé chiều muộn ngắm thành phố, giữ yên tĩnh quanh tháp."
+      },
+      {
+        "name": "Nhà thờ Mằng Lăng",
+        "area": "An Thạch",
+        "note": "Kiểm tra giờ lễ trước khi vào sân chụp kiến trúc."
+      },
+      {
+        "name": "Đầm Ô Loan",
+        "area": "Tuy An",
+        "note": "Ngắm đầm khi trời dịu, tìm chỗ dừng an toàn."
+      },
+      {
+        "name": "Cầu gỗ Ông Cọp",
+        "area": "Khu Bình Thạnh",
+        "note": "Quan sát tình trạng cầu và tuân theo hướng dẫn tại chỗ."
+      }
+    ]
+  },
+  "con-dao": {
+    "food": [
+      {
+        "name": "Bún riêu Bà Hai Khiêm",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Ghé buổi sáng sớm, thêm mắm và ớt theo từng chút."
+      },
+      {
+        "name": "Quán Tri Kỷ",
+        "area": "Đường Nguyễn Đức Thuận",
+        "note": "Chọn hải sản theo nhóm để dễ chia phần ăn."
+      },
+      {
+        "name": "Quán Thu Ba",
+        "area": "Đường Võ Thị Sáu",
+        "note": "Hỏi món nào đang có trước khi chốt thực đơn."
+      },
+      {
+        "name": "Ốc đêm Bình Nguyên",
+        "area": "Đường Phạm Văn Đồng",
+        "note": "Nếm ốc hấp trước rồi mới gọi thêm món xào."
+      },
+      {
+        "name": "Chợ Côn Đảo",
+        "area": "Đường Phạm Văn Đồng",
+        "note": "Ăn sáng trong chợ rồi mua chút trái cây mang theo."
+      },
+      {
+        "name": "Bánh mì heo quay tại chợ Côn Đảo",
+        "area": "Khu trung tâm Côn Sơn",
+        "note": "Nhờ để riêng nước sốt nếu chưa ăn ngay."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "An Ơi Cafe & Restaurant",
+        "area": "Đường Lê Văn Lương",
+        "note": "Tìm bàn râm mát, gọi ly nước cho buổi dừng chân."
+      },
+      {
+        "name": "Infiniti Cafe & Restaurant",
+        "area": "Đường Trần Phú",
+        "note": "Chọn bánh nhỏ dùng kèm cà phê sau giờ đi bộ."
+      },
+      {
+        "name": "Cafe Ba Lê",
+        "area": "Đường Trần Phú",
+        "note": "Ngồi xem đồ cũ, nhấp cà phê chậm giữa trưa yên."
+      },
+      {
+        "name": "Cafe & Milk Tea Dugong",
+        "area": "Khu 9",
+        "note": "Giảm đường khi gọi trà sữa nếu vừa ăn đồ ngọt."
+      },
+      {
+        "name": "Tiệm cà phê Tháng Năm",
+        "area": "Đường Lê Hồng Phong",
+        "note": "Ghé chiều dịu để nghỉ trước buổi dạo trung tâm."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Nhà tù Côn Đảo",
+        "area": "Trung tâm Côn Sơn",
+        "note": "Nghe thuyết minh đầy đủ, giữ thái độ tôn trọng lịch sử."
+      },
+      {
+        "name": "Nghĩa trang Hàng Dương",
+        "area": "Đường Nguyễn An Ninh",
+        "note": "Đi nhẹ nói khẽ, tuân theo hướng dẫn khi dâng hương."
+      },
+      {
+        "name": "Bãi Đầm Trầu",
+        "area": "Gần sân bay Cỏ Ống",
+        "note": "Theo dõi sóng biển và tránh ngồi sát vách đá."
+      },
+      {
+        "name": "Mũi Cá Mập",
+        "area": "Đường Bến Đầm",
+        "note": "Ngắm bình minh từ điểm rộng, không dừng ở khúc cua."
+      },
+      {
+        "name": "Bãi Nhát",
+        "area": "Đường Bến Đầm",
+        "note": "Xem thủy triều trước vì bãi cát có lúc bị ngập."
+      },
+      {
+        "name": "Vườn quốc gia Côn Đảo",
+        "area": "Khu rừng Côn Sơn",
+        "note": "Đăng ký tuyến phù hợp, mang nước và chống côn trùng."
+      },
+      {
+        "name": "Miếu Bà Phi Yến",
+        "area": "Khu An Sơn",
+        "note": "Ăn mặc kín đáo, dành ít phút tìm hiểu tích miếu."
+      }
+    ]
+  },
+  "can-tho": {
+    "food": [
+      {
+        "name": "Bánh cống Cô Út",
+        "area": "Đường Lý Tự Trọng",
+        "note": "Bẻ bánh lúc còn nóng rồi cuốn nhiều rau xanh."
+      },
+      {
+        "name": "Bánh xèo Bảy Tới",
+        "area": "Đường Hoàng Quốc Việt",
+        "note": "Chia bánh ngay khi ra chảo để vỏ giữ giòn."
+      },
+      {
+        "name": "Nem nướng Thanh Vân",
+        "area": "Đường Nguyễn An Ninh",
+        "note": "Cuốn nem cùng chuối chát, chấm sốt theo khẩu vị."
+      },
+      {
+        "name": "Hủ tiếu Sáu Hoài",
+        "area": "Khu Cái Răng",
+        "note": "Thử pizza hủ tiếu sau khi xem cách làm sợi."
+      },
+      {
+        "name": "Chợ đêm Ninh Kiều",
+        "area": "Đường Hai Bà Trưng",
+        "note": "Mua từng phần nhỏ để đi dạo và thử thêm."
+      },
+      {
+        "name": "Lẩu mắm Dạ Lý",
+        "area": "Đường Ba Tháng Hai",
+        "note": "Nhúng rau từng ít một để nồi không nguội nhanh."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Quán cà phê Hồi Đó",
+        "area": "Đường Trần Bình Trọng",
+        "note": "Ngắm vật dụng xưa, gọi cà phê cho buổi nghỉ trưa."
+      },
+      {
+        "name": "Tiệm trà Cỏ Ngọt",
+        "area": "Khu Ninh Kiều",
+        "note": "Nhâm nhi trà cùng bạn, chọn vị ít ngọt cho dễ uống."
+      },
+      {
+        "name": "Highlands Coffee Bến Ninh Kiều",
+        "area": "Đường Hai Bà Trưng",
+        "note": "Ngồi nhìn bến sông, cất gọn đồ khi đông khách."
+      },
+      {
+        "name": "Cộng Cà Phê Cần Thơ",
+        "area": "Đường Nguyễn Khuyến",
+        "note": "Thử cà phê dừa rồi thong thả xem nhịp phố."
+      },
+      {
+        "name": "The Coffee House Cần Thơ",
+        "area": "Đường Ba Tháng Hai",
+        "note": "Dừng nạp nước giữa hành trình, chọn ghế tựa cho đỡ mỏi."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Chợ nổi Cái Răng",
+        "area": "Sông Cần Thơ",
+        "note": "Đi sớm để thấy buôn bán, mặc áo phao trên ghe."
+      },
+      {
+        "name": "Bến Ninh Kiều",
+        "area": "Ven sông Hậu",
+        "note": "Dạo chiều tối mát mẻ, giữ túi sát người khi đông."
+      },
+      {
+        "name": "Nhà cổ Bình Thủy",
+        "area": "Đường Bùi Hữu Nghĩa",
+        "note": "Xin hướng dẫn chỗ được chụp trước khi vào nhà."
+      },
+      {
+        "name": "Thiền viện Trúc Lâm Phương Nam",
+        "area": "Mỹ Khánh",
+        "note": "Che vai kín đáo, đi chậm quanh hành lang gỗ."
+      },
+      {
+        "name": "Làng du lịch Mỹ Khánh",
+        "area": "Đường Lộ Vòng Cung",
+        "note": "Chọn vài trải nghiệm phù hợp, dành thời gian nghỉ giữa buổi."
+      },
+      {
+        "name": "Cồn Sơn",
+        "area": "Khu Bình Thủy",
+        "note": "Hẹn nhà vườn trước để biết hoạt động hôm đó."
+      },
+      {
+        "name": "Chùa Ông Cần Thơ",
+        "area": "Đường Hai Bà Trưng",
+        "note": "Đứng gọn khi chụp hương vòng, tránh cản người hành lễ."
+      }
+    ]
+  },
+  "tam-dao": {
+    "food": [
+      {
+        "name": "Chợ Tam Đảo",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Thử su su xào nóng sau buổi đi bộ mệt."
+      },
+      {
+        "name": "Nhà hàng Phố Núi",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Gọi cá suối chiên giòn, ăn ngay khi vừa dọn."
+      },
+      {
+        "name": "Nhà hàng Hải Đăng",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Hỏi khẩu phần gà đồi để gọi vừa số người."
+      },
+      {
+        "name": "Nhà hàng Tuấn Hương",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Chọn món rau trước rồi cân đối thêm phần thịt."
+      },
+      {
+        "name": "Nhà hàng Xuân Dương",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Nếm lẩu từng chút vì nước dùng giữ nóng lâu."
+      },
+      {
+        "name": "Chợ đêm Tam Đảo",
+        "area": "Khu quảng trường",
+        "note": "Nướng trứng và ngô vừa tới, nhờ chủ quán canh giúp."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Quán Gió Tam Đảo",
+        "area": "Thôn 1",
+        "note": "Mang áo ấm, ngồi ngoài trời gió lên khá nhanh."
+      },
+      {
+        "name": "Rock Cafe Tam Đảo",
+        "area": "Đối diện nhà thờ đá",
+        "note": "Tìm bàn nhìn quảng trường, nghỉ sau chặng leo dốc."
+      },
+      {
+        "name": "Tiệm cà phê Nhiệt Đới",
+        "area": "Đường Lang Thị Liêu",
+        "note": "Chọn ngày trời trong để chụp các góc cây xanh."
+      },
+      {
+        "name": "Tam Đảo 1904 Coffee",
+        "area": "Đường Trần Quốc Tuấn",
+        "note": "Gọi trà nóng khi sương xuống, ngồi thong thả ngắm phố."
+      },
+      {
+        "name": "Hillside Coffee Tam Đảo",
+        "area": "Đường Trần Quốc Tuấn",
+        "note": "Đến trước hoàng hôn để tìm góc nhìn thoáng núi."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Nhà thờ đá Tam Đảo",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Đợi vắng người rồi chụp vòm đá từ khoảng sân."
+      },
+      {
+        "name": "Thác Bạc Tam Đảo",
+        "area": "Khu Thác Bạc",
+        "note": "Giữ tay vịn khi xuống bậc, đường về khá tốn sức."
+      },
+      {
+        "name": "Đền Bà Chúa Thượng Ngàn",
+        "area": "Sườn núi Thiên Nhị",
+        "note": "Mang giày nhẹ, nghỉ vài lần trên đoạn nhiều bậc."
+      },
+      {
+        "name": "Quảng trường Tam Đảo",
+        "area": "Trung tâm Tam Đảo",
+        "note": "Dạo khi phố lên đèn, chuẩn bị áo khoác chống lạnh."
+      },
+      {
+        "name": "Cổng trời Tam Đảo",
+        "area": "Khu nhà thờ đá",
+        "note": "Chọn hôm ít sương để nhìn rõ các dãy núi."
+      },
+      {
+        "name": "Vườn quốc gia Tam Đảo",
+        "area": "Khu Tam Đảo",
+        "note": "Liên hệ tuyến được phép, đi rừng cùng người hướng dẫn."
+      },
+      {
+        "name": "Tháp truyền hình Tam Đảo",
+        "area": "Đỉnh Thiên Nhị",
+        "note": "Hỏi lối đi hiện mở trước khi lên kế hoạch leo."
+      }
+    ]
+  },
+  "mu-cang-chai": {
+    "food": [
+      {
+        "name": "Chợ Mù Cang Chải",
+        "area": "Trung tâm Mù Cang Chải",
+        "note": "Chọn xôi nếp nóng cho bữa sáng trước hành trình."
+      },
+      {
+        "name": "Chợ Ngã Ba Kim",
+        "area": "Púng Luông",
+        "note": "Ghé hàng đông khách, thử thịt nướng với cơm lam."
+      },
+      {
+        "name": "Chợ Nậm Khắt",
+        "area": "Nậm Khắt",
+        "note": "Hỏi ngày họp chợ để có thêm món địa phương."
+      },
+      {
+        "name": "Chợ Khao Mang",
+        "area": "Khao Mang",
+        "note": "Ăn bát mì nóng rồi mua ít đồ nhẹ đi đường."
+      },
+      {
+        "name": "Chợ Lao Chải",
+        "area": "Lao Chải",
+        "note": "Thử bánh làm từ ngô, hỏi nguyên liệu nếu chưa quen."
+      },
+      {
+        "name": "Chợ phiên Dế Xu Phình",
+        "area": "Dế Xu Phình",
+        "note": "Nếm món vừa chín, để bụng cho bữa trưa trong bản."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Vua Xứ Mù Cafe",
+        "area": "Tổ 2, Mù Cang Chải",
+        "note": "Uống ly nóng trước chặng đèo, kiểm tra lại áo mưa."
+      },
+      {
+        "name": "Quán nước ven đèo Khau Phạ",
+        "area": "Đèo Khau Phạ",
+        "note": "Ngồi nghỉ sau đường dài, hỏi đường bản trước khi đi."
+      },
+      {
+        "name": "Quán cà phê nhìn đồi Mâm Xôi",
+        "area": "La Pán Tẩn",
+        "note": "Chọn chỗ nhìn ruộng, đợi ánh sáng mềm rồi chụp."
+      },
+      {
+        "name": "Nhà Mị Tea & Coffee",
+        "area": "Tổ 2, Mù Cang Chải",
+        "note": "Nhâm nhi trà ấm để nghỉ chân giữa lịch săn ảnh."
+      },
+      {
+        "name": "Mây Mù Cang Chải Café",
+        "area": "Tổ 2, Mù Cang Chải",
+        "note": "Để sẵn áo khoác vì chiều vùng cao lạnh nhanh."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Đồi Mâm Xôi La Pán Tẩn",
+        "area": "La Pán Tẩn",
+        "note": "Hỏi tình hình đường ruộng trước khi chọn phương tiện lên."
+      },
+      {
+        "name": "Đồi Móng Ngựa",
+        "area": "Sáng Nhù",
+        "note": "Canh nắng chiều nhưng chừa thời gian xuống trước khi tối."
+      },
+      {
+        "name": "Đèo Khau Phạ",
+        "area": "Cung Tú Lệ đến Mù Cang Chải",
+        "note": "Tránh dừng sát cua, chọn điểm ngắm có chỗ đỗ."
+      },
+      {
+        "name": "Ruộng bậc thang Chế Cu Nha",
+        "area": "Chế Cu Nha",
+        "note": "Đi theo bờ rộng, đừng bước vào ruộng đang canh tác."
+      },
+      {
+        "name": "Ruộng bậc thang Dế Xu Phình",
+        "area": "Dế Xu Phình",
+        "note": "Hỏi người dân mùa lúa trước khi chọn ngày chụp."
+      },
+      {
+        "name": "Rừng trúc Púng Luông",
+        "area": "Púng Luông",
+        "note": "Mang giày có độ bám vì đường rừng thường ẩm."
+      },
+      {
+        "name": "Thác Pú Nhu",
+        "area": "La Pán Tẩn",
+        "note": "Giữ khoảng cách với dòng xiết, đá gần nước khá trơn."
+      }
+    ]
+  },
+  "ly-son": {
+    "food": [
+      {
+        "name": "Chợ đêm Lý Sơn",
+        "area": "Khu cầu cảng Lý Sơn",
+        "note": "Thử ốc cừ xào, hỏi giá theo đĩa trước đã."
+      },
+      {
+        "name": "Chợ An Vĩnh",
+        "area": "Khu An Vĩnh",
+        "note": "Tìm bún chả cá nóng cho bữa sáng trên đảo."
+      },
+      {
+        "name": "Chợ An Hải",
+        "area": "Khu An Hải",
+        "note": "Mua bánh ít lá gai, ăn thử trước khi chọn nhiều."
+      },
+      {
+        "name": "Hải sản Đại Hằng",
+        "area": "Khu An Vĩnh",
+        "note": "Hỏi mẻ hải sản mới về rồi chọn món hấp."
+      },
+      {
+        "name": "Quán Xuân Truyền",
+        "area": "Thôn Tây, An Hải",
+        "note": "Gọi gỏi tỏi trước, thêm bánh tráng để ăn kèm."
+      },
+      {
+        "name": "Chợ Đảo Bé",
+        "area": "An Bình",
+        "note": "Tìm hàng ăn gần bến, hỏi món sẵn trước khi ngồi."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cafe Cóc Pro",
+        "area": "Thôn Tây, An Vĩnh",
+        "note": "Gọi ly mát rồi nghỉ trước buổi chạy xe quanh đảo."
+      },
+      {
+        "name": "Blue Islands Coffee",
+        "area": "Thôn Tây, An Vĩnh",
+        "note": "Ngồi tránh gió mạnh, kiểm tra đồ trước khi rời bàn."
+      },
+      {
+        "name": "Napoli Coffee Lý Sơn",
+        "area": "Thôn Tây",
+        "note": "Chọn cà phê sữa cho bữa xế sau chuyến ra biển."
+      },
+      {
+        "name": "HighLight Coffee",
+        "area": "Thôn Đông",
+        "note": "Hẹn bạn nghỉ chiều, nhờ giảm đá nếu muốn uống chậm."
+      },
+      {
+        "name": "Cafe Vườn Dừa",
+        "area": "Thôn Đông",
+        "note": "Tìm bóng râm dưới cây để ngồi giữa trưa nắng."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Cổng Tò Vò",
+        "area": "Khu An Vĩnh",
+        "note": "Chọn lúc ít người, bước nhẹ trên những mảng đá."
+      },
+      {
+        "name": "Chùa Hang",
+        "area": "Khu An Hải",
+        "note": "Mặc đồ kín đáo, đi chậm đoạn bậc xuống chùa."
+      },
+      {
+        "name": "Núi Thới Lới",
+        "area": "Phía đông đảo Lớn",
+        "note": "Lên khi trời quang, kiểm tra phanh trước đoạn xuống dốc."
+      },
+      {
+        "name": "Hang Câu",
+        "area": "Chân núi Thới Lới",
+        "note": "Tránh đứng sát vách đá khi sóng lên hoặc gió lớn."
+      },
+      {
+        "name": "Đảo Bé",
+        "area": "An Bình",
+        "note": "Xem lịch tàu và thời tiết trước khi sang đảo."
+      },
+      {
+        "name": "Chùa Đục",
+        "area": "Khu An Vĩnh",
+        "note": "Chuẩn bị nước uống cho đoạn leo lên tượng Quan Âm."
+      },
+      {
+        "name": "Âm Linh Tự",
+        "area": "Khu An Vĩnh",
+        "note": "Tìm hiểu lễ khao lề, giữ thái độ trang nghiêm."
+      }
+    ]
+  },
+  "vung-tau": {
+    "food": [
+      {
+        "name": "Bánh khọt Gốc Vú Sữa",
+        "area": "Đường Nguyễn Trường Tộ",
+        "note": "Ăn bánh ngay khi ra đĩa, cuốn kèm rau mát."
+      },
+      {
+        "name": "Lẩu cá đuối Hoàng Minh",
+        "area": "Đường Trương Công Định",
+        "note": "Gắp cá vừa chín để thịt không bị bở quá."
+      },
+      {
+        "name": "Bánh bông lan trứng muối Gốc Cột Điện",
+        "area": "Đường Nguyễn Trường Tộ",
+        "note": "Mua hộp nhỏ ăn thử trước khi lấy thêm làm quà."
+      },
+      {
+        "name": "Bánh mì chảo Hàng Quyên",
+        "area": "Đường Tú Xương",
+        "note": "Chấm bánh mì vào sốt khi chảo vừa bớt nóng."
+      },
+      {
+        "name": "Ốc Tự Nhiên",
+        "area": "Đường Trần Phú",
+        "note": "Chọn món theo số người, đừng gọi nhiều đĩa cùng vị."
+      },
+      {
+        "name": "Chợ Xóm Lưới",
+        "area": "Đường Nguyễn Công Trứ",
+        "note": "Hỏi giá cân và phí chế biến thành hai phần."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "SOHO Coffee",
+        "area": "Đường Hạ Long",
+        "note": "Ghé sáng nhẹ nắng để ngồi nhìn biển qua cửa kính."
+      },
+      {
+        "name": "Lightroom Coffee",
+        "area": "Hẻm Hải Đăng",
+        "note": "Đi xe chậm trong hẻm, chọn chỗ có bóng mát."
+      },
+      {
+        "name": "Ngọc Tước Book Cafe",
+        "area": "Đường Bùi Công Minh",
+        "note": "Lấy một cuốn sách rồi gọi nước ngồi đọc yên."
+      },
+      {
+        "name": "Bohemiens Cafe",
+        "area": "Đường Ba Cu",
+        "note": "Ngắm đồ trang trí nhỏ, giữ âm lượng vừa khi trò chuyện."
+      },
+      {
+        "name": "Gazebo Beach Front Lounge & Cafe",
+        "area": "Đường Hạ Long",
+        "note": "Ghé ban ngày uống cà phê, hỏi vị trí bàn thoáng."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Tượng Chúa Kitô Vua",
+        "area": "Núi Nhỏ",
+        "note": "Mặc trang phục phù hợp, chuẩn bị sức cho nhiều bậc."
+      },
+      {
+        "name": "Hải đăng Vũng Tàu",
+        "area": "Núi Nhỏ",
+        "note": "Đi đường dốc chậm, chụp cảnh thành phố từ sân."
+      },
+      {
+        "name": "Bãi Sau",
+        "area": "Đường Thùy Vân",
+        "note": "Quan sát cờ tắm biển, tránh vùng nước có dòng xoáy."
+      },
+      {
+        "name": "Bãi Trước",
+        "area": "Đường Quang Trung",
+        "note": "Dạo công viên chiều mát, ngồi ngắm thuyền ngoài xa."
+      },
+      {
+        "name": "Bạch Dinh",
+        "area": "Đường Trần Phú",
+        "note": "Dành thời gian xem hiện vật rồi dạo quanh hàng sứ."
+      },
+      {
+        "name": "Mũi Nghinh Phong",
+        "area": "Đường Hạ Long",
+        "note": "Giữ mũ và kính chắc vì gió ở mũi khá mạnh."
+      },
+      {
+        "name": "Niết Bàn Tịnh Xá",
+        "area": "Đường Hạ Long",
+        "note": "Vào chùa nhẹ nhàng, xin phép nếu muốn chụp bên trong."
+      }
+    ]
+  },
+  "cat-ba": {
+    "food": [
+      {
+        "name": "Chợ Cát Bà",
+        "area": "Trung tâm Cát Bà",
+        "note": "Ăn bún hải sản nóng rồi xem thêm các hàng cá."
+      },
+      {
+        "name": "Bún tôm tại chợ Cát Bà",
+        "area": "Chợ Cát Bà",
+        "note": "Hỏi phần topping trước khi gọi tô cho bữa sáng."
+      },
+      {
+        "name": "Nhà hàng Yummy Cát Bà",
+        "area": "Đường Núi Ngọc",
+        "note": "Gọi món vừa đủ rồi bổ sung nếu còn đói."
+      },
+      {
+        "name": "Nhà hàng Viễn Dương",
+        "area": "Đường Núi Ngọc",
+        "note": "Thống nhất giá hải sản theo cân trước khi chế biến."
+      },
+      {
+        "name": "Nhà hàng Quân Cát Bà",
+        "area": "Đường Một Tháng Tư",
+        "note": "Chọn món hấp để thử vị hải sản tự nhiên."
+      },
+      {
+        "name": "Chợ đêm Cát Bà",
+        "area": "Khu trung tâm Cát Bà",
+        "note": "Dạo hàng quán trước, chỉ gọi đồ nướng khi còn nóng."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "The Little Leaf Restaurant & Coffee",
+        "area": "Đường Một Tháng Tư",
+        "note": "Chọn ly trái cây mát sau buổi đi bộ ngoài biển."
+      },
+      {
+        "name": "LIKE COFFEE – Vegetarian Food CatBa",
+        "area": "Trung tâm Cát Bà",
+        "note": "Thử đồ uống cùng món chay nhẹ cho buổi nghỉ trưa."
+      },
+      {
+        "name": "NamPhuong Coffee",
+        "area": "Trung tâm Cát Bà",
+        "note": "Nhâm nhi cà phê buổi sớm trước lúc ra bến tàu."
+      },
+      {
+        "name": "TIT Coffee",
+        "area": "Trung tâm Cát Bà",
+        "note": "Ghé giữa buổi dạo phố, chọn chỗ ngồi tránh gió."
+      },
+      {
+        "name": "CatBa Specialty Coffee",
+        "area": "Trung tâm Cát Bà",
+        "note": "Hỏi hạt rang đang dùng để chọn cách pha hợp gu."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Vịnh Lan Hạ",
+        "area": "Phía đông đảo Cát Bà",
+        "note": "Mặc áo phao khi chèo kayak, theo tuyến được hướng dẫn."
+      },
+      {
+        "name": "Vườn quốc gia Cát Bà",
+        "area": "Khu Trân Châu",
+        "note": "Mang nước và giày bám tốt cho đoạn đường rừng."
+      },
+      {
+        "name": "Hang Quân Y",
+        "area": "Khu Trân Châu",
+        "note": "Nghe chuyện bệnh viện trong núi trước khi xem các phòng."
+      },
+      {
+        "name": "Động Trung Trang",
+        "area": "Khu Trung Trang",
+        "note": "Hạ thấp đầu ở đoạn hẹp, không chạm vào thạch nhũ."
+      },
+      {
+        "name": "Bãi tắm Cát Cò 1",
+        "area": "Khu Cát Cò",
+        "note": "Xuống biển lúc còn sáng và trong vùng được phép tắm."
+      },
+      {
+        "name": "Làng Việt Hải",
+        "area": "Trong vườn quốc gia Cát Bà",
+        "note": "Đạp xe chậm qua làng, hỏi đường trước khi rẽ."
+      },
+      {
+        "name": "Làng chài Cái Bèo",
+        "area": "Khu bến Bèo",
+        "note": "Đi thuyền có áo phao, xin phép trước khi ghé bè."
+      }
+    ]
+  },
+  "buon-ma-thuot": {
+    "food": [
+      {
+        "name": "Bún đỏ tại chợ Tân An",
+        "area": "Khu Tân An",
+        "note": "Trộn rau cải với bún, nếm nước trước khi thêm ớt."
+      },
+      {
+        "name": "Bánh ướt thịt nướng 45",
+        "area": "Đường Trần Nhật Duật",
+        "note": "Cuốn từng miếng bánh ướt với thịt vừa nướng nóng."
+      },
+      {
+        "name": "Bún chìa Cô Chua",
+        "area": "Đường Nguyễn Tất Thành",
+        "note": "Gọi tô vừa sức vì phần chìa thường khá đầy."
+      },
+      {
+        "name": "Bún riêu Đoàn Kết",
+        "area": "Đường Đoàn Kết",
+        "note": "Thêm mắm tôm từng ít nếu chưa quen vị đậm."
+      },
+      {
+        "name": "Nem nướng Thanh Hùng",
+        "area": "Đường Hùng Vương",
+        "note": "Chia rau và bánh tráng trước để cuốn cho tiện."
+      },
+      {
+        "name": "Chợ Buôn Ma Thuột",
+        "area": "Đường Điện Biên Phủ",
+        "note": "Khám phá khu ăn sáng rồi chọn cà phê sau bữa."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Arul House",
+        "area": "Buôn Ako Dhông",
+        "note": "Ngắm nhà dài trước, gọi ly cà phê vị bản địa."
+      },
+      {
+        "name": "Soul Roastery",
+        "area": "Đường Nguyễn Khuyến",
+        "note": "Hỏi cách pha theo gu để chọn độ đậm vừa ý."
+      },
+      {
+        "name": "House of Lens Coffee",
+        "area": "Khu Tự An",
+        "note": "Ghé lúc có nắng để ngắm những góc trang trí cũ."
+      },
+      {
+        "name": "AZZAN Coffee & Chocolate",
+        "area": "Đường Trần Phú",
+        "note": "Thử ca cao nếu muốn đổi vị sau nhiều ly phin."
+      },
+      {
+        "name": "Cà phê Bâng Khuâng",
+        "area": "Đường Phan Bội Châu",
+        "note": "Ngồi nghe nhạc nhẹ, nhấp từng ngụm cà phê nóng."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Bảo tàng Thế giới Cà phê",
+        "area": "Đường Nguyễn Đình Chiểu",
+        "note": "Dành thời gian xem dụng cụ pha từ nhiều vùng."
+      },
+      {
+        "name": "Bảo tàng Đắk Lắk",
+        "area": "Đường Y Ngông",
+        "note": "Xem phần văn hóa bản địa trước khi dạo sân cây."
+      },
+      {
+        "name": "Buôn Ako Dhông",
+        "area": "Khu Tân Lợi",
+        "note": "Xin phép khi chụp nhà dài và sinh hoạt người dân."
+      },
+      {
+        "name": "Chùa Sắc tứ Khải Đoan",
+        "area": "Đường Phan Bội Châu",
+        "note": "Ghé lúc trời mát, giữ trật tự trong gian thờ."
+      },
+      {
+        "name": "Đường sách cà phê Buôn Ma Thuột",
+        "area": "Đường Nguyễn Tất Thành",
+        "note": "Dạo chậm xem sách, chọn một góc nghỉ dưới bóng cây."
+      },
+      {
+        "name": "Thác Dray Nur",
+        "area": "Khu Buôn Kuốp",
+        "note": "Kiểm tra đường đi trước, tránh bơi gần chân thác."
+      },
+      {
+        "name": "Hồ Ea Kao",
+        "area": "Khu Ea Kao",
+        "note": "Đến chiều ngắm mặt hồ, đứng xa mép đất trơn."
+      }
+    ]
+  },
+  "an-giang": {
+    "food": [
+      {
+        "name": "Bún cá Châu Đốc tại chợ Châu Đốc",
+        "area": "Trung tâm Châu Đốc",
+        "note": "Ăn cùng bông điên điển nếu đúng mùa nước nổi."
+      },
+      {
+        "name": "Bánh bò thốt nốt tại chợ Tịnh Biên",
+        "area": "Trung tâm Tịnh Biên",
+        "note": "Chọn bánh còn ấm để cảm nhận mùi đường thốt nốt."
+      },
+      {
+        "name": "Chợ Long Xuyên",
+        "area": "Đường Nguyễn Trãi",
+        "note": "Tìm cơm tấm cho bữa sáng trước chuyến đi xa."
+      },
+      {
+        "name": "Bánh xèo Núi Cấm",
+        "area": "Khu Núi Cấm",
+        "note": "Cuốn cùng rau núi, hỏi loại rau lạ trước khi ăn."
+      },
+      {
+        "name": "Lẩu mắm Bảy Bồng",
+        "area": "Đường Trưng Nữ Vương, Châu Đốc",
+        "note": "Nhúng rau lần lượt để nếm rõ từng vị khác nhau."
+      },
+      {
+        "name": "Chợ Châu Phú",
+        "area": "Khu Châu Đốc",
+        "note": "Thử bánh địa phương rồi mua chút đồ khô làm quà."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Lang Thang An Giang Cafe",
+        "area": "Khu Long Xuyên",
+        "note": "Ngồi chuyện trò về hành trình, chọn nước mát cho buổi trưa."
+      },
+      {
+        "name": "Thảo Mộc Modern",
+        "area": "Khu Long Xuyên",
+        "note": "Tìm bàn rộng nếu đi nhóm, gọi trà chia nhau."
+      },
+      {
+        "name": "Cồ-Lá Coffee",
+        "area": "Khu Long Xuyên",
+        "note": "Thưởng thức ly cà phê trong góc mang màu xưa."
+      },
+      {
+        "name": "Indochine Cafe",
+        "area": "Khu Long Xuyên",
+        "note": "Ghé lúc nắng nhẹ, chụp vài góc rồi ngồi nghỉ."
+      },
+      {
+        "name": "Art Coffee Shop",
+        "area": "Khu Long Xuyên",
+        "note": "Chọn ghế dưới bóng cây để tránh nắng miền Tây."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Rừng tràm Trà Sư",
+        "area": "Khu Văn Giáo, Tịnh Biên",
+        "note": "Giữ yên khi đi xuồng để nghe tiếng chim rõ."
+      },
+      {
+        "name": "Miếu Bà Chúa Xứ Núi Sam",
+        "area": "Khu Núi Sam, Châu Đốc",
+        "note": "Chuẩn bị lễ gọn, đi theo luồng hướng dẫn khi đông."
+      },
+      {
+        "name": "Núi Cấm",
+        "area": "Khu An Hảo, Tịnh Biên",
+        "note": "Mang áo khoác mỏng, chọn đường di chuyển hợp thể lực."
+      },
+      {
+        "name": "Làng Chăm Châu Giang",
+        "area": "Khu Châu Phong",
+        "note": "Tôn trọng sinh hoạt tôn giáo, xin phép trước khi chụp."
+      },
+      {
+        "name": "Chùa Tây An",
+        "area": "Chân núi Sam",
+        "note": "Ngắm kiến trúc từ sân, giữ tiếng nói nhỏ khi vào."
+      },
+      {
+        "name": "Lăng Thoại Ngọc Hầu",
+        "area": "Khu Núi Sam",
+        "note": "Đọc bia giới thiệu để hiểu công cuộc khai phá vùng đất."
+      },
+      {
+        "name": "Hồ Tà Pạ",
+        "area": "Khu Núi Tô, Tri Tôn",
+        "note": "Ngắm hồ từ bờ chắc, không xuống nước ở chỗ sâu."
+      }
+    ]
+  },
+  "phan-thiet": {
+    "food": [
+      {
+        "name": "Bánh căn Lân Nguyệt",
+        "area": "Đường Hải Thượng Lãn Ông",
+        "note": "Chấm bánh với xíu mại nóng, thêm xoài theo khẩu vị."
+      },
+      {
+        "name": "Bánh canh Bà Lý",
+        "area": "Đường Trần Hưng Đạo",
+        "note": "Thử nước dùng trước rồi thêm chanh và ớt ít thôi."
+      },
+      {
+        "name": "Mì Quảng Phan Thiết tại chợ Phan Thiết",
+        "area": "Khu Đức Nghĩa",
+        "note": "Hỏi mì vị ngọt ra sao trước khi gọi phần lớn."
+      },
+      {
+        "name": "Bánh tráng nướng mắm ruốc chợ Phú Thủy",
+        "area": "Khu Phú Thủy",
+        "note": "Ăn bánh vừa nướng để lớp tráng không bị dai."
+      },
+      {
+        "name": "Chợ Hàm Tiến",
+        "area": "Đường Nguyễn Đình Chiểu",
+        "note": "Ghé ăn sáng rồi mua trái cây cho buổi ra biển."
+      },
+      {
+        "name": "Làng chài Mũi Né",
+        "area": "Đường Huỳnh Thúc Kháng",
+        "note": "Chốt giá cân hải sản và tiền nấu trước khi mua."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Ông Bà Bích Cafe",
+        "area": "Đường Hải Thượng Lãn Ông",
+        "note": "Ngồi trong góc hoài cổ, thử cà phê trứng cho bữa xế."
+      },
+      {
+        "name": "A Little Thing Bistro",
+        "area": "Đường Hoàng Bích Sơn",
+        "note": "Chọn bàn nhận nắng sớm để thưởng thức ly cà phê."
+      },
+      {
+        "name": "Bus Cafe Phan Thiết",
+        "area": "Đường Võ Văn Kiệt",
+        "note": "Ghé sau buổi dạo phố, tìm chỗ ngồi thoải mái."
+      },
+      {
+        "name": "Bistro Mộc",
+        "area": "Đường Hoàng Bích Sơn",
+        "note": "Nhâm nhi đồ uống giữa trưa, tranh thủ nghỉ chân thật lâu."
+      },
+      {
+        "name": "Lochome Coffee Mũi Né",
+        "area": "Đường Nguyễn Đình Chiểu",
+        "note": "Đến khi nắng dịu để chụp góc tường sáng màu."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Đồi cát bay Mũi Né",
+        "area": "Khu Mũi Né",
+        "note": "Đi sớm để cát còn mát, cất máy tránh gió bụi."
+      },
+      {
+        "name": "Bàu Trắng",
+        "area": "Khu Hòa Thắng",
+        "note": "Mang kính và nước uống, nắng trên đồi lên rất nhanh."
+      },
+      {
+        "name": "Suối Tiên Mũi Né",
+        "area": "Khu Hàm Tiến",
+        "note": "Xắn quần gọn, quan sát nền cát trước khi bước."
+      },
+      {
+        "name": "Tháp Pô Sah Inư",
+        "area": "Đồi Bà Nài",
+        "note": "Ngắm gạch tháp từ ngoài, tránh chạm vào chi tiết cổ."
+      },
+      {
+        "name": "Trường Dục Thanh",
+        "area": "Đường Trưng Nhị",
+        "note": "Dành thời gian nghe giới thiệu về lớp học xưa."
+      },
+      {
+        "name": "Dinh Vạn Thủy Tú",
+        "area": "Đường Ngư Ông",
+        "note": "Tìm hiểu tục thờ cá Ông trước khi xem bộ xương."
+      },
+      {
+        "name": "Bãi đá Ông Địa",
+        "area": "Khu Hàm Tiến",
+        "note": "Chụp lúc sóng nhẹ, đừng bước lên đá phủ rêu."
+      }
+    ]
+  },
+  "ha-noi": {
+    "food": [
+      {
+        "name": "Phở Bát Đàn",
+        "area": "Đường Bát Đàn",
+        "note": "Chuẩn bị gọi món gọn, ăn phở khi nước còn nóng."
+      },
+      {
+        "name": "Bún chả Hương Liên",
+        "area": "Đường Lê Văn Hưu",
+        "note": "Thử nước chấm trước rồi thêm tỏi ớt theo ý."
+      },
+      {
+        "name": "Bún thang Bà Đức",
+        "area": "Đường Cầu Gỗ",
+        "note": "Húp nước dùng trước để cảm nhận vị thanh của thang."
+      },
+      {
+        "name": "Chả cá Thăng Long",
+        "area": "Đường Đường Thành",
+        "note": "Đảo cá với thì là, ăn kèm bún từng ít."
+      },
+      {
+        "name": "Bánh cuốn Bà Hoành",
+        "area": "Đường Tô Hiến Thành",
+        "note": "Gọi bánh mới tráng cùng chả để bữa sáng ấm bụng."
+      },
+      {
+        "name": "Chợ Đồng Xuân",
+        "area": "Phố cổ Hà Nội",
+        "note": "Vào ngõ ăn uống, chia món nhỏ để thử nhiều hàng."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cà phê Giảng",
+        "area": "Đường Nguyễn Hữu Huân",
+        "note": "Ăn lớp kem trứng cùng cà phê khi vẫn còn ấm."
+      },
+      {
+        "name": "Cà phê Đinh",
+        "area": "Đường Đinh Tiên Hoàng",
+        "note": "Leo cầu thang chậm, tìm góc nhìn hồ trước khi gọi."
+      },
+      {
+        "name": "Cà phê Lâm",
+        "area": "Đường Nguyễn Hữu Huân",
+        "note": "Nhìn tranh trên tường, nhấp phin đậm cho buổi sáng."
+      },
+      {
+        "name": "Tranquil Books & Coffee",
+        "area": "Đường Nguyễn Quang Bích",
+        "note": "Giữ giọng nhỏ, mang sách để đọc trong góc yên."
+      },
+      {
+        "name": "Maison de Tet Decor",
+        "area": "Khu Hồ Tây",
+        "note": "Ghé sáng muộn dùng bánh, hỏi bàn ngồi thoáng trước."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Hồ Hoàn Kiếm",
+        "area": "Khu Hoàn Kiếm",
+        "note": "Đi một vòng hồ sớm để cảm nhận nhịp phố tỉnh giấc."
+      },
+      {
+        "name": "Văn Miếu Quốc Tử Giám",
+        "area": "Đường Quốc Tử Giám",
+        "note": "Đọc bảng giới thiệu trước khi xem những hàng bia."
+      },
+      {
+        "name": "Hoàng thành Thăng Long",
+        "area": "Đường Hoàng Diệu",
+        "note": "Mang mũ vì nhiều khu tham quan nằm ngoài trời."
+      },
+      {
+        "name": "Chùa Trấn Quốc",
+        "area": "Đường Thanh Niên",
+        "note": "Mặc kín đáo, đi nhẹ quanh sân nhìn ra Hồ Tây."
+      },
+      {
+        "name": "Bảo tàng Dân tộc học Việt Nam",
+        "area": "Đường Nguyễn Văn Huyên",
+        "note": "Dành thêm thời gian cho khu nhà truyền thống ngoài trời."
+      },
+      {
+        "name": "Nhà tù Hỏa Lò",
+        "area": "Đường Hỏa Lò",
+        "note": "Theo thứ tự trưng bày để hiểu câu chuyện lịch sử."
+      },
+      {
+        "name": "Phố bích họa Phùng Hưng",
+        "area": "Đường Phùng Hưng",
+        "note": "Chụp khi ít xe, giữ lối vỉa hè cho người qua."
+      }
+    ]
+  },
+  "sai-gon": {
+    "food": [
+      {
+        "name": "Cơm tấm Ba Ghiền",
+        "area": "Đường Đặng Văn Ngữ",
+        "note": "Gọi cơm vừa phần vì miếng sườn thường khá lớn."
+      },
+      {
+        "name": "Bánh mì Huỳnh Hoa",
+        "area": "Đường Lê Thị Riêng",
+        "note": "Chia bánh cho hai người nếu chỉ muốn ăn lót dạ."
+      },
+      {
+        "name": "Phở Hòa Pasteur",
+        "area": "Đường Pasteur",
+        "note": "Nếm nước phở trước khi thêm tương và nhiều rau."
+      },
+      {
+        "name": "Hủ tiếu Nam Vang Nhân Quán",
+        "area": "Đường Nguyễn Thượng Hiền",
+        "note": "Thử tô khô nếu thích trộn sốt riêng với sợi."
+      },
+      {
+        "name": "Bánh xèo 46A",
+        "area": "Đường Đinh Công Tráng",
+        "note": "Ăn bánh cùng nhiều rau, chia phần trước khi nguội."
+      },
+      {
+        "name": "Chợ Hồ Thị Kỷ",
+        "area": "Khu Hồ Thị Kỷ",
+        "note": "Dạo từng đoạn rồi chọn món, giữ bụng cho chè."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Cà phê vợt Phan Đình Phùng",
+        "area": "Hẻm Phan Đình Phùng",
+        "note": "Uống ly nóng buổi sớm để cảm nhận vị cà phê vợt."
+      },
+      {
+        "name": "Cà phê Cheo Leo",
+        "area": "Hẻm Nguyễn Thiện Thuật",
+        "note": "Ngồi ghế nhỏ nghe chuyện phố, gọi cà phê ít đường."
+      },
+      {
+        "name": "The Workshop Coffee",
+        "area": "Đường Ngô Đức Kế",
+        "note": "Hỏi cách pha phù hợp trước khi thử hạt mới."
+      },
+      {
+        "name": "L'Usine",
+        "area": "Đường Đồng Khởi",
+        "note": "Chọn bánh nhẹ với cà phê để nghỉ giữa buổi dạo."
+      },
+      {
+        "name": "SHIN Coffee",
+        "area": "Đường Nguyễn Thiệp",
+        "note": "Thử phin từ hạt Việt, nhờ gợi ý mức đậm."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Dinh Độc Lập",
+        "area": "Đường Nam Kỳ Khởi Nghĩa",
+        "note": "Đi theo sơ đồ phòng để tránh bỏ sót tầng hầm."
+      },
+      {
+        "name": "Bảo tàng Chứng tích Chiến tranh",
+        "area": "Đường Võ Văn Tần",
+        "note": "Dành thời gian đọc chú thích, giữ yên trong phòng ảnh."
+      },
+      {
+        "name": "Bưu điện Trung tâm Sài Gòn",
+        "area": "Đường Công xã Paris",
+        "note": "Ngắm trần vòm từ sảnh, tránh chắn quầy đang phục vụ."
+      },
+      {
+        "name": "Chợ Bến Thành",
+        "area": "Đường Lê Lợi",
+        "note": "Dạo cửa chợ chụp ảnh, hỏi giá trước khi mua quà."
+      },
+      {
+        "name": "Phố đi bộ Nguyễn Huệ",
+        "area": "Đường Nguyễn Huệ",
+        "note": "Đi chiều muộn cho mát, để ý đồ khi đông người."
+      },
+      {
+        "name": "Chùa Bà Thiên Hậu",
+        "area": "Đường Nguyễn Trãi",
+        "note": "Xin phép trước khi chụp nghi lễ hoặc người dâng hương."
+      },
+      {
+        "name": "Đường sách Nguyễn Văn Bình",
+        "area": "Đường Nguyễn Văn Bình",
+        "note": "Lật sách nhẹ tay, tìm một tựa mang về làm kỷ niệm."
+      }
+    ]
+  },
+  "ca-mau": {
+    "food": [
+      {
+        "name": "Chợ Cà Mau",
+        "area": "Khu trung tâm Cà Mau",
+        "note": "Thử bánh tằm cay, nhờ giảm cay nếu mới ăn lần đầu."
+      },
+      {
+        "name": "Bánh tằm cay Chú Đạo",
+        "area": "Đường Bùi Thị Xuân",
+        "note": "Trộn sốt cà ri vừa đủ để sợi bánh không ngấy."
+      },
+      {
+        "name": "Bánh tằm cà ri cay Cô Lan",
+        "area": "Đường Lý Bôn",
+        "note": "Gọi phần nhỏ trước vì sốt cay khá đậm vị."
+      },
+      {
+        "name": "Chợ phường 7 Cà Mau",
+        "area": "Khu phường 7",
+        "note": "Tìm bún nước lèo nóng trước khi bắt đầu chuyến xa."
+      },
+      {
+        "name": "Chợ Năm Căn",
+        "area": "Khu Năm Căn",
+        "note": "Hỏi cua theo cân, kiểm tra độ chắc trước khi chọn."
+      },
+      {
+        "name": "Chợ Đất Mũi",
+        "area": "Khu Đất Mũi",
+        "note": "Dừng ăn hải sản buổi trưa, hỏi món sẵn trong ngày."
+      }
+    ],
+    "cafe": [
+      {
+        "name": "Anni Coffee",
+        "area": "Đường Nguyễn Thái Bình",
+        "note": "Ngồi nghỉ sáng chậm rãi, gọi ly vừa vị trước."
+      },
+      {
+        "name": "Coffee Huỳnh Hương",
+        "area": "Đường Bùi Thị Trường",
+        "note": "Tìm bàn có bóng cây để tránh nắng miền cực Nam."
+      },
+      {
+        "name": "Art Coffee Nhiệt Đới",
+        "area": "Đường Tô Hiến Thành",
+        "note": "Chọn góc nhiều cây, nhâm nhi nước mát sau buổi dạo."
+      },
+      {
+        "name": "Pallet Coffee",
+        "area": "Đường Hoa Lư",
+        "note": "Ghé cùng bạn buổi chiều, thử đồ uống ít ngọt."
+      },
+      {
+        "name": "Zero One Coffee & Bakery",
+        "area": "Đường Tôn Đức Thắng",
+        "note": "Chia một phần bánh rồi uống cà phê cho bữa xế."
+      }
+    ],
+    "fun": [
+      {
+        "name": "Công viên Văn hóa Du lịch Mũi Cà Mau",
+        "area": "Khu Đất Mũi",
+        "note": "Chừa thời gian đi bộ giữa các điểm chụp biểu tượng."
+      },
+      {
+        "name": "Mốc tọa độ quốc gia GPS 0001",
+        "area": "Khu Đất Mũi",
+        "note": "Xếp lượt chụp nhanh để mọi người đều có khoảng trống."
+      },
+      {
+        "name": "Cột cờ Hà Nội tại Mũi Cà Mau",
+        "area": "Khu Đất Mũi",
+        "note": "Lên tầng quan sát khi trời quang để ngắm rừng biển."
+      },
+      {
+        "name": "Vườn quốc gia U Minh Hạ",
+        "area": "Khu Trần Văn Thời",
+        "note": "Hỏi tuyến tham quan đang mở, mang thuốc chống muỗi."
+      },
+      {
+        "name": "Đầm Thị Tường",
+        "area": "Khu Phú Tân và Trần Văn Thời",
+        "note": "Ngắm đầm lúc chiều dịu, mặc áo phao nếu đi xuồng."
+      },
+      {
+        "name": "Hòn Đá Bạc",
+        "area": "Khu Khánh Bình Tây",
+        "note": "Đi giày bám chắc khi dạo qua các khối đá."
+      },
+      {
+        "name": "Sân chim Cà Mau",
+        "area": "Khu Lâm Viên Mười Chín Tháng Năm",
+        "note": "Giữ yên lặng để quan sát chim về trên ngọn cây."
+      }
+    ]
+  }
+}

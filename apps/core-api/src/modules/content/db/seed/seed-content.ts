@@ -13,7 +13,7 @@ import {
   type TripAttachmentData,
 } from '../schema/index.js';
 
-interface ContentSeed {
+export interface ContentSeed {
   mediaAssets: {
     id: string;
     ownerId: string;
@@ -38,7 +38,7 @@ interface ContentSeed {
     isVerified: boolean;
     mediaIds: string[];
     coverMediaId: string | null;
-    tripAttachment: TripAttachmentData;
+    tripAttachment: TripAttachmentData | null;
     reactionCounts: Record<string, number>;
     reactionTotal: number;
     commentCount: number;
@@ -82,8 +82,20 @@ export async function seedContent(
   reactions: number;
   bookmarks: number;
 }> {
-  const seed = JSON.parse(readFileSync(file, 'utf8')) as ContentSeed;
+  return seedContentData(db, JSON.parse(readFileSync(file, 'utf8')) as ContentSeed);
+}
 
+/** Nạp dữ liệu content đã có sẵn trong bộ nhớ (reel mẫu sinh tự động dùng lại hàm này). */
+export async function seedContentData(
+  db: Db,
+  seed: ContentSeed,
+): Promise<{
+  mediaAssets: number;
+  posts: number;
+  comments: number;
+  reactions: number;
+  bookmarks: number;
+}> {
   await db.transaction(async (tx) => {
     // 1. Seed Media Assets
     for (const media of seed.mediaAssets) {

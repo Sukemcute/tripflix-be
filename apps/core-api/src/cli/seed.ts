@@ -2,12 +2,15 @@ import '../platform/load-env.js';
 import { loadEnv } from '@tripflix/config';
 import type { Role } from '@tripflix/contracts';
 import { createDb, createPool } from '@tripflix/db';
+import { sql } from 'drizzle-orm';
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { Argon2PasswordHasher } from '../modules/access/auth/infra/argon2-password-hasher.js';
 import { DrizzleAccessStore } from '../modules/access/auth/infra/drizzle-access.store.js';
-import { seedCatalog } from '../modules/commerce/db/seed/seed-catalog.js';
+import { CATALOG_SEED_FILE, seedCatalog } from '../modules/commerce/db/seed/seed-catalog.js';
 import { CalendarUseCases } from '../modules/commerce/inventory/application/calendar.use-cases.js';
 import { DrizzleCommerceStore } from '../modules/commerce/inventory/infra/drizzle-commerce.store.js';
+import { buildReelSeed, seedReels } from '../modules/content/db/seed/reels/reel-seed.js';
 import { seedContent } from '../modules/content/db/seed/seed-content.js';
 import { coreEnvSchema } from '../platform/env.js';
 
@@ -27,6 +30,8 @@ const ACCOUNTS: { email: string; displayName: string; role: Role }[] = [
 ];
 
 const pool = createPool({ url: env.DATABASE_URL_ACCESS, max: 1, applicationName: 'seed:access' });
+// Người đăng 1000 reel mẫu: 200 tài khoản load test có sẵn (tools/loadtest/gen-users-sql.mjs). Không có thì bỏ qua reel mẫu.
+let reelAuthorIds: string[] = [];
 try {
   const db = createDb(pool);
   const store = new DrizzleAccessStore(() => db);
@@ -38,6 +43,10 @@ try {
     if (user && !user.emailVerifiedAt) await store.users.markEmailVerified(user.id, new Date());
     process.stdout.write(`${account.email} (${account.role}): ${created ? 'đã tạo' : 'đã có, giữ nguyên'}\n`);
   }
+  const loadtestUsers = await db.execute<{ id: string }>(
+    sql`SELECT id FROM access.users WHERE email LIKE 'loadtest%@tripflix.local' ORDER BY email LIMIT 200`,
+  );
+  reelAuthorIds = loadtestUsers.rows.map((row) => row.id);
 } finally {
   await pool.end();
 }
@@ -67,6 +76,19 @@ try {
     `content: ${contentStats.posts} bài đăng, ${contentStats.comments} bình luận, ` +
       `${contentStats.reactions} cảm xúc, ${contentStats.bookmarks} bookmark, ${contentStats.mediaAssets} media assets\n`,
   );
+  if (reelAuthorIds.length >= 2) {
+    const catalogSeed = JSON.parse(readFileSync(CATALOG_SEED_FILE, 'utf8')) as Omit<Parameters<typeof buildReelSeed>[0], 'authorIds'>;
+    const reels = await seedReels(
+      contentDb,
+      buildReelSeed({ authorIds: reelAuthorIds, hotels: catalogSeed.hotels, flights: catalogSeed.flights }),
+    );
+    process.stdout.write(
+      `reel mẫu: ${reels.posts} bài của ${reelAuthorIds.length} tài khoản load test, ${reels.comments} bình luận, ` +
+        `${reels.reactions} cảm xúc, ${reels.bookmarks} bookmark\n`,
+    );
+  } else {
+    process.stdout.write('reel mẫu: bỏ qua, chưa có tài khoản loadtestNNNN@tripflix.local\n');
+  }
 } finally {
   await contentPool.end();
 }
