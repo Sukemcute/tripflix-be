@@ -68,6 +68,7 @@ export const PLACES: readonly PlaceSeed[] = [
   province('an-giang', 'An Giang'),
   destination('sai-gon', 'Sài Gòn', 'ho-chi-minh', ['sg', 'saigon']),
   destination('con-dao', 'Côn Đảo', 'ho-chi-minh'),
+  destination('vung-tau', 'Vũng Tàu', 'ho-chi-minh', ['vt', 'vungtau']),
   destination('hoi-an', 'Hội An', 'da-nang', ['hoian']),
   destination('da-lat', 'Đà Lạt', 'lam-dong', ['dl', 'dalat']),
   destination('nha-trang', 'Nha Trang', 'khanh-hoa', ['nt', 'nhatrang']),
