@@ -3,6 +3,7 @@ import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
 import { isDue, JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
 import { BuildFeaturesUseCases } from '../application/build-features.use-cases.js';
+import { BuildProductFeaturesUseCases } from '../application/build-product-features.use-cases.js';
 
 export const BUILD_FEATURES_EVERY_MS = 10 * 60 * 1000;
 
@@ -22,6 +23,7 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(BuildFeaturesUseCases) private readonly features: BuildFeaturesUseCases,
     @Inject(JobRuns) private readonly runs: JobRuns,
+    @Inject(BuildProductFeaturesUseCases) private readonly products: BuildProductFeaturesUseCases,
   ) {}
 
   onApplicationBootstrap() {
@@ -48,14 +50,25 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
     this.lastStartedAt = startedAt;
     try {
       await this.runs.track('recommend_build', trigger, async () => {
+        // Hồ sơ khách sạn, chuyến bay (TF39) không phụ thuộc bài: dựng trước, kể cả khi lượt bài bị bỏ.
+        const products = await this.products.runCycle();
         const result = await this.features.runCycle();
         if (result === null) {
           this.logger.log('Worker khác đang tính đặc trưng gợi ý (hoặc chưa có bài), bỏ lượt');
           return { outcome: 'skipped' };
         }
-        this.logger.log({ ...result, durationMs: Date.now() - startedAt }, `Đã tính đặc trưng gợi ý: ${result.posts} bài, ${result.users} người trong ${Date.now() - startedAt} ms`);
-        const failed = result.failedBuilders.length ? { error: `Builder lỗi: ${result.failedBuilders.join(', ')}` } : {};
-        return { outcome: 'succeeded', summary: result, ...failed };
+        const summary = {
+          ...result,
+          hotels: products?.hotels ?? 0,
+          flights: products?.flights ?? 0,
+          failedBuilders: [...result.failedBuilders, ...(products?.failedBuilders ?? [])],
+        };
+        this.logger.log(
+          { ...summary, durationMs: Date.now() - startedAt },
+          `Đã tính đặc trưng gợi ý: ${summary.posts} bài, ${summary.users} người, ${summary.hotels} khách sạn, ${summary.flights} chuyến bay trong ${Date.now() - startedAt} ms`,
+        );
+        const failed = summary.failedBuilders.length ? { error: `Builder lỗi: ${summary.failedBuilders.join(', ')}` } : {};
+        return { outcome: 'succeeded', summary, ...failed };
       });
     } catch (error) {
       // Không chặn: endpoint vẫn chạy trên đặc trưng cũ.

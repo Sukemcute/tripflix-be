@@ -1,4 +1,4 @@
-import type { Candidate, Kind, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
+import type { Candidate, Kind, ProductBuildOutput, ProductType, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 import type { AlgoRow } from '../domain/registry.js';
 
@@ -54,6 +54,51 @@ export interface RecommendCardPost {
   coverMediaId: string | null;
   authorId: string;
   reactionTotal: number;
+}
+
+export const PRODUCT_PROFILE_CATALOG = Symbol('PRODUCT_PROFILE_CATALOG');
+export const PRODUCT_FEATURE_STORE = Symbol('PRODUCT_FEATURE_STORE');
+
+/** Khách sạn cho hotel builder (TF39). Thật: CommerceFacade.listCatalog, days 30. */
+export interface HotelProfileSource {
+  id: string;
+  provinceSlug: string;
+  city: string | null;
+  stars: number | null;
+  priceFrom: number | null;
+  rating: { average: number; count: number } | null;
+  location: { lat: number; lng: number } | null;
+  /** Mã loại phòng của khách sạn: mục order_item ghi mã loại phòng, không ghi mã khách sạn. */
+  roomProductIds: string[];
+}
+
+/** Chuyến bay cho flight builder (TF39). Thật: CommerceFacade.listCatalog (type flight), days 30. */
+export interface FlightProfileSource {
+  flightKey: string;
+  fromAirport: string;
+  toAirport: string;
+  airline: string | null;
+  departTime: string | null;
+  arriveTime: string | null;
+  priceFrom: number | null;
+  hasRefundableFare: boolean;
+  /** Mã hạng ghế: mục order_item ghi mã hạng ghế, không ghi mã chuyến. */
+  cabinProductIds: string[];
+}
+
+export interface ProductProfileCatalog {
+  listHotelProfiles(cursor: string | null): Promise<Page<HotelProfileSource>>;
+  listFlightProfiles(cursor: string | null): Promise<Page<FlightProfileSource>>;
+}
+
+/** Hồ sơ sản phẩm trên Postgres (bảng recommend_product_features). Thật: DrizzleRecommendStore. */
+export interface ProductFeatureStore {
+  /** Số mục (phòng, vé) trong đơn đã trả 30 ngày tới now (bỏ đơn đã huỷ), theo mã loại phòng / mã hạng ghế. */
+  countProductBookings(now: Date): Promise<Map<string, number>>;
+  /** Thay toàn bộ hồ sơ của một builder trong một transaction. */
+  replaceProductFeatures(builderKey: string, productType: ProductType, rows: ProductBuildOutput[]): Promise<void>;
+  /** Hồ sơ của các sản phẩm; sản phẩm chưa dựng thì không có trong Map. */
+  findProductFeatures(builderKey: string, productIds: string[]): Promise<Map<string, { score: number; features: Record<string, unknown> }>>;
 }
 
 export const SERVED_STORE = Symbol('SERVED_STORE');

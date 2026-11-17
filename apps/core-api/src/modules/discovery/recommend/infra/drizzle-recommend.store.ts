@@ -3,14 +3,15 @@ import { and, desc, eq, gt, inArray, isNotNull, lte, notInArray, or, sql, type S
 import { alias } from 'drizzle-orm/pg-core';
 import {
   recommendAlgos,
+  recommendProductFeatures,
   recommendInteractions,
   recommendJobState,
   recommendPostScores,
   recommendPosts,
   recommendUserFeatures,
 } from '../../db/schema/index.js';
-import type { CandidateQuery, InteractionCounts, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
-import { splitKey, type Candidate, type CandidateSource, type Kind, type PostInteractionSample, type PostMeta, type RawRow } from '../domain/contracts.js';
+import type { CandidateQuery, InteractionCounts, ProductFeatureStore, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
+import { splitKey, type Candidate, type CandidateSource, type Kind, type ProductBuildOutput, type ProductType, type PostInteractionSample, type PostMeta, type RawRow } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 
 const CHUNK = 1000;
@@ -24,7 +25,7 @@ const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_se
 
 const excluded = (column: string) => sql.raw(`excluded."${column}"`);
 
-export class DrizzleRecommendStore implements RecommendStore {
+export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStore {
   constructor(private readonly db: Db) {}
 
   async upsertInteractions(rows: RawRow[], meta: { source: string; eventId: string }): Promise<void> {
@@ -230,6 +231,45 @@ export class DrizzleRecommendStore implements RecommendStore {
       detail: r.detail ?? null,
       occurredAt: r.occurredAt.toISOString(),
     }));
+  }
+
+  async countProductBookings(now: Date): Promise<Map<string, number>> {
+    const rows = await this.db
+      .select({ productId: recommendInteractions.targetId, n: sql<number>`count(*)::int` })
+      .from(recommendInteractions)
+      .where(
+        and(
+          eq(recommendInteractions.kind, 'order_item'),
+          inArray(recommendInteractions.targetType, ['room', 'flight']),
+          eq(recommendInteractions.isRemoved, false),
+          gt(recommendInteractions.occurredAt, daysBefore(now, 30)),
+          lte(recommendInteractions.occurredAt, now),
+        ),
+      )
+      .groupBy(recommendInteractions.targetId);
+    return new Map(rows.flatMap((r) => (r.productId ? [[r.productId, r.n] as const] : [])));
+  }
+
+  async replaceProductFeatures(builderKey: string, productType: ProductType, rows: ProductBuildOutput[]) {
+    const { builder, version } = splitKey(builderKey);
+    const t = recommendProductFeatures;
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t).where(and(eq(t.builder, builder), eq(t.version, version)));
+      for (const part of chunks(rows)) {
+        await tx.insert(t).values(part.map((r) => ({ builder, version, productType, ...r })));
+      }
+    });
+  }
+
+  async findProductFeatures(builderKey: string, productIds: string[]) {
+    if (!productIds.length) return new Map<string, { score: number; features: Record<string, unknown> }>();
+    const { builder, version } = splitKey(builderKey);
+    const t = recommendProductFeatures;
+    const rows = await this.db
+      .select({ productId: t.productId, score: t.score, features: t.features })
+      .from(t)
+      .where(and(eq(t.builder, builder), eq(t.version, version), inArray(t.productId, productIds)));
+    return new Map(rows.map((r) => [r.productId, { score: r.score, features: r.features }]));
   }
 
   async upsertUserFeatures(builderKey: string, features: Array<{ userId: string; features: Record<string, unknown> }>) {

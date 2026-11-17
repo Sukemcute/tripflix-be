@@ -4,16 +4,28 @@ import { RedisStreamsEventBus } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
-import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
+import { CommerceFacade, CommerceModule, type CatalogFlight, type CatalogHotel } from '../commerce/index.js';
 import { ContentFacade, ContentModule } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { PostRecommendationsController } from './recommend/api/post-recommendations.controller.js';
+import { TripAddonsController } from './recommend/api/trip-addons.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
-import { RECENT_POSTS_STORE, RECOMMEND_CATALOG, RECOMMEND_STORE, SERVED_STORE, type RecommendCatalog } from './recommend/application/ports.js';
+import { BuildProductFeaturesUseCases } from './recommend/application/build-product-features.use-cases.js';
+import {
+  PRODUCT_FEATURE_STORE,
+  PRODUCT_PROFILE_CATALOG,
+  RECENT_POSTS_STORE,
+  RECOMMEND_CATALOG,
+  RECOMMEND_STORE,
+  SERVED_STORE,
+  type ProductProfileCatalog,
+  type RecommendCatalog,
+} from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
+import { TripAddonUseCases } from './recommend/application/trip-addons.use-cases.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
@@ -82,6 +94,43 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
   getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
 });
 
+/** Khách sạn, chuyến bay cho hồ sơ gợi ý phần còn thiếu (TF39). days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
+const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog => ({
+  listHotelProfiles: async (cursor) => {
+    const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 30 });
+    const items = page.items
+      .filter((item): item is CatalogHotel => item.type === 'hotel')
+      .map((h) => ({
+        id: h.id,
+        provinceSlug: h.province.slug,
+        city: h.city,
+        stars: h.stars,
+        priceFrom: h.priceFrom,
+        rating: h.rating ?? null,
+        location: h.location,
+        roomProductIds: h.options.map((o) => o.productId),
+      }));
+    return { items, nextCursor: page.nextCursor };
+  },
+  listFlightProfiles: async (cursor) => {
+    const page = await commerce.listCatalog({ type: 'flight', cursor, limit: 200, days: 30 });
+    const items = page.items
+      .filter((item): item is CatalogFlight => item.type === 'flight')
+      .map((f) => ({
+        flightKey: f.id,
+        fromAirport: f.fromAirport,
+        toAirport: f.toAirport,
+        airline: f.airline,
+        departTime: f.departTime,
+        arriveTime: f.arriveTime,
+        priceFrom: f.priceFrom,
+        hasRefundableFare: f.options.some((o) => o.ratePlans.some((p) => p.isRefundable)),
+        cabinProductIds: f.options.map((o) => o.productId),
+      }));
+    return { items, nextCursor: page.nextCursor };
+  },
+});
+
 /**
  * Module discovery. Chủ: Duy (backup Dũng). Xem README.md cùng thư mục.
  * Module khác chỉ dùng những gì được export trong index.ts. Gọi commerce, content, access qua facade (một chiều, trong tiến trình).
@@ -95,6 +144,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     ExploreController,
     HomeRecommendationsController,
     PostRecommendationsController,
+    TripAddonsController,
     AdminIndexHealthController,
     AdminVocabGapsController,
     AdminDiscoveryJobsController,
@@ -123,7 +173,11 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
     { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
     BuildFeaturesUseCases,
+    { provide: PRODUCT_PROFILE_CATALOG, inject: [CommerceFacade], useFactory: productProfileCatalog },
+    { provide: PRODUCT_FEATURE_STORE, useExisting: RECOMMEND_STORE },
+    BuildProductFeaturesUseCases,
     PostRecommendationUseCases,
+    TripAddonUseCases,
     BuildFeaturesJob,
     PurgeInteractionsJob,
     DiscoveryEventsConsumer,

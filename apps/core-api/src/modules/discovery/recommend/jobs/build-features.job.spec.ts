@@ -1,6 +1,7 @@
 import type { CoreEnv } from '../../../../platform/env.js';
 import type { JobRuns } from '../../jobs/job-runs.js';
 import type { BuildFeaturesUseCases } from '../application/build-features.use-cases.js';
+import type { BuildProductFeaturesUseCases } from '../application/build-product-features.use-cases.js';
 import { BuildFeaturesJob } from './build-features.job.js';
 
 const minute = 60_000;
@@ -12,8 +13,14 @@ function setup() {
     track: (_job: string, _trigger: string, fn: () => Promise<unknown>) => fn(),
     getIntervalMs: vi.fn(async () => intervalMs),
   };
-  const job = new BuildFeaturesJob({ APP_ROLE: 'worker' } as CoreEnv, { runCycle } as unknown as BuildFeaturesUseCases, runs as unknown as JobRuns);
-  return { job, runCycle, runs, changeInterval: (ms: number) => (intervalMs = ms) };
+  const productCycle = vi.fn(async () => ({ hotels: 2, flights: 3, failedBuilders: [] }));
+  const job = new BuildFeaturesJob(
+    { APP_ROLE: 'worker' } as CoreEnv,
+    { runCycle } as unknown as BuildFeaturesUseCases,
+    runs as unknown as JobRuns,
+    { runCycle: productCycle } as unknown as BuildProductFeaturesUseCases,
+  );
+  return { job, runCycle, productCycle, runs, changeInterval: (ms: number) => (intervalMs = ms) };
 }
 
 describe('BuildFeaturesJob: chu kỳ admin đổi được (TF103)', () => {
@@ -38,6 +45,12 @@ describe('BuildFeaturesJob: chu kỳ admin đổi được (TF103)', () => {
     await vi.advanceTimersByTimeAsync(minute);
     expect(runCycle).toHaveBeenCalledTimes(3); // phút 40
     job.onApplicationShutdown();
+  });
+
+  it('TF39: mỗi lượt dựng cả hồ sơ khách sạn và chuyến bay', async () => {
+    const { job, productCycle } = setup();
+    await job.run('manual');
+    expect(productCycle).toHaveBeenCalledTimes(1);
   });
 
   it('chạy tay tính là một lượt: lượt tự động kế tiếp đếm từ đó', async () => {

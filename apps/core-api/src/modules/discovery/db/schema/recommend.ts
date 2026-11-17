@@ -1,4 +1,5 @@
-import { boolean, doublePrecision, index, jsonb, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, check, doublePrecision, index, jsonb, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { discoverySchema } from './discovery-schema.js';
 
 const at = (name: string) => timestamp(name, { withTimezone: true });
@@ -63,6 +64,28 @@ export const recommendPostScores = discoverySchema.table(
   (t) => [
     primaryKey({ name: 'recommend_post_scores_pkey', columns: [t.builder, t.version, t.postId] }),
     index('idx_recommend_post_scores_builder_version_post_type_score').on(t.builder, t.version, t.postType, t.score.desc()),
+  ],
+);
+
+/**
+ * Hồ sơ sản phẩm commerce cho gợi ý phần còn thiếu (TF39): khách sạn (product_id = mã khách sạn) và chuyến bay
+ * (product_id = mã chuyến). Mỗi builder (builder@version) một tập dòng. group_key: tỉnh của khách sạn, tuyến của chuyến ("SGN-CXR").
+ */
+export const recommendProductFeatures = discoverySchema.table(
+  'recommend_product_features',
+  {
+    builder: text('builder').notNull(),
+    version: text('version').notNull(),
+    productType: text('product_type').notNull(),
+    productId: text('product_id').notNull(),
+    groupKey: text('group_key').notNull(),
+    score: doublePrecision('score').notNull(),
+    features: jsonb('features').$type<Record<string, unknown>>().notNull(),
+    builtAt: at('built_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: 'recommend_product_features_pkey', columns: [t.builder, t.version, t.productId] }),
+    check('ck_recommend_product_features_product_type', sql`${t.productType} in ('hotel', 'flight')`),
   ],
 );
 

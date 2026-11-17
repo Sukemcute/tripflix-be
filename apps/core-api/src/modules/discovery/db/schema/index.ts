@@ -5,6 +5,7 @@ export { searchQueryGrams } from './search-query-grams.js';
 export { searchEntities, type SearchEntityRow } from './search-entities.js';
 export {
   recommendAlgos,
+  recommendProductFeatures,
   recommendInteractions,
   recommendJobState,
   recommendPostScores,
