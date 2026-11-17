@@ -14,6 +14,7 @@ import type { Server } from 'socket.io';
 import { createHandshakeAuth, type RealtimeSocket } from './handshake-auth.js';
 import {
   AUTH_EXPIRED_EVENT,
+  STAFF_ROOM,
   MAX_TIMER_MS,
   MAX_WATCHED_POSTS,
   postRoom,
@@ -59,6 +60,7 @@ export class RealtimeGateway
   async handleConnection(socket: RealtimeSocket): Promise<void> {
     const { user } = socket.data;
     await socket.join([userRoom(user.userId), sessionRoom(user.sid)]);
+    if (user.role === 'moderator' || user.role === 'superadmin') await socket.join(STAFF_ROOM);
     // Bắt tay chỉ kiểm token tại thời điểm đó: tới exp thì ngắt, client làm mới token rồi kết nối lại.
     const msLeft = user.exp * 1000 - Date.now();
     if (msLeft <= 0) {
@@ -66,6 +68,7 @@ export class RealtimeGateway
       return;
     }
     socket.data.expiryTimer = setTimeout(() => this.expire(socket), Math.min(msLeft, MAX_TIMER_MS));
+    if (user.role === 'moderator' || user.role === 'superadmin') socket.emit('moderation.ready', {});
     this.logger.debug({ userId: user.userId, socketId: socket.id }, 'Đã kết nối /ws');
   }
 

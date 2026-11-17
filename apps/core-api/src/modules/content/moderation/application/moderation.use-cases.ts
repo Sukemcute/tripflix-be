@@ -24,7 +24,7 @@ export interface ScreeningConfig extends SeverityConfig {
 }
 
 export class SubmitAppealUseCase {
-  constructor(private readonly repository: ModerationRepository) {}
+  constructor(private readonly repository: ModerationRepository, private readonly outbox: ContentOutbox) {}
 
   @Transactional('content')
   async execute(decisionId: string, authorId: string, reason: string) {
@@ -70,6 +70,7 @@ export class SubmitAppealUseCase {
       .onConflictDoNothing()
       .returning();
     if (!appeal) throw new ConflictException('Quyết định đã được khiếu nại');
+    await this.outbox.add({ type: 'content.moderation.changed', userId: authorId, payload: { scope: 'appeal', id: appeal.id } });
     return appeal;
   }
 }
@@ -167,6 +168,7 @@ export class RecordScreeningUseCase {
     private readonly repository: ModerationRepository,
     private readonly visibility: ChangeVisibilityUseCase,
     private readonly config: ScreeningConfig,
+    private readonly outbox: ContentOutbox,
   ) {}
 
   @Transactional('content')
@@ -222,6 +224,7 @@ export class RecordScreeningUseCase {
           updatedAt: new Date(),
         },
       });
+    await this.outbox.add({ type: 'content.moderation.changed', payload: { scope: 'scan', id: eventId } });
     const rules = evaluateRules(target.text, this.config.allowedDomains);
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
@@ -256,6 +259,7 @@ export class RecordScreeningUseCase {
         .set({ isAutoHidden: true })
         .where(eq(moderationCases.id, item.id));
     }
+    await this.outbox.add({ type: 'content.moderation.changed', payload: { scope: 'case', id: item.id } });
   }
 }
 export class ScreenContentUseCase {
