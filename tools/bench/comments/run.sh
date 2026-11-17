@@ -92,7 +92,7 @@ do_read() {
   [ "${SKIP_SEED:-}" = 1 ] || do_seed
   for i in $(seq 1 "$RUNS"); do
     echo "== R1: đọc ($read_mode), lần $i/$RUNS =="
-    run_k6 read.js "$name" "$name.run$i" "$seconds" -e READ_MODE="$read_mode"
+    run_k6 read.js "$name" "$name.run$i" "$seconds" -e READ_MODE="$read_mode" -e SUMMARY_NAME="$name"
   done
 }
 

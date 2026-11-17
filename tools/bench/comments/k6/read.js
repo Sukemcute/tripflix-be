@@ -71,5 +71,6 @@ export function readPage(data) {
 }
 
 export function handleSummary(data) {
-  return writeSummary(READ_MODE === 'sweep' ? 'r1-sweep' : 'r1-read', data);
+  // run.sh truyền SUMMARY_NAME: cùng chế độ sweep nhưng paging cần tên riêng (r1-paging).
+  return writeSummary(__ENV.SUMMARY_NAME || (READ_MODE === 'sweep' ? 'r1-sweep' : 'r1-read'), data);
 }
