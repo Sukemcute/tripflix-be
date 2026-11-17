@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
   AccessUserGuestMergedV1,
@@ -80,6 +80,13 @@ export interface RegisterInput {
   gender: Gender;
   nationality: string;
 }
+
+export const ADMIN_HANDOFF_TTL_SECONDS = 60;
+export const ADMIN_HANDOFF_FORBIDDEN_MESSAGE = 'Tài khoản không có quyền vào trang quản trị';
+const STAFF_ROLES: ReadonlySet<string> = new Set(['moderator', 'superadmin']);
+/** <userId>.<challengeId>.<secret 256 bit base64url> */
+const ADMIN_HANDOFF_CODE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/;
 
 export interface TokenPair {
   accessToken: string;
@@ -307,6 +314,48 @@ export class AuthUseCases {
     return this.issueTokenPair(user, session.id, refreshToken);
   }
 
+  /**
+   * Web tạo mã dùng một lần để mở trang quản trị bằng đúng tài khoản đang đăng nhập. Không dùng chung refresh token
+   * vì token web gắn với khoá trình duyệt của origin web; admin đổi mã lấy phiên mới gắn khoá của admin.
+   */
+  async createAdminHandoff(user: AuthUser): Promise<{ code: string; expiresIn: number }> {
+    const record = await this.store.users.findById(user.userId);
+    if (!record || record.status !== 'active' || !STAFF_ROLES.has(record.role)) {
+      throw new AccessError('forbidden', ADMIN_HANDOFF_FORBIDDEN_MESSAGE);
+    }
+    const id = randomUUID();
+    const secret = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(this.now().getTime() + ADMIN_HANDOFF_TTL_SECONDS * 1000);
+    // Mỗi người chỉ một mã chưa dùng: tạo mã mới thì mã cũ hết hiệu lực (khoá chính là email).
+    await this.store.registrationChallenges.save({ email: `admin-handoff:${record.id}`, id, codeHash: hashRefreshToken(secret), expiresAt });
+    return { code: `${record.id}.${id}.${secret}`, expiresIn: ADMIN_HANDOFF_TTL_SECONDS };
+  }
+
+  /** Admin đổi mã lấy phiên mới. Mã sai, hết hạn, đã dùng hoặc người không còn là nhân viên: 401. */
+  async exchangeAdminHandoff(code: string, meta: RequestMeta, browserProof: BrowserProof): Promise<TokenPair> {
+    const match = ADMIN_HANDOFF_CODE_PATTERN.exec(code);
+    if (!match) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    const [, userId, id, secret] = match as unknown as [string, string, string, string];
+    const key = `admin-handoff:${userId}`;
+    const challenge = await this.store.registrationChallenges.findUsable(key, id, this.now());
+    const expected = Buffer.from(challenge?.codeHash ?? '', 'hex');
+    const presented = Buffer.from(hashRefreshToken(secret), 'hex');
+    if (!challenge || expected.length !== presented.length || !timingSafeEqual(expected, presented)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const browserKey = await this.authenticateBrowser(browserProof, 'login');
+    if (!(await this.store.registrationChallenges.consume(key, id, this.now()))) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const user = await this.store.users.findById(userId);
+    if (!user || user.status !== 'active' || !STAFF_ROLES.has(user.role)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const refreshToken = createRefreshToken(browserKey);
+    const session = await this.openSession(user, hashRefreshToken(refreshToken), null, meta, 'admin_handoff');
+    return this.issueTokenPair(user, session.id, refreshToken);
+  }
+
   private async authenticateBrowser(proof: BrowserProof, purpose: BrowserProofPurpose, expectedKey?: string): Promise<string> {
     const verified = await verifyBrowserProof(proof, purpose, this.now());
     if (!verified || (expectedKey !== undefined && verified.thumbprint !== expectedKey)) {
@@ -472,7 +521,7 @@ export class AuthUseCases {
     refreshTokenHash: string,
     deviceName: string | null,
     meta: RequestMeta,
-    provider: 'password' | 'google' = 'password',
+    provider: 'password' | 'google' | 'admin_handoff' = 'password',
     loginChallengeId?: string,
   ): Promise<SessionRecord> {
     if (

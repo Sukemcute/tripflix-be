@@ -133,8 +133,28 @@ export const coreEnvSchema = baseEnvSchema
     S3_MEDIA_BUCKET: z.string().default('tripflix-media-dev'),
     S3_KEY_PREFIX: z.string().default('dev/unknown/'),
     MEDIA_CDN_URL: OptionalStringSchema,
+    // TF82: cookie ký để CloudFront chỉ trả video cho app, web của Tripflix. Trống cả hai: không ký (máy dev).
+    // Key Pair ID là ID public key trong key group gắn vào behavior video của distribution.
+    CLOUDFRONT_KEY_PAIR_ID: OptionalStringSchema,
+    // Khoá riêng RSA dạng PEM, mã hoá base64 thành một dòng: base64 < private_key.pem | tr -d '\n'.
+    CLOUDFRONT_PRIVATE_KEY: OptionalStringSchema,
+    // Domain cookie cho web, là tên miền cha của MEDIA_CDN_URL (ví dụ .tripflix.io.vn). Trống: chỉ trả cookie trong body.
+    MEDIA_COOKIE_DOMAIN: OptionalStringSchema,
+    // Số giây cookie xem video còn hiệu lực (5 phút đến 1 ngày). Trống: 6 giờ.
+    MEDIA_PLAYBACK_TTL_SEC: z.coerce.number().int().min(300).max(86_400).optional(),
   })
   .superRefine((env, ctx) => {
+    // Thiếu một trong hai thì không ký được: dừng ngay lúc khởi động thay vì âm thầm phát video không khoá.
+    if (Boolean(env.CLOUDFRONT_KEY_PAIR_ID) !== Boolean(env.CLOUDFRONT_PRIVATE_KEY)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [env.CLOUDFRONT_KEY_PAIR_ID ? 'CLOUDFRONT_PRIVATE_KEY' : 'CLOUDFRONT_KEY_PAIR_ID'],
+        message: 'CLOUDFRONT_KEY_PAIR_ID và CLOUDFRONT_PRIVATE_KEY phải đặt cùng nhau',
+      });
+    }
+    if (env.CLOUDFRONT_KEY_PAIR_ID && !env.MEDIA_CDN_URL) {
+      ctx.addIssue({ code: 'custom', path: ['MEDIA_CDN_URL'], message: 'bắt buộc khi bật ký cookie CloudFront' });
+    }
     if (env.NODE_ENV === 'production' && !env.AUTH_JWT_PRIVATE_KEY) {
       ctx.addIssue({ code: 'custom', path: ['AUTH_JWT_PRIVATE_KEY'], message: 'bắt buộc ở production' });
     }

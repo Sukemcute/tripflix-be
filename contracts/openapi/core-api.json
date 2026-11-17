@@ -306,6 +306,91 @@
         ]
       }
     },
+    "/api/auth/admin-handoff": {
+      "post": {
+        "operationId": "AuthController_createAdminHandoff",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminHandoffDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tài khoản không có quyền vào trang quản trị"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin-handoff/exchange": {
+      "post": {
+        "operationId": "AuthController_exchangeAdminHandoff",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt của trang quản trị",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminHandoffExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -2674,6 +2759,29 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/playback-session": {
+      "post": {
+        "description": "Web: gọi kèm credentials (có Origin), trình duyệt nhận Set-Cookie cho tên miền media. App: không nhận Set-Cookie, ghép `cookies` thành header Cookie khi phát video.",
+        "operationId": "MediaPlaybackController_createSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cấp cookie xem video trên CDN",
         "tags": [
           "media"
         ]
@@ -6384,6 +6492,36 @@
           }
         }
       },
+      "AdminHandoffDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã một lần để trang quản trị đổi lấy phiên"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây mã còn hiệu lực"
+          }
+        },
+        "required": [
+          "code",
+          "expiresIn"
+        ]
+      },
+      "AdminHandoffExchangeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã một lần từ POST /auth/admin-handoff, sống 60 giây"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
       "TravelPreferencesDto": {
         "type": "object",
         "properties": {
@@ -8721,6 +8859,33 @@
         "required": [
           "assetId",
           "status"
+        ]
+      },
+      "PlaybackSessionDto": {
+        "type": "object",
+        "properties": {
+          "cookies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "CloudFront-Policy": "…",
+              "CloudFront-Signature": "…",
+              "CloudFront-Key-Pair-Id": "K2…"
+            },
+            "description": "Cookie CloudFront để mở video. App ghép thành header Cookie khi phát; web đã nhận qua Set-Cookie nên bỏ qua. Rỗng khi server chưa bật ký cookie."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hết hạn lúc này; xin lại trước đó. Null khi không ký."
+          }
+        },
+        "required": [
+          "cookies",
+          "expiresAt"
         ]
       },
       "FeedAuthorDto": {

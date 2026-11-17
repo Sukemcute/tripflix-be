@@ -64,16 +64,16 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const visibility = new ChangeVisibilityUseCase(repository, posts, outbox, moderate);
     return {
       repository,
-      recovery: new ClaimDeferredScansUseCase(repository),
+      recovery: new ClaimDeferredScansUseCase(repository, outbox),
       comments,
       summaries,
       visibility,
       moderate,
       report: new SubmitReportUseCase(repository, visibility, outbox, CONFIG),
-      appeal: new SubmitAppealUseCase(repository),
+      appeal: new SubmitAppealUseCase(repository, outbox),
       decideAppeal: new DecideAppealUseCase(repository, visibility, outbox),
       decide: new DecideCaseUseCase(repository, visibility),
-      screen: new RecordScreeningUseCase(repository, visibility, CONFIG),
+      screen: new RecordScreeningUseCase(repository, visibility, CONFIG, outbox),
       add: new AddCommentUseCase(posts, comments, outbox),
       delete: new DeleteCommentUseCase(comments, posts, outbox),
       edit: new EditCommentUseCase(comments, outbox, posts),
@@ -139,6 +139,30 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     return (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
       .comment_count;
   }
+  it('scan ghi tín hiệu staff trong transaction và rollback khi outbox lỗi', async () => {
+    const eventId = randomUUID();
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    failOutbox = true;
+    await expect(cases.screen.execute(eventId, target, null)).rejects.toThrow('outbox unavailable');
+    expect(await cases.repository.scan(eventId)).toBeUndefined();
+    failOutbox = false;
+    await cases.screen.execute(eventId, target, null);
+    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
+    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'scan', id: eventId });
+  });
+
+  it('khiếu nại mới có tín hiệu staff và không lưu nếu outbox lỗi', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    failOutbox = true;
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow('outbox unavailable');
+    expect(await cases.repository.appealsByUser(AUTHOR, 20, 0)).toHaveLength(0);
+    failOutbox = false;
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
+    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'appeal', id: appeal.id });
+  });
+
   it('recovery có lease, giới hạn retry và staff có thể lên lịch lại', async () => {
     const eventId = randomUUID();
     const target = (await cases.repository.loadTarget('post', postId))!;

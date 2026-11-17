@@ -78,6 +78,29 @@ describe('WebSocket /ws (TF26A)', () => {
     await expect(waitConnected(s)).resolves.toBeUndefined();
   });
 
+  it('chỉ moderator và superadmin nhận được tín hiệu staff', async () => {
+    const member = await connectAs({ sub: 'member', role: 'member' });
+    const moderator = await connectAs({ sub: 'moderator', role: 'moderator' });
+    const admin = await connectAs({ sub: 'admin', role: 'superadmin' });
+    const noMemberEvent = expectNoEvent(member, 'moderation.changed');
+    const modEvent = waitEvent(moderator, 'moderation.changed');
+    const adminEvent = waitEvent(admin, 'moderation.changed');
+    expect(realtime.emitToStaff()).toBe(true);
+    await expect(modEvent).resolves.toEqual({});
+    await expect(adminEvent).resolves.toEqual({});
+    await noMemberEvent;
+  });
+
+  it('báo moderation.ready sau khi socket đã vào phòng staff', async () => {
+    const socket = open({ token: await signAccessToken(jwks.privateKey, { role: 'moderator' }) });
+    const ready = waitEvent(socket, 'moderation.ready');
+    await waitConnected(socket);
+    await expect(ready).resolves.toEqual({});
+    const changed = waitEvent(socket, 'moderation.changed');
+    realtime.emitToStaff();
+    await expect(changed).resolves.toEqual({});
+  });
+
   it('từ chối khi thiếu token', async () => {
     const err = await waitRejected(open());
     expect(err.data?.code).toBe(WS_ERROR.unauthorized);
