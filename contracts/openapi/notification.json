@@ -162,6 +162,88 @@
           }
         }
       }
+    },
+    "/notifications/posts/{postId}/watch": {
+      "get": {
+        "operationId": "getPostWatch",
+        "summary": "Xem có đang nhận thông báo bình luận mới của bài đã bình luận",
+        "description": "canChange=false khi người gọi chưa bình luận bài (lúc đó isWatching=false). Bình luận lần đầu được ghi qua sự kiện, trễ khoảng 0,5 giây.",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWatch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Mã bài viết không hợp lệ"
+          },
+          "401": {
+            "description": "Cần access token hợp lệ"
+          }
+        }
+      },
+      "put": {
+        "operationId": "setPostWatch",
+        "summary": "Bật/tắt nhận thông báo bình luận mới của bài đã bình luận",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWatchUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWatchUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số không hợp lệ"
+          },
+          "401": {
+            "description": "Cần access token hợp lệ"
+          },
+          "404": {
+            "description": "Người gọi chưa bình luận bài viết này"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -264,6 +346,34 @@
             "description": "ID thông báo mới nhất đã thấy. Bỏ trống để tương thích client cũ và đánh dấu toàn bộ."
           }
         }
+      },
+      "PostWatch": {
+        "type": "object",
+        "required": [
+          "isWatching",
+          "canChange"
+        ],
+        "properties": {
+          "isWatching": {
+            "type": "boolean"
+          },
+          "canChange": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PostWatchUpdate": {
+        "type": "object",
+        "required": [
+          "isWatching"
+        ],
+        "properties": {
+          "isWatching": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

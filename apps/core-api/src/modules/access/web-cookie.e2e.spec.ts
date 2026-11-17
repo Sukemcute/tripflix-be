@@ -270,4 +270,78 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
       .set({ Origin: 'https://evil.example', 'Access-Control-Request-Method': 'POST' });
     expect(evil.headers['access-control-allow-origin']).toBeUndefined();
   });
+  describe('mở trang quản trị bằng phiên web (mã chuyển phiên một lần)', () => {
+    const ADMIN = { ...WEB, Origin: ADMIN_ORIGIN };
+
+    async function staffWebLogin(email: string, role: 'member' | 'moderator' | 'superadmin') {
+      const reg = await register(email);
+      store.userRows.set(reg.body.id, { ...store.userRows.get(reg.body.id)!, role });
+      const { res } = await webLogin(email);
+      return { id: reg.body.id as string, accessToken: res.body.accessToken as string };
+    }
+    const createCode = (accessToken: string) =>
+      http().post('/api/auth/admin-handoff').set('Authorization', `Bearer ${accessToken}`);
+    async function exchange(code: string, status: number, origin = ADMIN_ORIGIN) {
+      const proof = await createTestBrowserProof();
+      return http().post('/api/auth/admin-handoff/exchange').set({ ...WEB, Origin: origin })
+        .set(await proof('login', origin)).send({ code }).expect(status);
+    }
+
+    it('nhân viên đổi mã lấy phiên admin riêng, cookie admin, vào được /admin/me', async () => {
+      const staff = await staffWebLogin('handoff-mod@example.com', 'moderator');
+      const created = await createCode(staff.accessToken).expect(200);
+      expect(created.headers['cache-control']).toBe('no-store');
+      expect(created.body).toEqual({ code: expect.any(String), expiresIn: 60 });
+
+      const proof = await createTestBrowserProof();
+      const res = await http().post('/api/auth/admin-handoff/exchange').set(ADMIN)
+        .set(await proof('login', ADMIN_ORIGIN)).send({ code: created.body.code }).expect(200);
+      expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+      const adminCookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      expect(adminCookie).toMatch(/^tripflix_refresh_[a-f0-9]+=w1\./);
+
+      const me = await http().get('/api/admin/me').set('Authorization', `Bearer ${res.body.accessToken}`).expect(200);
+      expect(me.body.id).toBe(staff.id);
+      // Phiên admin gắn khoá trình duyệt của admin: làm mới được bằng khoá đó.
+      await http().post('/api/auth/refresh').set({ ...ADMIN, Cookie: adminCookie })
+        .set(await proof('refresh', ADMIN_ORIGIN)).expect(200);
+    });
+
+    it('mã chỉ dùng một lần; tạo mã mới thì mã cũ hết hiệu lực', async () => {
+      const staff = await staffWebLogin('handoff-once@example.com', 'superadmin');
+      const first = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      const second = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      await exchange(first, 401);
+      await exchange(second, 200);
+      await exchange(second, 401);
+    });
+
+    it('thành viên thường không tạo được mã: 403; chưa đăng nhập: 401', async () => {
+      const member = await staffWebLogin('handoff-member@example.com', 'member');
+      await createCode(member.accessToken).expect(403);
+      await http().post('/api/auth/admin-handoff').expect(401);
+    });
+
+    it('bị hạ quyền sau khi tạo mã thì không đổi được', async () => {
+      const staff = await staffWebLogin('handoff-demoted@example.com', 'moderator');
+      const code = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      store.userRows.set(staff.id, { ...store.userRows.get(staff.id)!, role: 'member' });
+      await exchange(code, 401);
+    });
+
+    it('đổi mã cần Origin tin cậy, chế độ web và chữ ký khoá trình duyệt; mã sai dạng: 401', async () => {
+      const staff = await staffWebLogin('handoff-origin@example.com', 'moderator');
+      const code = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      const before = store.sessionRows.size;
+      await exchange(code, 403, 'https://evil.example');
+      await http().post('/api/auth/admin-handoff/exchange').set(ADMIN).send({ code }).expect(401);
+      const proof = await createTestBrowserProof();
+      await http().post('/api/auth/admin-handoff/exchange').set({ Origin: ADMIN_ORIGIN })
+        .set(await proof('login', ADMIN_ORIGIN)).send({ code }).expect(401);
+      await exchange('khong-phai-ma', 401);
+      expect(store.sessionRows.size).toBe(before);
+      // Các lần trên không tiêu mã: lần đúng vẫn đổi được.
+      await exchange(code, 200);
+    });
+  });
 });

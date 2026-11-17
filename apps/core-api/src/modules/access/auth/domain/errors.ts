@@ -8,6 +8,7 @@ export class AccessError extends Error {
       | 'invalid_refresh'
       | 'session_revoked'
       | 'not_found'
+      | 'forbidden'
       | 'staff_rule'
       | 'wrong_password'
       | 'invalid_reset_token'

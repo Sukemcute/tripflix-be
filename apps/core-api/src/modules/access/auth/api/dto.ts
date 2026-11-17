@@ -69,6 +69,19 @@ export const RefreshRequestSchema = z.preprocess(
   }),
 );
 
+export const AdminHandoffExchangeRequestSchema = z.object({
+  code: z.string().min(1, 'Thiếu mã chuyển phiên').max(200, 'Mã chuyển phiên không hợp lệ'),
+});
+
+export class AdminHandoffExchangeDto {
+  @ApiProperty({ description: 'Mã một lần từ POST /auth/admin-handoff, sống 60 giây' }) code!: string;
+}
+
+export class AdminHandoffDto {
+  @ApiProperty({ description: 'Mã một lần để trang quản trị đổi lấy phiên' }) code!: string;
+  @ApiProperty({ example: 60, description: 'Số giây mã còn hiệu lực' }) expiresIn!: number;
+}
+
 export const GoogleLoginRequestSchema = z.object({
   idToken: z.string().min(1, 'Thiếu ID token của Google').max(4096, 'ID token của Google không hợp lệ'),
   deviceName: deviceNameField(),
