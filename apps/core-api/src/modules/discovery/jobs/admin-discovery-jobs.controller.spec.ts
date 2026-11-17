@@ -13,7 +13,11 @@ function setup() {
   const suggest = job();
   const build = job();
   const purge = job();
-  const runs = { list: vi.fn(async (name: string) => [{ runId: `r-${name}`, outcome: 'succeeded' }]) };
+  const runs = {
+    list: vi.fn(async (name: string) => [{ runId: `r-${name}`, outcome: 'succeeded' }]),
+    getIntervalMs: vi.fn(async (_job: string, fallback: number) => fallback),
+    setIntervalMs: vi.fn(async () => undefined),
+  };
   const store = {
     getAdminStats: vi.fn(async () => ({
       interactionsLast10m: 1,
@@ -32,7 +36,7 @@ function setup() {
     build as unknown as BuildFeaturesJob,
     purge as unknown as PurgeInteractionsJob,
   );
-  return { controller, explore, build, store };
+  return { controller, explore, build, store, runs };
 }
 
 describe('AdminDiscoveryJobsController', () => {
@@ -59,10 +63,11 @@ describe('AdminDiscoveryJobsController', () => {
     await expect(setup().controller.list('ai')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('quyền: xem cho moderator và superadmin, chạy ngay chỉ superadmin', () => {
-    const roles = (method: 'list' | 'run') => Reflect.getMetadata('tripflix:roles', AdminDiscoveryJobsController.prototype[method]) as string[];
+  it('quyền: xem cho moderator và superadmin, chạy ngay và đổi chu kỳ chỉ superadmin', () => {
+    const roles = (method: 'list' | 'run' | 'setInterval') => Reflect.getMetadata('tripflix:roles', AdminDiscoveryJobsController.prototype[method]) as string[];
     expect(roles('list')).toEqual(['moderator', 'superadmin']);
     expect(roles('run')).toEqual(['superadmin']);
+    expect(roles('setInterval')).toEqual(['superadmin']);
   });
 
   it('chạy ngay: gọi run("manual") không chờ; đang chạy thì từ chối; job lạ → 404', () => {
@@ -73,5 +78,47 @@ describe('AdminDiscoveryJobsController', () => {
     expect(controller.run('recommend_build')).toEqual({ accepted: false, reason: 'running' });
     expect(build.run).toHaveBeenCalledTimes(1);
     expect(() => controller.run('drop_db')).toThrow(NotFoundException);
+  });
+
+  describe('TF103: chu kỳ job', () => {
+    it('GET trả chu kỳ đang dùng (Redis), mặc định và job nào đổi được', async () => {
+      const { controller, runs } = setup();
+      runs.getIntervalMs.mockResolvedValueOnce(1_800_000);
+      const [explore, suggest] = (await controller.list('search')).jobs;
+      expect(explore).toMatchObject({ intervalMs: 1_800_000, defaultIntervalMs: 600_000, canChangeInterval: true });
+      expect(suggest).toMatchObject({ intervalMs: null, defaultIntervalMs: null, canChangeInterval: false });
+      expect(runs.getIntervalMs).toHaveBeenCalledTimes(1);
+    });
+
+    it('PUT đổi chu kỳ recommend_build; GET nhóm recommend hiện chu kỳ đang dùng', async () => {
+      const { controller, runs } = setup();
+      expect(await controller.setInterval('recommend_build', { intervalMs: 3_600_000 })).toEqual({ job: 'recommend_build', intervalMs: 3_600_000, defaultIntervalMs: 600_000 });
+      expect(runs.setIntervalMs).toHaveBeenLastCalledWith('recommend_build', 3_600_000);
+      runs.getIntervalMs.mockResolvedValueOnce(3_600_000);
+      const [build, purge] = (await controller.list('recommend')).jobs;
+      expect(build).toMatchObject({ intervalMs: 3_600_000, defaultIntervalMs: 600_000, canChangeInterval: true });
+      expect(purge).toMatchObject({ intervalMs: 86_400_000, canChangeInterval: false });
+    });
+
+    it('PUT đổi chu kỳ explore; null về mặc định', async () => {
+      const { controller, runs } = setup();
+      expect(await controller.setInterval('explore', { intervalMs: 1_800_000 })).toEqual({ job: 'explore', intervalMs: 1_800_000, defaultIntervalMs: 600_000 });
+      expect(runs.setIntervalMs).toHaveBeenLastCalledWith('explore', 1_800_000);
+      expect(await controller.setInterval('explore', { intervalMs: null })).toMatchObject({ intervalMs: 600_000 });
+      expect(runs.setIntervalMs).toHaveBeenLastCalledWith('explore', null);
+    });
+
+    it.each([{ intervalMs: 59_999 }, { intervalMs: 86_400_001 }, { intervalMs: 1.5 }, { intervalMs: '600000' }, {}])('PUT body sai %o -> 400', async (body) => {
+      const { controller, runs } = setup();
+      await expect(controller.setInterval('explore', body)).rejects.toBeInstanceOf(BadRequestException);
+      expect(runs.setIntervalMs).not.toHaveBeenCalled();
+    });
+
+    it('PUT job không đổi được chu kỳ -> 400, job lạ -> 404', async () => {
+      const { controller } = setup();
+      await expect(controller.setInterval('suggest', { intervalMs: 600_000 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(controller.setInterval('recommend_purge', { intervalMs: 600_000 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(controller.setInterval('drop_db', { intervalMs: 600_000 })).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });

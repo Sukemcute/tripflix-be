@@ -1,12 +1,16 @@
 import type { Redis } from 'ioredis';
-import { JobRuns } from './job-runs.js';
+import { isDue, JobRuns } from './job-runs.js';
 
 /** Redis giả: đủ hset/hvals/hdel/expire và multi().hset().expire().exec(). */
 function fakeRedis(opts: { isBroken?: boolean } = {}) {
   const hashes = new Map<string, Map<string, string>>();
+  const strings = new Map<string, string>();
   const hash = (k: string) => hashes.get(k) ?? hashes.set(k, new Map()).get(k)!;
   const fail = () => Promise.reject(new Error('redis down'));
   const redis = {
+    get: (k: string) => (opts.isBroken ? fail() : Promise.resolve(strings.get(k) ?? null)),
+    set: (k: string, v: string) => (strings.set(k, v), Promise.resolve('OK')),
+    del: (k: string) => Promise.resolve(Number(strings.delete(k))),
     hvals: (k: string) => (opts.isBroken ? fail() : Promise.resolve([...hash(k).values()])),
     hdel: (k: string, ...fields: string[]) => Promise.resolve(fields.filter((f) => hash(k).delete(f)).length),
     multi: () => {
@@ -19,7 +23,7 @@ function fakeRedis(opts: { isBroken?: boolean } = {}) {
       return tx;
     },
   };
-  return { redis: redis as unknown as Redis, hashes };
+  return { redis: redis as unknown as Redis, hashes, strings };
 }
 
 describe('JobRuns', () => {
@@ -63,5 +67,30 @@ describe('JobRuns', () => {
   it('Redis lỗi: job vẫn chạy và trả kết quả', async () => {
     const runs = new JobRuns(fakeRedis({ isBroken: true }).redis);
     await expect(runs.track('recommend_purge', 'manual', () => Promise.resolve({ outcome: 'succeeded', summary: { deleted: 0 } }))).resolves.toMatchObject({ outcome: 'succeeded' });
+  });
+
+  it('chu kỳ: đặt, đọc, về mặc định; giá trị hỏng hay Redis lỗi thì dùng mặc định', async () => {
+    const { redis, strings } = fakeRedis();
+    const runs = new JobRuns(redis);
+    expect(await runs.getIntervalMs('explore', 600_000)).toBe(600_000);
+    await runs.setIntervalMs('explore', 1_800_000);
+    expect(await runs.getIntervalMs('explore', 600_000)).toBe(1_800_000);
+    strings.set('discovery:job-interval:explore', 'abc');
+    expect(await runs.getIntervalMs('explore', 600_000)).toBe(600_000);
+    await runs.setIntervalMs('explore', null);
+    expect(strings.has('discovery:job-interval:explore')).toBe(false);
+    expect(await new JobRuns(fakeRedis({ isBroken: true }).redis).getIntervalMs('explore', 600_000)).toBe(600_000);
+  });
+});
+
+describe('isDue (TF103)', () => {
+  const minute = 60_000;
+  it('lượt trước ghi giờ trễ vài ms sau nhịp: nhịp đủ chu kỳ vẫn chạy, không trượt thêm một nhịp', () => {
+    expect(isDue(5, 2 * minute, 2 * minute)).toBe(true);
+    expect(isDue(5, 10 * minute, 10 * minute)).toBe(true);
+  });
+  it('chưa tới chu kỳ (nhịp trước đó) thì chưa chạy', () => {
+    expect(isDue(5, 2 * minute, minute)).toBe(false);
+    expect(isDue(5, 10 * minute, 9 * minute)).toBe(false);
   });
 });

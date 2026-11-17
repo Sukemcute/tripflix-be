@@ -101,6 +101,16 @@ export class PostRepository {
       .where(eq(posts.id, id));
   }
 
+  /** Tổng cảm xúc trên các bài công khai của tác giả (cùng điều kiện với GET /v1/posts?author_id=). */
+  async sumPublicReactions(authorId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ total: sql<string | null>`sum(${posts.reactionTotal})` })
+      .from(posts)
+      .where(and(eq(posts.authorId, authorId), eq(posts.status, 'published'), eq(posts.visibility, 'public'),
+        sql`${posts.deletedAt} IS NULL`));
+    return Number(row?.total ?? 0);
+  }
+
   /**
    * Truy vấn bảng tin công khai với Keyset Cursor Pagination (created_at DESC, id DESC).
    */

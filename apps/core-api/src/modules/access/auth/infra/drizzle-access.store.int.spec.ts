@@ -106,6 +106,22 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(percent.items.map((u) => u.email)).toEqual(['search-b@example.com']);
   });
 
+  it('TF99: findDisplayNamesByIds chỉ trả id và tên hiển thị, không có hash mật khẩu, email, SĐT; bỏ id không tồn tại', async () => {
+    const user = await store.users.insert({
+      email: 'names-a@example.com',
+      passwordHash: 'secret-hash',
+      displayName: 'Tên A',
+      role: 'member',
+    });
+    await store.users.updateProfile(user!.id, { phone: '+84912345678' });
+    const rows = await store.users.findDisplayNamesByIds([user!.id, '00000000-0000-4000-8000-000000000000']);
+    expect(rows).toEqual([{ id: user!.id, displayName: 'Tên A' }]);
+    expect(rows[0]).not.toHaveProperty('passwordHash');
+    expect(rows[0]).not.toHaveProperty('email');
+    expect(rows[0]).not.toHaveProperty('personal');
+    expect(await store.users.findDisplayNamesByIds([])).toEqual([]);
+  });
+
   it('searchPublic khớp tên không dấu, bỏ email và tài khoản khoá', async () => {
     const active = await store.users.insert({ email: 'pub-bao@example.com', passwordHash: 'x', displayName: 'Lê ĐỨC Bảo', role: 'member' });
     const locked = await store.users.insert({ email: 'pub-locked@example.com', passwordHash: 'x', displayName: 'Bảo Khoá', role: 'member' });

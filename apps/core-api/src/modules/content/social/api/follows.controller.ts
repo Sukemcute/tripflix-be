@@ -15,6 +15,14 @@ class FollowStatusDto {
   @ApiProperty() isFollowing!: boolean;
 }
 
+class PublicProfileDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ example: 'Bảo Lê' }) displayName!: string;
+  @ApiProperty() followerCount!: number;
+  @ApiProperty() followingCount!: number;
+  @ApiProperty({ description: 'Tổng cảm xúc trên các bài công khai của người này' }) likeCount!: number;
+}
+
 class PostFollowerPageDto {
   @ApiProperty() isEligible!: boolean;
   @ApiProperty({ required: false, format: 'date-time' }) sharedPublishedAt?: string;
@@ -32,6 +40,20 @@ export class FollowsController {
     private readonly posts: PostRepository,
     @Inject(CONTENT_OUTBOX) private readonly outbox: ContentOutbox,
   ) {}
+
+  /** Hồ sơ công khai cho trang cá nhân: không cần đăng nhập, không trả email hay dữ liệu riêng. */
+  @Get('users/:userId/profile')
+  @ApiResponse({ status: 200, type: PublicProfileDto })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy người dùng' })
+  async getProfile(@Param('userId', ParseUUIDPipe) rawUserId: string): Promise<PublicProfileDto> {
+    const userId = rawUserId.toLowerCase();
+    const displayName = (await this.access.getDisplayNames([userId])).get(userId);
+    if (!displayName) throw new NotFoundException('Không tìm thấy người dùng.');
+    const [counts, likeCount] = await Promise.all([
+      this.follows.countFor(userId), this.posts.sumPublicReactions(userId),
+    ]);
+    return { id: userId, displayName, ...counts, likeCount };
+  }
 
   @Get('users/:authorId/follow')
   @Authenticated()

@@ -37,6 +37,8 @@ describe('FollowRepository trên PostgreSQL', () => {
     expect(await repository.isFollowing(late, authorId)).toBe(true);
     expect(await repository.reachesThreshold(authorId, 202)).toBe(true);
     expect(await repository.reachesThreshold(authorId, 203)).toBe(false);
+    expect(await repository.countFor(authorId)).toEqual({ followerCount: 202, followingCount: 0 });
+    expect(await repository.countFor(late)).toEqual({ followerCount: 0, followingCount: 1 });
     const first = await repository.listEligible(authorId, publishedAt);
     expect(first).toEqual({ recipients: eligible.slice(0, 200), nextCursor: eligible[199] });
     await repository.unfollow(eligible[200]!, authorId);

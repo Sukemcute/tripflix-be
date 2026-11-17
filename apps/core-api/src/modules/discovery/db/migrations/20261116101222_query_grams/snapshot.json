@@ -1,0 +1,119 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a3478c3e-f05a-446f-a8e0-7d96f42ae98c",
+  "prevIds": [
+    "43863a00-db88-4aab-b225-76817468b16b"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "search_query_grams"
+      ],
+      "writes": [
+        "s|tbl|discovery.search_query_grams",
+        "n|tbl|discovery.search_query_grams",
+        "e|tbl|discovery.search_query_grams",
+        "n|rel|discovery.search_query_grams",
+        "n|type|discovery.search_query_grams",
+        "n|rel|discovery.search_query_grams_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "search_query_grams",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_query_grams",
+        "name": "day",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_query_grams",
+        "name": "gram",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_query_grams",
+        "name": "hits",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_query_grams",
+        "name": "samples",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_query_grams",
+        "name": "search_query_grams_pkey",
+        "columns": [
+          "day",
+          "gram"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    }
+  ]
+}
