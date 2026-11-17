@@ -15,6 +15,9 @@ export interface StayResult {
   totalPrice: number;
   /** Điểm đánh giá của khách (trung bình 1–5, số đánh giá); null khi chưa có. */
   rating: { average: number; count: number } | null;
+  /** Loại phòng và gói giá rẻ nhất còn bán (để đặt ngay, TF105 tự lên lộ trình); thiếu khi nguồn không có. */
+  roomProductId?: string | null;
+  ratePlanCode?: string | null;
 }
 
 export type StaySort = 'price' | 'price_desc' | 'stars';
