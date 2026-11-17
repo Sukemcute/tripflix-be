@@ -2,12 +2,26 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type pg from 'pg';
-import { posts } from '../../db/schema/index.js';
+import { comments, posts } from '../../db/schema/index.js';
 import { decodeCursor, decodeSyncCursor, encodeCursor, encodeSyncCursor } from '../application/common/cursor.js';
 import { BookmarkRepository } from './bookmark.repository.js';
 import { CommentRepository } from './comment.repository.js';
+import { isBeforeCursor } from './keyset-cursor.js';
 import { PostRepository } from './post.repository.js';
+
+interface PlanNode {
+  'Node Type': string;
+  'Index Name'?: string;
+  'Actual Rows': number;
+  'Rows Removed by Filter'?: number;
+  Plans?: PlanNode[];
+}
+
+function flattenPlan(node: PlanNode): PlanNode[] {
+  return [node, ...(node.Plans ?? []).flatMap(flattenPlan)];
+}
 
 /** Cùng một mili giây, khác micro giây: như khi nhiều người gửi cùng lúc. Cursor chỉ giữ mili giây. */
 const SAME_MS = ['100', '200', '300', '400', '500'].map((us) => `2026-11-16 08:00:00.048${us}+00`);
@@ -139,6 +153,61 @@ describe('Cursor phân trang không bỏ sót dòng cùng mili giây', () => {
     );
 
     expect(seen).toEqual(rows.map((row) => row.id));
+  });
+
+  it('trang sâu của bình luận gốc: quét index từ đúng cursor, chỉ đọc một trang, không sắp xếp lại', async () => {
+    const authorId = randomUUID();
+    const [post] = await db.insert(posts).values({ authorId, postType: 'vlog', title: 'Bài nhiều bình luận' }).returning();
+    // 2.000 bình luận gốc, 1 phút một bình luận; 500 trả lời chen giữa và 200 bình luận đã xoá để index một phần có việc lọc.
+    await pool.query(
+      `INSERT INTO content.comments (post_id, author_id, body, created_at)
+       SELECT $1, $2, 'gốc ' || n, '2026-11-01 00:00:00+00'::timestamptz + n * interval '1 minute' FROM generate_series(1, 2000) AS n`,
+      [post!.id, authorId],
+    );
+    await pool.query(
+      `INSERT INTO content.comments (post_id, author_id, parent_comment_id, body, created_at)
+       SELECT $1, $2, (SELECT id FROM content.comments WHERE post_id = $1 ORDER BY created_at LIMIT 1),
+         'trả lời ' || n, '2026-11-01 00:00:30+00'::timestamptz + n * interval '1 minute' FROM generate_series(1, 500) AS n`,
+      [post!.id, authorId],
+    );
+    await pool.query(
+      `UPDATE content.comments SET deleted_at = now() WHERE post_id = $1 AND parent_comment_id IS NULL AND body LIKE 'gốc %0'
+         AND created_at < '2026-11-02 10:00:00+00'`,
+      [post!.id],
+    );
+    await pool.query('ANALYZE content.comments');
+    const { rows: cursorRows } = await pool.query<{ created_at: Date; id: string }>(
+      `SELECT created_at, id FROM content.comments WHERE post_id = $1 AND parent_comment_id IS NULL AND deleted_at IS NULL
+       ORDER BY created_at DESC, id DESC OFFSET 1499 LIMIT 1`,
+      [post!.id],
+    );
+    const cursor = { time: cursorRows[0]!.created_at, id: cursorRows[0]!.id };
+    // Cùng điều kiện, thứ tự với CommentRepository.findPage (trang bình luận gốc, 20 dòng + 1).
+    const query = db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(and(
+        eq(comments.postId, post!.id),
+        isNull(comments.deletedAt),
+        eq(comments.status, 'visible'),
+        isNull(comments.parentCommentId),
+        isBeforeCursor(comments, comments.createdAt, comments.id, cursor),
+      ))
+      .orderBy(desc(comments.createdAt), desc(comments.id))
+      .limit(21)
+      .toSQL();
+
+    const { rows } = await pool.query<{ 'QUERY PLAN': [{ Plan: PlanNode }] }>(
+      `EXPLAIN (ANALYZE, FORMAT JSON) ${query.sql}`,
+      query.params,
+    );
+    const nodes = flattenPlan(rows[0]!['QUERY PLAN'][0].Plan);
+    const pageScan = nodes.find((node) => node['Index Name'] === 'idx_comments_post_root_created');
+
+    expect(pageScan).toMatchObject({ 'Actual Rows': 21 });
+    expect(pageScan!['Rows Removed by Filter'] ?? 0).toBe(0);
+    expect(nodes.map((node) => node['Node Type'])).not.toContain('Sort');
+    expect(nodes.map((node) => node['Node Type'])).not.toContain('Incremental Sort');
   });
 
   it('dòng của cursor đã đổi thời gian (bài vừa sửa): vẫn dùng thời gian trong cursor, không nhảy cóc', async () => {

@@ -36,6 +36,15 @@ export const comments = contentSchema.table(
     index('idx_comments_post_created').on(t.postId, t.createdAt),
     index('idx_comments_parent').on(t.parentCommentId),
     index('idx_comments_author').on(t.authorId),
+    // Trang bình luận gốc, trang trả lời đọc đúng 21 dòng theo thứ tự trang thay vì lọc qua mọi trả lời, bình luận đã xoá.
+    // status, author_id ở cuối: đếm tổng theo readableStatus chỉ đọc index, không đọc từng dòng (Drizzle chưa có INCLUDE).
+    // NULLS FIRST cho khớp ORDER BY ... DESC của Postgres; drizzle-kit mặc định ghi NULLS LAST thì không dùng được thứ tự index (TF99).
+    index('idx_comments_post_root_created')
+      .on(t.postId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst(), t.status, t.authorId)
+      .where(sql`${t.parentCommentId} IS NULL AND ${t.deletedAt} IS NULL`),
+    index('idx_comments_parent_created')
+      .on(t.parentCommentId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst(), t.status, t.authorId)
+      .where(sql`${t.deletedAt} IS NULL`),
   ],
 );
 
