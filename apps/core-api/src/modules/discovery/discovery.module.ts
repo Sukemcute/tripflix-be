@@ -23,6 +23,7 @@ import {
   SERVED_STORE,
   type ProductProfileCatalog,
   type RecommendCatalog,
+  type RecommendReelCard,
 } from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { TripAddonUseCases } from './recommend/application/trip-addons.use-cases.js';
@@ -94,7 +95,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade, feed
     return { items, nextCursor: page.nextCursor };
   },
   getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
-  getReelCardsByIds: async (postIds, viewerId) => (await feed.getByIds(postIds, viewerId)).items,
+  getReelCardsByIds: async (postIds, viewerId) => (await feed.getByIds(postIds, viewerId)).items as unknown as RecommendReelCard[],
 });
 
 /** Khách sạn, chuyến bay cho hồ sơ gợi ý phần còn thiếu (TF39). days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
