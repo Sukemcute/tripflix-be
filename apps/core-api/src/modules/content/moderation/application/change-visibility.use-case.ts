@@ -204,7 +204,14 @@ export class ChangeVisibilityUseCase {
         })
         .where(eq(moderationActions.id, actionId));
     for (const row of changes) {
-      const payload = { postId: target.postId, commentId: row.id, authorId: row.authorId };
+      // postVisibility để notification phát tín hiệu realtime vào phòng của bài public (TF99, TF101):
+      // người đang xem thấy bình luận bị ẩn biến mất mà không cần tải lại.
+      const payload = {
+        postId: target.postId,
+        commentId: row.id,
+        authorId: row.authorId,
+        ...(parentPost ? { postVisibility: parentPost.visibility } : {}),
+      };
       await this.outbox.add({
         type:
           row.previousStatus === 'held' && !row.wasPublic && row.status === 'visible'

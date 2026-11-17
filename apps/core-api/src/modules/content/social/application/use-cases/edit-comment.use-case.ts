@@ -4,7 +4,7 @@ import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
-import type { CommentRecord } from '../../../db/schema/index.js';
+import type { CommentRecord, PostVisibility } from '../../../db/schema/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 
 export interface EditCommentCommand {
@@ -33,12 +33,14 @@ export class EditCommentUseCase {
     if (!record || !['visible', 'held'].includes(record.status) || record.deletedAt) {
       throw new CommentNotFoundException(command.commentId);
     }
+    let postVisibility: PostVisibility | undefined;
     if (this.postRepository) {
       const post = this.postRepository.findByIdForUpdate
         ? await this.postRepository.findByIdForUpdate(record.postId)
         : await this.postRepository.findById(record.postId);
       if (!post || post.status !== 'published' || post.deletedAt)
         throw new CommentNotFoundException(command.commentId);
+      postVisibility = post.visibility;
     }
 
     // Khoá theo cùng thứ tự với moderation: bài trước, bình luận sau.
@@ -81,6 +83,7 @@ export class EditCommentUseCase {
         postId: updated.postId,
         authorId: updated.authorId,
         parentCommentId: updated.parentCommentId ?? null,
+        ...(postVisibility ? { postVisibility } : {}),
         body: updated.body,
         updatedAt: updated.updatedAt.toISOString(),
       },

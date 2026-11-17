@@ -22,6 +22,16 @@ export function threadReplyBody(actorName: string, actorCount: number): string {
   return `${actorName}${others} đã trả lời trong luồng bạn tham gia.`;
 }
 
+const EXCERPT_LENGTH = 100;
+
+/** Đoạn trích ngắn để banner trên app hiện nội dung bình luận mà không phải tải bài. */
+export function toCommentExcerpt(body: string | undefined): string | undefined {
+  const text = body?.replace(/\s+/g, ' ').trim();
+  if (!text) return undefined;
+  const chars = Array.from(text);
+  return chars.length > EXCERPT_LENGTH ? `${chars.slice(0, EXCERPT_LENGTH - 1).join('')}…` : text;
+}
+
 @Injectable()
 export class CommentNotificationRepository {
   constructor(@Inject(DB) private readonly pool: pg.Pool) {}
@@ -31,6 +41,7 @@ export class CommentNotificationRepository {
     postId: string;
     authorId: string;
     authorDisplayName?: string;
+    commentBody?: string;
     parentCommentId: string | null;
     eventId: string;
     occurredAt: string;
@@ -56,7 +67,12 @@ export class CommentNotificationRepository {
           input.recipients.map((recipient) => recipient.isReplyRecipient),
           input.authorId,
           `/trips/${input.postId}?comment=${input.commentId}`,
-          JSON.stringify({ postId: input.postId, commentId: input.commentId, parentCommentId: input.parentCommentId }),
+          JSON.stringify({
+            postId: input.postId,
+            commentId: input.commentId,
+            parentCommentId: input.parentCommentId,
+            excerpt: toCommentExcerpt(input.commentBody),
+          }),
           input.eventId,
           input.commentId,
           input.occurredAt,
@@ -77,6 +93,7 @@ export class CommentNotificationRepository {
     postId: string;
     authorId: string;
     authorDisplayName?: string;
+    commentBody?: string;
     parentCommentId: string | null;
     parentCommentAuthorId?: string | null;
     postAuthorId?: string;
@@ -129,7 +146,7 @@ export class CommentNotificationRepository {
     client: pg.PoolClient,
     input: {
       commentId: string; postId: string; authorId: string; rootId: string; userId: string;
-      actorName: string; eventId: string; occurredAt: string;
+      actorName: string; eventId: string; occurredAt: string; commentBody?: string;
     },
   ): Promise<ThreadNotification | null> {
     const link = `/trips/${input.postId}?comment=${input.commentId}`;
@@ -150,7 +167,7 @@ export class CommentNotificationRepository {
            data = data || $6::jsonb
          WHERE id = $1 RETURNING *`,
         [unread.id, threadReplyBody(input.actorName, actorIds.length), link, input.commentId, input.occurredAt,
-          JSON.stringify({ commentId: input.commentId, actorIds })],
+          JSON.stringify({ commentId: input.commentId, actorIds, excerpt: toCommentExcerpt(input.commentBody) ?? null })],
       );
       return rows[0] ? { row: rows[0], isNew: false } : null;
     }
@@ -160,7 +177,10 @@ export class CommentNotificationRepository {
        VALUES ($1, $2, 'Có trả lời mới trong luồng', $3, $4, $5::jsonb, $6, $7, $8, $9)
        ON CONFLICT DO NOTHING RETURNING *`,
       [input.userId, THREAD_REPLY_TYPE, threadReplyBody(input.actorName, 1), link,
-        JSON.stringify({ postId: input.postId, commentId: input.commentId, parentCommentId: input.rootId, actorIds: [input.authorId] }),
+        JSON.stringify({
+          postId: input.postId, commentId: input.commentId, parentCommentId: input.rootId, actorIds: [input.authorId],
+          excerpt: toCommentExcerpt(input.commentBody),
+        }),
         input.eventId, input.commentId, key + input.eventId, input.occurredAt],
     );
     return rows[0] ? { row: rows[0], isNew: true } : null;

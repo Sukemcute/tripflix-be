@@ -73,6 +73,7 @@ export const LEXICON_ROWS: readonly LexiconRow[] = [
   ["norm", "dep", "xinh", 0],
   ["place", "Hà Nội", "ha noi", 0],
   ["place", "Hà Nội", "hanoi", 0],
+  ["place", "Hà Nội", "ha loi", 0],
   ["place", "Hà Nội", "hn", 0],
   ["place", "Hà Nội", "thu do", 0],
   ["place", "Sài Gòn", "ho chi minh", 0],

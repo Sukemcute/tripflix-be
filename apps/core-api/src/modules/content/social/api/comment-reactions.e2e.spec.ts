@@ -115,6 +115,15 @@ describe('E2E: PUT & GET Comment Reactions (Thả tim bình luận - TF25)', () 
         return c && !c.deletedAt ? { ...c } : null;
       },
       findByPostId: async () => Array.from(commentsStore.values()).filter((c) => !c.deletedAt),
+      // Như câu truy vấn thật: trang kèm số trả lời còn hiển thị và người xem đã thích chưa.
+      findPage: async (options: { viewerId?: string }) =>
+        Array.from(commentsStore.values())
+          .filter((c) => !c.deletedAt)
+          .map((c) => ({
+            ...c,
+            replyCount: Array.from(commentsStore.values()).filter((r) => !r.deletedAt && r.parentCommentId === c.id).length,
+            isLiked: Boolean(options.viewerId && reactionStore.has(makeKey(c.id, options.viewerId))),
+          })),
       countByPostId: async () => Array.from(commentsStore.values()).filter((c) => !c.deletedAt).length,
       countRepliesByParentIds: async (parentIds: string[]) => {
         const counts = new Map<string, number>();

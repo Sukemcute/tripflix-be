@@ -1,12 +1,13 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
-import { JobRuns, type JobTrigger } from '../../jobs/job-runs.js';
+import { isDue, JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
 import { EXPLORE_INDEX_INTERVAL_MS, IndexHealth } from './index-health.js';
 
 /**
- * Dựng lại chỉ mục tìm khám phá lúc worker khởi động và mỗi 10 phút. Chỉ chạy khi APP_ROLE là worker hoặc all.
+ * Dựng lại chỉ mục tìm khám phá lúc worker khởi động và mỗi chu kỳ (mặc định 10 phút, admin đổi được qua Redis,
+ * xem JobRuns.getIntervalMs). Chạy tay cũng tính là một lượt: lượt tự động kế tiếp đếm từ đó. Chỉ chạy khi APP_ROLE là worker hoặc all.
  * ponytail: dựng lại toàn bộ (~230 mục, dưới 1 giây) thay vì cộng dồn từng bài — listPosts không báo bài bị ẩn/xoá.
  * Đổi sang cộng dồn (cursor updatedAfter + sự kiện content.post.*) khi dữ liệu lên vài chục nghìn mục.
  */
@@ -14,6 +15,8 @@ import { EXPLORE_INDEX_INTERVAL_MS, IndexHealth } from './index-health.js';
 export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(RebuildExploreIndexJob.name);
   private timer?: NodeJS.Timeout;
+  private lastStartedAt = 0;
+  private intervalMs = EXPLORE_INDEX_INTERVAL_MS;
   isRunning = false;
 
   constructor(
@@ -25,8 +28,8 @@ export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplica
 
   onApplicationBootstrap() {
     if (this.env.APP_ROLE === 'api' || this.env.NODE_ENV === 'test') return;
-    void this.run();
-    this.timer = setInterval(() => void this.run(), EXPLORE_INDEX_INTERVAL_MS);
+    void this.tick(); // lastStartedAt = 0: chạy ngay, kèm chu kỳ đọc được
+    this.timer = setInterval(() => void this.tick(), SCHEDULE_TICK_MS);
     this.timer.unref();
   }
 
@@ -34,13 +37,20 @@ export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplica
     if (this.timer) clearInterval(this.timer);
   }
 
+  /** Chạy khi đã qua đủ chu kỳ kể từ lượt trước. */
+  async tick() {
+    this.intervalMs = await this.runs.getIntervalMs('explore', EXPLORE_INDEX_INTERVAL_MS);
+    if (isDue(this.lastStartedAt, this.intervalMs)) await this.run();
+  }
+
   async run(trigger: JobTrigger = 'schedule') {
     if (this.isRunning) return;
     this.isRunning = true;
     const startedAt = Date.now();
+    this.lastStartedAt = startedAt;
     try {
       await this.runs.track('explore', trigger, async () => {
-        this.health.start('explore', startedAt);
+        this.health.start('explore', startedAt, this.intervalMs);
         const count = await this.explore.rebuildIndex();
         this.health.finish('explore', startedAt, count === null ? 'skipped' : 'succeeded', count ?? undefined);
         if (count === null) {

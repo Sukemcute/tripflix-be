@@ -1,4 +1,5 @@
 import type { BuiltIndex, ExploreSource } from '../domain/explore/types.js';
+import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
 import type { HotelSummary, SuggestEntity, SuggestType } from '../domain/suggest-entity.js';
 
 export const SUGGEST_STORE = Symbol('SUGGEST_STORE');
@@ -12,6 +13,12 @@ export interface ExploreStore extends ExploreSource {
   replaceAll(index: BuiltIndex): Promise<boolean>;
   /** Xoá tài liệu theo id (`post:<uuid>`), trả số dòng đã xoá. Id không có trong chỉ mục thì bỏ qua. */
   deleteDocuments(ids: string[]): Promise<number>;
+  /** Cộng dồn n-gram của một câu tìm vào ngày `day` (YYYY-MM-DD): `hits` cộng thêm, `samples` thêm câu mới khi còn chỗ. */
+  recordQueryGrams(day: string, rows: QueryGramRow[]): Promise<void>;
+  /** N-gram từ ngày `since` có tổng `hits` >= minCount (nhiều nhất trước), cộng các khoá tổng `#...`. */
+  listQueryGrams(since: string, minCount: number): Promise<QueryGramRow[]>;
+  /** Xoá đếm câu tìm của các ngày trước `before`, trả số dòng đã xoá. */
+  purgeQueryGrams(before: string): Promise<number>;
 }
 
 /** Khách sạn cho tìm khám phá. Thật: CommerceFacade.listCatalog (CatalogHotel). */
