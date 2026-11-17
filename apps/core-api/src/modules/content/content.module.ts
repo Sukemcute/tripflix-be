@@ -1,4 +1,5 @@
 import { CONTENT_GATE_PORT, type ContentGatePort } from './social/application/ports/content-gate.port.js';
+import { ModuleRef } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import type { EventEnvelope } from '@tripflix/contracts';
 import { buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
@@ -9,6 +10,7 @@ import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { PostShareLinks } from './social/application/post-share-links.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
+import { createCommerceServicePort } from './social/infra/commerce-service.adapter.js';
 import { FollowsController } from './social/api/follows.controller.js';
 import { FollowRepository } from './social/infra/follow.repository.js';
 import { ContentFacade } from './content.facade.js';
@@ -199,12 +201,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: COMMERCE_SERVICE_PORT,
-      useFactory: (): CommerceServicePort => ({
-        async verifyCompletedBooking(): Promise<boolean> {
-          // Mặc định trả về false khi chưa tích hợp với module Commerce thật (chưa xác thực)
-          return false;
-        },
-      }),
+      inject: [ModuleRef],
+      useFactory: (moduleRef: ModuleRef): CommerceServicePort => createCommerceServicePort(moduleRef),
     },
 
     // 5. Application Use Cases

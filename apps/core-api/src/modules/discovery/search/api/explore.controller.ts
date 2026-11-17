@@ -7,6 +7,9 @@ import {
   ExploreRequestDto,
   ExploreRequestSchema,
   ExploreResponseDto,
+  SearchPlacesRequestDto,
+  SearchPlacesRequestSchema,
+  SearchPlacesResponseDto,
   SearchPostsRequestDto,
   SearchPostsRequestSchema,
   SearchPostsResponseDto,
@@ -88,5 +91,27 @@ export class ExploreController {
       this.searchEvents.searchPerformed(user.userId, { surface: 'posts', understood: page.understood, postType, resultCount: page.total });
     }
     return page;
+  }
+
+  @Post('places')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Tìm một loại chỗ, điểm (khách sạn, điểm tham quan, quán ăn, quán nước) bằng câu tự nhiên, có phân trang',
+    description: [
+      'Cho các tab riêng của trang tìm web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.',
+      '',
+      '- `kind`: `stay` (khách sạn đặt được, `refId` là mã khách sạn), `see`, `food`, `cafe` (địa điểm ngoài Tripflix từ OpenStreetMap, không đặt được, có `location`).',
+      '- Có điểm OpenStreetMap thì `attribution` khác null và phải hiện kèm danh sách.',
+      '- Phân trang, `isFallback`, `dropped`, `fallbackRelaxed` như `POST /api/search/posts`.',
+    ].join('\n'),
+  })
+  @ApiBody({ type: SearchPlacesRequestDto })
+  @ApiOkResponse({ type: SearchPlacesResponseDto })
+  @ApiBadRequestResponse({ description: '`q` rỗng hoặc dài hơn 200 ký tự, `kind`, `cursor`, `limit` sai' })
+  async searchPlaces(@Body() body: unknown): Promise<SearchPlacesResponseDto> {
+    const parsed = SearchPlacesRequestSchema.safeParse(body);
+    if (!parsed.success) throw invalidBody(parsed.error.issues);
+    // ponytail: chưa phát discovery.search.performed cho tab chỗ/điểm (enum surface chưa có); thêm khi gợi ý cần tín hiệu này.
+    return this.explore.searchPlaces(parsed.data);
   }
 }

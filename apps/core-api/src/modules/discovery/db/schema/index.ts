@@ -12,3 +12,4 @@ export {
   recommendUserFeatures,
   type RecommendInteractionRow,
 } from './recommend.js';
+export { places, pointsOfInterest, type PlaceRow, type PointOfInterestRow } from './places.js';

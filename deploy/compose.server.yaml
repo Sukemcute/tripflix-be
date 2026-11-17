@@ -52,6 +52,14 @@ x-core-env: &core-env
   # Link chia sẻ bài do core-api trả về (shareUrl) trỏ về web này; trùng biến của notification-service.
   WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
 
+# Gửi metric, trace sang otel-collector (profile observability, deploy/SERVER.md mục Observability).
+# Đặt OTEL_SDK_DISABLED=true trong .env.server để tắt. Trace lấy mẫu 10%, metric request vẫn đo đủ.
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT-http://otel-collector:4318}
+  OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
+  OTEL_TRACES_SAMPLER: parentbased_traceidratio
+  OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
+
 services:
   # ---------- Giai đoạn 1: database, Redis ----------
   postgres:
@@ -109,9 +117,13 @@ services:
     restart: unless-stopped
     logging: *logging
     environment:
-      <<: *core-env
+      <<: [*core-env, *otel-env]
       APP_ROLE: all
       PORT: 3000
+      OTEL_SERVICE_NAME: core-api
+      # Trang /analytics của admin đọc metric, trace qua core-api (docs/observability.md).
+      ANALYTICS_PROMETHEUS_URL: ${ANALYTICS_PROMETHEUS_URL-http://prometheus:9090}
+      ANALYTICS_TEMPO_URL: ${ANALYTICS_TEMPO_URL-http://tempo:3200}
     ports: ['127.0.0.1:${API_PORT:-3000}:3000']
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -150,6 +162,8 @@ services:
       PUSH_ENABLED: ${PUSH_ENABLED:-false}
       # Chỉ cần khi bật "Enhanced Push Security" trên Expo. EXPO_PUSH_URL để mặc định trong code.
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      <<: *otel-env
+      OTEL_SERVICE_NAME: notification-service
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
@@ -374,7 +388,44 @@ services:
       retries: 12
       start_period: 30s
 
+  # ---------- Observability: metric, trace cho trang /analytics ----------
+  # Cấu hình chung với compose.observability.yaml (máy dev), file trong deploy/observability/.
+  # Không mở cổng ra ngoài: core-api, notification-service gọi qua mạng nội bộ của compose.
+  # Profile riêng, deploy-api.sh không đụng tới; bật một lần là chạy tiếp qua các lần deploy.
+  otel-collector:
+    profiles: [observability]
+    image: otel/opentelemetry-collector-contrib:0.137.0
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes: ['./observability/collector.yaml:/etc/otelcol/config.yaml:ro']
+    depends_on: [tempo]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.6.0
+    command:
+      ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=7d', '--storage.tsdb.retention.size=2GB']
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:2.9.0
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+
 volumes:
   pg-data:
   redis-data:
   letsencrypt:
+  prometheus-data:
+  tempo-data:

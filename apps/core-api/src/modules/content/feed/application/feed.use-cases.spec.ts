@@ -208,7 +208,11 @@ describe('FeedUseCases.getByIds', () => {
 
 describe('FeedUseCases poster lộ trình (TF105)', () => {
   it('thẻ có posterMediaId thì trả posterUrl, không lộ bookingId; ảnh không còn thì bỏ qua', async () => {
-    const withPoster = { ...row('p1'), tripAttachment: { bookingId: 'b1', posterMediaId: 'img-1', posterUrl: 'https://evil/x' } };
+    const withPoster = {
+      ...row('p1'),
+      isVerified: true,
+      tripAttachment: { bookingId: 'b1', posterMediaId: 'img-1', posterUrl: 'https://evil/x' },
+    };
     const missing = { ...row('p2'), tripAttachment: { posterMediaId: 'gone' } };
     const store = { findPlayablePostsByIds: vi.fn(() => Promise.resolve([withPoster, missing])) } as unknown as FeedStore;
     const media = {
@@ -223,5 +227,7 @@ describe('FeedUseCases poster lộ trình (TF105)', () => {
     expect(page.items[0]!.tripAttachment).toMatchObject({ posterMediaId: 'img-1', posterUrl: 'https://cdn/poster.jpg' });
     expect(page.items[0]!.tripAttachment).not.toHaveProperty('bookingId');
     expect(page.items[1]!.tripAttachment).not.toHaveProperty('posterUrl');
+    // Tích "Đã đi" theo cờ của bài; bài thiếu cờ coi như chưa xác thực.
+    expect(page.items.map((card) => card.isVerified)).toEqual([true, false]);
   });
 });
