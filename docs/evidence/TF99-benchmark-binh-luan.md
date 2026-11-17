@@ -76,6 +76,8 @@ Từ 5 người, request/giây gần như đứng yên; độ trễ tăng đúng
 - `summarize.mjs` cũ cộng cả nhóm `expected_response:true` vào tổng request nên "lượt quét mỗi request" bị chia đôi (ghi 2,5, đúng là 5 và nay đo được 7,3).
 - Bản trước kết luận "phân trang không thiếu" chỉ đúng với dữ liệu seed; dữ liệu do app ghi thì có thiếu (mục trên).
 - Bản trước dùng 50, 100, 200 người không nghỉ: thực chất là đo sức chứa. Nay R1 giữ tốc độ cố định để biết mức tải còn đạt ngưỡng.
+- 17/11: `run.sh paging` dừng giữa chừng vì `read.js` ở chế độ sweep ghi tóm tắt tên `r1-sweep` còn `run.sh` tìm `r1-paging`; nay `run.sh` truyền `SUMMARY_NAME`. Chạy lại: đi hết 699 trang, total 13.966, thiếu 0, lặp 0.
+- 17/11: `explain.sql` chép đúng điều kiện `readableStatus` của app (người xem thấy bình luận `held` của chính mình), thêm cursor dạng cặp `(created_at, id) < (x, y)` và trang trả lời để so trước, sau khi thêm index (S2).
 
 ## Kết luận cho bước sau
 - **Sửa ngay (lỗi đúng sai):** cursor bình luận giữ đủ micro giây, ví dụ so `(created_at, id) < (SELECT created_at, id FROM comments WHERE id = :cursorId)` để thời gian lấy thẳng từ DB; có test tái hiện.
@@ -85,6 +87,7 @@ Từ 5 người, request/giây gần như đứng yên; độ trễ tăng đúng
 
 ## Kết quả kiểm tra
 - Chạy thật trên máy local: `run.sh read`, `run.sh rsweep`, `run.sh wsweep` (mỗi kịch bản 3 lần), `run.sh explain`; CPU profile core-api qua DevTools Protocol lúc 10 người đọc.
+- `run.sh paging` (17/11, sau khi sửa tên tóm tắt): chạy hết, có `r1-paging` trong `summary.md`.
 - `k6 inspect` mọi chế độ của `read.js` và `write.js`: hợp lệ; `bash -n run.sh`: hợp lệ.
 - Không đổi code ứng dụng nên không ảnh hưởng lint, typecheck, test của core-api.
 
