@@ -43,6 +43,21 @@ export class BookmarkRepository {
     }
   }
 
+  /** Lưu hoặc bỏ lưu; trả true khi trạng thái thật sự đổi (bấm lặp không đổi bộ đếm). */
+  async changeBookmark(postId: string, userId: string, isBookmarked: boolean): Promise<boolean> {
+    const changed = isBookmarked
+      ? await this.db
+          .insert(bookmarks)
+          .values({ postId, userId })
+          .onConflictDoNothing({ target: [bookmarks.postId, bookmarks.userId] })
+          .returning({ id: bookmarks.id })
+      : await this.db
+          .delete(bookmarks)
+          .where(and(eq(bookmarks.postId, postId), eq(bookmarks.userId, userId)))
+          .returning({ id: bookmarks.id });
+    return changed.length > 0;
+  }
+
   async isBookmarked(postId: string, userId: string): Promise<boolean> {
     const [record] = await this.db
       .select({ id: bookmarks.id })

@@ -35,21 +35,16 @@ export class BookmarkPostUseCase {
       throw new PostNotFoundException(command.postId);
     }
 
-    const wasBookmarked = await this.bookmarkRepository.isBookmarked(command.postId, command.userId);
-
-    // Chỉ cập nhật counter khi trạng thái thay đổi
-    if (wasBookmarked !== command.isBookmarked) {
-      await this.bookmarkRepository.setBookmark(command.postId, command.userId, command.isBookmarked);
-      const delta = command.isBookmarked ? 1 : -1;
-      await this.postRepository.incrementCounter(command.postId, 'bookmarkCount', delta);
-    }
-
-    const updatedPost = await this.postRepository.findById(command.postId);
+    // Một câu vừa ghi vừa biết trạng thái có đổi không; số mới lấy từ chính câu cộng đếm (TF99).
+    const isChanged = await this.bookmarkRepository.changeBookmark(command.postId, command.userId, command.isBookmarked);
+    const bookmarkCount = isChanged
+      ? await this.postRepository.incrementCounter(command.postId, 'bookmarkCount', command.isBookmarked ? 1 : -1)
+      : post.bookmarkCount;
 
     return {
       postId: command.postId,
       isBookmarked: command.isBookmarked,
-      bookmarkCount: updatedPost?.bookmarkCount ?? 0,
+      bookmarkCount: bookmarkCount ?? 0,
     };
   }
 }

@@ -46,6 +46,8 @@ export interface FindAdminPostsOptions {
  * Repository thao tác với bảng content.posts qua Drizzle ORM.
  * Hỗ trợ executor động để tự động tham gia @Transactional('content').
  */
+export type PostCounterField = 'commentCount' | 'shareCount' | 'bookmarkCount';
+
 export class PostRepository {
   constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
 
@@ -216,27 +218,31 @@ export class PostRepository {
   }
 
   /**
-   * Tăng/giảm nguyên tử (atomic) số lượng comment, share, bookmark.
+   * Tăng/giảm nguyên tử (atomic) số lượng comment, share, bookmark. Trả về số mới (không có bài thì undefined).
    */
   async incrementCounter(
     id: string,
-    field: 'commentCount' | 'shareCount' | 'bookmarkCount',
+    field: PostCounterField,
     delta: number,
-  ): Promise<void> {
-    const col =
-      field === 'commentCount'
-        ? posts.commentCount
-        : field === 'shareCount'
-          ? posts.shareCount
-          : posts.bookmarkCount;
+  ): Promise<number | undefined> {
+    const record = await this.lockAndIncrementCounter(id, field, delta);
+    return record?.[field];
+  }
 
-    await this.db
+  /**
+   * Khoá dòng bài và cộng bộ đếm trong cùng một câu (UPDATE … RETURNING): dùng làm câu đầu transaction
+   * thay cho SELECT … FOR UPDATE rồi UPDATE, bớt một lượt gọi DB trong lúc giữ khoá (TF99).
+   */
+  async lockAndIncrementCounter(id: string, field: PostCounterField, delta: number): Promise<PostRecord | null> {
+    const [record] = await this.db
       .update(posts)
       .set({
-        [field]: sql`GREATEST(0, ${col} + ${delta})`,
+        [field]: sql`GREATEST(0, ${posts[field]} + ${delta})`,
         updatedAt: new Date(),
       })
-      .where(eq(posts.id, id));
+      .where(eq(posts.id, id))
+      .returning();
+    return record ?? null;
   }
 
   /**

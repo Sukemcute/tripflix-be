@@ -6,6 +6,7 @@ import { createNoOpTransactionalPlugins } from '@tripflix/db';
 import {
   AddCommentUseCase,
   AdminModeratePostUseCase,
+  applyReactionChange,
   BookmarkPostUseCase,
   CreateDraftUseCase,
   DeleteCommentUseCase,
@@ -27,6 +28,7 @@ import type { CommerceServicePort } from '../ports/commerce-service.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { PostRecord, CommentRecord } from '../../../db/schema/index.js';
 import {
+  CommentNotFoundException,
   InvalidPostStatusTransitionException,
   InvalidReactionTypeException,
   PostMediaNotAllowedException,
@@ -105,6 +107,7 @@ describe('Social Application Use Cases', () => {
       updateReactionCounts: vi.fn(),
     };
     mockPostRepo.findByIdForUpdate = mockPostRepo.findById;
+    mockPostRepo.lockAndIncrementCounter = vi.fn((id: string) => mockPostRepo.findById(id));
     mockCommentRepo = {
       create: vi.fn(),
       findById: vi.fn(),
@@ -122,6 +125,7 @@ describe('Social Application Use Cases', () => {
     };
     mockBookmarkRepo = {
       setBookmark: vi.fn(),
+      changeBookmark: vi.fn(),
       isBookmarked: vi.fn(),
       findUserBookmarks: vi.fn(),
       countByPostId: vi.fn(),
@@ -529,10 +533,6 @@ describe('Social Application Use Cases', () => {
       const post = samplePostRecord({ status: 'published' });
       mockPostRepo.findById.mockResolvedValue(post);
       mockReactionRepo.upsert.mockResolvedValue({});
-      mockReactionRepo.aggregateReactionCounts.mockResolvedValue({
-        reactionCounts: { like: 1 },
-        reactionTotal: 1,
-      });
 
       const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
 
@@ -542,6 +542,8 @@ describe('Social Application Use Cases', () => {
       expect(result.reactionTotal).toBe(1);
       expect(mockReactionRepo.upsert).toHaveBeenCalledWith(postId, otherUserId, 'like');
       expect(mockPostRepo.updateReactionCounts).toHaveBeenCalledWith(postId, { like: 1 }, 1);
+      // Cộng đúng phần thay đổi từ dòng bài đã khoá, không đếm lại mọi cảm xúc của bài.
+      expect(mockReactionRepo.aggregateReactionCounts).not.toHaveBeenCalled();
       expect(mockOutbox.add).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'content.reaction.updated',
@@ -557,13 +559,10 @@ describe('Social Application Use Cases', () => {
     });
 
     it('truyền type null để hủy cảm xúc', async () => {
-      const post = samplePostRecord({ status: 'published' });
+      const post = samplePostRecord({ status: 'published', reactionCounts: { like: 1 }, reactionTotal: 1 });
       mockPostRepo.findById.mockResolvedValue(post);
+      mockReactionRepo.findByPostAndUser.mockResolvedValue({ type: 'like' });
       mockReactionRepo.delete.mockResolvedValue(true);
-      mockReactionRepo.aggregateReactionCounts.mockResolvedValue({
-        reactionCounts: {},
-        reactionTotal: 0,
-      });
 
       const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
 
@@ -572,6 +571,45 @@ describe('Social Application Use Cases', () => {
       expect(result.myReaction).toBeNull();
       expect(result.reactionTotal).toBe(0);
       expect(mockReactionRepo.delete).toHaveBeenCalledWith(postId, otherUserId);
+      expect(mockPostRepo.updateReactionCounts).toHaveBeenCalledWith(postId, {}, 0);
+    });
+
+    it('đổi loại cảm xúc: loại cũ trừ 1, loại mới cộng 1, tổng giữ nguyên', async () => {
+      const post = samplePostRecord({ status: 'published', reactionCounts: { like: 3, love: 1 }, reactionTotal: 4 });
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockReactionRepo.findByPostAndUser.mockResolvedValue({ type: 'like' });
+
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
+      const result = await useCase.execute({ postId, userId: otherUserId, type: 'love' });
+
+      expect(result).toMatchObject({ reactionCounts: { like: 2, love: 2 }, reactionTotal: 4 });
+    });
+
+    it('bấm lại đúng loại đang thả: số đếm không đổi', async () => {
+      const post = samplePostRecord({ status: 'published', reactionCounts: { like: 3 }, reactionTotal: 3 });
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockReactionRepo.findByPostAndUser.mockResolvedValue({ type: 'like' });
+
+      const useCase = new SetReactionUseCase(mockPostRepo, mockReactionRepo, mockOutbox);
+      const result = await useCase.execute({ postId, userId: otherUserId, type: 'like' });
+
+      expect(result).toMatchObject({ reactionCounts: { like: 3 }, reactionTotal: 3 });
+    });
+  });
+
+  describe('applyReactionChange', () => {
+    it.each([
+      [{}, null, 'like', { like: 1 }, 1],
+      [{ like: 1 }, 'like', null, {}, 0],
+      [{ like: 2, helpful: 1 }, 'helpful', 'like', { like: 3 }, 3],
+      [{ like: 2 }, null, null, { like: 2 }, 2],
+      // Số trên bài lệch về 0 thì không trừ xuống âm.
+      [{}, 'like', null, {}, 0],
+    ] as const)('%o: %s → %s', (counts, previousType, nextType, expectedCounts, expectedTotal) => {
+      expect(applyReactionChange({ ...counts }, previousType, nextType)).toEqual({
+        reactionCounts: expectedCounts,
+        reactionTotal: expectedTotal,
+      });
     });
   });
 
@@ -619,7 +657,7 @@ describe('Social Application Use Cases', () => {
         });
 
         expect(result.id).toBe('comm-1');
-        expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'commentCount', 1);
+        expect(mockPostRepo.lockAndIncrementCounter).toHaveBeenCalledWith(postId, 'commentCount', 1);
         expect(mockOutbox.add).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'content.comment.created',
@@ -705,7 +743,7 @@ describe('Social Application Use Cases', () => {
 
       mockPostRepo.findById.mockResolvedValue(post);
       const root = { ...parentReplyRecord, id: 'root-comment-id', authorId, parentCommentId: null };
-      mockCommentRepo.findById.mockResolvedValueOnce(parentReplyRecord).mockResolvedValueOnce(root);
+      mockCommentRepo.findById.mockImplementation(async (id: string) => (id === root.id ? root : parentReplyRecord));
       mockCommentRepo.create.mockResolvedValue({ ...parentReplyRecord, id: 'new-reply', replyToName: 'Dũng' });
 
       const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, {
@@ -724,6 +762,83 @@ describe('Social Application Use Cases', () => {
       expect(mockOutbox.add).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({
         commentId: 'new-reply', replyToCommentId: 'reply-1', replyToAuthorId: otherUserId, parentCommentAuthorId: authorId,
       }) }));
+    });
+
+    describe('rút ngắn thời gian khoá dòng bài (TF99)', () => {
+      const rootComment = (): CommentRecord => ({
+        id: 'root-1',
+        postId,
+        authorId,
+        status: 'visible',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
+        parentCommentId: null,
+        body: 'Gốc',
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      });
+
+      it('tra tên và tìm bình luận gốc trước khi khoá; câu đầu trong khoá là khoá + cộng đếm', async () => {
+        const post = samplePostRecord({ status: 'published' });
+        mockPostRepo.findById.mockResolvedValue(post);
+        mockCommentRepo.findById.mockResolvedValue(rootComment());
+        mockCommentRepo.create.mockResolvedValue({ ...rootComment(), id: 'reply-new', parentCommentId: 'root-1' });
+        const getDisplayNames = vi.fn().mockResolvedValue(new Map([[authorId, 'Thành']]));
+
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, { getDisplayNames });
+        await useCase.execute({ postId, authorId: otherUserId, body: 'Trả lời', parentCommentId: 'root-1' });
+
+        const lockOrder = mockPostRepo.lockAndIncrementCounter.mock.invocationCallOrder[0];
+        expect(getDisplayNames.mock.invocationCallOrder[0]).toBeLessThan(lockOrder);
+        expect(mockCommentRepo.findById.mock.invocationCallOrder[0]).toBeLessThan(lockOrder);
+        // Sau khi khoá vẫn kiểm lại gốc một lần.
+        expect(mockCommentRepo.findById.mock.invocationCallOrder.at(-1)).toBeGreaterThan(lockOrder);
+        expect(mockCommentRepo.create.mock.invocationCallOrder[0]).toBeGreaterThan(lockOrder);
+        expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
+      });
+
+      it('bài bị ẩn trong lúc chuẩn bị: kiểm lại sau khi khoá thì từ chối, không tạo bình luận', async () => {
+        mockPostRepo.findById
+          .mockResolvedValueOnce(samplePostRecord({ status: 'published' }))
+          .mockResolvedValueOnce(samplePostRecord({ status: 'hidden' }));
+
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+
+        await expect(useCase.execute({ postId, authorId: otherUserId, body: 'Muộn rồi' })).rejects.toBeInstanceOf(
+          PostNotFoundException,
+        );
+        expect(mockCommentRepo.create).not.toHaveBeenCalled();
+        expect(mockOutbox.add).not.toHaveBeenCalled();
+      });
+
+      it('bình luận gốc bị xoá trong lúc chuẩn bị: không thêm được trả lời dưới gốc đã xoá', async () => {
+        mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+        mockCommentRepo.findById
+          .mockResolvedValueOnce(rootComment())
+          .mockResolvedValueOnce({ ...rootComment(), deletedAt: new Date() });
+
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox);
+
+        await expect(
+          useCase.execute({ postId, authorId: otherUserId, body: 'Trả lời', parentCommentId: 'root-1' }),
+        ).rejects.toBeInstanceOf(CommentNotFoundException);
+        expect(mockCommentRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('bình luận bị giữ chờ duyệt: chỉ khoá, không cộng đếm', async () => {
+        mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+        mockCommentRepo.create.mockResolvedValue({ ...rootComment(), id: 'held-1', status: 'held' });
+        const gate = { precheck: () => ({ shouldHold: true }) };
+
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, undefined, gate as never);
+        await useCase.execute({ postId, authorId: otherUserId, body: 'Nội dung bị giữ' });
+
+        expect(mockPostRepo.lockAndIncrementCounter).not.toHaveBeenCalled();
+        expect(mockPostRepo.findById).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('sửa bình luận cập nhật nội dung và phát sự kiện outbox content.comment.updated', async () => {
@@ -911,16 +1026,30 @@ describe('Social Application Use Cases', () => {
   describe('Bookmark & Share Use Cases', () => {
     it('bookmark bài viết tăng bookmarkCount', async () => {
       const post = samplePostRecord({ status: 'published', bookmarkCount: 5 });
-      mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce({ ...post, bookmarkCount: 6 });
-      mockBookmarkRepo.isBookmarked.mockResolvedValue(false);
+      mockPostRepo.findById.mockResolvedValue(post);
+      mockBookmarkRepo.changeBookmark.mockResolvedValue(true);
+      mockPostRepo.incrementCounter.mockResolvedValue(6);
 
       const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
       const result = await useCase.execute({ postId, userId: otherUserId, isBookmarked: true });
 
       expect(result.isBookmarked).toBe(true);
       expect(result.bookmarkCount).toBe(6);
-      expect(mockBookmarkRepo.setBookmark).toHaveBeenCalledWith(postId, otherUserId, true);
+      expect(mockBookmarkRepo.changeBookmark).toHaveBeenCalledWith(postId, otherUserId, true);
       expect(mockPostRepo.incrementCounter).toHaveBeenCalledWith(postId, 'bookmarkCount', 1);
+      // Số mới lấy từ câu cộng đếm, không đọc lại bài.
+      expect(mockPostRepo.findById).toHaveBeenCalledTimes(1);
+    });
+
+    it('lưu lại bài đã lưu (bấm lặp): không cộng đếm, trả số đang có', async () => {
+      mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published', bookmarkCount: 5 }));
+      mockBookmarkRepo.changeBookmark.mockResolvedValue(false);
+
+      const useCase = new BookmarkPostUseCase(mockPostRepo, mockBookmarkRepo);
+      const result = await useCase.execute({ postId, userId: otherUserId, isBookmarked: true });
+
+      expect(result.bookmarkCount).toBe(5);
+      expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
     });
 
     it('ghi nhận lượt chia sẻ tăng shareCount và ghi outbox content.post.shared', async () => {
@@ -1212,7 +1341,7 @@ describe('Social Application Use Cases', () => {
       await expect(
         useCase.execute({ postId, userId: otherUserId, isBookmarked: true }),
       ).rejects.toBeInstanceOf(PostNotFoundException);
-      expect(mockBookmarkRepo.setBookmark).not.toHaveBeenCalled();
+      expect(mockBookmarkRepo.changeBookmark).not.toHaveBeenCalled();
       expect(mockPostRepo.incrementCounter).not.toHaveBeenCalled();
     });
 
