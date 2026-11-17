@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { isAfterCursor, isBeforeCursor } from './keyset-cursor.js';
 import {
+  postCounterDeltas,
   posts,
   type NewPostRecord,
   type PostRecord,
@@ -230,8 +231,30 @@ export class PostRepository {
     field: PostCounterField,
     delta: number,
   ): Promise<number | undefined> {
+    if (field === 'commentCount') return this.changeCommentCount(id, delta);
     const record = await this.lockAndIncrementCounter(id, field, delta);
     return record?.[field];
+  }
+
+  /**
+   * Đổi comment_count kèm gộp luôn phần "+1" còn trong bảng đệm của bài (TF99). Trừ thẳng khi phần đệm chưa cộng
+   * thì GREATEST(0, …) chặn số về 0, job cộng dồn cộng phần đệm sau đó làm số lệch lên (xoá gốc cùng 8 trả lời vừa
+   * gửi lúc bài đông: còn 0 bình luận mà số đếm là 8). Người gọi giữ khoá dòng bài nên các lượt thêm bình luận
+   * đang dở đã commit phần đệm của chúng; job cộng dồn khoá dòng bài trước khi lấy phần đệm nên không khoá chết.
+   */
+  private async changeCommentCount(id: string, delta: number): Promise<number | undefined> {
+    const result = await this.db.execute<{ comment_count: number }>(sql`
+      WITH pending AS (
+        DELETE FROM ${postCounterDeltas} WHERE ${postCounterDeltas.postId} = ${id}
+        RETURNING ${postCounterDeltas.commentDelta} AS comment_delta
+      )
+      UPDATE ${posts}
+      SET comment_count = GREATEST(0, comment_count + (SELECT coalesce(sum(comment_delta), 0) FROM pending)::int + ${delta}),
+          updated_at = now()
+      WHERE ${posts.id} = ${id}
+      RETURNING comment_count
+    `);
+    return result.rows[0]?.comment_count;
   }
 
   /**

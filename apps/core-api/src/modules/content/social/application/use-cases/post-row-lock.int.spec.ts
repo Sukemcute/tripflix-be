@@ -154,6 +154,57 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
     expect((await readPost()).comment_count).toBe(1);
   });
 
+  it('xoá gốc khi các trả lời còn nằm trong bảng đệm: số đếm về đúng 0, cộng dồn sau đó không làm lệch', async () => {
+    const root = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Gốc' });
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from content.posts where id = $1 for no key update', [postId]);
+      for (let index = 0; index < 8; index += 1) {
+        await cases.add.execute({ postId, authorId: randomUUID(), body: `Trả lời ${index}`, parentCommentId: root.id });
+      }
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    expect((await readPost()).comment_count).toBe(1);
+    expect(await pendingDeltas()).toBe(8);
+
+    // Trước khi sửa: trừ 9 trên số 1 bị chặn về 0, job cộng thêm 8 phần đệm, số đếm thành 8.
+    await cases.delete.execute({ commentId: root.id, userId: AUTHOR, isSuperAdmin: false });
+    expect((await readPost()).comment_count).toBe(0);
+    expect(await pendingDeltas()).toBe(0);
+
+    await cases.flush.execute();
+    expect((await readPost()).comment_count).toBe(0);
+  });
+
+  it('xoá bình luận cùng lúc với lượt cộng dồn: không khoá chết, số đếm khớp', async () => {
+    const roots = [];
+    for (let index = 0; index < 6; index += 1) {
+      roots.push(await cases.add.execute({ postId, authorId: AUTHOR, body: `Gốc ${index}` }));
+    }
+    await pool.query(
+      'insert into content.post_counter_deltas (post_id, comment_delta) select $1, 1 from generate_series(1, 40)',
+      [postId],
+    );
+    await pool.query(
+      `insert into content.comments (post_id, author_id, body) select $1, $2, 'đã đệm ' || n from generate_series(1, 40) as n`,
+      [postId, AUTHOR],
+    );
+
+    const results = await Promise.allSettled([
+      ...roots.map((root) => cases.delete.execute({ commentId: root.id, userId: AUTHOR, isSuperAdmin: false })),
+      cases.flush.execute(),
+      cases.flush.execute(),
+    ]);
+    await cases.flush.execute();
+
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
+    expect((await readPost()).comment_count).toBe(40);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
   it('một người gửi một mình (bài vắng): cộng ngay, không ghi bảng đệm', async () => {
     await cases.add.execute({ postId, authorId: randomUUID(), body: 'Một mình' });
 
