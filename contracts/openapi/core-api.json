@@ -9195,6 +9195,10 @@
               }
             ]
           },
+          "isVerified": {
+            "type": "boolean",
+            "description": "Lộ trình lấy từ chuyến đã đi xong của chính người đăng (tích \"Đã đi\")"
+          },
           "counts": {
             "$ref": "#/components/schemas/FeedCountsDto"
           },
@@ -9228,6 +9232,7 @@
           "region",
           "tags",
           "linkedProductIds",
+          "isVerified",
           "counts",
           "viewerState",
           "reason"
