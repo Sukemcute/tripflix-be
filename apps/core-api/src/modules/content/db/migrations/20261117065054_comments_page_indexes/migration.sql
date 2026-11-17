@@ -1,0 +1,2 @@
+CREATE INDEX "idx_comments_post_root_created" ON "content"."comments" ("post_id","created_at" DESC,"id" DESC,"status","author_id") WHERE "parent_comment_id" IS NULL AND "deleted_at" IS NULL;--> statement-breakpoint
+CREATE INDEX "idx_comments_parent_created" ON "content"."comments" ("parent_comment_id","created_at" DESC,"id" DESC,"status","author_id") WHERE "deleted_at" IS NULL;
