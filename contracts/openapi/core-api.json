@@ -3954,6 +3954,76 @@
         ]
       }
     },
+    "/api/places": {
+      "get": {
+        "description": "Dữ liệu © OpenStreetMap contributors (ODbL), nạp sẵn cho các thành phố demo. App phải hiện `attribution` kèm danh sách.\n\n- Cần `city` (tên có dấu hay không đều được, hoặc id như `vung-tau`) hoặc `near=lat,lng`.\n- `lodging` là chỗ ở ngoài Tripflix: chỉ để tham khảo, không có giá, không đặt được.\n- Không khớp thành phố thì `items: []` (không phải lỗi).",
+        "operationId": "PlacesController_places",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–100, mặc định 40",
+            "schema": {
+              "example": 40
+            }
+          },
+          {
+            "name": "radiusKm",
+            "required": false,
+            "in": "query",
+            "description": "1–50, mặc định 15",
+            "schema": {
+              "example": 15
+            }
+          },
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "Lọc loại: see, food, cafe, lodging",
+            "schema": {
+              "example": "see,food"
+            }
+          },
+          {
+            "name": "near",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "10.346,107.084"
+            }
+          },
+          {
+            "name": "city",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Vũng Tàu"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu cả `city` lẫn `near`, `near` sai dạng, `kinds` có loại lạ"
+          }
+        },
+        "summary": "Điểm tham quan, ăn uống, chỗ ở có toạ độ quanh một thành phố hoặc một toạ độ",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/stays": {
       "get": {
         "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars` (từ X sao trở lên), `stars` (đúng X sao; gửi cả hai thì áp cả hai), `priceMin`/`priceMax` theo giá một đêm một phòng.\n- `sort=price` (mặc định, rẻ trước), `price_desc` (đắt trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
@@ -9548,6 +9618,88 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "PointOfInterestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "osm:node/123456789",
+            "description": "Id OpenStreetMap, ổn định giữa các lần nạp"
+          },
+          "name": {
+            "type": "string",
+            "example": "Hải Đăng Vũng Tàu"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "see",
+              "food",
+              "cafe",
+              "lodging"
+            ],
+            "description": "see: tham quan · food: ăn uống · cafe · lodging: chỗ ở ngoài Tripflix"
+          },
+          "lat": {
+            "type": "number",
+            "example": 10.3333
+          },
+          "lng": {
+            "type": "number",
+            "example": 107.0778
+          },
+          "city": {
+            "type": "string",
+            "example": "Vũng Tàu"
+          },
+          "tags": {
+            "example": [
+              "viewpoint"
+            ],
+            "description": "beach, viewpoint, museum, park, market, temple, indoor",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "popularity": {
+            "type": "number",
+            "example": 0.9,
+            "description": "0–1, ước lượng từ dữ liệu OSM (có Wikipedia, Wikidata, website)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "lat",
+          "lng",
+          "city",
+          "tags",
+          "popularity"
+        ]
+      },
+      "PlacesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Xếp theo độ phổ biến rồi khoảng cách; rỗng khi chưa có dữ liệu",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PointOfInterestDto"
+            }
+          },
+          "attribution": {
+            "type": "string",
+            "example": "© OpenStreetMap contributors (ODbL)",
+            "description": "Phải hiện kèm danh sách (giấy phép ODbL)"
+          }
+        },
+        "required": [
+          "items",
+          "attribution"
         ]
       },
       "StayProvinceDto": {

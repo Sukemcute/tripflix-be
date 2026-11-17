@@ -26,6 +26,7 @@ import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
+import { PlacesController } from './search/api/places.controller.js';
 import { ExploreUseCases } from './search/application/explore.use-cases.js';
 import {
   EXPLORE_CATALOG,
@@ -85,6 +86,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
   imports: [CommerceModule, ContentModule, AccessModule],
   controllers: [
     SuggestController,
+    PlacesController,
     StaysController,
     ExploreController,
     HomeRecommendationsController,
