@@ -327,9 +327,9 @@ function buildTrip(
   const hotelItem = (day: number, time: string, choice: HotelChoice): TripItineraryItem => ({
     day,
     time,
-    title: `Nhận phòng ${choice.hotel.name}`,
+    title: choice.hotel.name,
     location: choice.hotel.address,
-    notes: `${choice.roomType.name} · ${choice.ratePlan.name}`,
+    notes: `Nhận phòng · ${choice.roomType.name} · ${choice.ratePlan.name}`,
     hotel: { hotelId: choice.hotel.id, productId: choice.roomType.id, ratePlanCode: choice.ratePlan.code },
   });
   let checkIn = '14:00';

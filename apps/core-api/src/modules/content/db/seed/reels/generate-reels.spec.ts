@@ -65,6 +65,8 @@ describe('reel mẫu sinh từ các video mẫu', () => {
       const stops = items.filter((item) => !item.hotel && !item.transport);
       expect(stops.length).toBeGreaterThan(0);
       expect(post.tripAttachment!.hotelId).toBe(hotels[0]!.hotel!.hotelId);
+      // App lấy tiêu đề điểm khách sạn làm tên khách sạn ở tab Đặt, giống bài đăng từ app.
+      for (const item of hotels) expect(item.title).toBe(hotelsById.get(item.hotel!.hotelId)!.name);
       expect(post.tripAttachment!.bookingId).toBeUndefined();
       expect(post.tripAttachment!.daysCount).toBeGreaterThanOrEqual(Math.max(...items.map((i) => i.day)));
     }
