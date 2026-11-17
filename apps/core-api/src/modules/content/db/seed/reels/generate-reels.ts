@@ -275,12 +275,24 @@ function buildTrip(
   const fun = random.shuffle(stops.fun);
   const items: TripItineraryItem[] = [];
   const stopNames: string[] = [];
+  const pools = { food, cafe, fun };
+  // Chợ phiên chỉ họp buổi sáng. Hết điểm loại cần thì lấy loại khác, để chuyến dài không có ngày trống.
   const takeStop = (day: number, time: string, kind: 'food' | 'cafe' | 'fun') => {
-    const list = kind === 'food' ? food : kind === 'cafe' ? cafe : fun;
-    const stop = list.shift();
-    if (!stop) return;
-    stopNames.push(stop.name);
-    items.push(stopItem(day, time, stop, destination, kind));
+    const isMorning = time < '12:00';
+    for (const candidate of [kind, ...(['food', 'fun', 'cafe'] as const).filter((k) => k !== kind)]) {
+      const list = pools[candidate];
+      const index = list.findIndex((stop) => isMorning || !/chợ phiên/i.test(stop.name));
+      if (index < 0) continue;
+      const [stop] = list.splice(index, 1);
+      stopNames.push(stop!.name);
+      items.push(stopItem(day, time, stop!, destination, candidate));
+      return;
+    }
+  };
+  const fillEmptyDay = (day: number) => {
+    if (!items.some((item) => item.day === day)) {
+      items.push({ day, time: '09:00', title: `Tự do khám phá ${destination.name}`, notes: 'Ngày thong thả, đi dạo hoặc nghỉ ở khách sạn' });
+    }
   };
 
   // Chuyến đi bay sáng, chuyến về bay chiều nếu có, để lịch trong ngày hợp lý.
@@ -340,15 +352,19 @@ function buildTrip(
       takeStop(day, '16:00', 'fun');
       takeStop(day, '19:00', 'food');
       if (random.next() < 0.4) takeStop(day, '21:00', 'cafe');
+      fillEmptyDay(day);
       day++;
     }
   });
 
   // Ngày cuối: cà phê sáng, chơi nếu còn thời gian, đi xe ra sân bay rồi bay về.
-  takeStop(day, '08:00', 'cafe');
   const leaveAt = inbound ? addMinutes(inbound.departTime, -120 - (transfer?.minutes ?? 0)) : '15:00';
+  if (leaveAt >= '09:00') takeStop(day, '08:00', 'cafe');
   if (leaveAt >= '11:00') takeStop(day, '09:30', 'fun');
   if (leaveAt >= '13:00') takeStop(day, '12:00', 'food');
+  // Ngày cuối luôn có mục trả phòng, nên số ngày của lộ trình khớp daysCount.
+  const lastHotel = choices[choices.length - 1]!.hotel;
+  items.push({ day, time: leaveAt < '11:00' ? addMinutes(leaveAt, -30) : '11:00', title: `Trả phòng ${lastHotel.name}`, notes: 'Gửi hành lý ở lễ tân nếu còn đi chơi' });
   if (inbound) {
     if (transfer) {
       items.push({ day, time: leaveAt, title: `Di chuyển ${destination.name} → ${transfer.from}`, notes: transfer.note, transport: { mode: transfer.mode } });

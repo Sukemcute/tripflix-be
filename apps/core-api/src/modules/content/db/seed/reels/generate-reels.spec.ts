@@ -71,6 +71,18 @@ describe('reel mẫu sinh từ các video mẫu', () => {
     expect([...bookableCounts].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('lịch từng ngày hợp lý: không ngày trống, đúng số ngày, không trùng giờ, chợ phiên chỉ buổi sáng', () => {
+    for (const post of seed.posts.filter((p) => p.tripAttachment)) {
+      const items = post.tripAttachment!.items!;
+      const days = new Set(items.map((item) => item.day));
+      expect(Math.max(...days)).toBe(post.tripAttachment!.daysCount);
+      for (let day = 1; day <= post.tripAttachment!.daysCount!; day++) expect(days.has(day)).toBe(true);
+      const slots = items.map((item) => `${item.day} ${item.time}`);
+      expect(new Set(slots).size).toBe(slots.length);
+      for (const item of items.filter((i) => /chợ phiên/i.test(i.title))) expect(item.time! < '12:00').toBe(true);
+    }
+  });
+
   it('cảm xúc, bookmark, bình luận khớp số đếm và không tự tương tác bài của mình', () => {
     const posts = new Map(seed.posts.map((p) => [p.id, p]));
     const reactionKeys = new Set(seed.reactions.map((r) => `${r.postId}:${r.userId}`));
