@@ -2679,6 +2679,29 @@
         ]
       }
     },
+    "/api/media/playback-session": {
+      "post": {
+        "description": "Web: gọi kèm credentials (có Origin), trình duyệt nhận Set-Cookie cho tên miền media. App: không nhận Set-Cookie, ghép `cookies` thành header Cookie khi phát video.",
+        "operationId": "MediaPlaybackController_createSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cấp cookie xem video trên CDN",
+        "tags": [
+          "media"
+        ]
+      }
+    },
     "/api/v1/feed": {
       "get": {
         "operationId": "FeedController_getFeed",
@@ -8470,6 +8493,33 @@
         "required": [
           "assetId",
           "status"
+        ]
+      },
+      "PlaybackSessionDto": {
+        "type": "object",
+        "properties": {
+          "cookies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "CloudFront-Policy": "…",
+              "CloudFront-Signature": "…",
+              "CloudFront-Key-Pair-Id": "K2…"
+            },
+            "description": "Cookie CloudFront để mở video. App ghép thành header Cookie khi phát; web đã nhận qua Set-Cookie nên bỏ qua. Rỗng khi server chưa bật ký cookie."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hết hạn lúc này; xin lại trước đó. Null khi không ký."
+          }
+        },
+        "required": [
+          "cookies",
+          "expiresAt"
         ]
       },
       "FeedAuthorDto": {
