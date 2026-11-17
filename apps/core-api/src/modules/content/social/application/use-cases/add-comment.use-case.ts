@@ -3,6 +3,7 @@ import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException, Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import type { PostCounterDeltaRepository } from '../../infra/post-counter-delta.repository.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostRecord } from '../../../db/schema/index.js';
@@ -19,6 +20,8 @@ interface CommentThread {
   parent: CommentRecord;
 }
 
+type PostLock = { kind: 'locked'; post: PostRecord | null } | { kind: 'busy' };
+
 interface PreparedComment {
   shouldHold: boolean;
   thread: CommentThread | null;
@@ -33,6 +36,8 @@ export class AddCommentUseCase {
     private readonly outbox: ContentOutbox,
     private readonly userDirectory?: UserDirectoryPort,
     private readonly gate?: ContentGatePort,
+    // Không có (test dựng tay) thì luôn chờ khoá dòng bài như bước 1.
+    private readonly counterDeltas?: PostCounterDeltaRepository,
   ) {}
 
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
@@ -61,21 +66,11 @@ export class AddCommentUseCase {
 
   @Transactional('content')
   protected async createInTransaction(command: AddCommentCommand, prepared: PreparedComment): Promise<CommentRecord> {
-    // Câu đầu tiên khoá dòng bài (vừa khoá vừa cộng đếm), giữ thứ tự "khoá bài trước" như xoá bình luận và
-    // kiểm duyệt: ẩn, xoá cả luồng phải chờ lượt thêm này xong, không ai chen trả lời vào giữa lúc cascade.
-    // Kiểm không đạt thì ném lỗi, transaction rollback nên phần cộng đếm cũng bị huỷ.
-    const post = prepared.shouldHold
-      ? await this.postRepository.findByIdForUpdate(command.postId)
-      : await this.postRepository.lockAndIncrementCounter(command.postId, 'commentCount', 1);
-    this.assertCanComment(post, command);
-
-    if (prepared.thread) {
-      const { root, parent } = prepared.thread;
-      // Sau khi khoá bài, không ai xoá, ẩn được gốc hay mục được trả lời nữa: kiểm lại một lần là đủ.
-      this.assertReplyTarget(await this.commentRepository.findById(root.id), command.postId, parent.id);
-      if (parent.id !== root.id)
-        this.assertReplyTarget(await this.commentRepository.findById(parent.id), command.postId, parent.id);
-    }
+    // Bài vắng: lấy được khoá dòng bài ngay thì cộng đếm luôn (câu đầu vừa khoá vừa cộng), giữ thứ tự "khoá bài
+    // trước" như xoá bình luận và kiểm duyệt. Kiểm không đạt thì ném lỗi, rollback huỷ cả phần cộng đếm.
+    const lock = await this.lockPostForComment(command.postId, prepared.shouldHold);
+    const lockedPost =
+      lock.kind === 'locked' ? await this.assertStillCommentable(lock.post, command, prepared.thread) : null;
     const threadRootId = prepared.thread?.root.id ?? null;
     const parentCommentAuthorId = prepared.thread?.root.authorId ?? null;
     const replyToAuthorId = prepared.thread?.parent.authorId ?? null;
@@ -91,6 +86,19 @@ export class AddCommentUseCase {
       isEdited: false,
       status: shouldHold ? 'held' : 'visible',
     });
+
+    // Bài đông (dòng bài đang bị giữ): không chờ. Từ lúc INSERT, khoá ngoại giữ nhẹ dòng bài (KEY SHARE) nên ẩn, xoá
+    // cả luồng đến sau phải chờ lượt này; cái gì đã xong trước đó thì đọc lại ở đây thấy, không đạt thì rollback.
+    // Số đếm ghi vào bảng đệm, FlushCommentCountsUseCase cộng sau khoảng 1 giây (TF99).
+    let post = lockedPost;
+    if (!post) {
+      post = await this.assertStillCommentable(
+        await this.postRepository.findById(command.postId),
+        command,
+        prepared.thread,
+      );
+      await this.counterDeltas!.addCommentDelta(command.postId, 1);
+    }
 
     // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
     await this.outbox.add({
@@ -113,6 +121,32 @@ export class AddCommentUseCase {
     });
 
     return comment;
+  }
+
+  private async lockPostForComment(postId: string, shouldHold: boolean): Promise<PostLock> {
+    // Bình luận bị giữ chờ duyệt không cộng đếm: chỉ khoá như cũ.
+    if (shouldHold) return { kind: 'locked', post: await this.postRepository.findByIdForUpdate(postId) };
+    if (!this.counterDeltas) {
+      return { kind: 'locked', post: await this.postRepository.lockAndIncrementCounter(postId, 'commentCount', 1) };
+    }
+    const result = await this.postRepository.tryLockAndIncrementCounter(postId, 'commentCount', 1);
+    if (result.status === 'busy') return { kind: 'busy' };
+    return { kind: 'locked', post: result.status === 'locked' ? result.post : null };
+  }
+
+  /** Bài và luồng có thể vừa bị ẩn, xoá trong lúc chuẩn bị: kiểm lại khi đã chắc không ai đổi được nữa. */
+  private async assertStillCommentable(
+    post: PostRecord | null,
+    command: AddCommentCommand,
+    thread: CommentThread | null,
+  ): Promise<PostRecord> {
+    this.assertCanComment(post, command);
+    if (!thread) return post;
+    const { root, parent } = thread;
+    this.assertReplyTarget(await this.commentRepository.findById(root.id), command.postId, parent.id);
+    if (parent.id !== root.id)
+      this.assertReplyTarget(await this.commentRepository.findById(parent.id), command.postId, parent.id);
+    return post;
   }
 
   /** Người dùng chỉ bình luận được bài mình xem được (chặn draft, private, removed, hidden, held). */

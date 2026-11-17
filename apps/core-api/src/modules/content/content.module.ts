@@ -29,6 +29,7 @@ import {
 } from './social/api/index.js';
 import {
   AddCommentUseCase,
+  FlushCommentCountsUseCase,
   AdminModeratePostUseCase,
   BookmarkPostUseCase,
   COMMERCE_SERVICE_PORT,
@@ -73,10 +74,12 @@ import {
   CommentRepository,
   ContentOutboxRelay,
   ModerationActionRepository,
+  PostCounterDeltaRepository,
   PostRepository,
   PostSummaryRepository,
   ReactionRepository,
 } from './social/infra/index.js';
+import { FlushCommentCountsJob } from './social/jobs/flush-comment-counts.job.js';
 
 export const CONTENT_DB = Symbol('CONTENT_DB');
 export const CONTENT_EVENT_PRODUCER = 'core-api/content';
@@ -138,6 +141,18 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       inject: [buildTransactionHostToken('content')],
       useFactory: (txHost: ModuleTransactionHost) => new ReactionRepository(() => txHost.tx),
     },
+    {
+      provide: PostCounterDeltaRepository,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new PostCounterDeltaRepository(() => txHost.tx),
+    },
+    {
+      provide: FlushCommentCountsUseCase,
+      inject: [PostCounterDeltaRepository],
+      useFactory: (counterDeltas: PostCounterDeltaRepository) => new FlushCommentCountsUseCase(counterDeltas),
+    },
+    // Cộng bảng đệm số bình luận của bài đông mỗi giây (TF99), chỉ ở vai trò worker hoặc all.
+    FlushCommentCountsJob,
     {
       provide: BookmarkRepository,
       inject: [buildTransactionHostToken('content')],
@@ -276,10 +291,13 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: AddCommentUseCase,
-      inject: [PostRepository, CommentRepository, CONTENT_OUTBOX, USER_DIRECTORY_PORT, CONTENT_GATE_PORT],
+      inject: [
+        PostRepository, CommentRepository, CONTENT_OUTBOX, USER_DIRECTORY_PORT, CONTENT_GATE_PORT, PostCounterDeltaRepository,
+      ],
       useFactory: (
         postRepo: PostRepository, commentRepo: CommentRepository, outbox: ContentOutbox, userDirectory: UserDirectoryPort, gate: ContentGatePort,
-      ) => new AddCommentUseCase(postRepo, commentRepo, outbox, userDirectory, gate),
+        counterDeltas: PostCounterDeltaRepository,
+      ) => new AddCommentUseCase(postRepo, commentRepo, outbox, userDirectory, gate, counterDeltas),
     },
     {
       provide: EditCommentUseCase,

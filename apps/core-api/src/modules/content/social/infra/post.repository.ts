@@ -48,6 +48,11 @@ export interface FindAdminPostsOptions {
  */
 export type PostCounterField = 'commentCount' | 'shareCount' | 'bookmarkCount';
 
+export type CounterLockResult =
+  | { status: 'locked'; post: PostRecord }
+  | { status: 'busy' }
+  | { status: 'missing' };
+
 export class PostRepository {
   constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
 
@@ -227,6 +232,30 @@ export class PostRepository {
   ): Promise<number | undefined> {
     const record = await this.lockAndIncrementCounter(id, field, delta);
     return record?.[field];
+  }
+
+  /**
+   * Như lockAndIncrementCounter nhưng không chờ (TF99): dòng bài đang bị người khác giữ (bài đông) thì trả `busy`
+   * ngay để lượt thêm bình luận ghi vào bảng đệm thay vì xếp hàng. FOR NO KEY UPDATE không xung đột với khoá nhẹ
+   * (KEY SHARE) mà khoá ngoại của các lượt INSERT bình luận đang giữ, nên chỉ "bận" khi có người đang cộng đếm,
+   * sửa bài hoặc kiểm duyệt.
+   */
+  async tryLockAndIncrementCounter(id: string, field: PostCounterField, delta: number): Promise<CounterLockResult> {
+    const [record] = await this.db
+      .update(posts)
+      .set({
+        [field]: sql`GREATEST(0, ${posts[field]} + ${delta})`,
+        updatedAt: new Date(),
+      })
+      .where(
+        eq(
+          posts.id,
+          sql`(SELECT locked.id FROM ${posts} AS locked WHERE locked.id = ${id} FOR NO KEY UPDATE SKIP LOCKED)`,
+        ),
+      )
+      .returning();
+    if (record) return { status: 'locked', post: record };
+    return (await this.findById(id)) ? { status: 'busy' } : { status: 'missing' };
   }
 
   /**
