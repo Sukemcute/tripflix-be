@@ -18,7 +18,8 @@ export interface ListCommentsQuery {
   isStaff?: boolean;
 }
 
-export type EnrichedCommentItem = CommentRecord & {
+export type EnrichedCommentItem = Omit<CommentRecord, 'hiddenByActionId' | 'cascadeRootCommentId'> & {
+  moderationState: 'hidden' | null;
   isLiked: boolean;
   likeCount: number;
   replyCount: number;
@@ -91,10 +92,9 @@ export class ListCommentsUseCase {
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id, total) : null;
 
     const authorNames = await this.findAuthorNames(pageItems);
-    const items = pageItems.map((comment) => ({
-      ...comment,
-      authorName: authorNames.get(comment.authorId) ?? null,
-      likeCount: comment.likeCount ?? 0,
+    const items = pageItems.map((comment) => this.toEnrichedItem(comment, authorNames, {
+      replyCount: comment.replyCount,
+      isLiked: comment.isLiked,
     }));
     return { items, nextCursor, total };
   }
@@ -121,12 +121,36 @@ export class ListCommentsUseCase {
   private async findFocusThread(postId: string, commentId: string, viewerId?: string, isStaff = false): Promise<CommentRecord[]> {
     if (!z.uuid().safeParse(commentId).success) return [];
     const comment = await this.commentRepository.findById(commentId);
-    if (!comment || comment.postId !== postId || comment.deletedAt ||
-      (comment.status !== 'visible' && !(comment.status === 'held' && (isStaff || viewerId === comment.authorId)))) return [];
+    if (!comment || comment.postId !== postId || comment.deletedAt || !this.canRead(comment, viewerId, isStaff)) return [];
     if (!comment.parentCommentId) return [comment];
     const parent = await this.commentRepository.findById(comment.parentCommentId);
-    if (!parent || parent.postId !== postId || parent.deletedAt || parent.status !== 'visible') return [];
+    if (!parent || parent.postId !== postId || parent.deletedAt || !this.canRead(parent, viewerId, isStaff)) return [];
     return [parent, comment];
+  }
+
+  private canRead(comment: CommentRecord, viewerId?: string, isStaff = false): boolean {
+    return comment.status === 'visible' ||
+      (comment.status === 'held' && (isStaff || viewerId === comment.authorId)) ||
+      (['hidden', 'removed'].includes(comment.status) && viewerId === comment.authorId);
+  }
+
+  private toEnrichedItem(
+    comment: CommentRecord,
+    authorNames: Map<string, string>,
+    extras: { isLiked?: boolean; replyCount?: number } = {},
+  ): EnrichedCommentItem {
+    const moderated = comment.status === 'hidden' || comment.status === 'removed';
+    const { hiddenByActionId: _hiddenByActionId, cascadeRootCommentId: _cascadeRootCommentId, ...publicComment } = comment;
+    return {
+      ...publicComment,
+      status: moderated ? 'hidden' : comment.status,
+      body: moderated ? '' : comment.body,
+      moderationState: moderated ? 'hidden' : null,
+      authorName: authorNames.get(comment.authorId) ?? null,
+      likeCount: comment.likeCount ?? 0,
+      replyCount: extras.replyCount ?? 0,
+      isLiked: extras.isLiked ?? false,
+    };
   }
 
   /** Luồng mở bình luận được nhắc tới (1–2 dòng): lấy lượt thích và số trả lời riêng. */
@@ -145,10 +169,7 @@ export class ListCommentsUseCase {
     const replyCounts = await this.commentRepository.countRepliesByParentIds(rawItems.map((c) => c.id));
     const authorNames = await this.findAuthorNames(rawItems);
 
-    return rawItems.map((comment) => ({
-      ...comment,
-      authorName: authorNames.get(comment.authorId) ?? null,
-      likeCount: comment.likeCount ?? 0,
+    return rawItems.map((comment) => this.toEnrichedItem(comment, authorNames, {
       replyCount: replyCounts.get(comment.id) ?? 0,
       isLiked: likedIds.has(comment.id),
     }));

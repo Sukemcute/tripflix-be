@@ -91,4 +91,33 @@ describe('CommentRepository.countRepliesByParentIds', () => {
       ['Cũ hơn', false],
     ]);
   });
+
+  it('chỉ cho tác giả xem bình luận hidden/removed, và không tính chúng cho người xem khác', async () => {
+    const firstAuthorId = randomUUID();
+    const secondAuthorId = randomUUID();
+    const otherViewerId = randomUUID();
+    const [post] = await db.insert(posts).values({ authorId: firstAuthorId, postType: 'vlog', title: 'Bài thử ẩn comment' }).returning();
+    const postId = post!.id;
+    await db.insert(comments).values([
+      { postId, authorId: firstAuthorId, body: 'Bình luận của tôi đã ẩn', status: 'hidden' },
+      { postId, authorId: firstAuthorId, body: 'Bình luận của tôi đã gỡ', status: 'removed' },
+      { postId, authorId: secondAuthorId, body: 'Bình luận người khác đã ẩn', status: 'hidden' },
+      { postId, authorId: secondAuthorId, body: 'Bình luận người khác đã gỡ', status: 'removed' },
+      { postId, authorId: secondAuthorId, body: 'Bình luận công khai' },
+    ]);
+
+    const asAuthor = await repository.findPage({ postId, limit: 10, viewerId: firstAuthorId });
+    const asOtherViewer = await repository.findPage({ postId, limit: 10, viewerId: otherViewerId });
+    const asGuest = await repository.findPage({ postId, limit: 10 });
+
+    expect(asAuthor.map((comment) => comment.body).sort()).toEqual([
+      'Bình luận công khai',
+      'Bình luận của tôi đã gỡ',
+      'Bình luận của tôi đã ẩn',
+    ]);
+    expect(asOtherViewer.map((comment) => comment.body)).toEqual(['Bình luận công khai']);
+    expect(asGuest.map((comment) => comment.body)).toEqual(['Bình luận công khai']);
+    await expect(repository.countByPostId(postId, { viewerId: firstAuthorId })).resolves.toBe(3);
+    await expect(repository.countByPostId(postId, { viewerId: otherViewerId })).resolves.toBe(1);
+  });
 });

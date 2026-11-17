@@ -188,7 +188,7 @@ describe('Social API Controllers', () => {
         body: 'Tuyet voi',
         parentCommentId: undefined,
       });
-      expect(res).toEqual({ id: 'c1', body: 'Tuyet voi', likeCount: 0, isLiked: false });
+      expect(res).toEqual({ id: 'c1', body: 'Tuyet voi', moderationState: null, likeCount: 0, isLiked: false });
     });
 
     it('editComment nên gọi editCommentUseCase', async () => {
@@ -198,7 +198,7 @@ describe('Social API Controllers', () => {
         userId: mockUser.userId,
         body: 'Updated',
       });
-      expect(res).toEqual({ id: 'c1', body: 'Updated', likeCount: 2, isLiked: false });
+      expect(res).toEqual({ id: 'c1', body: 'Updated', moderationState: null, likeCount: 2, isLiked: false });
     });
 
     it('deleteComment nên gọi deleteCommentUseCase', async () => {
