@@ -353,6 +353,19 @@ function convertPayload(e: RawEvent, ctx: Ctx): Json | null {
   }
 }
 
+/** ID mô phỏng mà lệnh remove được phép xoá: tính lại từ bộ dữ liệu, không dò theo tên hay prefix. */
+export interface SimIdSets {
+  userIds: string[];
+  postIds: string[];
+  /** Khoá trong discovery.search_documents của bài (`post:<uuid>`). */
+  searchDocumentIds: string[];
+}
+
+export function simIdSetsOf(ds: Pick<SimDataset, 'users' | 'posts'>): SimIdSets {
+  const postIds = ds.posts.map((p) => p.id);
+  return { userIds: ds.users.map((u) => u.id), postIds, searchDocumentIds: postIds.map((id) => `post:${id}`) };
+}
+
 /** Trạng thái cuối của content sau khi chạy hết sự kiện (bảng reactions, bookmarks, comments, số đếm, bài bị xoá/ẩn). */
 export interface ContentState {
   reactions: Array<{ id: string; postId: string; userId: string; type: string; at: Date }>;

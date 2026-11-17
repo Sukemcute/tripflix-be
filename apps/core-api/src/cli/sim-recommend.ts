@@ -1,18 +1,42 @@
 import { Logger } from '@nestjs/common';
 import { createDb, createPool, type Db } from '@tripflix/db';
 import { RedisStreamsEventBus } from '@tripflix/event-bus';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import type { PgTable } from 'drizzle-orm/pg-core';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { Argon2PasswordHasher } from '../modules/access/auth/infra/argon2-password-hasher.js';
 import { users } from '../modules/access/db/schema/index.js';
-import { bookmarks, comments, follows, mediaAssets, posts, reactions } from '../modules/content/db/schema/index.js';
+import {
+  bookmarks,
+  commentReactions,
+  comments,
+  follows,
+  mediaAssets,
+  moderationCases,
+  posts,
+  reactions,
+  reports,
+} from '../modules/content/db/schema/index.js';
 import { RecommendIngestUseCases } from '../modules/discovery/recommend/application/ingest.use-cases.js';
 import type { RecentPostsStore } from '../modules/discovery/recommend/application/ports.js';
-import { recommendInteractions } from '../modules/discovery/db/schema/recommend.js';
+import {
+  recommendInteractions,
+  recommendPostScores,
+  recommendPosts,
+  recommendUserFeatures,
+} from '../modules/discovery/db/schema/recommend.js';
+import { searchDocuments } from '../modules/discovery/db/schema/search-documents.js';
 import { toRawRows } from '../modules/discovery/recommend/domain/ingest/to-raw-rows.js';
 import { DrizzleRecommendStore } from '../modules/discovery/recommend/infra/drizzle-recommend.store.js';
-import { contentStateOf, loadSimDataset, type ConvertedEvent, type SimDataset } from './sim-recommend/convert.js';
+import {
+  contentStateOf,
+  loadSimDataset,
+  SIM_EMAIL_DOMAIN,
+  simIdSetsOf,
+  type ConvertedEvent,
+  type SimDataset,
+} from './sim-recommend/convert.js';
 
 /**
  * Nạp bộ dữ liệu mô phỏng gợi ý (bộ sinh v2 của Duy) vào hệ thống (TF107).
@@ -21,6 +45,7 @@ import { contentStateOf, loadSimDataset, type ConvertedEvent, type SimDataset } 
  *   node dist/cli/sim-recommend.js seed-state  --data <thư mục> --yes           người dùng, bài, theo dõi, cảm xúc, lưu, bình luận
  *   node dist/cli/sim-recommend.js replay      --data <thư mục> --per-type 3 --yes   phát thử vào stream, consumer thật nạp
  *   node dist/cli/sim-recommend.js ingest      --data <thư mục> --yes           nạp hàng loạt bằng RecommendIngestUseCases
+ *   node dist/cli/sim-recommend.js remove      --data <thư mục> [--yes]         xoá đúng dữ liệu mô phỏng; thiếu --yes thì chỉ đếm
  *
  * Chạy lại không tạo trùng (uuid v5 cố định + ON CONFLICT). Không chạy ở production.
  */
@@ -34,7 +59,7 @@ const EnvSchema = z.object({
   SEED_PASSWORD: z.string().min(8, 'cần ít nhất 8 ký tự'),
 });
 const ArgsSchema = z.object({
-  command: z.enum(['plan', 'seed-state', 'replay', 'ingest']),
+  command: z.enum(['plan', 'seed-state', 'replay', 'ingest', 'remove']),
   data: z.string().min(1, 'thiếu --data <thư mục dữ liệu>'),
   shiftDays: z.coerce.number().int().min(0).max(3650),
   perType: z.coerce.number().int().min(1).max(50),
@@ -301,6 +326,90 @@ async function ingest(ds: SimDataset, env: z.infer<typeof EnvSchema>): Promise<v
   }
 }
 
+interface RemoveStep {
+  label: string;
+  db: Db;
+  table: PgTable;
+  /** Điều kiện cho một lô ID; luôn kèm ID tính lại từ bộ dữ liệu. */
+  where: (ids: string[]) => SQL | undefined;
+  ids: string[];
+}
+
+async function countRows(step: RemoveStep): Promise<number> {
+  let total = 0;
+  for (const part of chunks(step.ids)) {
+    const [row] = await step.db.select({ n: sql<number>`count(*)::int` }).from(step.table).where(step.where(part));
+    total += row?.n ?? 0;
+  }
+  return total;
+}
+
+async function deleteRows(step: RemoveStep): Promise<number> {
+  let total = 0;
+  for (const part of chunks(step.ids)) {
+    const result = await step.db.delete(step.table).where(step.where(part));
+    total += result.rowCount ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Xoá đúng dữ liệu mô phỏng. Hai lớp chặn: ID phải là uuid v5 tính lại từ bộ dữ liệu, và người dùng phải có
+ * email @sim.tripflix.local / bài phải do người dùng mô phỏng đăng. Xoá bài thì Postgres tự xoá theo cảm xúc, lưu,
+ * bình luận (kể cả của người thật trên bài mô phỏng), bộ đếm, tóm tắt, hành động kiểm duyệt; xoá người dùng thì xoá
+ * theo phiên đăng nhập. Không đụng báo cáo/case kiểm duyệt (không có khoá ngoại, của Trang): chỉ đếm để báo.
+ */
+async function remove(ds: SimDataset, env: z.infer<typeof EnvSchema>, isConfirmed: boolean): Promise<void> {
+  const { userIds, postIds, searchDocumentIds } = simIdSetsOf(ds);
+  const accessPool = createPool({ url: env.DATABASE_URL_ACCESS, max: 1, applicationName: 'sim-recommend:remove-access' });
+  const contentPool = createPool({ url: env.DATABASE_URL_CONTENT, max: 1, applicationName: 'sim-recommend:remove-content' });
+  const discoveryPool = createPool({ url: env.DATABASE_URL_DISCOVERY, max: 1, applicationName: 'sim-recommend:remove-discovery' });
+  try {
+    const accessDb = createDb(accessPool);
+    const contentDb = createDb(contentPool);
+    const discoveryDb = createDb(discoveryPool);
+    const simUsers = (ids: string[]) => and(inArray(users.id, ids), like(users.email, `%@${SIM_EMAIL_DOMAIN}`));
+    // Thứ tự: discovery (đọc từ content) → content (bài trước người) → access cuối cùng.
+    const steps: RemoveStep[] = [
+      { label: 'discovery.recommend_interactions (người mô phỏng)', db: discoveryDb, table: recommendInteractions, ids: userIds,
+        where: (ids) => inArray(recommendInteractions.actorId, ids) },
+      { label: 'discovery.recommend_interactions (người thật trên bài mô phỏng)', db: discoveryDb, table: recommendInteractions, ids: postIds,
+        // Loại dòng của người mô phỏng (bước trên) để số đếm khi chưa --yes khớp số xoá thật.
+        where: (ids) =>
+          and(eq(recommendInteractions.targetType, 'post'), inArray(recommendInteractions.targetId, ids), notInArray(recommendInteractions.actorId, userIds)) },
+      { label: 'discovery.recommend_post_scores', db: discoveryDb, table: recommendPostScores, ids: postIds,
+        where: (ids) => inArray(recommendPostScores.postId, ids) },
+      { label: 'discovery.recommend_posts', db: discoveryDb, table: recommendPosts, ids: postIds, where: (ids) => inArray(recommendPosts.postId, ids) },
+      { label: 'discovery.recommend_user_features', db: discoveryDb, table: recommendUserFeatures, ids: userIds,
+        where: (ids) => inArray(recommendUserFeatures.userId, ids) },
+      { label: 'discovery.search_documents', db: discoveryDb, table: searchDocuments, ids: searchDocumentIds, where: (ids) => inArray(searchDocuments.id, ids) },
+      { label: 'content.follows', db: contentDb, table: follows, ids: userIds,
+        // Dòng có cả hai đầu là người mô phỏng chỉ thuộc lô của người theo dõi, để không đếm hai lần.
+        where: (ids) => or(inArray(follows.followerId, ids), and(inArray(follows.authorId, ids), notInArray(follows.followerId, userIds))) },
+      { label: 'content.comment_reactions (người mô phỏng)', db: contentDb, table: commentReactions, ids: userIds,
+        where: (ids) => inArray(commentReactions.userId, ids) },
+      { label: 'content.reactions (người mô phỏng)', db: contentDb, table: reactions, ids: userIds, where: (ids) => inArray(reactions.userId, ids) },
+      { label: 'content.bookmarks (người mô phỏng)', db: contentDb, table: bookmarks, ids: userIds, where: (ids) => inArray(bookmarks.userId, ids) },
+      { label: 'content.comments (người mô phỏng)', db: contentDb, table: comments, ids: userIds, where: (ids) => inArray(comments.authorId, ids) },
+      { label: 'content.posts (kèm dòng xoá theo)', db: contentDb, table: posts, ids: postIds,
+        where: (ids) => and(inArray(posts.id, ids), inArray(posts.authorId, userIds)) },
+      { label: 'access.users (kèm phiên đăng nhập)', db: accessDb, table: users, ids: userIds, where: simUsers },
+    ];
+    const keep: RemoveStep[] = [
+      { label: 'content.moderation_cases trên bài mô phỏng', db: contentDb, table: moderationCases, ids: postIds,
+        where: (ids) => inArray(moderationCases.postId, ids) },
+      { label: 'content.reports trên bài mô phỏng', db: contentDb, table: reports, ids: postIds, where: (ids) => inArray(reports.targetId, ids) },
+    ];
+    for (const step of steps) out(`${isConfirmed ? 'xoá' : 'sẽ xoá'} ${step.label}: ${isConfirmed ? await deleteRows(step) : await countRows(step)}`);
+    for (const step of keep) out(`để nguyên ${step.label}: ${await countRows(step)} (báo Trang nếu > 0)`);
+    if (!isConfirmed) out('Chưa xoá gì. Kiểm đúng đích và số dòng rồi chạy lại với --yes.');
+  } finally {
+    await accessPool.end();
+    await contentPool.end();
+    await discoveryPool.end();
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const ds = loadSimDataset(args.data, args.shiftDays);
@@ -311,6 +420,10 @@ async function main(): Promise<void> {
   const env = EnvSchema.parse(process.env);
   if (env.NODE_ENV === 'production') throw new Error('Không nạp dữ liệu mô phỏng ở production');
   out(`Đích: DB ${targetOf(env.DATABASE_URL_CONTENT)} · Redis ${targetOf(env.REDIS_URL).replace(/\/$/, '')}`);
+  if (args.command === 'remove') {
+    await remove(ds, env, args.isConfirmed);
+    return;
+  }
   if (!args.isConfirmed) {
     out('Chưa ghi gì. Kiểm đúng đích rồi chạy lại với --yes.');
     return;

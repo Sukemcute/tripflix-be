@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { toRawRows } from '../../modules/discovery/recommend/domain/ingest/to-raw-rows.js';
-import { contentStateOf, loadSimDataset, simId, uuidV5 } from './convert.js';
+import { contentStateOf, loadSimDataset, simId, simIdSetsOf, uuidV5 } from './convert.js';
 
 const jsonl = (rows: unknown[]) => rows.map((r) => JSON.stringify(r)).join('\n');
 const ev = (eventId: string, type: string, occurredAt: string, payload: Record<string, unknown>, stream = 'stream:core.content') => ({
@@ -136,6 +136,17 @@ describe('loadSimDataset', () => {
     expect(ds.follows).toEqual([expect.objectContaining({ followerId: simId.user('usr_00001'), authorId: simId.user('usr_00002') })]);
     expect(Object.keys(ds.users[0]!).sort()).toEqual(['createdAt', 'displayName', 'email', 'id', 'simId']);
     expect(ds.users[0]!.email).toBe('usr_00001@sim.tripflix.local');
+  });
+});
+
+describe('simIdSetsOf', () => {
+  it('chỉ gồm uuid tính lại từ bộ dữ liệu, khoá tìm kiếm có tiền tố post:', () => {
+    const ids = simIdSetsOf(loadSimDataset(dir, 0));
+    expect(ids.userIds).toEqual([simId.user('usr_00001'), simId.user('usr_00002')]);
+    expect(ids.postIds).toHaveLength(3);
+    expect(ids.searchDocumentIds[0]).toBe(`post:${simId.post('post_000001')}`);
+    // ID mô phỏng gốc không bao giờ lọt vào lệnh xoá.
+    expect([...ids.userIds, ...ids.postIds].some((id) => id.startsWith('usr_') || id.startsWith('post_'))).toBe(false);
   });
 });
 
