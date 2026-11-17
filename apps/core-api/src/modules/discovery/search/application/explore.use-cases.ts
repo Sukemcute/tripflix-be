@@ -85,6 +85,8 @@ export interface ExploreResultItem {
   id: string;
   kind: string;
   refId: string;
+  /** stay: mã trên URL trang chi tiết khách sạn; null với mục khác. */
+  slug: string | null;
   title: string;
   subtitle: string | null;
   thumbnail: string | null;
@@ -146,6 +148,7 @@ export function hotelToObject(h: ExploreHotel): ExploreObject {
   return {
     id: `hotel:${h.id}`,
     refId: h.id,
+    slug: h.slug ?? null,
     kind: 'stay',
     src: 'commerce',
     title: h.name,
@@ -228,6 +231,7 @@ function toResultItem({ obj, reason }: ExploreItem, names: AuthorNames): Explore
     id: obj.id,
     kind: obj.kind,
     refId: obj.refId ?? obj.id,
+    slug: obj.slug ?? null,
     title: obj.title,
     subtitle: obj.place ?? null,
     thumbnail: obj.thumbnail ?? null,

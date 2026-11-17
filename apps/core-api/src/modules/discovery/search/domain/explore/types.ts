@@ -33,6 +33,8 @@ export interface ExploreObject {
   stars?: number | null;
   /** Mã gốc ở module nguồn (mã khách sạn, mã bài). */
   refId?: string;
+  /** Khách sạn: mã trên URL trang chi tiết. Chỉ mục dựng trước khi có field này thì không có. */
+  slug?: string | null;
   thumbnail?: string | null;
   /** Bài: id tác giả và ngày đăng (ISO). Chỉ mục dựng trước khi có field này thì không có. */
   authorId?: string | null;

@@ -66,7 +66,7 @@ export class StaysUseCases {
       const a = byId.get(h.id);
       if (!a?.isAvailable || a.unitPrice === null || a.totalPrice === null) return [];
       return [
-        { hotelId: h.id, name: h.name, stars: h.stars, thumbnail: h.thumbnail, province: h.province, unitPrice: a.unitPrice, totalPrice: a.totalPrice, rating: h.rating ?? null },
+        { hotelId: h.id, slug: h.slug ?? null, name: h.name, stars: h.stars, thumbnail: h.thumbnail, province: h.province, unitPrice: a.unitPrice, totalPrice: a.totalPrice, rating: h.rating ?? null },
       ];
     });
     const ranked = filterAndSortStays(available, query, query.sort);

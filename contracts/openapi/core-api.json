@@ -10251,6 +10251,12 @@
             "example": "da-lat",
             "description": "place: placeId để gọi /stays · hotel: mã khách sạn của commerce · airport: mã IATA"
           },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": null,
+            "description": "hotel: mã trên URL trang chi tiết (`/hotels/<slug>`) · place, airport: null. Có thể null tới lượt dựng lại chỉ mục gợi ý kế tiếp sau khi deploy; khi đó dùng `refId`"
+          },
           "name": {
             "type": "string",
             "example": "Đà Lạt",
@@ -10273,6 +10279,7 @@
           "id",
           "type",
           "refId",
+          "slug",
           "name",
           "subtitle",
           "placeId"
@@ -10417,7 +10424,13 @@
           "hotelId": {
             "type": "string",
             "example": "P-h-dl-01",
-            "description": "Mã khách sạn của commerce; mở trang chi tiết bằng mã này"
+            "description": "Mã khách sạn của commerce"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat-ana-mandara-villas-da-lat-ab12",
+            "description": "Mã trên URL trang chi tiết (`/hotels/<slug>`); null thì dùng `hotelId`"
           },
           "name": {
             "type": "string",
@@ -10464,6 +10477,7 @@
         },
         "required": [
           "hotelId",
+          "slug",
           "name",
           "stars",
           "thumbnail",
@@ -10648,6 +10662,12 @@
             "example": "P-h-dl-01",
             "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
           },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat-ana-mandara-villas-da-lat-ab12",
+            "description": "stay: mã trên URL trang chi tiết (`/hotels/<slug>`) · mục khác: null. Có thể null tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy; khi đó dùng `refId`"
+          },
           "title": {
             "type": "string",
             "example": "Ana Mandara Villas Đà Lạt"
@@ -10719,6 +10739,7 @@
           "id",
           "kind",
           "refId",
+          "slug",
           "title",
           "subtitle",
           "thumbnail",
@@ -10781,6 +10802,12 @@
             "type": "string",
             "example": "P-h-dl-01",
             "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat-ana-mandara-villas-da-lat-ab12",
+            "description": "stay: mã trên URL trang chi tiết (`/hotels/<slug>`) · mục khác: null. Có thể null tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy; khi đó dùng `refId`"
           },
           "title": {
             "type": "string",
@@ -10873,6 +10900,7 @@
           "id",
           "kind",
           "refId",
+          "slug",
           "title",
           "subtitle",
           "thumbnail",
@@ -10955,6 +10983,12 @@
             "example": "P-h-dl-01",
             "description": "stay: mã khách sạn của commerce · plan/post/video: mã bài"
           },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": "da-lat-ana-mandara-villas-da-lat-ab12",
+            "description": "stay: mã trên URL trang chi tiết (`/hotels/<slug>`) · mục khác: null. Có thể null tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy; khi đó dùng `refId`"
+          },
           "title": {
             "type": "string",
             "example": "Ana Mandara Villas Đà Lạt"
@@ -11031,6 +11065,7 @@
           "id",
           "kind",
           "refId",
+          "slug",
           "title",
           "subtitle",
           "thumbnail",

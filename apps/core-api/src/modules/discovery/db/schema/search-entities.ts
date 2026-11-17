@@ -12,6 +12,8 @@ export const searchEntities = discoverySchema.table(
     id: text('id').primaryKey(),
     type: text('type').notNull(),
     refId: text('ref_id').notNull(),
+    // Khách sạn: mã trên URL trang chi tiết (TF67); dòng khác null.
+    slug: text('slug'),
     name: text('name').notNull(),
     subtitle: text('subtitle'),
     placeId: text('place_id'),

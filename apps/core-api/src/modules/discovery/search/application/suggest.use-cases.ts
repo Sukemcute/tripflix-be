@@ -19,6 +19,8 @@ export interface Suggestion {
   id: string;
   type: SuggestType;
   refId: string;
+  /** hotel: mã trên URL trang chi tiết; dòng khác null. */
+  slug: string | null;
   name: string;
   subtitle: string | null;
   placeId: string | null;
@@ -29,10 +31,11 @@ const CANDIDATE_LIMIT = 40;
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_CATALOG_PAGES = 1_000;
 
-const toSuggestion = ({ id, type, refId, name, subtitle, placeId }: SuggestEntity): Suggestion => ({
+const toSuggestion = ({ id, type, refId, slug, name, subtitle, placeId }: SuggestEntity): Suggestion => ({
   id,
   type,
   refId,
+  slug,
   name,
   subtitle,
   placeId,

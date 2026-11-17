@@ -25,6 +25,14 @@ export class SuggestionDto {
     description: 'place: placeId để gọi /stays · hotel: mã khách sạn của commerce · airport: mã IATA',
   })
   refId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: null,
+    description:
+      'hotel: mã trên URL trang chi tiết (`/hotels/<slug>`) · place, airport: null. Có thể null tới lượt dựng lại chỉ mục gợi ý kế tiếp sau khi deploy; khi đó dùng `refId`',
+  })
+  slug!: string | null;
   @ApiProperty({ example: 'Đà Lạt', description: 'Tên hiện ở dòng chính' }) name!: string;
   @ApiProperty({
     type: String,
@@ -115,7 +123,14 @@ class StayProvinceDto {
 }
 
 export class StayDto {
-  @ApiProperty({ example: 'P-h-dl-01', description: 'Mã khách sạn của commerce; mở trang chi tiết bằng mã này' }) hotelId!: string;
+  @ApiProperty({ example: 'P-h-dl-01', description: 'Mã khách sạn của commerce' }) hotelId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'da-lat-ana-mandara-villas-da-lat-ab12',
+    description: 'Mã trên URL trang chi tiết (`/hotels/<slug>`); null thì dùng `hotelId`',
+  })
+  slug!: string | null;
   @ApiProperty({ example: 'Ana Mandara Villas Đà Lạt' }) name!: string;
   @ApiProperty({ type: Number, nullable: true, example: 5 }) stars!: number | null;
   @ApiProperty({ type: String, nullable: true, example: '/images/vinpearl/vp-luxury-nha-trang-1.jpg' }) thumbnail!: string | null;
@@ -175,6 +190,13 @@ export class ExploreItemDto {
   @ApiProperty({ example: 'hotel:P-h-dl-01', description: '`<loại>:<mã gốc>`, duy nhất' }) id!: string;
   @ApiProperty({ example: 'stay', description: 'stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)' }) kind!: string;
   @ApiProperty({ example: 'P-h-dl-01', description: 'stay: mã khách sạn của commerce · plan/post/video: mã bài' }) refId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'da-lat-ana-mandara-villas-da-lat-ab12',
+    description: 'stay: mã trên URL trang chi tiết (`/hotels/<slug>`) · mục khác: null. Có thể null tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy; khi đó dùng `refId`',
+  })
+  slug!: string | null;
   @ApiProperty({ example: 'Ana Mandara Villas Đà Lạt' }) title!: string;
   @ApiProperty({ type: String, nullable: true, example: 'Đà Lạt', description: 'Nơi của mục' }) subtitle!: string | null;
   @ApiProperty({ type: String, nullable: true }) thumbnail!: string | null;
