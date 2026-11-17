@@ -5921,6 +5921,159 @@
           "analytics"
         ]
       }
+    },
+    "/api/analytics/observability": {
+      "get": {
+        "operationId": "ObservabilityController_getOverview",
+        "parameters": [
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilityDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/observability/traces": {
+      "get": {
+        "operationId": "ObservabilityController_listTraces",
+        "parameters": [
+          {
+            "name": "minDurationMs",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "errorsOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/observability/traces/{traceId}": {
+      "get": {
+        "operationId": "ObservabilityController_getTrace",
+        "parameters": [
+          {
+            "name": "traceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
@@ -13692,6 +13845,323 @@
           "groupBy",
           "rows",
           "total"
+        ]
+      },
+      "TelemetrySourceDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "unavailable",
+              "not_configured"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "TelemetrySummaryDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p50Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "requests",
+          "requestRate",
+          "errorRate",
+          "p50Ms",
+          "p95Ms"
+        ]
+      },
+      "TelemetryPointDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "requestRate",
+          "errorRate",
+          "p95Ms"
+        ]
+      },
+      "TelemetryServiceDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p50Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "isHealthy": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "memoryBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "requests",
+          "requestRate",
+          "errorRate",
+          "p50Ms",
+          "p95Ms",
+          "name",
+          "isHealthy",
+          "lastSeenAt",
+          "memoryBytes",
+          "uptimeSeconds"
+        ]
+      },
+      "TelemetryRouteDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "number"
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "service",
+          "method",
+          "route",
+          "requests",
+          "errorRate",
+          "p95Ms"
+        ]
+      },
+      "ObservabilityDto": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "number"
+          },
+          "from": {
+            "type": "number"
+          },
+          "to": {
+            "type": "number"
+          },
+          "metricsSource": {
+            "$ref": "#/components/schemas/TelemetrySourceDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TelemetrySummaryDto"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryPointDto"
+            }
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryServiceDto"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryRouteDto"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "from",
+          "to",
+          "metricsSource",
+          "summary",
+          "series",
+          "services",
+          "routes"
+        ]
+      },
+      "TraceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "traceId",
+          "service",
+          "operation",
+          "startedAt",
+          "durationMs"
+        ]
+      },
+      "TraceListDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/TelemetrySourceDto"
+          },
+          "traces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceSummaryDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "traces",
+          "limit"
+        ]
+      },
+      "TelemetrySpanDto": {
+        "type": "object",
+        "properties": {
+          "spanId": {
+            "type": "string"
+          },
+          "parentSpanId": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "isError": {
+            "type": "boolean"
+          },
+          "httpStatus": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "spanId",
+          "parentSpanId",
+          "service",
+          "operation",
+          "startedAt",
+          "durationMs",
+          "isError",
+          "httpStatus"
+        ]
+      },
+      "TraceDetailDto": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string"
+          },
+          "spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetrySpanDto"
+            }
+          }
+        },
+        "required": [
+          "traceId",
+          "spans"
         ]
       }
     }

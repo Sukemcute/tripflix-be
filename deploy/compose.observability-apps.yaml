@@ -1,0 +1,12 @@
+# Merge after compose.yaml and compose.observability.yaml to enable application exports.
+services:
+  core-api:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: core-api
+      ANALYTICS_PROMETHEUS_URL: http://prometheus:9090
+      ANALYTICS_TEMPO_URL: http://tempo:3200
+  notification-service:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: notification-service
