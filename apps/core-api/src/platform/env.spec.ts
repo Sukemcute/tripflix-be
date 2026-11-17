@@ -59,5 +59,6 @@ describe('CLOUDFRONT_KEY_PAIR_ID, CLOUDFRONT_PRIVATE_KEY', () => {
   it('MEDIA_PLAYBACK_TTL_SEC trong khoảng 5 phút đến 1 ngày', () => {
     expect(coreEnvSchema.parse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '3600' }).MEDIA_PLAYBACK_TTL_SEC).toBe(3600);
     expect(coreEnvSchema.safeParse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '60' }).success).toBe(false);
+    expect(coreEnvSchema.parse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '' }).MEDIA_PLAYBACK_TTL_SEC).toBeUndefined();
   });
 });

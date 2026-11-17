@@ -141,7 +141,11 @@ export const coreEnvSchema = baseEnvSchema
     // Domain cookie cho web, là tên miền cha của MEDIA_CDN_URL (ví dụ .tripflix.io.vn). Trống: chỉ trả cookie trong body.
     MEDIA_COOKIE_DOMAIN: OptionalStringSchema,
     // Số giây cookie xem video còn hiệu lực (5 phút đến 1 ngày). Trống: 6 giờ.
-    MEDIA_PLAYBACK_TTL_SEC: z.coerce.number().int().min(300).max(86_400).optional(),
+    // Compose truyền `${MEDIA_PLAYBACK_TTL_SEC:-}` thành "", coerce đọc "" thành 0 và core-api không khởi động.
+    MEDIA_PLAYBACK_TTL_SEC: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.coerce.number().int().min(300).max(86_400).optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     // Thiếu một trong hai thì không ký được: dừng ngay lúc khởi động thay vì âm thầm phát video không khoá.
