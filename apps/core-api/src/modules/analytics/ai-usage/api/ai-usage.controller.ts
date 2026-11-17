@@ -67,8 +67,8 @@ export class AiUsageController {
     summary: 'Số lần gọi, token và chi phí AI theo tính năng, ngày hoặc model',
     description: 'Ngày theo giờ Việt Nam, gồm cả `from` và `to`. Mặc định 7 ngày tới hôm nay, tối đa 92 ngày. Chi phí là ước tính.',
   })
-  @ApiQuery({ name: 'from', required: false, example: '2026-11-11' })
-  @ApiQuery({ name: 'to', required: false, example: '2026-11-17' })
+  @ApiQuery({ name: 'from', required: false, type: String, example: '2026-11-11' })
+  @ApiQuery({ name: 'to', required: false, type: String, example: '2026-11-17' })
   @ApiQuery({ name: 'groupBy', required: false, enum: AI_USAGE_GROUPS })
   @ApiOkResponse({ type: AiUsageResponseDto })
   @ApiBadRequestResponse({ description: 'Ngày sai dạng, from sau to, quá 92 ngày hoặc groupBy lạ' })
