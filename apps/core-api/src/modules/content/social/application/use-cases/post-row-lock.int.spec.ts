@@ -19,11 +19,13 @@ import type pg from 'pg';
 import { contentOutboxEvents } from '../../../db/schema/index.js';
 import { BookmarkRepository } from '../../infra/bookmark.repository.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
+import { PostCounterDeltaRepository } from '../../infra/post-counter-delta.repository.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { ReactionRepository } from '../../infra/reaction.repository.js';
 import { AddCommentUseCase } from './add-comment.use-case.js';
 import { BookmarkPostUseCase } from './bookmark-post.use-case.js';
 import { DeleteCommentUseCase } from './delete-comment.use-case.js';
+import { FlushCommentCountsUseCase } from './flush-comment-counts.use-case.js';
 import { SetReactionUseCase } from './set-reaction.use-case.js';
 
 const AUTHOR = '11111111-1111-4111-8111-111111111111';
@@ -39,6 +41,7 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
     const posts = new PostRepository(() => tx.tx);
     const comments = new CommentRepository(() => tx.tx);
     const outbox = new OutboxWriter(() => tx.tx, contentOutboxEvents, 'core-api/content');
+    const counterDeltas = new PostCounterDeltaRepository(() => tx.tx);
     return {
       add: new AddCommentUseCase(posts, comments, outbox, {
         // Tra tên chạy trước khi khoá: giả lập chậm để các lượt chồng lên nhau nhiều hơn.
@@ -46,7 +49,8 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
           await new Promise((resolve) => setTimeout(resolve, 2));
           return new Map(ids.map((id) => [id, 'Người dùng']));
         },
-      }),
+      }, undefined, counterDeltas),
+      flush: new FlushCommentCountsUseCase(counterDeltas),
       delete: new DeleteCommentUseCase(comments, posts, outbox),
       react: new SetReactionUseCase(posts, new ReactionRepository(() => tx.tx), outbox),
       bookmark: new BookmarkPostUseCase(posts, new BookmarkRepository(() => tx.tx)),
@@ -82,7 +86,7 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
   });
 
   beforeEach(async () => {
-    await pool.query('truncate content.posts, content.outbox_events cascade');
+    await pool.query('truncate content.posts, content.outbox_events, content.post_counter_deltas cascade');
     postId = randomUUID();
     await pool.query(
       "insert into content.posts (id, author_id, post_type, title, status, published_at) values ($1,$2,'video','Bài đông','published',now())",
@@ -108,7 +112,12 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
     return rows[0]!;
   }
 
-  it('30 người cùng gửi bình luận: đủ 30 dòng và comment_count = 30', async () => {
+  async function pendingDeltas(): Promise<number> {
+    const { rows } = await pool.query('select count(*)::int as count from content.post_counter_deltas');
+    return rows[0].count;
+  }
+
+  it('30 người cùng gửi bình luận (bài đông): đủ 30 dòng; số đếm = cộng ngay + bảng đệm, đủ 30 sau khi job cộng', async () => {
     await Promise.all(
       Array.from({ length: 30 }, (_, index) =>
         cases.add.execute({ postId, authorId: randomUUID(), body: `Bình luận ${index}` }),
@@ -119,7 +128,125 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
       postId,
     ]);
     expect(rows[0].count).toBe(30);
+    // Trước khi job chạy: phần cộng ngay + phần đang đệm luôn bằng số bình luận thật.
+    expect((await readPost()).comment_count + (await pendingDeltas())).toBe(30);
+
+    await cases.flush.execute();
     expect((await readPost()).comment_count).toBe(30);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
+  it('dòng bài đang bị giữ: lượt gửi không chờ, xong ngay và ghi +1 vào bảng đệm', async () => {
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from content.posts where id = $1 for no key update', [postId]);
+
+      const startedAt = Date.now();
+      await cases.add.execute({ postId, authorId: randomUUID(), body: 'Không xếp hàng' });
+      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      expect(await pendingDeltas()).toBe(1);
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    await cases.flush.execute();
+    expect((await readPost()).comment_count).toBe(1);
+  });
+
+  it('lượt cộng dồn lỗi giữa chừng (rollback): phần đệm còn nguyên, lượt sau cộng đúng một lần', async () => {
+    await pool.query(
+      'insert into content.post_counter_deltas (post_id, comment_delta) select $1, 1 from generate_series(1, 12)',
+      [postId],
+    );
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const repository = new PostCounterDeltaRepository(createDb(client as unknown as pg.Pool));
+      expect(await repository.flushCommentDeltas(5000)).toEqual({ deltaRows: 12, postCount: 1 });
+      // Giả lập process chết hoặc lỗi sau khi đã cộng và xoá nhưng trước COMMIT.
+      await client.query('rollback');
+    } finally {
+      client.release();
+    }
+    expect((await readPost()).comment_count).toBe(0);
+    expect(await pendingDeltas()).toBe(12);
+
+    await cases.flush.execute();
+    await cases.flush.execute();
+    expect((await readPost()).comment_count).toBe(12);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
+  it('xoá gốc khi các trả lời còn nằm trong bảng đệm: số đếm về đúng 0, cộng dồn sau đó không làm lệch', async () => {
+    const root = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Gốc' });
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from content.posts where id = $1 for no key update', [postId]);
+      for (let index = 0; index < 8; index += 1) {
+        await cases.add.execute({ postId, authorId: randomUUID(), body: `Trả lời ${index}`, parentCommentId: root.id });
+      }
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    expect((await readPost()).comment_count).toBe(1);
+    expect(await pendingDeltas()).toBe(8);
+
+    // Trước khi sửa: trừ 9 trên số 1 bị chặn về 0, job cộng thêm 8 phần đệm, số đếm thành 8.
+    await cases.delete.execute({ commentId: root.id, userId: AUTHOR, isSuperAdmin: false });
+    expect((await readPost()).comment_count).toBe(0);
+    expect(await pendingDeltas()).toBe(0);
+
+    await cases.flush.execute();
+    expect((await readPost()).comment_count).toBe(0);
+  });
+
+  it('xoá bình luận cùng lúc với lượt cộng dồn: không khoá chết, số đếm khớp', async () => {
+    const roots = [];
+    for (let index = 0; index < 6; index += 1) {
+      roots.push(await cases.add.execute({ postId, authorId: AUTHOR, body: `Gốc ${index}` }));
+    }
+    await pool.query(
+      'insert into content.post_counter_deltas (post_id, comment_delta) select $1, 1 from generate_series(1, 40)',
+      [postId],
+    );
+    await pool.query(
+      `insert into content.comments (post_id, author_id, body) select $1, $2, 'đã đệm ' || n from generate_series(1, 40) as n`,
+      [postId, AUTHOR],
+    );
+
+    const results = await Promise.allSettled([
+      ...roots.map((root) => cases.delete.execute({ commentId: root.id, userId: AUTHOR, isSuperAdmin: false })),
+      cases.flush.execute(),
+      cases.flush.execute(),
+    ]);
+    await cases.flush.execute();
+
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
+    expect((await readPost()).comment_count).toBe(40);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
+  it('một người gửi một mình (bài vắng): cộng ngay, không ghi bảng đệm', async () => {
+    await cases.add.execute({ postId, authorId: randomUUID(), body: 'Một mình' });
+
+    expect((await readPost()).comment_count).toBe(1);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
+  it('hai lượt cộng dồn chạy cùng lúc (2 bản worker): không cộng trùng', async () => {
+    await pool.query(
+      'insert into content.post_counter_deltas (post_id, comment_delta) select $1, 1 from generate_series(1, 50)',
+      [postId],
+    );
+
+    const results = await Promise.all([cases.flush.execute(), cases.flush.execute(), cases.flush.execute()]);
+
+    expect((await readPost()).comment_count).toBe(50);
+    expect(await pendingDeltas()).toBe(0);
+    expect(results.reduce((sum, result) => sum + result.deltaRows, 0)).toBe(50);
   });
 
   it('gửi trả lời cùng lúc với xoá bình luận gốc: không còn trả lời nào hiện dưới gốc đã xoá, số đếm khớp', async () => {
@@ -140,6 +267,7 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
       [postId],
     );
     expect(orphan.rows[0].count).toBe(0);
+    await cases.flush.execute();
     const visible = await pool.query(
       "select count(*)::int as count from content.comments where post_id = $1 and deleted_at is null and status = 'visible'",
       [postId],
