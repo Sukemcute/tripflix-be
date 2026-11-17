@@ -10,6 +10,7 @@ import { MemoryExploreSource } from '../domain/explore/memory-source.js';
 import type { BuiltIndex } from '../domain/explore/types.js';
 import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
 import { ExploreUseCases, hotelToObject, pointToObject, postToObject } from './explore.use-cases.js';
+import { PLACE_SEEDS } from '../domain/place-seeds.js';
 import type { PointOfInterestSeed } from '../domain/points-of-interest.js';
 import type { ExploreCatalog, ExploreHotel, ExplorePost, ExploreStore } from './ports.js';
 import type { JobRuns } from '../../jobs/job-runs.js';
@@ -95,7 +96,8 @@ function setup(hotels: ExploreHotel[], posts: ExplorePost[], hidden: string[] = 
     findVisiblePostIds: async (ids) => new Set(ids.filter((id) => !hidden.includes(id))),
     getAuthorNames: async (ids) => new Map(ids.filter((id) => id === 'U1').map((id) => [id, 'Minh Anh'])),
   };
-  return { store, catalog, explore: new ExploreUseCases(store, catalog, points) };
+  const places = { listPlaces: async () => [...PLACE_SEEDS], listPoints: async () => points };
+  return { store, catalog, explore: new ExploreUseCases(store, catalog, places) };
 }
 
 describe('ExploreUseCases', () => {
@@ -351,8 +353,8 @@ describe('ExploreUseCases', () => {
     const points = [poi('osm:node/1', 'Kokoro Coffee', 'cafe', ['indoor']), poi('osm:node/2', 'Bảo tàng Lâm Đồng', 'see', ['museum']), poi('osm:node/3', 'Nhà nghỉ Hoa', 'lodging')];
 
     it('map quán, điểm tham quan sang đúng vùng và nơi; bỏ chỗ ở ngoài Tripflix', () => {
-      expect(pointToObject(points[0]!)).toMatchObject({ id: 'poi:osm:node/1', kind: 'cafe', place: 'Đà Lạt', lat: 11.94, lon: 108.45 });
-      expect(pointToObject(points[2]!)).toBeNull();
+      expect(pointToObject(points[0]!, 'Đà Lạt')).toMatchObject({ id: 'poi:osm:node/1', kind: 'cafe', place: 'Đà Lạt', lat: 11.94, lon: 108.45 });
+      expect(pointToObject(points[2]!, 'Đà Lạt')).toBeNull();
     });
 
     it('dựng chỉ mục kèm điểm OSM rồi tìm được quán cà phê và bảo tàng theo câu tiếng Việt', async () => {
@@ -363,6 +365,22 @@ describe('ExploreUseCases', () => {
       expect(cafe.sections.find((s) => s.kind === 'cafe')!.items.map((i) => i.title)).toEqual(['Kokoro Coffee']);
       const museum = await explore.search({ q: 'bảo tàng đà lạt' });
       expect(museum.sections.find((s) => s.kind === 'see')!.items.map((i) => i.title)).toEqual(['Bảo tàng Lâm Đồng']);
+    });
+
+    it('searchPlaces: một loại, phân trang, kèm ghi nguồn OSM; không khớp đủ câu thì trả kết quả thay thế cùng loại', async () => {
+      const many = Array.from({ length: 3 }, (_, i) => poi(`osm:node/${10 + i}`, `Cafe Số ${i + 1}`, 'cafe'));
+      const { explore } = setup([], [], [], [...points, ...many]);
+      await explore.rebuildIndex();
+      const first = await explore.searchPlaces({ q: 'cafe đà lạt', kind: 'cafe', limit: 2 });
+      expect(first.items.every((i) => i.kind === 'cafe')).toBe(true);
+      expect(first).toMatchObject({ total: 4, isFallback: false, attribution: '© OpenStreetMap contributors (ODbL)' });
+      const second = await explore.searchPlaces({ q: 'cafe đà lạt', kind: 'cafe', cursor: first.nextCursor!, limit: 2 });
+      expect([...first.items, ...second.items].map((i) => i.id)).toHaveLength(4);
+      expect(second.nextCursor).toBeNull();
+      const relaxed = await explore.searchPlaces({ q: 'cafe yên tĩnh đà lạt', kind: 'cafe', limit: 10 });
+      expect(relaxed.isFallback).toBe(true);
+      expect(relaxed.dropped).toContain('yên tĩnh');
+      expect((await explore.searchPlaces({ q: 'cafe đà lạt', kind: 'stay', limit: 10 })).attribution).toBeNull();
     });
   });
 });
