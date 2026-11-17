@@ -22,6 +22,11 @@ export const HotV1FeaturesSchema = z.object({
   ageHours: z.number(),
 });
 
+export const HotV2FeaturesSchema = HotV1FeaturesSchema.extend({
+  completeness: z.number(),
+  hasPlan: z.boolean(),
+});
+
 /** Phân vị kiểu numpy.percentile (nội suy tuyến tính), để khớp thử nghiệm Python. */
 export function percentile(values: readonly number[], p: number): number {
   if (!values.length) return 0;
@@ -113,6 +118,54 @@ function summarizeItemV1(item: PostBuildItem) {
   return { signal, reactions, comments, bookmarks, shares, orders, views };
 }
 
+function buildHotBase(items: PostBuildItem[], now: Date) {
+  const summaries = items.map((item) => {
+    const ageHours = Math.max(0, (now.getTime() - Date.parse(item.publishedAt)) / 3_600_000);
+    const velocity24h = Object.values(item.interactions24h).reduce((sum, n) => sum + (n ?? 0), 0);
+    const s = summarizeItemV1(item);
+    return {
+      postId: item.postId,
+      ageHours,
+      velocity24h,
+      completeness: item.completeness ?? 0,
+      hasPlan: item.hasPlan ?? false,
+      ...s,
+    };
+  });
+
+  const hasViewSignal = summaries.some((s) => s.views > 0);
+  return summaries.map((s) => {
+    const viewDenom = hasViewSignal ? s.views + HOT_V1_VIEW_SMOOTHING_K : 1;
+    const rawV1 = Math.log1p(s.signal) / viewDenom / (s.ageHours + 2) ** 1.2;
+    return {
+      postId: s.postId,
+      rawV1,
+      completeness: s.completeness,
+      hasPlan: s.hasPlan,
+      features: {
+        signal: round4(s.signal),
+        reactions: s.reactions,
+        comments: s.comments,
+        shares: s.shares,
+        bookmarks: s.bookmarks,
+        orders: s.orders,
+        views: s.views,
+        velocity24h: s.velocity24h,
+        ageHours: Math.round(s.ageHours * 100) / 100,
+      },
+    };
+  });
+}
+
+function normalizeByP99<F extends Record<string, unknown>>(rows: Array<{ postId: string; raw: number; features: F }>) {
+  const p99 = percentile(rows.map((r) => r.raw), 99);
+  return rows.map((r) => ({
+    postId: r.postId,
+    score: p99 > 0 ? round4(Math.min(1, Math.max(0, r.raw / p99))) : 0,
+    features: r.features,
+  }));
+}
+
 /**
  * hot@v1 (TF23):
  * - signal = Σ (w_loại × w_tài_khoản) gồm reaction(1), comment(3), bookmark(4), share(5), order_item(10)
@@ -124,37 +177,33 @@ export const hotV1: PostBuilder = {
   key: 'hot@v1',
   featuresSchema: HotV1FeaturesSchema,
   build(items, now) {
-    const summaries = items.map((item) => {
-      const ageHours = Math.max(0, (now.getTime() - Date.parse(item.publishedAt)) / 3_600_000);
-      const velocity24h = Object.values(item.interactions24h).reduce((sum, n) => sum + (n ?? 0), 0);
-      const s = summarizeItemV1(item);
-      return { postId: item.postId, ageHours, velocity24h, ...s };
-    });
+    const rows = buildHotBase(items, now).map((r) => ({
+      postId: r.postId,
+      raw: r.rawV1,
+      features: r.features,
+    }));
+    return Promise.resolve(normalizeByP99(rows));
+  },
+};
 
-    const hasViewSignal = summaries.some((s) => s.views > 0);
-    const rows = summaries.map((s) => {
-      const viewDenom = hasViewSignal ? s.views + HOT_V1_VIEW_SMOOTHING_K : 1;
-      const raw = Math.log1p(s.signal) / viewDenom / (s.ageHours + 2) ** 1.2;
-      return {
-        postId: s.postId,
-        raw,
-        features: {
-          signal: round4(s.signal),
-          reactions: s.reactions,
-          comments: s.comments,
-          shares: s.shares,
-          bookmarks: s.bookmarks,
-          orders: s.orders,
-          views: s.views,
-          velocity24h: s.velocity24h,
-          ageHours: Math.round(s.ageHours * 100) / 100,
-        },
-      };
-    });
-
-    const p99 = percentile(rows.map((r) => r.raw), 99);
-    return Promise.resolve(
-      rows.map((r) => ({ postId: r.postId, score: p99 > 0 ? round4(Math.min(1, Math.max(0, r.raw / p99))) : 0, features: r.features })),
-    );
+/**
+ * hot@v2 (TF108):
+ * - Bằng hot@v1, nhân thêm hệ số hoàn thiện bài viết: raw_v2 = raw_v1 × (0.5 + 0.5 × completeness).
+ * - Bài 0 tương tác vẫn ra 0; bài đủ mọi thành phần được tối đa gấp đôi bài trống cùng tương tác & tuổi.
+ */
+export const hotV2: PostBuilder = {
+  key: 'hot@v2',
+  featuresSchema: HotV2FeaturesSchema,
+  build(items, now) {
+    const rows = buildHotBase(items, now).map((r) => ({
+      postId: r.postId,
+      raw: r.rawV1 * (0.5 + 0.5 * r.completeness),
+      features: {
+        ...r.features,
+        completeness: r.completeness,
+        hasPlan: r.hasPlan,
+      },
+    }));
+    return Promise.resolve(normalizeByP99(rows));
   },
 };

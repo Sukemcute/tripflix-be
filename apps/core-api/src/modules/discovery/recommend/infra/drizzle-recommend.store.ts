@@ -100,6 +100,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
               tags: excluded('tags'),
               placeId: excluded('place_id'),
               isVerified: excluded('is_verified'),
+              hasPlan: excluded('has_plan'),
               publishedAt: excluded('published_at'),
               syncedAt: excluded('synced_at'),
             },

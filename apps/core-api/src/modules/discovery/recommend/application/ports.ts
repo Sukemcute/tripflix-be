@@ -11,9 +11,19 @@ export interface RecommendSourcePost {
   authorId: string;
   postType: string;
   title: string;
+  body: string;
   hashtags: string[];
   isVerified: boolean;
-  tripAttachment: { hotelId?: string; destinationName?: string } | null;
+  mediaIds: string[];
+  coverMediaId: string | null;
+  tripAttachment: {
+    hotelId?: string;
+    destinationName?: string;
+    destinationPlaceId?: string;
+    daysCount?: number;
+    estimatedCostPerPerson?: number;
+    items?: unknown[];
+  } | null;
   /** listPosts không có publishedAt: dùng createdAt. */
   createdAt: Date;
 }
@@ -121,6 +131,7 @@ export interface RecentPostsStore {
 
 export interface RecommendPostRow extends PostMeta {
   isVerified: boolean;
+  hasPlan: boolean;
   publishedAt: Date;
 }
 

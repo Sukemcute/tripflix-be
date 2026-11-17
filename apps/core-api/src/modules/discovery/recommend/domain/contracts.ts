@@ -39,6 +39,10 @@ export interface PostBuildItem {
   placeId: string | null;
   /** ISO */
   publishedAt: string;
+  /** Điểm hoàn thiện bài viết 0..1 (dùng cho hot@v2). */
+  completeness?: number;
+  /** Bài có lịch trình hay không (dùng cho hot@v2). */
+  hasPlan?: boolean;
   /** 30 ngày, bỏ dòng isRemoved. */
   interactions: Partial<Record<Kind, number>>;
   interactions24h: Partial<Record<Kind, number>>;
@@ -73,6 +77,7 @@ export interface PostMeta {
   postType: string;
   tags: string[];
   placeId: string | null;
+  hasPlan?: boolean;
 }
 
 export interface UserBuildItem {

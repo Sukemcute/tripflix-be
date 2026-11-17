@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
 import type { PostBuilder, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
@@ -50,18 +51,23 @@ export class BuildFeaturesUseCases {
       readAll((c) => this.catalog.listHotelProvinces(c)),
     ]);
     const hotelProvinces = new Map(hotels.map((h) => [h.id, h.provinceSlug]));
-    const posts: RecommendPostRow[] = sourcePosts.map((p) => ({
-      postId: p.id,
-      authorId: p.authorId,
-      postType: p.postType,
-      tags: p.hashtags,
-      placeId: placeIdOfPost(
-        { hotelId: p.tripAttachment?.hotelId ?? null, destinationName: p.tripAttachment?.destinationName ?? null, title: p.title },
-        hotelProvinces,
-      ),
-      isVerified: p.isVerified,
-      publishedAt: p.createdAt,
-    }));
+    const completenessById = new Map<string, number>();
+    const posts: RecommendPostRow[] = sourcePosts.map((p) => {
+      completenessById.set(p.id, calculateCompleteness(p));
+      return {
+        postId: p.id,
+        authorId: p.authorId,
+        postType: p.postType,
+        tags: p.hashtags,
+        placeId: placeIdOfPost(
+          { hotelId: p.tripAttachment?.hotelId ?? null, destinationName: p.tripAttachment?.destinationName ?? null, title: p.title },
+          hotelProvinces,
+        ),
+        isVerified: p.isVerified,
+        hasPlan: hasPlan(p),
+        publishedAt: p.createdAt,
+      };
+    });
     if (!(await this.store.replacePosts(posts))) {
       this.logger.warn('listPosts trả 0 bài (content tạm rỗng?), giữ dữ liệu gợi ý cũ, bỏ lượt');
       return null;
@@ -70,7 +76,7 @@ export class BuildFeaturesUseCases {
     const { postBuilders, userBuilders } = await this.activeBuilders();
     const failedBuilders: string[] = [];
 
-    const needsSamples = postBuilders.some((b) => b.key === 'hot@v1');
+    const needsSamples = postBuilders.some((b) => b.key === 'hot@v1' || b.key === 'hot@v2');
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),
       needsSamples ? this.store.listPostInteractionSamples(now) : Promise.resolve(null),
@@ -82,6 +88,8 @@ export class BuildFeaturesUseCases {
       tags: p.tags,
       placeId: p.placeId,
       publishedAt: p.publishedAt.toISOString(),
+      completeness: completenessById.get(p.postId) ?? 0,
+      hasPlan: p.hasPlan,
       interactions: counts.get(p.postId)?.d30 ?? {},
       interactions24h: counts.get(p.postId)?.h24 ?? {},
       ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
