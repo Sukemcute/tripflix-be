@@ -28,6 +28,8 @@ export interface FeedCard {
   tags: string[];
   linkedProductIds: string[];
   tripAttachment: TripAttachmentData | null;
+  /** Tích "Đã đi": lộ trình lấy từ chuyến đã đi xong của chính người đăng (TF105). */
+  isVerified: boolean;
   counts: { likes: number; comments: number; saves: number; shares: number };
   viewerState: { liked: boolean; saved: boolean } | null;
   reason: { code: string; text: string } | null;
@@ -224,6 +226,7 @@ function buildCard(
     tags: row.hashtags,
     linkedProductIds: [],
     tripAttachment: maskTripAttachment(row.tripAttachment, posterUrl),
+    isVerified: row.isVerified ?? false,
     counts: {
       likes: row.reactionTotal,
       comments: row.commentCount,
