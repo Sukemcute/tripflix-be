@@ -27,8 +27,12 @@ export interface OrderItemRecord {
   productType: 'room' | 'flight';
   productId: string;
   productName: string;
-  /** Tên khách sạn của mục phòng; có khi đọc đơn, vé bay là null. */
+  /** Khách sạn của mục phòng; có khi đọc đơn, vé bay là null. */
+  propertyId?: string | null;
   propertyName?: string | null;
+  /** Sân bay đi/đến của vé bay; có khi đọc đơn, phòng là null. Dùng dựng lộ trình từ đơn đã đi (TF105). */
+  fromAirport?: string | null;
+  toAirport?: string | null;
   date: string;
   nights: number;
   qty: number;

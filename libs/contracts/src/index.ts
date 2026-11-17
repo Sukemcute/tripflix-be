@@ -189,6 +189,38 @@ export const ContentCommentCreatedV1Schema = z.object({
 });
 export type ContentCommentCreatedV1 = z.infer<typeof ContentCommentCreatedV1Schema>;
 
+/** Nơi trong app phát sinh sự kiện hành vi với bài (TF23). */
+export const CONTENT_VIEW_SURFACES = ['reels', 'post_detail'] as const;
+/** Xem thật một bài video quá 10 phút thì coi là app đếm sai, không nhận. */
+export const MAX_WATCHED_MS = 10 * 60 * 1000;
+
+/**
+ * content.post.viewed v1 (stream:app-events): người xem rời một video sau khi xem, app gửi theo lô qua POST /api/v1/feed/events.
+ * Đủ điều kiện "xem thật" (isQualified) khi xem từ 15 giây hoặc từ nửa thời lượng. Khách: viewerId null, anonId là X-Anon-Id nếu app gửi.
+ */
+export const ContentPostViewedV1Schema = z.object({
+  postId: z.uuid(),
+  viewerId: z.uuid().nullable(),
+  anonId: z.uuid().nullable(),
+  watchedMs: z.int().min(0).max(MAX_WATCHED_MS),
+  /** Thời lượng video lúc xem; null nếu chưa biết. */
+  durationSec: z.number().positive().nullable(),
+  isQualified: z.boolean(),
+  surface: z.enum(CONTENT_VIEW_SURFACES),
+});
+export type ContentPostViewedV1 = z.infer<typeof ContentPostViewedV1Schema>;
+
+/** content.post.booking_clicked v1 (stream:app-events): người xem bấm "Đặt" trên lộ trình gắn với Reels. */
+export const ContentPostBookingClickedV1Schema = z.object({
+  postId: z.uuid(),
+  viewerId: z.uuid().nullable(),
+  anonId: z.uuid().nullable(),
+  /** Khách sạn trong lộ trình; null nếu lộ trình không có khách sạn. */
+  hotelId: z.string().min(1).max(100).nullable(),
+  surface: z.enum(['reels_trip_plan']),
+});
+export type ContentPostBookingClickedV1 = z.infer<typeof ContentPostBookingClickedV1Schema>;
+
 /** content.comment.updated v1: bình luận được chỉnh sửa nội dung. */
 export const ContentCommentUpdatedV1Schema = z.object({
   commentId: z.uuid(),
@@ -451,6 +483,8 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.reaction.updated.v1': ContentReactionUpdatedV1Schema,
   'content.comment_reaction.updated.v1': ContentCommentReactionUpdatedV1Schema,
   'content.comment.created.v1': ContentCommentCreatedV1Schema,
+  'content.post.viewed.v1': ContentPostViewedV1Schema,
+  'content.post.booking_clicked.v1': ContentPostBookingClickedV1Schema,
   'content.comment.updated.v1': ContentCommentUpdatedV1Schema,
   'content.comment.deleted.v1': ContentCommentDeletedV1Schema,
   'access.password_reset_requested.v1': AccessPasswordResetRequestedV1Schema,

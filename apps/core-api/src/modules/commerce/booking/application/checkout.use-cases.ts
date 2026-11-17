@@ -125,7 +125,7 @@ const findStayDate = (items: Pick<OrderItemRecord, 'productType' | 'date'>[]): s
   items.filter((i) => i.productType === 'room').map((i) => i.date).sort()[0];
 
 const toItemViews = (items: OrderItemRecord[]): CheckoutView['items'] =>
-  items.map(({ orderId: _orderId, ...i }) => ({ ...i, propertyName: i.propertyName ?? null, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
+  items.map(({ orderId: _orderId, ...i }) => ({ ...i, propertyId: i.propertyId ?? null, propertyName: i.propertyName ?? null, fromAirport: i.fromAirport ?? null, toAirport: i.toAirport ?? null, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
 
 /** Giá hiện tại của một mục, đọc từ lịch trống (không tin giá client gửi). */
 export interface PricedItem extends NewOrderItem {
