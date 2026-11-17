@@ -383,11 +383,39 @@ Kiểm tra: `curl -s -X POST https://<API_HOST>/api/auth/google -H 'content-type
 
 Thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` vào `.env.server`, không commit và không gửi qua chat. Thiếu một trong hai thì các API VNPay trả 404. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web, đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
 
+## Observability: metric, trace cho trang `/analytics`
+
+Trang `/analytics` của admin đọc metric từ Prometheus và trace từ Tempo qua core-api (`docs/observability.md`). core-api, notification-service gửi metric, trace sang `otel-collector`, Collector chuyển trace sang Tempo, Prometheus lấy metric từ Collector mỗi 15 giây.
+
+- Ba service nằm trong `compose.server.yaml`, profile `observability`, cấu hình trong `deploy/observability/`. `deploy-api.sh` không bật profile này nên không đụng tới. Bật một lần thì chạy tiếp qua các lần deploy sau.
+- Biến của core-api và notification-service đã có mặc định trong compose, `.env.server` không cần thêm gì. Trace lấy mẫu 10% (`OTEL_TRACES_SAMPLER_ARG`); metric request vẫn đo đủ.
+- Không mở cổng nào ra ngoài. Giới hạn RAM: Collector 256 MB, Prometheus 512 MB, Tempo 512 MB. Prometheus giữ 7 ngày hoặc 2 GB, Tempo giữ 48 giờ.
+
+Bật lần đầu: chép `compose.server.yaml` và thư mục `observability/` của `deploy/` lên `~/tripflix-be/deploy/`, rồi:
+
+```bash
+dc --profile observability up -d
+dc --profile api up -d --no-deps core-api          # nhận biến OTEL, ANALYTICS mới
+dc --profile mail up -d --no-deps notification-service
+dc --profile observability ps                      # 3 service running
+```
+
+Kiểm: gọi vài request vào API, đợi khoảng 1 phút, rồi
+
+```bash
+dc exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/query?query=count(tripflix_http_server_duration_seconds_count)'   # result không rỗng
+dc exec -T prometheus wget -qO- 'http://tempo:3200/api/search?limit=3'   # có traceID (image Tempo không có wget)
+```
+
+Trang `/analytics` (tài khoản superadmin) phải báo nguồn `ready`, có số request và trace.
+
+Tắt: đặt `OTEL_SDK_DISABLED=true` trong `.env.server`, tạo lại core-api và notification-service, rồi `dc --profile observability stop`. Collector dừng mà app vẫn bật thì app chỉ ghi log lỗi gửi, không ảnh hưởng request.
+
 ## Vận hành
 
 ```bash
 dc --profile api logs -f core-api
-dc --profile api --profile gateway --profile mail pull && dc --profile api --profile gateway --profile mail up -d --wait   # cập nhật bản mới, migrate chạy lại trước API
+dc --profile api --profile gateway --profile mail --profile observability pull && dc --profile api --profile gateway --profile mail --profile observability up -d --wait   # cập nhật bản mới, migrate chạy lại trước API
 ```
 
 `CORE_API_TAG` (core-api và migrate), `NOTIFICATION_TAG` (notification-service) và `VIDEO_WORKER_TAG` (video-worker) trong `.env.server` chọn bản chạy. Mỗi app một biến vì CI chỉ build image của app có thay đổi, nên sha mới nhất của app này có thể không có ở app kia. Nên dùng `sha-<7 ký tự>` để biết chính xác bản đang chạy. Biến nào chưa đặt thì dùng `IMAGE_TAG` cũ, không có cả hai thì dùng `develop`.
