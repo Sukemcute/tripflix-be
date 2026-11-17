@@ -5788,6 +5788,67 @@
           "admin-commerce"
         ]
       }
+    },
+    "/api/analytics/ai-usage": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả `from` và `to`. Mặc định 7 ngày tới hôm nay, tối đa 92 ngày. Chi phí là ước tính.",
+        "operationId": "AiUsageController_getAiUsage",
+        "parameters": [
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "feature",
+                "day",
+                "model"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to, quá 92 ngày hoặc groupBy lạ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số lần gọi, token và chi phí AI theo tính năng, ngày hoặc model",
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
@@ -13377,6 +13438,106 @@
           "paymentToken",
           "last4",
           "isTestCard"
+        ]
+      },
+      "AiUsageRowDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "chat",
+            "description": "Tính năng (chat, summary, moderation), ngày YYYY-MM-DD hoặc tên model"
+          },
+          "calls": {
+            "type": "number",
+            "example": 120
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 350000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 42000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0132,
+            "description": "USD, ước tính theo bảng giá ai-service"
+          }
+        },
+        "required": [
+          "key",
+          "calls",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiUsageTotalDto": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "number",
+            "example": 120
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 350000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 42000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0132
+          }
+        },
+        "required": [
+          "calls",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiUsageResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-11-10T17:00:00.000Z",
+            "description": "Đầu khoảng (gồm)"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-17T17:00:00.000Z",
+            "description": "Cuối khoảng (không gồm)"
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "day",
+              "model"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiUsageRowDto"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/AiUsageTotalDto"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "groupBy",
+          "rows",
+          "total"
         ]
       }
     }
