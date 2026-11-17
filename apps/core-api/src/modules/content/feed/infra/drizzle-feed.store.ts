@@ -130,6 +130,7 @@ export class DrizzleFeedStore implements FeedStore {
         hashtags: posts.hashtags,
         mediaIds: posts.mediaIds,
         tripAttachment: posts.tripAttachment,
+        isVerified: posts.isVerified,
         reactionTotal: posts.reactionTotal,
         commentCount: posts.commentCount,
         bookmarkCount: posts.bookmarkCount,
