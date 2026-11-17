@@ -50,6 +50,8 @@ Tất cả endpoint dưới đây yêu cầu Bearer token superadmin và trả `
 
 ## Lưu trữ và giới hạn
 
+Danh sách trace mặc định loại `trace:rootName = "OPTIONS CORS preflight"` ngay trong truy vấn Tempo, trước giới hạn 50 kết quả. Đặt `includeSuccessfulPreflights=true` để xem lại. Middleware chỉ đặt tên này khi OPTIONS có Origin, Access-Control-Request-Method, HTTP 2xx và response cho phép origin/method/header tương ứng. Trace lỗi, OPTIONS thường và trace cũ chưa phân loại vẫn hiện. Không lưu giá trị header CORS; metric và trace vẫn được thu, tra cứu trực tiếp bằng ID không bị lọc. Cần triển khai lại service dùng `libs/observability` để phân loại request mới.
+
 Prometheus giữ tối đa 7 ngày hoặc 2 GB, Tempo giữ 48 giờ. Cả hai dùng Docker named volume. Collector chỉ có hàng đợi RAM; nếu Collector dừng, có thể mất dữ liệu đang chờ. Cấu hình này là một node cho local/staging; cần cấu hình lưu trữ bền và vận hành phù hợp trước khi dùng cho production nhiều replica.
 
 Đổi source code không tự cập nhật môi trường đã triển khai. Cần build/deploy image mới và áp dụng overlay. Với compose server, dùng `compose.server.yaml` làm file gốc thay cho `compose.yaml` sau khi review cấu hình môi trường; không chạy lệnh local trên production theo mặc định.
