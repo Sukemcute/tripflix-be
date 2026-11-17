@@ -3,11 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { createDb, createPool } from '@tripflix/db';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import type pg from 'pg';
-import { CATALOG_SEED_FILE } from '../../../../commerce/db/seed/seed-catalog.js';
 import type { ReelCatalogFlight, ReelCatalogHotel } from './generate-reels.js';
 import { buildReelSeed, seedReels } from './reel-seed.js';
 
 const MIGRATIONS_FOLDER = fileURLToPath(new URL('../../migrations', import.meta.url));
+// Chỉ đọc file dữ liệu catalog, không import code của module commerce (tools/check-boundaries.mjs).
+const CATALOG_SEED_FILE = 'src/modules/commerce/db/seed/catalog.json';
 const catalog = JSON.parse(readFileSync(CATALOG_SEED_FILE, 'utf8')) as { hotels: ReelCatalogHotel[]; flights: ReelCatalogFlight[] };
 const users = Array.from({ length: 200 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
 const REAL_USER = '99999999-0000-4000-8000-000000000001';

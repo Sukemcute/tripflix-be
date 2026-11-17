@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CATALOG_SEED_FILE } from '../../../../commerce/db/seed/seed-catalog.js';
 import type { ReelCatalogFlight, ReelCatalogHotel, ReelVideo } from './generate-reels.js';
 import { buildReelSeed, REEL_VIDEOS_FILE } from './reel-seed.js';
 
+// Chỉ đọc file dữ liệu catalog, không import code của module commerce (tools/check-boundaries.mjs).
+const CATALOG_SEED_FILE = 'src/modules/commerce/db/seed/catalog.json';
 const catalog = JSON.parse(readFileSync(CATALOG_SEED_FILE, 'utf8')) as { hotels: ReelCatalogHotel[]; flights: ReelCatalogFlight[] };
 const videos = JSON.parse(readFileSync(REEL_VIDEOS_FILE, 'utf8')) as ReelVideo[];
 const authorIds = Array.from({ length: 200 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
