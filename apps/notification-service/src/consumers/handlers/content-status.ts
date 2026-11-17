@@ -103,6 +103,7 @@ export function createContentStatusHandlers(options: {
   async function commentDecision(event: EventEnvelope): Promise<boolean> {
     const decision = ContentModerationDecidedV1Schema.parse(event.payload);
     if (decision.targetType !== 'comment' || decision.action === 'dismiss') return true;
+    if (decision.isAutomatic && decision.action === 'hide') return true;
     const restored = decision.action === 'restore';
     const title = restored
       ? 'Bình luận đã được khôi phục'
