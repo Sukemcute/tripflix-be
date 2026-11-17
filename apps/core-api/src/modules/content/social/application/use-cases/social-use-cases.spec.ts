@@ -879,6 +879,19 @@ describe('Social Application Use Cases', () => {
         expect(mockOutbox.add).not.toHaveBeenCalled();
       });
 
+      it('lỗi DB lúc thử khoá dòng bài: ném lỗi ra ngoài, không coi là bài đông, không thêm bình luận, không ghi +1', async () => {
+        mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
+        const dbError = new Error('canceling statement due to lock timeout');
+        mockPostRepo.tryLockAndIncrementCounter = vi.fn().mockRejectedValue(dbError);
+        const counterDeltas = { addCommentDelta: vi.fn() };
+
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, undefined, undefined, counterDeltas as never);
+        await expect(useCase.execute({ postId, authorId: otherUserId, body: 'Lỗi DB' })).rejects.toBe(dbError);
+        expect(mockCommentRepo.create).not.toHaveBeenCalled();
+        expect(counterDeltas.addCommentDelta).not.toHaveBeenCalled();
+        expect(mockOutbox.add).not.toHaveBeenCalled();
+      });
+
       it('bình luận bị giữ chờ duyệt: chỉ khoá, không cộng đếm', async () => {
         mockPostRepo.findById.mockResolvedValue(samplePostRecord({ status: 'published' }));
         mockCommentRepo.create.mockResolvedValue({ ...rootComment(), id: 'held-1', status: 'held' });
