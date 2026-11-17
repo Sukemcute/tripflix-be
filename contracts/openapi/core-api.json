@@ -4846,6 +4846,174 @@
         ]
       }
     },
+    "/api/trip-builder/flights": {
+      "get": {
+        "description": "`place` là `refId` của dòng `place` trong `/api/suggest`; `from` là sân bay nhà của khách.\n- Chỉ chuyến còn chỗ cho đúng ngày; giá là hạng ghế rẻ nhất còn bán.\n- `sort=cheapest` (rẻ trước) hoặc `best_time` (chiều đi tới kịp nhận phòng, chiều về còn trọn buổi sáng cuối lên trước).\n- `reason` là câu ngắn hiện dưới lựa chọn, có thể null.",
+        "operationId": "TripBuilderController_suggestFlights",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20 mỗi chiều, mặc định 5",
+            "schema": {
+              "example": 5
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "cheapest",
+                "best_time"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "adults",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 2
+            }
+          },
+          {
+            "name": "returnDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-03"
+            }
+          },
+          {
+            "name": "departDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-01"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "SGN"
+            }
+          },
+          {
+            "name": "place",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "nha-trang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightSuggestionsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu hoặc sai tham số, nơi hay sân bay không tồn tại"
+          }
+        },
+        "summary": "Gợi ý vé bay chiều đi và chiều về tới một nơi",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/trip-builder/stays": {
+      "get": {
+        "description": "`place` là `refId` của dòng `place` trong `/api/suggest`. Chỉ khách sạn còn phòng, giá thật từ commerce.\n- `sort=best_price` (rẻ một đêm trước) hoặc `top_rated` (điểm đánh giá cao trước).",
+        "operationId": "TripBuilderController_suggestStays",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 5",
+            "schema": {
+              "example": 5
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "best_price",
+                "top_rated"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "adults",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 2
+            }
+          },
+          {
+            "name": "checkOut",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-03"
+            }
+          },
+          {
+            "name": "checkIn",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-01"
+            }
+          },
+          {
+            "name": "place",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "nha-trang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaySuggestionsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu hoặc sai tham số, nơi không tồn tại"
+          }
+        },
+        "summary": "Gợi ý chỗ ở còn phòng ở một nơi",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
@@ -12251,6 +12419,223 @@
           "job",
           "intervalMs",
           "defaultIntervalMs"
+        ]
+      },
+      "SuggestReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "cheapest",
+              "arrive_before_check_in",
+              "full_last_morning",
+              "best_price",
+              "top_rated"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "example": "Tới 08:20, kịp nhận phòng",
+            "description": "Câu ngắn hiện dưới lựa chọn"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "FlightSuggestionDto": {
+        "type": "object",
+        "properties": {
+          "flightId": {
+            "type": "string",
+            "example": "VJ135-SGN-CXR",
+            "description": "Mã chuyến (gom các hạng ghế)"
+          },
+          "productId": {
+            "type": "string",
+            "example": "VJ135-SGN-CXR--ECO",
+            "description": "Hạng ghế rẻ nhất còn bán: gửi lên POST /checkout"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "ECO_SAVER"
+          },
+          "name": {
+            "type": "string",
+            "example": "Bay Sài Gòn – Cam Ranh sớm"
+          },
+          "airline": {
+            "type": "string",
+            "nullable": true,
+            "example": "Vietjet Air"
+          },
+          "fromAirport": {
+            "type": "string",
+            "example": "SGN"
+          },
+          "toAirport": {
+            "type": "string",
+            "example": "CXR"
+          },
+          "departTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "06:45"
+          },
+          "arriveTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "08:20"
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 950000,
+            "description": "Một vé (VND)"
+          },
+          "totalPrice": {
+            "type": "number",
+            "example": 1900000,
+            "description": "Mọi vé cho số khách đã chọn (VND)"
+          },
+          "reason": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuggestReasonDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "flightId",
+          "productId",
+          "ratePlanCode",
+          "name",
+          "airline",
+          "fromAirport",
+          "toAirport",
+          "departTime",
+          "arriveTime",
+          "unitPrice",
+          "totalPrice",
+          "reason"
+        ]
+      },
+      "FlightSuggestionsDto": {
+        "type": "object",
+        "properties": {
+          "outbound": {
+            "description": "Chiều đi, đã xếp theo `sort`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightSuggestionDto"
+            }
+          },
+          "inbound": {
+            "description": "Chiều về; rỗng khi không gửi `returnDate`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightSuggestionDto"
+            }
+          }
+        },
+        "required": [
+          "outbound",
+          "inbound"
+        ]
+      },
+      "StaySuggestionDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-h-nt-01"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "example": "Vinpearl Beachfront Nha Trang"
+          },
+          "stars": {
+            "type": "number",
+            "nullable": true,
+            "example": 5
+          },
+          "thumbnail": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StayRatingDto"
+              }
+            ]
+          },
+          "roomProductId": {
+            "type": "string",
+            "example": "P-h-nt-01--DLX",
+            "description": "Loại phòng rẻ nhất còn bán: gửi lên POST /checkout"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "RO"
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 3320000,
+            "description": "Một đêm một phòng (VND)"
+          },
+          "totalPrice": {
+            "type": "number",
+            "example": 9960000,
+            "description": "Cả kỳ ở, mọi phòng (VND)"
+          },
+          "reason": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuggestReasonDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "hotelId",
+          "slug",
+          "name",
+          "stars",
+          "thumbnail",
+          "rating",
+          "roomProductId",
+          "ratePlanCode",
+          "unitPrice",
+          "totalPrice",
+          "reason"
+        ]
+      },
+      "StaySuggestionsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Đã xếp theo `sort`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaySuggestionDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "ProvinceDto": {
