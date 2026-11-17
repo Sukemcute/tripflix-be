@@ -10,8 +10,8 @@ import { DrizzleAccessStore } from '../modules/access/auth/infra/drizzle-access.
 import { CATALOG_SEED_FILE, seedCatalog } from '../modules/commerce/db/seed/seed-catalog.js';
 import { CalendarUseCases } from '../modules/commerce/inventory/application/calendar.use-cases.js';
 import { DrizzleCommerceStore } from '../modules/commerce/inventory/infra/drizzle-commerce.store.js';
-import { buildReelSeed } from '../modules/content/db/seed/reels/reel-seed.js';
-import { seedContent, seedContentData } from '../modules/content/db/seed/seed-content.js';
+import { buildReelSeed, seedReels } from '../modules/content/db/seed/reels/reel-seed.js';
+import { seedContent } from '../modules/content/db/seed/seed-content.js';
 import { coreEnvSchema } from '../platform/env.js';
 
 // pnpm db:seed: tạo tài khoản mẫu cho 3 vai trò. Chạy lại nhiều lần không tạo trùng. Không chạy ở production.
@@ -78,7 +78,7 @@ try {
   );
   if (reelAuthorIds.length >= 2) {
     const catalogSeed = JSON.parse(readFileSync(CATALOG_SEED_FILE, 'utf8')) as Omit<Parameters<typeof buildReelSeed>[0], 'authorIds'>;
-    const reels = await seedContentData(
+    const reels = await seedReels(
       contentDb,
       buildReelSeed({ authorIds: reelAuthorIds, hotels: catalogSeed.hotels, flights: catalogSeed.flights }),
     );

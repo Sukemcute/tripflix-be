@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
-import type { ContentSeed } from '../seed-content.js';
+import type { Db } from '@tripflix/db';
+import { sql } from 'drizzle-orm';
+import { seedContentData, type ContentSeed } from '../seed-content.js';
 import {
   generateReelSeed,
+  reelSeedId,
   type ReelCatalogFlight,
   type ReelCatalogHotel,
   type ReelStops,
@@ -27,4 +30,29 @@ export function buildReelSeed(input: {
     authorIds: input.authorIds,
     now: REEL_SEED_NOW,
   });
+}
+
+/**
+ * Nạp reel mẫu, chạy lại được kể cả khi dữ liệu sinh đã đổi (thêm video, sửa bộ sinh):
+ * xoá cảm xúc, bookmark, bình luận mẫu cũ theo dải id của seed (không đụng tương tác của người dùng thật),
+ * nạp lại, rồi đặt lại người đăng và chủ video vì upsert bài không ghi đè author_id, owner_id.
+ */
+export async function seedReels(db: Db, seed: ContentSeed): Promise<Awaited<ReturnType<typeof seedContentData>>> {
+  const range = (group: 'comment' | 'reaction' | 'bookmark') => sql`BETWEEN ${reelSeedId(group, 0)} AND ${reelSeedId(group, 0xffffffffffff)}`;
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`DELETE FROM content.reactions WHERE id ${range('reaction')}`);
+    await tx.execute(sql`DELETE FROM content.bookmarks WHERE id ${range('bookmark')}`);
+    await tx.execute(sql`DELETE FROM content.comments WHERE id ${range('comment')}`);
+  });
+  const stats = await seedContentData(db, seed);
+  const authors = sql.join(seed.posts.map((p) => sql`(${p.id}::uuid, ${p.authorId}::uuid, ${p.mediaIds[0]}::uuid)`), sql`, `);
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`UPDATE content.posts p SET author_id = v.author_id FROM (VALUES ${authors}) AS v(post_id, author_id, media_id) WHERE p.id = v.post_id AND p.author_id <> v.author_id`,
+    );
+    await tx.execute(
+      sql`UPDATE content.media_assets m SET owner_id = v.author_id FROM (VALUES ${authors}) AS v(post_id, author_id, media_id) WHERE m.id = v.media_id AND m.owner_id <> v.author_id`,
+    );
+  });
+  return stats;
 }
