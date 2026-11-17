@@ -17,6 +17,7 @@ const mapRow = (row: SearchEntityRow): SuggestEntity => ({
   id: row.id,
   type: row.type as SuggestType,
   refId: row.refId,
+  slug: row.slug,
   name: row.name,
   subtitle: row.subtitle,
   placeId: row.placeId,

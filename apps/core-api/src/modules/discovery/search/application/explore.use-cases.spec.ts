@@ -114,13 +114,13 @@ describe('ExploreUseCases', () => {
   it('tìm theo nơi, ngân sách; bài bị ẩn không lọt ra kết quả', async () => {
     const trip = (d: number) => ({ destinationName: 'Đà Nẵng', daysCount: d, estimatedCostPerPerson: 2_500_000 });
     const { explore } = setup(
-      [hotel('H1', 'Vinpearl Resort Đà Nẵng', 'Đà Nẵng'), hotel('H2', 'Dalat Palace', 'Đà Lạt'), hotel('H3', 'Sang Resort', 'Đà Nẵng', { priceFrom: 9_000_000 })],
+      [hotel('H1', 'Vinpearl Resort Đà Nẵng', 'Đà Nẵng', { slug: 'vinpearl-resort-da-nang-ab12' }), hotel('H2', 'Dalat Palace', 'Đà Lạt'), hotel('H3', 'Sang Resort', 'Đà Nẵng', { priceFrom: 9_000_000 })],
       [post('P1', 'Trọn bộ lịch trình Đà Nẵng 3N2Đ', { tripAttachment: trip(3) }), post('P2', 'Lịch trình Đà Nẵng 3 ngày', { tripAttachment: trip(3) })],
       ['P2'],
     );
     const stays = await explore.search({ q: 'khách sạn đà nẵng dưới 2tr' });
     expect(stays.understood).toMatchObject({ place: 'Đà Nẵng', budget: 2_000_000 });
-    expect(stays.sections[0]).toMatchObject({ kind: 'stay', items: [{ id: 'hotel:H1', refId: 'H1' }] });
+    expect(stays.sections[0]).toMatchObject({ kind: 'stay', items: [{ id: 'hotel:H1', refId: 'H1', slug: 'vinpearl-resort-da-nang-ab12' }] });
     const plans = await explore.search({ q: 'lịch trình đà nẵng 3n2đ' });
     expect(plans.sections.find((s) => s.kind === 'plan')!.items.map((i) => i.refId)).toEqual(['P1']);
   });
@@ -200,7 +200,7 @@ describe('ExploreUseCases', () => {
     const explorePage = await explore.search({ q: 'đà nẵng' });
     const items = explorePage.sections.flatMap((s) => s.items);
     expect(items.find((i) => i.refId === 'H1')).toMatchObject({ likes: null, comments: null, createdAt: null, author: null });
-    expect(items.find((i) => i.refId === 'P1')).toMatchObject({ likes: 120, author: { name: 'Minh Anh' } });
+    expect(items.find((i) => i.refId === 'P1')).toMatchObject({ slug: null, likes: 120, author: { name: 'Minh Anh' } });
   });
 
   it('tìm bài: không bài nào khớp đủ câu thì gợi ý theo phần hiểu được và nói rõ từ nào bị bỏ', async () => {

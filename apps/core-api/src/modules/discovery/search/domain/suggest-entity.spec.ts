@@ -29,6 +29,15 @@ describe('buildSuggestEntities', () => {
     expect(entity).toMatchObject({ refId: 'h1', placeId: 'phu-quoc', subtitle: 'Phú Quốc, An Giang', searchText: 'sun phu quoc' });
   });
 
+  it('TF67: khách sạn mang slug của commerce; thiếu slug, địa điểm và sân bay thì null', () => {
+    const entities = buildSuggestEntities([{ ...hotel('h1', 'da-lat'), slug: 'ks-h1-ab12' }, hotel('h2', 'da-lat')]);
+    const byId = new Map(entities.map((e) => [e.id, e]));
+    expect(byId.get('hotel:h1')?.slug).toBe('ks-h1-ab12');
+    expect(byId.get('hotel:h2')?.slug).toBeNull();
+    expect(byId.get('place:da-lat')?.slug).toBeNull();
+    expect(byId.get('airport:SGN')?.slug).toBeNull();
+  });
+
   it('slug lạ không có trong cây thì lấy tên tỉnh commerce gửi', () => {
     const [entity] = buildSuggestEntities([{ ...hotel('h1', 'moi-them'), province: { slug: 'moi-them', name: 'Mới thêm' } }]).filter(
       (e) => e.type === 'hotel',

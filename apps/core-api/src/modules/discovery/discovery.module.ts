@@ -55,7 +55,7 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
     const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 1 });
     const items = page.items
       .filter((item): item is CatalogHotel => item.type === 'hotel')
-      .map(({ id, name, province, stars }) => ({ id, name, province, stars }));
+      .map(({ id, slug, name, province, stars }) => ({ id, slug, name, province, stars }));
     return { items, nextCursor: page.nextCursor };
   },
 });

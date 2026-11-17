@@ -3,6 +3,8 @@ import { PLACES } from './places.js';
 /** Một khách sạn còn phòng cho ngày đã chọn, giá thật từ commerce. */
 export interface StayResult {
   hotelId: string;
+  /** Mã trên URL trang chi tiết khách sạn; null nếu commerce chưa có. */
+  slug: string | null;
   name: string;
   stars: number | null;
   thumbnail: string | null;

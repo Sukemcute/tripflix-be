@@ -26,6 +26,8 @@ export interface ExploreStore extends ExploreSource {
 /** Khách sạn cho tìm khám phá. Thật: CommerceFacade.listCatalog (CatalogHotel). */
 export interface ExploreHotel {
   id: string;
+  /** Mã trên URL trang chi tiết (TF66). Optional như CatalogHotel.slug. */
+  slug?: string;
   name: string;
   province: { slug: string; name: string };
   city: string | null;

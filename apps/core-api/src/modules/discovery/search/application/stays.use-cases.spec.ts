@@ -80,6 +80,18 @@ describe('StaysUseCases.listStays', () => {
     );
   });
 
+  it('TF67: trả slug khách sạn từ commerce; commerce chưa có slug thì null', async () => {
+    const withSlug = { ...hotel('dl1', 'da-lat', 4), slug: 'ks-dl1-ab12' };
+    const { commerce } = fakeCommerce({ 'lam-dong': [hotel('ld1', 'lam-dong', 3)], 'da-lat': [withSlug] }, { ld1: 900_000, dl1: 600_000 });
+
+    const page = await new StaysUseCases(commerce).listStays(query());
+
+    expect(page?.items.map((s) => [s.hotelId, s.slug])).toEqual([
+      ['dl1', 'ks-dl1-ab12'],
+      ['ld1', null],
+    ]);
+  });
+
   it('trả điểm đánh giá của khách từ commerce; khách sạn chưa có đánh giá thì null', async () => {
     const rated = { ...hotel('dl1', 'da-lat', 2), rating: { average: 4.5, count: 77 } };
     const { commerce } = fakeCommerce({ 'lam-dong': [hotel('ld1', 'lam-dong', 3)], 'da-lat': [rated] }, { ld1: 900_000, dl1: 600_000 });

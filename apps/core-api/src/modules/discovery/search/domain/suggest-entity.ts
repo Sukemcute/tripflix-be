@@ -12,6 +12,8 @@ export interface SuggestEntity {
   type: SuggestType;
   /** Mã để bước sau dùng: slug địa điểm (placeId của /stays), mã khách sạn của commerce, mã IATA. */
   refId: string;
+  /** Khách sạn: mã trên URL trang chi tiết; dòng khác null. */
+  slug: string | null;
   name: string;
   subtitle: string | null;
   /** Địa điểm chứa nó, để /stays lọc theo nhánh cây. */
@@ -23,6 +25,8 @@ export interface SuggestEntity {
 /** Phần danh mục khách sạn mà gợi ý cần. Khớp kiểu CatalogHotel của commerce. */
 export interface HotelSummary {
   id: string;
+  /** Optional như CatalogHotel.slug. */
+  slug?: string;
   name: string;
   province: { slug: string; name: string };
   stars: number | null;
@@ -55,6 +59,7 @@ export function buildSuggestEntities(hotels: readonly HotelSummary[]): SuggestEn
     id: `place:${place.id}`,
     type: 'place',
     refId: place.id,
+    slug: null,
     name: place.name,
     subtitle: describePlace(place),
     placeId: place.id,
@@ -70,6 +75,7 @@ export function buildSuggestEntities(hotels: readonly HotelSummary[]): SuggestEn
       id: `airport:${airport.code}`,
       type: 'airport',
       refId: airport.code,
+      slug: null,
       name: airport.name,
       subtitle: `${airport.code} · ${label}`,
       placeId: airport.placeId,
@@ -82,6 +88,7 @@ export function buildSuggestEntities(hotels: readonly HotelSummary[]): SuggestEn
     id: `hotel:${hotel.id}`,
     type: 'hotel',
     refId: hotel.id,
+    slug: hotel.slug ?? null,
     name: hotel.name,
     subtitle: placeLabel(hotel.province.slug, hotel.province.name),
     placeId: hotel.province.slug,

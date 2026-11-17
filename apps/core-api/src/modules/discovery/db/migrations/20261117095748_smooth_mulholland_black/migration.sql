@@ -1,0 +1,1 @@
+ALTER TABLE "discovery"."search_entities" ADD COLUMN "slug" text;

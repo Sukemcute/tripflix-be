@@ -3,6 +3,7 @@ import { filterAndSortStays, paginate, resolvePlaceSlugs, type StayResult } from
 
 const stay = (hotelId: string, unitPrice: number, stars: number | null): StayResult => ({
   hotelId,
+  slug: null,
   name: hotelId,
   stars,
   thumbnail: null,
