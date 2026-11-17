@@ -4117,7 +4117,7 @@
     },
     "/api/places": {
       "get": {
-        "description": "Dữ liệu © OpenStreetMap contributors (ODbL), nạp sẵn cho các thành phố demo. App phải hiện `attribution` kèm danh sách.\n\n- Cần `city` (tên có dấu hay không đều được, hoặc id như `vung-tau`) hoặc `near=lat,lng`.\n- `lodging` là chỗ ở ngoài Tripflix: chỉ để tham khảo, không có giá, không đặt được.\n- Không khớp thành phố thì `items: []` (không phải lỗi).",
+        "description": "Dữ liệu © OpenStreetMap contributors (ODbL), nạp sẵn cho các thành phố demo. App phải hiện `attribution` kèm danh sách.\n\n- Cần `city` (tên có dấu hay không đều được, hoặc id như `vung-tau`) hoặc `near=lat,lng`. Tỉnh gồm cả điểm đến con (\"Lâm Đồng\" ra điểm của Đà Lạt) và không lọc bán kính.\n- `lodging` là chỗ ở ngoài Tripflix: chỉ để tham khảo, không có giá, không đặt được.\n- Không khớp thành phố thì `items: []` (không phải lỗi).",
         "operationId": "PlacesController_places",
         "parameters": [
           {
@@ -4397,6 +4397,47 @@
           }
         ],
         "summary": "Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/search/places": {
+      "post": {
+        "description": "Cho các tab riêng của trang tìm web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `kind`: `stay` (khách sạn đặt được, `refId` là mã khách sạn), `see`, `food`, `cafe` (địa điểm ngoài Tripflix từ OpenStreetMap, không đặt được, có `location`).\n- Có điểm OpenStreetMap thì `attribution` khác null và phải hiện kèm danh sách.\n- Phân trang, `isFallback`, `dropped`, `fallbackRelaxed` như `POST /api/search/posts`.",
+        "operationId": "ExploreController_searchPlaces",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPlacesRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPlacesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`q` rỗng hoặc dài hơn 200 ký tự, `kind`, `cursor`, `limit` sai"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tìm một loại chỗ, điểm (khách sạn, điểm tham quan, quán ăn, quán nước) bằng câu tự nhiên, có phân trang",
         "tags": [
           "discovery"
         ]
@@ -9208,6 +9249,10 @@
               }
             ]
           },
+          "isVerified": {
+            "type": "boolean",
+            "description": "Lộ trình lấy từ chuyến đã đi xong của chính người đăng (tích \"Đã đi\")"
+          },
           "counts": {
             "$ref": "#/components/schemas/FeedCountsDto"
           },
@@ -9241,6 +9286,7 @@
           "region",
           "tags",
           "linkedProductIds",
+          "isVerified",
           "counts",
           "viewerState",
           "reason"
@@ -11150,6 +11196,113 @@
           "dropped",
           "isFallback",
           "fallbackRelaxed"
+        ]
+      },
+      "SearchPlacesRequestDto": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "example": "cà phê đà lạt",
+            "description": "Câu người dùng gõ (1–200 ký tự)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stay",
+              "see",
+              "food",
+              "cafe"
+            ],
+            "description": "stay: khách sạn Tripflix · see: điểm tham quan · food: quán ăn · cafe: quán nước"
+          },
+          "cursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "`nextCursor` của trang trước"
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "q",
+          "kind"
+        ]
+      },
+      "SearchPlacesResponseDto": {
+        "type": "object",
+        "properties": {
+          "understood": {
+            "description": "Máy hiểu câu thế nào (hiện dạng chip)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreUnderstoodDto"
+              }
+            ]
+          },
+          "items": {
+            "description": "Bài đã xếp theo mức khớp, đã bỏ bài bị ẩn. `reason` luôn có số ngày (nếu có lộ trình) và lượt thích",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreItemDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số bài khớp trên mọi trang"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Con trỏ trang sau; null = hết"
+          },
+          "dropped": {
+            "description": "Từ trong câu mà dữ liệu không có. Chỉ có giá trị khi `isFallback = true`, rỗng nếu không",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFallback": {
+            "type": "boolean",
+            "description": "true: không bài nào khớp đủ câu nên `items` là kết quả thay thế sau khi nới điều kiện (xem `fallbackRelaxed`). FE nên báo \"Kết quả thay thế cho “q”\""
+          },
+          "fallbackRelaxed": {
+            "type": "array",
+            "example": [
+              "budget"
+            ],
+            "description": "Chỉ có giá trị khi `isFallback = true`. Điều kiện đã nới: place = khác nơi (cách nơi hỏi quá 40 km), budget = vượt ngân sách, terms = không khớp đủ từ trong câu",
+            "items": {
+              "type": "string",
+              "enum": [
+                "place",
+                "budget",
+                "terms"
+              ]
+            }
+          },
+          "attribution": {
+            "type": "string",
+            "nullable": true,
+            "example": "© OpenStreetMap contributors (ODbL)",
+            "description": "Có khi trang có điểm OpenStreetMap: phải hiện kèm danh sách (giấy phép ODbL)"
+          }
+        },
+        "required": [
+          "understood",
+          "items",
+          "total",
+          "nextCursor",
+          "dropped",
+          "isFallback",
+          "fallbackRelaxed",
+          "attribution"
         ]
       },
       "HomeProvinceDto": {

@@ -14,6 +14,8 @@ export interface FeedPostRow {
   hashtags: string[];
   mediaIds: string[];
   tripAttachment: TripAttachmentData | null;
+  /** Người đăng đã đi đúng chuyến của lộ trình (đơn đã trả, đã kết thúc) lúc đăng bài. */
+  isVerified?: boolean;
   reactionTotal: number;
   commentCount: number;
   bookmarkCount: number;

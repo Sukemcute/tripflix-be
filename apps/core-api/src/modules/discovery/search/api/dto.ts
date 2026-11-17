@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { STAY_SORTS, type StaySort } from '../domain/stays.js';
-import { POST_TYPES, type PostType } from '../application/explore.use-cases.js';
+import { PLACE_KINDS, POST_TYPES, type PlaceKind, type PostType } from '../application/explore.use-cases.js';
 import { SUGGEST_TYPES, type SuggestType } from '../domain/suggest-entity.js';
 import { POI_KINDS, type PoiKind } from '../domain/points-of-interest.js';
 
@@ -271,6 +271,21 @@ export class SearchPostsRequestDto {
   @ApiProperty({ required: false, default: 20, description: '1–50' }) limit?: number;
 }
 
+export const SearchPlacesRequestSchema = z.object({
+  q: z.string().trim().min(1, 'Nhập điều muốn tìm').max(200),
+  kind: z.enum(PLACE_KINDS),
+  cursor: z.string().regex(/^\d+$/, 'cursor lấy từ nextCursor của trang trước').nullish().transform((c) => c ?? undefined),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+export class SearchPlacesRequestDto {
+  @ApiProperty({ example: 'cà phê đà lạt', description: 'Câu người dùng gõ (1–200 ký tự)' }) q!: string;
+  @ApiProperty({ enum: PLACE_KINDS, description: 'stay: khách sạn Tripflix · see: điểm tham quan · food: quán ăn · cafe: quán nước' })
+  kind!: PlaceKind;
+  @ApiProperty({ required: false, nullable: true, type: String, description: '`nextCursor` của trang trước' }) cursor?: string | null;
+  @ApiProperty({ required: false, default: 20, minimum: 1, maximum: 50 }) limit?: number;
+}
+
 export class SearchPostsResponseDto {
   @ApiProperty({ type: ExploreUnderstoodDto, description: 'Máy hiểu câu thế nào (hiện dạng chip)' }) understood!: ExploreUnderstoodDto;
   @ApiProperty({
@@ -292,4 +307,14 @@ export class SearchPostsResponseDto {
   isFallback!: boolean;
   @ApiProperty({ enum: RELAX_VALUES, isArray: true, example: ['budget'], description: `Chỉ có giá trị khi \`isFallback = true\`. ${RELAX_DESCRIPTION}` })
   fallbackRelaxed!: Array<(typeof RELAX_VALUES)[number]>;
+}
+
+export class SearchPlacesResponseDto extends SearchPostsResponseDto {
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '© OpenStreetMap contributors (ODbL)',
+    description: 'Có khi trang có điểm OpenStreetMap: phải hiện kèm danh sách (giấy phép ODbL)',
+  })
+  attribution!: string | null;
 }

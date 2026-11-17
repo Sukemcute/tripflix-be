@@ -116,6 +116,8 @@ export class FeedCardDto {
   linkedProductIds!: string[];
   @ApiProperty({ type: TripAttachmentDto, nullable: true, required: false })
   tripAttachment?: TripAttachmentDto | null;
+  @ApiProperty({ description: 'Lộ trình lấy từ chuyến đã đi xong của chính người đăng (tích "Đã đi")' })
+  isVerified!: boolean;
   @ApiProperty({ type: FeedCountsDto }) counts!: FeedCountsDto;
   @ApiProperty({ type: FeedViewerStateDto, nullable: true, description: 'null với khách' })
   viewerState!: FeedViewerStateDto | null;

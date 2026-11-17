@@ -1,11 +1,13 @@
 import type { BuiltIndex, ExploreSource } from '../domain/explore/types.js';
 import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
+import type { PointOfInterestSeed, PoiPlace } from '../domain/points-of-interest.js';
 import type { HotelSummary, SuggestEntity, SuggestType } from '../domain/suggest-entity.js';
 
 export const SUGGEST_STORE = Symbol('SUGGEST_STORE');
 export const HOTEL_CATALOG = Symbol('HOTEL_CATALOG');
 export const EXPLORE_STORE = Symbol('EXPLORE_STORE');
 export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
+export const PLACES_STORE = Symbol('PLACES_STORE');
 
 /** Chỉ mục tìm khám phá trên Postgres. */
 export interface ExploreStore extends ExploreSource {
@@ -72,4 +74,17 @@ export interface SuggestStore {
 /** Nguồn danh mục khách sạn, đọc theo trang. Thật: CommerceFacade.listCatalog. */
 export interface HotelCatalog {
   listHotels(cursor: string | null): Promise<{ items: HotelSummary[]; nextCursor: string | null }>;
+}
+
+/** Cây nơi và địa điểm ngoài OTA (bảng discovery.places, discovery.points_of_interest). */
+export interface PlacesStore {
+  listPlaces(): Promise<PoiPlace[]>;
+  /** Mọi điểm chưa bị ẩn. */
+  listPoints(): Promise<PointOfInterestSeed[]>;
+  /** Ghi đè từ nguồn nạp trong một transaction: thêm, sửa, xoá điểm của `source` không còn trong nguồn; giữ `is_hidden`. */
+  upsertSeed(
+    places: ReadonlyArray<PoiPlace & { kind: 'province' | 'destination' }>,
+    points: readonly PointOfInterestSeed[],
+    source: string,
+  ): Promise<{ places: number; points: number }>;
 }
