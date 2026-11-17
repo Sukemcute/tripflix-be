@@ -403,6 +403,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     const postTypeColumn = source === 'hot' ? recommendPostScores.postType : recommendPosts.postType;
     const where = and(
       q.postType ? eq(postTypeColumn, q.postType) : undefined,
+      q.hasPlan ? eq(recommendPosts.hasPlan, true) : undefined,
       q.excludePostIds.length ? notInArray(recommendPosts.postId, q.excludePostIds) : undefined,
       lte(recommendPosts.publishedAt, q.now),
       publishedAfter ? gt(recommendPosts.publishedAt, publishedAfter) : undefined,

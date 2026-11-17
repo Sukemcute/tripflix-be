@@ -17,7 +17,9 @@ import {
   type ServedStore,
 } from './ports.js';
 
-export type RecommendMode = 'for_you' | 'trending';
+export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent';
+
+const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 
 const ALGO_CACHE_MS = 60_000;
 const HOT_LIMIT = 150;
@@ -66,9 +68,10 @@ export class ReelsFeedNotWiredError extends Error {}
 /** Bài gợi ý trước mốc này tính là "phiên trước" và bị phạt điểm; bài gợi ý trong phiên giữ chỗ. */
 const SESSION_MS = 30 * 60_000;
 
-/** Cursor do server cấp: giữ thuật toán, offset và mốc "phiên trước" của trang đầu. */
+/** Cursor do server cấp: giữ thuật toán, mode, offset và mốc "phiên trước" của trang đầu. */
 interface Cursor {
   algo: string;
+  mode?: RecommendMode;
   page: number;
   offset: number;
   seenBefore: number;
@@ -79,12 +82,15 @@ const OWN_RECENT_MS = 60 * 60_000;
 
 export class InvalidRecommendCursorError extends Error {}
 
+const VALID_MODES = new Set<RecommendMode>(['for_you', 'trending', 'has_plan', 'recent']);
+
 const encodeCursor = (c: Cursor) => Buffer.from(JSON.stringify(c)).toString('base64url');
 function decodeCursor(raw: string): Cursor {
   try {
     const c = JSON.parse(Buffer.from(raw, 'base64url').toString()) as Partial<Cursor>;
     if (
       typeof c.algo === 'string' &&
+      (c.mode === undefined || VALID_MODES.has(c.mode)) &&
       Number.isInteger(c.page) &&
       Number.isInteger(c.offset) &&
       Number.isInteger(c.seenBefore) &&
@@ -152,8 +158,14 @@ export class PostRecommendationUseCases {
 
   private async selectRankedPage(q: PostRecommendationQuery, now: Date) {
     const cursor = q.cursor ? decodeCursor(q.cursor) : null;
-    // Khách không có gu: for_you của khách là trending.
-    const algoName = cursor?.algo ?? (q.userId ? q.mode : 'trending');
+    const mode = cursor?.mode ?? q.mode;
+    if (mode === 'recent') {
+      return this.selectRecentPage(q, cursor, now);
+    }
+
+    // Khách không có gu: for_you và has_plan của khách dùng trending.
+    const requestedAlgo = mode === 'has_plan' ? 'for_you' : mode;
+    const algoName = cursor?.algo ?? (q.userId ? requestedAlgo : 'trending');
     const algo = await this.loadAlgo(algoName);
     const page = cursor?.page ?? 0;
     const offset = cursor?.offset ?? 0;
@@ -161,9 +173,10 @@ export class PostRecommendationUseCases {
     const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
     // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
     const sessionAt = seenBefore + SESSION_MS;
+    const hasPlanOnly = mode === 'has_plan';
 
     // Mọi tín hiệu người xem chốt theo trang đầu (sessionAt): tương tác giữa phiên không làm trang sau xô lệch.
-    const [interacted, seenIds, longTaste, recent, ownRecent] = q.userId
+    const [interacted, seenIds, longTaste, recent, rawOwnRecent] = q.userId
       ? await Promise.all([
           this.store.listInteractedPostIds(q.userId, new Date(sessionAt)),
           this.listSeen(q.userId, new Date(seenBefore)),
@@ -177,10 +190,23 @@ export class PostRecommendationUseCases {
           }),
         ])
       : [[], [], null, [], []];
+
+    let ownRecent = rawOwnRecent;
+    if (hasPlanOnly && ownRecent.length) {
+      const metas = new Map((await this.store.findPostMetas(ownRecent)).map((m) => [m.postId, m]));
+      ownRecent = ownRecent.filter((id) => metas.get(id)?.hasPlan === true);
+    }
+
     const userFeatures = await this.withSessionTaste(longTaste, recent, sessionAt);
     const seen = new Set(seenIds);
     // Nguồn ứng viên không loại bài theo lịch sử người dùng (mục 6.3); riêng explore bỏ bài đã gặp vì dành cho bài mới.
-    const base = { postBuilder: algo.postBuilder.key, postType: q.postType, excludePostIds: [], now };
+    const base = {
+      postBuilder: algo.postBuilder.key,
+      postType: q.postType,
+      ...(hasPlanOnly ? { hasPlan: true } : {}),
+      excludePostIds: [],
+      now,
+    };
     const [hot, fresh] = await Promise.all([
       this.store.listHotCandidates({ ...base, limit: HOT_LIMIT }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
@@ -215,7 +241,64 @@ export class PostRecommendationUseCases {
     return {
       pageItems,
       algo,
-      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, page: page + 1, offset: nextOffset, seenBefore }) : null,
+      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore }) : null,
+    };
+  }
+
+  /** Mode recent: mới nhất trước (cửa sổ 30 ngày), không qua ranker/explore/phạt lịch sử; bài tự đăng trong 1h lên đầu. */
+  private async selectRecentPage(q: PostRecommendationQuery, cursor: Cursor | null, now: Date) {
+    const page = cursor?.page ?? 0;
+    const offset = cursor?.offset ?? 0;
+    const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
+    const sessionAt = seenBefore + SESSION_MS;
+
+    const [pool, ownRecent] = await Promise.all([
+      this.store.listExplorePool({
+        postBuilder: 'hot@v0',
+        postType: q.postType,
+        excludePostIds: [],
+        limit: EXPLORE_POOL_LIMIT,
+        days: EXPLORE_DAYS,
+        now,
+      }),
+      q.userId
+        ? this.store.listOwnRecentPostIds({
+            userId: q.userId,
+            since: new Date(sessionAt - OWN_RECENT_MS),
+            until: new Date(sessionAt),
+            postType: q.postType,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const ownSet = new Set(ownRecent);
+    const ownItems: RankedItem[] = ownRecent.map((postId) => ({
+      postId,
+      authorId: q.userId!,
+      score: 0,
+      source: 'own',
+      breakdown: {},
+      reason: OWN_POST_REASON,
+    }));
+    const poolItems: RankedItem[] = pool
+      .filter((c) => !ownSet.has(c.postId))
+      .map((c) => ({
+        postId: c.postId,
+        authorId: c.authorId,
+        score: 0,
+        source: 'fresh',
+        breakdown: {},
+        reason: RECENT_REASON,
+      }));
+
+    const combined = [...ownItems, ...poolItems];
+    const pageItems = combined.slice(offset, offset + q.limit);
+    const nextOffset = offset + pageItems.length;
+    const hasMore = combined.length > nextOffset;
+    return {
+      pageItems,
+      algo: { name: 'recent' },
+      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: 'recent', mode: 'recent', page: page + 1, offset: nextOffset, seenBefore }) : null,
     };
   }
 

@@ -4490,7 +4490,7 @@
     },
     "/api/recommendations/posts": {
       "get": {
-        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- `trending`: bài thịnh hành chung.\n- `has_plan`: giống `for_you` (khách nhận `trending`) nhưng chỉ lấy bài có lịch trình.\n- `recent`: bài mới đăng gần đây (mới nhất trước, không xếp hạng cá nhân hoá).\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
         "operationId": "PostRecommendationsController_recommendPosts",
         "parameters": [
           {
@@ -4524,10 +4524,13 @@
             "name": "mode",
             "required": false,
             "in": "query",
+            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)",
             "schema": {
               "enum": [
                 "for_you",
-                "trending"
+                "trending",
+                "has_plan",
+                "recent"
               ],
               "type": "string"
             }
@@ -4561,7 +4564,7 @@
     },
     "/api/recommendations/reels": {
       "get": {
-        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
+        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng, lọc có lịch trình, mới đăng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
         "operationId": "PostRecommendationsController_recommendReels",
         "parameters": [
           {
@@ -4583,10 +4586,13 @@
             "name": "mode",
             "required": false,
             "in": "query",
+            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)",
             "schema": {
               "enum": [
                 "for_you",
-                "trending"
+                "trending",
+                "has_plan",
+                "recent"
               ],
               "type": "string"
             }
@@ -4612,7 +4618,7 @@
             "bearer": []
           }
         ],
-        "summary": "Gợi ý Reels phát được (trending hoặc for_you)",
+        "summary": "Gợi ý Reels phát được (trending, for_you, has_plan hoặc recent)",
         "tags": [
           "discovery"
         ]
@@ -11744,7 +11750,8 @@
               "matches_interest",
               "trending",
               "explore",
-              "own_post"
+              "own_post",
+              "recent"
             ]
           },
           "text": {

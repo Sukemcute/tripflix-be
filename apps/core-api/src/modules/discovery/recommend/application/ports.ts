@@ -150,6 +150,8 @@ export interface CandidateQuery {
   /** 'hot@v0' */
   postBuilder: string;
   postType: string | null;
+  /** Chỉ lấy bài có lịch trình (`has_plan = true`). */
+  hasPlan?: boolean;
   /** Bài không lấy (explore bỏ bài đã tương tác; hot/fresh để rỗng, bài đã tương tác chỉ bị đẩy xuống cuối). */
   excludePostIds: string[];
   limit: number;
