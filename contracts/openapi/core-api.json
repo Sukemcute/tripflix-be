@@ -6384,6 +6384,83 @@
           }
         }
       },
+      "TravelPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "skipped"
+            ],
+            "description": "skipped: bỏ qua hoặc không chọn sở thích nào"
+          },
+          "interests": {
+            "type": "array",
+            "example": [
+              "coast",
+              "food"
+            ],
+            "description": "Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "coast",
+                "nature",
+                "culture",
+                "food",
+                "city",
+                "stays"
+              ]
+            }
+          },
+          "regions": {
+            "type": "array",
+            "example": [
+              "central"
+            ],
+            "description": "Vùng muốn đi. Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "north",
+                "central",
+                "highlands",
+                "south"
+              ]
+            }
+          },
+          "budgetLevels": {
+            "type": "array",
+            "example": [
+              "saving",
+              "moderate"
+            ],
+            "description": "Mức chi phí muốn đi: saving tiết kiệm, moderate vừa phải, premium cao cấp. Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "saving",
+                "moderate",
+                "premium"
+              ]
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-17T10:00:00.000Z",
+            "description": "Lúc người dùng bấm xong trên máy. PATCH bản cũ hơn bản đang lưu thì server giữ bản đang lưu."
+          }
+        },
+        "required": [
+          "status",
+          "interests",
+          "regions",
+          "budgetLevels",
+          "updatedAt"
+        ]
+      },
       "MyProfileDto": {
         "type": "object",
         "properties": {
@@ -6437,6 +6514,16 @@
             "type": "string",
             "nullable": true,
             "example": "VN"
+          },
+          "travelPreferences": {
+            "nullable": true,
+            "description": "null: chưa làm khảo sát sở thích",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravelPreferencesDto"
+              }
+            ]
           }
         },
         "required": [
@@ -6449,7 +6536,8 @@
           "phone",
           "dateOfBirth",
           "gender",
-          "nationality"
+          "nationality",
+          "travelPreferences"
         ]
       },
       "UpdateProfileDto": {
@@ -6487,6 +6575,16 @@
             "nullable": true,
             "example": "VN",
             "description": "ISO 3166-1 alpha-2"
+          },
+          "travelPreferences": {
+            "nullable": true,
+            "description": "null để xoá (làm lại khảo sát)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravelPreferencesDto"
+              }
+            ]
           }
         }
       },

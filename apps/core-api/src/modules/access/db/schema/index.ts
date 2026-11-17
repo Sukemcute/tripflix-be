@@ -1,6 +1,7 @@
 import { createOutboxTable } from '@tripflix/outbox';
 import { sql } from 'drizzle-orm';
 import { bigint, check, date, foreignKey, index, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { TravelPreferences } from '../../account/domain/travel-preferences.js';
 
 /** Mọi bảng của module access khai báo trong schema này. */
 export const accessSchema = pgSchema('access');
@@ -23,6 +24,8 @@ export const users = accessSchema.table(
     dateOfBirth: date('date_of_birth', { mode: 'string' }),
     gender: text('gender'),
     nationality: text('nationality'),
+    // Sở thích chọn ở onboarding (TF106): { status, interests, regions, budgetLevels, updatedAt }, kiểm ở dto. Chỉ lưu, chưa module nào đọc.
+    travelPreferences: jsonb('travel_preferences').$type<TravelPreferences>(),
     // Bản Điều khoản sử dụng đã đồng ý và lúc đồng ý (TF06O). Trống: tài khoản tạo trước đó hoặc qua Google.
     termsVersion: text('terms_version'),
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),

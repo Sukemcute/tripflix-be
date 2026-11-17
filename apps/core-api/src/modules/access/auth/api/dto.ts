@@ -11,6 +11,13 @@ import {
 } from '../domain/registration.js';
 import { GENDERS } from '../../account/domain/personal-info.js';
 import {
+  TRAVEL_BUDGET_LEVELS,
+  TRAVEL_INTERESTS,
+  TRAVEL_PREFERENCES_STATUSES,
+  TRAVEL_REGIONS,
+  type TravelPreferences,
+} from '../../account/domain/travel-preferences.js';
+import {
   currentPasswordField,
   dateOfBirthField,
   deviceNameField,
@@ -170,6 +177,29 @@ export class UserDto {
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
 }
 
+/** Sở thích chọn ở onboarding mobile (TF106). Chỉ lưu, chưa dùng để gợi ý. */
+export class TravelPreferencesDto {
+  @ApiProperty({ enum: TRAVEL_PREFERENCES_STATUSES, description: 'skipped: bỏ qua hoặc không chọn sở thích nào' })
+  status!: TravelPreferences['status'];
+  @ApiProperty({ enum: TRAVEL_INTERESTS, isArray: true, example: ['coast', 'food'], description: 'Không trùng; có thể rỗng' })
+  interests!: TravelPreferences['interests'];
+  @ApiProperty({ enum: TRAVEL_REGIONS, isArray: true, example: ['central'], description: 'Vùng muốn đi. Không trùng; có thể rỗng' })
+  regions!: TravelPreferences['regions'];
+  @ApiProperty({
+    enum: TRAVEL_BUDGET_LEVELS,
+    isArray: true,
+    example: ['saving', 'moderate'],
+    description: 'Mức chi phí muốn đi: saving tiết kiệm, moderate vừa phải, premium cao cấp. Không trùng; có thể rỗng',
+  })
+  budgetLevels!: TravelPreferences['budgetLevels'];
+  @ApiProperty({
+    format: 'date-time',
+    example: '2026-11-17T10:00:00.000Z',
+    description: 'Lúc người dùng bấm xong trên máy. PATCH bản cũ hơn bản đang lưu thì server giữ bản đang lưu.',
+  })
+  updatedAt!: string;
+}
+
 /** GET/PATCH /auth/me: hồ sơ của chính mình, có thông tin cá nhân (không có ở danh sách nhân viên). */
 export class MyProfileDto extends UserDto {
   @ApiProperty({ description: 'Đã xác thực email (TF05D). false: chưa đăng bài, bình luận được; gửi lại link bằng POST /auth/email/verification' })
@@ -178,6 +208,8 @@ export class MyProfileDto extends UserDto {
   @ApiProperty({ type: String, format: 'date', nullable: true, example: '2000-05-20' }) dateOfBirth!: string | null;
   @ApiProperty({ enum: ['male', 'female', 'other'], nullable: true }) gender!: 'male' | 'female' | 'other' | null;
   @ApiProperty({ type: String, nullable: true, example: 'VN' }) nationality!: string | null;
+  @ApiProperty({ type: TravelPreferencesDto, nullable: true, description: 'null: chưa làm khảo sát sở thích' })
+  travelPreferences!: TravelPreferencesDto | null;
 }
 
 export class JwksDto {

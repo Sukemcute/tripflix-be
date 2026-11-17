@@ -144,6 +144,7 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
         dateOfBirth: expect.any(String),
         gender: expect.any(String),
         nationality: expect.any(String),
+        travelPreferences: null,
       });
     }
   });

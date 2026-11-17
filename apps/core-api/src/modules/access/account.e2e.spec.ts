@@ -149,6 +149,48 @@ describe('TF055: tài khoản của tôi', () => {
     await http().patch('/api/auth/me').set(as(phone.accessToken)).send({}).expect(400);
   });
 
+  it('TF106: travelPreferences lưu qua PATCH, đọc qua GET; bản cũ hơn không đè; null xoá; sai dạng 400', async () => {
+    const { userId, phone } = await createAccountOnTwoDevices('taste@example.com');
+    const me = () => http().get('/api/auth/me').set(as(phone.accessToken)).expect(200);
+    const patch = (travelPreferences: unknown) => http().patch('/api/auth/me').set(as(phone.accessToken)).send({ travelPreferences });
+    expect((await me()).body.travelPreferences).toBeNull();
+
+    const saved = { status: 'completed', interests: ['coast', 'food'], regions: ['central'], budgetLevels: ['moderate'], updatedAt: '2026-11-17T10:00:00.000Z' };
+    expect((await patch(saved).expect(200)).body).toMatchObject({ travelPreferences: saved, displayName: 'Khang', nationality: 'VN' });
+    expect((await me()).body.travelPreferences).toEqual(saved);
+    // Không lên event bus; audit chỉ ghi tên trường.
+    expect(store.outboxRows.filter((e) => e.type === 'access.user.profile_updated' && e.userId === userId)).toHaveLength(0);
+    const audit = store.auditRows.filter((a) => a.action === 'auth.profile_updated' && a.actorUserId === userId);
+    expect(audit.map((a) => a.meta)).toEqual([{ changedFields: ['travelPreferences'] }]);
+
+    // Bản trong máy khách cũ hơn bản đã lưu: giữ bản đã lưu, không ghi audit.
+    const older = { status: 'skipped', interests: [], regions: [], budgetLevels: [], updatedAt: '2026-11-16T10:00:00.000Z' };
+    expect((await patch(older).expect(200)).body.travelPreferences).toEqual(saved);
+    expect(store.auditRows.filter((a) => a.action === 'auth.profile_updated' && a.actorUserId === userId)).toHaveLength(1);
+
+    const newer = { status: 'completed', interests: ['city'], regions: [], budgetLevels: ['saving', 'premium'], updatedAt: '2026-11-18T08:00:00+07:00' };
+    expect((await patch(newer).expect(200)).body.travelPreferences).toEqual(newer);
+
+    // null: làm lại khảo sát.
+    expect((await patch(null).expect(200)).body.travelPreferences).toBeNull();
+
+    for (const bad of [
+      { ...saved, interests: ['beach'] },
+      { ...saved, interests: ['coast', 'coast'] },
+      { ...saved, status: 'unseen' },
+      { ...saved, regions: ['west'] },
+      { ...saved, regions: ['north', 'north'] },
+      { ...saved, budgetLevels: ['cheap'] },
+      { ...saved, budgetLevels: ['saving', 'saving'] },
+      { ...saved, updatedAt: 'hôm qua' },
+      { ...saved, pace: 'slow' },
+      { status: 'completed', interests: ['coast'], regions: [], updatedAt: '2026-11-17T10:00:00.000Z' },
+    ]) {
+      const res = await patch(bad).expect(400);
+      expect(res.body.errors.some((e: { field: string }) => e.field.startsWith('travelPreferences'))).toBe(true);
+    }
+  });
+
   it('GET /auth/sessions liệt kê thiết bị, đánh dấu phiên hiện tại; không có bản băm token', async () => {
     const { phone } = await createAccountOnTwoDevices('sessions@example.com');
 
