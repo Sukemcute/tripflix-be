@@ -63,6 +63,8 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
   let facade: CommerceFacade;
   let roomTypeId: string;
   let roomPropertyName: string;
+  let roomPropertyId: string;
+  let flightAirports: { from_airport: string; to_airport: string };
   let flightId: string;
   const users = new Map<string, AuthUser>();
 
@@ -116,10 +118,14 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     await pool.query('update commerce.room_inventory set stop_sell = false, cta = false, ctd = false, min_los = 1, total = 10');
     await pool.query('update commerce.flight_inventory set stop_sell = false, total = 10');
     roomTypeId = (await pool.query<{ id: string }>('select id from commerce.room_types where max_guests >= 2 order by id limit 1')).rows[0]!.id;
-    roomPropertyName = (
-      await pool.query<{ name: string }>('select p.name from commerce.room_types r join commerce.properties p on p.id = r.property_id where r.id = $1', [roomTypeId])
-    ).rows[0]!.name;
-    flightId = (await pool.query<{ id: string }>('select id from commerce.flights order by id limit 1')).rows[0]!.id;
+    const property = (
+      await pool.query<{ id: string; name: string }>('select p.id, p.name from commerce.room_types r join commerce.properties p on p.id = r.property_id where r.id = $1', [roomTypeId])
+    ).rows[0]!;
+    roomPropertyName = property.name;
+    roomPropertyId = property.id;
+    const flight = (await pool.query<{ id: string; from_airport: string; to_airport: string }>('select id, from_airport, to_airport from commerce.flights order by id limit 1')).rows[0]!;
+    flightId = flight.id;
+    flightAirports = { from_airport: flight.from_airport, to_airport: flight.to_airport };
 
     gateway = new FlakyGateway(db);
     @Global()
@@ -315,6 +321,12 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
     ]));
     expect((await pool.query('select source_post_id from commerce.orders where id = $1', [response.body.orderId])).rows)
       .toEqual([{ source_post_id: 'trip-plan-post' }]);
+    // TF105: đọc lại đơn có sân bay của vé bay và mã khách sạn của phòng để dựng lộ trình từ chuyến đã đi.
+    const saved = await http().get(`/api/checkout/${response.body.orderId}`).set(user.auth);
+    expect(saved.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ productId: flightId, fromAirport: flightAirports.from_airport, toAirport: flightAirports.to_airport, propertyId: null }),
+      expect.objectContaining({ productId: roomTypeId, propertyId: roomPropertyId, fromAirport: null }),
+    ]));
   });
 
   it('giữ giỏ thiếu một mục thì không giữ gì; giỏ mới thay giỏ cũ và trả chỗ cũ về kho', async () => {
@@ -629,7 +641,7 @@ describe('TF29 checkout + thanh toán trên Postgres thật', () => {
         paidAt: null,
         startDate: checkIn,
         endDate: addDays(checkIn, 2),
-        items: [{ productType: 'room', productId: roomTypeId, propertyName: roomPropertyName, date: checkIn, dateTo: addDays(checkIn, 2), nights: 2 }],
+        items: [{ productType: 'room', productId: roomTypeId, propertyId: roomPropertyId, propertyName: roomPropertyName, fromAirport: null, toAirport: null, date: checkIn, dateTo: addDays(checkIn, 2), nights: 2 }],
       });
       expect((await http().get(`/api/checkout/${order.orderId}`).set(web.auth)).body.items[0].propertyName).toBe(roomPropertyName);
 

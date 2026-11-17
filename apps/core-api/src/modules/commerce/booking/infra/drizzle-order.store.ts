@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { TraceContext } from '../../trace-context.js';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
-import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
+import { flightInventory, flights, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
 import { SUBMITTED_REFUND_REF } from '../../payment/application/refund-gateways.port.js';
 import type { OrderStatus, PassengerType } from '../domain/order-rules.js';
 import type { InventoryCell, InventoryDrift, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
@@ -34,8 +34,14 @@ const mapOrder = (row: OrderRow): OrderRecord => ({
 
 const mapItem = (row: OrderItemRow): OrderItemRecord => ({ ...row, productType: row.productType as 'room' | 'flight' });
 
-/** Mục phòng kèm tên khách sạn (vé bay là null); đọc lúc xem đơn nên không cần thêm cột. */
-const mapItemWithProperty = (row: { item: OrderItemRow; propertyName: string | null }): OrderItemRecord => ({ ...mapItem(row.item), propertyName: row.propertyName });
+/** Mục phòng kèm khách sạn, vé bay kèm sân bay đi/đến; đọc lúc xem đơn nên không cần thêm cột. */
+const mapItemWithProperty = (row: { item: OrderItemRow; propertyId: string | null; propertyName: string | null; fromAirport: string | null; toAirport: string | null }): OrderItemRecord => ({
+  ...mapItem(row.item),
+  propertyId: row.propertyId,
+  propertyName: row.propertyName,
+  fromAirport: row.fromAirport,
+  toAirport: row.toAirport,
+});
 
 const mapPayment = (row: PaymentRow): PaymentRecord => ({
   id: row.id,
@@ -215,10 +221,11 @@ export class DrizzleOrderStore implements OrderStore {
 
   private selectItemsWithProperty() {
     return this.db
-      .select({ item: orderItems, propertyName: properties.name })
+      .select({ item: orderItems, propertyId: properties.id, propertyName: properties.name, fromAirport: flights.fromAirport, toAirport: flights.toAirport })
       .from(orderItems)
       .leftJoin(roomTypes, and(eq(orderItems.productType, 'room'), eq(roomTypes.id, orderItems.productId)))
-      .leftJoin(properties, eq(properties.id, roomTypes.propertyId));
+      .leftJoin(properties, eq(properties.id, roomTypes.propertyId))
+      .leftJoin(flights, and(eq(orderItems.productType, 'flight'), eq(flights.id, orderItems.productId)));
   }
 
   async updateItemPrices(prices: { id: string; unitPrice: number; childUnitPrice: number | null; infantUnitPrice: number | null; lineTotal: number }[]) {

@@ -115,6 +115,9 @@ class CheckoutItemDto {
   @ApiProperty() productId!: string;
   @ApiProperty() productName!: string;
   @ApiProperty({ type: String, nullable: true, description: 'Tên khách sạn của mục phòng; vé bay là null' }) propertyName!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Mã khách sạn của mục phòng; vé bay là null' }) propertyId?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'SGN', description: 'Sân bay đi của vé bay; phòng là null' }) fromAirport?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'CXR', description: 'Sân bay đến của vé bay; phòng là null' }) toAirport?: string | null;
   @ApiProperty({ format: 'date' }) date!: string;
   @ApiProperty({ format: 'date' }) dateTo!: string;
   @ApiProperty() nights!: number;
