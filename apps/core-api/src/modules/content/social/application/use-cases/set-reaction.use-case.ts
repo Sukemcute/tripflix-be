@@ -45,18 +45,19 @@ export class SetReactionUseCase {
       throw new InvalidReactionTypeException(command.type);
     }
 
+    // Dòng bài đang khoá nên số đếm trên bài không đổi dưới tay mình: cộng trừ đúng phần thay đổi
+    // thay vì đếm lại mọi cảm xúc của bài (bài nhiều tim thì count(*) quét rất nhiều dòng trong lúc giữ khoá).
+    const previous = await this.reactionRepository.findByPostAndUser(command.postId, command.userId);
     if (command.type !== null) {
       await this.reactionRepository.upsert(command.postId, command.userId, command.type);
     } else {
       await this.reactionRepository.delete(command.postId, command.userId);
     }
-
-    // Tổng hợp lại chính xác số lượng cảm xúc
-    const { reactionCounts, reactionTotal } = await this.reactionRepository.aggregateReactionCounts(
-      command.postId,
+    const { reactionCounts, reactionTotal } = applyReactionChange(
+      post.reactionCounts,
+      previous?.type ?? null,
+      command.type,
     );
-
-    // Cập nhật ngược lại bảng posts
     await this.postRepository.updateReactionCounts(command.postId, reactionCounts, reactionTotal);
 
     // Ghi sự kiện outbox content.reaction.updated trong cùng transaction DB
@@ -80,4 +81,23 @@ export class SetReactionUseCase {
       reactionTotal,
     };
   }
+}
+
+/** Số cảm xúc sau khi một người đổi từ `previousType` sang `nextType` (null là không thả). Bỏ loại về 0. */
+export function applyReactionChange(
+  reactionCounts: Record<string, number>,
+  previousType: ReactionType | null,
+  nextType: ReactionType | null,
+): { reactionCounts: Record<string, number>; reactionTotal: number } {
+  const nextCounts = { ...reactionCounts };
+  if (previousType !== nextType) {
+    if (previousType) {
+      const remaining = (nextCounts[previousType] ?? 0) - 1;
+      if (remaining > 0) nextCounts[previousType] = remaining;
+      else delete nextCounts[previousType];
+    }
+    if (nextType) nextCounts[nextType] = (nextCounts[nextType] ?? 0) + 1;
+  }
+  const reactionTotal = Object.values(nextCounts).reduce((sum, count) => sum + count, 0);
+  return { reactionCounts: nextCounts, reactionTotal };
 }

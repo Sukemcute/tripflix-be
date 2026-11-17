@@ -110,14 +110,22 @@ export class ReactionNotificationRepository {
       `WITH totals AS (
          SELECT COALESCE((data->>'actorCount')::integer, 0) + $2::integer AS actor_count
          FROM inbox WHERE id = $1
+       ), latest AS (
+         -- Hiện tên người thả gần nhất để bảng thông báo có tên và avatar thay vì chỉ có số.
+         SELECT COALESCE(NULLIF(btrim(u.display_name), ''), 'Một người dùng') AS name
+         FROM reaction_notification_actors a LEFT JOIN user_directory u ON u.user_id = a.actor_id
+         WHERE a.inbox_id = $1 AND a.is_active
+         ORDER BY a.occurred_at DESC LIMIT 1
        )
        UPDATE inbox SET
          data = jsonb_set(data, '{actorCount}', to_jsonb(totals.actor_count)),
-         body = totals.actor_count || $3::text,
+         body = COALESCE((SELECT name FROM latest), 'Một người dùng')
+           || CASE WHEN totals.actor_count > 1 THEN ' và ' || (totals.actor_count - 1) || ' người khác' ELSE '' END
+           || $3::text,
          deleted_at = CASE WHEN totals.actor_count = 0 THEN now() ELSE NULL END,
          read_at = CASE WHEN totals.actor_count = 0 THEN COALESCE(read_at, now()) ELSE read_at END
        FROM totals WHERE id = $1 AND NOT is_post_interaction_suppressed RETURNING inbox.*`,
-      [inboxId, isActive ? 1 : -1, commentId ? ' người đã thích bình luận của bạn.' : ' người đã thả cảm xúc vào bài của bạn.'],
+      [inboxId, isActive ? 1 : -1, commentId ? ' đã thích bình luận của bạn.' : ' đã thả cảm xúc vào bài của bạn.'],
     );
     return rows[0] ? { row: rows[0], isNew } : null;
   }

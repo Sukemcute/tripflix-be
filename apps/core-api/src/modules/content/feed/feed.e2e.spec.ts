@@ -23,6 +23,10 @@ import { ContentModule } from '../content.module.js';
 import { MEDIA_ASSET_STORE, OBJECT_STORAGE } from '../media/application/ports.js';
 import { MemoryMediaAssetStore } from '../media/infra/memory/memory-media-asset.store.js';
 import { FEED_STORE, type FeedPostRow, type FeedStore } from './application/ports.js';
+import { FEED_EVENT_BUS } from './application/feed-events.use-cases.js';
+import type { EventBus, StreamName } from '@tripflix/event-bus';
+import type { EventEnvelope } from '@tripflix/contracts';
+import { randomUUID } from 'node:crypto';
 import { encodeFeedCursor, type FeedCursor } from './domain/feed-cursor.js';
 import { calculateHotScore } from './domain/hot-score.js';
 
@@ -103,6 +107,15 @@ class FakeFeedStore implements FeedStore {
   }
 }
 
+class FakeEventBus implements EventBus {
+  published: { stream: StreamName; event: EventEnvelope }[] = [];
+
+  publish(stream: StreamName, event: EventEnvelope): Promise<string> {
+    this.published.push({ stream, event });
+    return Promise.resolve(`${this.published.length}-0`);
+  }
+}
+
 interface FeedPageBody {
   items: {
     postId: string;
@@ -117,12 +130,14 @@ interface FeedPageBody {
 describe('GET /api/v1/feed E2E', () => {
   let app: INestApplication;
   let feedStore: FakeFeedStore;
+  let eventBus: FakeEventBus;
   let token: string;
   let userId: string;
   const http = () => request(app.getHttpServer());
 
   beforeAll(async () => {
     feedStore = new FakeFeedStore();
+    eventBus = new FakeEventBus();
     const mediaStore = new MemoryMediaAssetStore();
     mediaStore.assets.set(ASSET_ID, {
       id: ASSET_ID,
@@ -154,6 +169,8 @@ describe('GET /api/v1/feed E2E', () => {
       .useValue(new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' }))
       .overrideProvider(FEED_STORE)
       .useValue(feedStore)
+      .overrideProvider(FEED_EVENT_BUS)
+      .useValue(eventBus)
       .compile();
     app = moduleRef.createNestApplication({ logger: false });
     applyGlobalPrefix(app);
@@ -169,6 +186,7 @@ describe('GET /api/v1/feed E2E', () => {
     feedStore.rows = [buildRow(1), buildRow(2), buildRow(3)];
     feedStore.liked = [];
     feedStore.savedQueriedBy = [];
+    eventBus.published = [];
   });
 
   afterAll(async () => {
@@ -326,4 +344,71 @@ describe('GET /api/v1/feed E2E', () => {
     await http().get('/api/v1/feed?saved=true').auth(token, { type: 'bearer' }).expect(200);
     expect(feedStore.savedQueriedBy).toEqual([userId]);
   });
+
+  it('TF23: khách gửi lượt xem, chỉ bài xem được mới vào stream:app-events, giữ eventId của app', async () => {
+    const anonId = randomUUID();
+    const eventId = randomUUID();
+    const response = await http()
+      .post('/api/v1/feed/events')
+      .set('X-Anon-Id', anonId)
+      .send({
+        events: [
+          { eventId, type: 'view', postId: buildPostId(1), watchedMs: 20_000, surface: 'reels' },
+          { eventId: randomUUID(), type: 'view', postId: buildPostId(2), watchedMs: 3_000, surface: 'reels' },
+          { eventId: randomUUID(), type: 'view', postId: buildPostId(9), watchedMs: 20_000, surface: 'reels' },
+        ],
+      })
+      .expect(202);
+
+    expect(response.body).toEqual({ accepted: 2 });
+    expect(eventBus.published.map(({ stream }) => stream)).toEqual(['stream:app-events', 'stream:app-events']);
+    expect(eventBus.published[0]?.event).toMatchObject({
+      eventId,
+      type: 'content.post.viewed',
+      version: 1,
+      userId: null,
+      payload: { postId: buildPostId(1), viewerId: null, anonId, watchedMs: 20_000, durationSec: 43, isQualified: true, surface: 'reels' },
+    });
+    // 3 giây của video 43 giây: chưa tới 15 giây, chưa tới nửa thời lượng.
+    expect(eventBus.published[1]?.event.payload).toMatchObject({ postId: buildPostId(2), isQualified: false });
+  });
+
+  it('TF23: người đã đăng nhập bấm đặt từ lộ trình, X-Anon-Id sai dạng thì bỏ qua', async () => {
+    await http()
+      .post('/api/v1/feed/events')
+      .auth(token, { type: 'bearer' })
+      .set('X-Anon-Id', 'khong-phai-uuid')
+      .send({
+        events: [
+          { eventId: randomUUID(), type: 'booking_click', postId: buildPostId(1), hotelId: 'P-osm-1', surface: 'reels_trip_plan' },
+        ],
+      })
+      .expect(202);
+
+    expect(eventBus.published[0]?.event).toMatchObject({
+      type: 'content.post.booking_clicked',
+      userId,
+      payload: { postId: buildPostId(1), viewerId: userId, anonId: null, hotelId: 'P-osm-1', surface: 'reels_trip_plan' },
+    });
+  });
+
+  it('TF23: lô rỗng, quá 50 sự kiện hoặc sự kiện sai dạng thì trả 400, không phát gì', async () => {
+    const view = () => ({ eventId: randomUUID(), type: 'view', postId: buildPostId(1), watchedMs: 1_000, surface: 'reels' });
+    await http().post('/api/v1/feed/events').send({ events: [] }).expect(400);
+    await http()
+      .post('/api/v1/feed/events')
+      .send({ events: Array.from({ length: 51 }, view) })
+      .expect(400);
+    await http()
+      .post('/api/v1/feed/events')
+      .send({ events: [{ ...view(), watchedMs: -5 }] })
+      .expect(400);
+    await http()
+      .post('/api/v1/feed/events')
+      .send({ events: [{ ...view(), type: 'booking_click', surface: 'reels' }] })
+      .expect(400);
+
+    expect(eventBus.published).toEqual([]);
+  });
 });
+

@@ -16,6 +16,7 @@ export * from './use-cases/list-user-posts.use-case.js';
 export * from './use-cases/set-reaction.use-case.js';
 export * from './use-cases/get-post-stats.use-case.js';
 export * from './use-cases/add-comment.use-case.js';
+export * from './use-cases/flush-comment-counts.use-case.js';
 export * from './use-cases/edit-comment.use-case.js';
 export * from './use-cases/delete-comment.use-case.js';
 export * from './use-cases/list-comments.use-case.js';

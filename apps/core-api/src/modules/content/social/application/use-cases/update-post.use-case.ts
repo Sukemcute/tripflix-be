@@ -3,7 +3,7 @@ import { assertPrecheckedPost, postGateText } from '../common/content-precheck.j
 import { Transactional } from '@tripflix/db';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
-import { assertPostMediaAllowed } from '../common/post-media.js';
+import { assertPostMediaAllowed, prepareTripAttachment } from '../common/post-media.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { PostMediaPort } from '../ports/post-media.port.js';
 import type {
@@ -72,6 +72,11 @@ export class UpdatePostUseCase {
       });
     }
 
+    // Người khác sửa thì domainPost.update chặn ở dưới; chỉ kiểm poster khi đúng chủ bài.
+    const tripAttachment = domainPost.isOwnedBy(command.userId)
+      ? await prepareTripAttachment(this.postMedia, record.authorId, command.tripAttachment)
+      : command.tripAttachment;
+
     domainPost.update(command.userId, {
       title: command.title,
       body: command.body,
@@ -79,7 +84,7 @@ export class UpdatePostUseCase {
       visibility: command.visibility,
       mediaIds: command.mediaIds,
       coverMediaId: command.coverMediaId,
-      tripAttachment: command.tripAttachment,
+      tripAttachment,
     });
 
     const shouldHold = record.status !== 'draft' && (this.gate?.precheck(postGateText({

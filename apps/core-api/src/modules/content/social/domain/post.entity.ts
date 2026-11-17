@@ -64,6 +64,14 @@ export interface TripItineraryItem {
   title: string;
   location?: string;
   notes?: string;
+  /** Giờ trong ngày (HH:mm), tuỳ chọn (TF105). */
+  time?: string;
+  /** Khách sạn và loại phòng của điểm khách sạn này; một chuyến có thể ở nhiều khách sạn (TF105). */
+  hotel?: {
+    hotelId: string;
+    productId?: string;
+    ratePlanCode?: string;
+  };
   transport?: {
     mode: 'flight' | 'bus' | 'train' | 'car' | 'other';
     fromAirport?: string;
@@ -75,10 +83,19 @@ export interface TripAttachment {
   bookingId?: string;
   hotelId?: string;
   hotelName?: string;
+  /** Loại phòng (productId) và gói giá người đăng chọn cho khách sạn của chuyến (TF105). */
+  hotelProductId?: string;
+  hotelRatePlanCode?: string;
+  /** Điểm đến chọn từ ô tìm kiếm của discovery (refId của dòng place). */
+  destinationPlaceId?: string;
   destinationName?: string;
   daysCount?: number;
   estimatedCostPerPerson?: number;
   priceDisclaimer?: string;
+  /** Ảnh poster riêng của lộ trình (asset ảnh của module media); bỏ trống thì dùng poster video (TF105). */
+  posterMediaId?: string;
+  /** Chỉ có khi đọc: link poster đổi từ posterMediaId, không lưu. */
+  posterUrl?: string;
   items?: TripItineraryItem[];
 }
 
@@ -257,6 +274,9 @@ export class Post {
     return {
       hotelId: this.props.tripAttachment.hotelId,
       hotelName: this.props.tripAttachment.hotelName,
+      hotelProductId: this.props.tripAttachment.hotelProductId,
+      hotelRatePlanCode: this.props.tripAttachment.hotelRatePlanCode,
+      destinationPlaceId: this.props.tripAttachment.destinationPlaceId,
       destinationName: this.props.tripAttachment.destinationName,
       daysCount: this.props.tripAttachment.daysCount,
       estimatedCostPerPerson: this.props.tripAttachment.estimatedCostPerPerson,
@@ -266,6 +286,14 @@ export class Post {
         title: item.title,
         location: item.location,
         notes: item.notes,
+        time: item.time,
+        ...(item.hotel && {
+          hotel: {
+            hotelId: item.hotel.hotelId,
+            productId: item.hotel.productId,
+            ratePlanCode: item.hotel.ratePlanCode,
+          },
+        }),
         ...(item.transport && {
           transport: {
             mode: item.transport.mode,

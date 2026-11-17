@@ -183,6 +183,7 @@ describe('TF05C: kiểm dữ liệu đầu vào của access qua HTTP', () => {
       dateOfBirth: '1999-12-31',
       gender: 'other',
       nationality: 'JP',
+      travelPreferences: null,
     });
     const terms = store.acceptedTerms.get(reg.body.id);
     expect(terms?.version).toBe(TERMS_VERSION);

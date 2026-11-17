@@ -108,6 +108,23 @@ describe('Gom thông báo cảm xúc trên PostgreSQL', () => {
     expect((await inbox.listForUser(commentAuthorId, { limit: 20 })).items).toEqual([]);
   });
 
+  it('hiện tên người thả gần nhất và số người còn lại', async () => {
+    const postId = randomUUID();
+    const owner = randomUUID();
+    const [lan, minh] = [randomUUID(), randomUUID()];
+    await pool.query(
+      `INSERT INTO user_directory (user_id, display_name, updated_at) VALUES ($1, 'Lan', now()), ($2, 'Minh', now())`,
+      [lan, minh],
+    );
+    await router.route(postReaction(postId, owner, lan, 'like'));
+    expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.body).toBe('Lan đã thả cảm xúc vào bài của bạn.');
+    await router.route(postReaction(postId, owner, minh, 'love', 1000));
+    expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.body)
+      .toBe('Minh và 1 người khác đã thả cảm xúc vào bài của bạn.');
+    await router.route(postReaction(postId, owner, minh, null, 2000));
+    expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.body).toBe('Lan đã thả cảm xúc vào bài của bạn.');
+  });
+
   it('dùng post_directory cho sự kiện cũ thiếu tác giả', async () => {
     const postId = randomUUID();
     const owner = randomUUID();

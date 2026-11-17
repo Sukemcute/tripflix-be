@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, or, sql, type SQL } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 export interface KeysetCursor {
@@ -20,14 +20,19 @@ function cursorTime(table: PgTable, timeColumn: PgColumn, idColumn: PgColumn, cu
   ), ${cursor.time})`;
 }
 
+/*
+ * So theo cặp (thời gian, id) thay vì (t < x) OR (t = x AND id < y): Postgres dùng cặp làm mốc bắt đầu quét index
+ * (thời gian, id), đọc đúng một trang. Dạng OR chỉ lọc sau khi quét: trang càng sâu càng đọc lại nhiều dòng phía trước.
+ */
+
 /** Dòng nằm sau cursor khi sắp (thời gian giảm dần, id giảm dần). */
 export function isBeforeCursor(table: PgTable, timeColumn: PgColumn, idColumn: PgColumn, cursor: KeysetCursor): SQL {
   const time = cursorTime(table, timeColumn, idColumn, cursor);
-  return or(lt(timeColumn, time), and(eq(timeColumn, time), lt(idColumn, cursor.id)))!;
+  return sql`(${timeColumn}, ${idColumn}) < (${time}, ${cursor.id})`;
 }
 
 /** Dòng nằm sau cursor khi sắp (thời gian tăng dần, id tăng dần). */
 export function isAfterCursor(table: PgTable, timeColumn: PgColumn, idColumn: PgColumn, cursor: KeysetCursor): SQL {
   const time = cursorTime(table, timeColumn, idColumn, cursor);
-  return or(gt(timeColumn, time), and(eq(timeColumn, time), gt(idColumn, cursor.id)))!;
+  return sql`(${timeColumn}, ${idColumn}) > (${time}, ${cursor.id})`;
 }

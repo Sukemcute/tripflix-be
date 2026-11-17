@@ -20,6 +20,17 @@ export class TripTransportDto implements NonNullable<TripItineraryItem['transpor
   toAirport?: string;
 }
 
+export class TripItemHotelDto implements NonNullable<TripItineraryItem['hotel']> {
+  @ApiProperty({ example: 'P-vn-h-da-lat-1', description: 'ID khách sạn' })
+  hotelId!: string;
+
+  @ApiPropertyOptional({ example: 'P-vn-h-da-lat-1--DLX', description: 'Loại phòng người đăng chọn' })
+  productId?: string;
+
+  @ApiPropertyOptional({ example: 'RO', description: 'Gói giá người đăng chọn' })
+  ratePlanCode?: string;
+}
+
 export class TripItineraryItemDto implements TripItineraryItem {
   @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })
   day!: number;
@@ -32,6 +43,12 @@ export class TripItineraryItemDto implements TripItineraryItem {
 
   @ApiPropertyOptional({ example: 'Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất', description: 'Ghi chú' })
   notes?: string;
+
+  @ApiPropertyOptional({ example: '16:30', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: 'Giờ trong ngày (HH:mm)' })
+  time?: string;
+
+  @ApiPropertyOptional({ type: TripItemHotelDto, description: 'Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)' })
+  hotel?: TripItemHotelDto;
 
   @ApiPropertyOptional({ type: TripTransportDto, description: 'Phương tiện được chọn khi soạn lộ trình' })
   transport?: TripTransportDto;
@@ -50,6 +67,15 @@ export class TripAttachmentDto implements TripAttachmentData {
   @ApiPropertyOptional({ example: 'Phú Quốc, Kiên Giang', description: 'Điểm đến' })
   destinationName?: string;
 
+  @ApiPropertyOptional({ example: 'phu-quoc', description: 'refId điểm đến lấy từ /api/suggest' })
+  destinationPlaceId?: string;
+
+  @ApiPropertyOptional({ example: 'P-h-pq-01--DLX', description: 'Loại phòng người đăng chọn (productId)' })
+  hotelProductId?: string;
+
+  @ApiPropertyOptional({ example: 'RO', description: 'Gói giá của loại phòng người đăng chọn' })
+  hotelRatePlanCode?: string;
+
   @ApiPropertyOptional({ example: 3, description: 'Số ngày' })
   daysCount?: number;
 
@@ -58,6 +84,12 @@ export class TripAttachmentDto implements TripAttachmentData {
 
   @ApiPropertyOptional({ example: 'Giá chỉ mang tính chất tham khảo', description: 'Lưu ý giá tham khảo' })
   priceDisclaimer?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Ảnh poster riêng của lộ trình (asset ảnh đã tải lên); bỏ trống thì dùng poster video' })
+  posterMediaId?: string;
+
+  @ApiPropertyOptional({ description: 'Chỉ có trong phản hồi: link ảnh poster của lộ trình' })
+  posterUrl?: string;
 
   @ApiPropertyOptional({ type: [TripItineraryItemDto], description: 'Các mục trong lịch trình' })
   items?: TripItineraryItemDto[];

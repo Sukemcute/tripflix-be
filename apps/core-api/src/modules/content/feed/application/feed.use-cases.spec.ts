@@ -205,3 +205,23 @@ describe('FeedUseCases.getByIds', () => {
     expect(page.items[0]?.viewerState).toBeNull();
   });
 });
+
+describe('FeedUseCases poster lộ trình (TF105)', () => {
+  it('thẻ có posterMediaId thì trả posterUrl, không lộ bookingId; ảnh không còn thì bỏ qua', async () => {
+    const withPoster = { ...row('p1'), tripAttachment: { bookingId: 'b1', posterMediaId: 'img-1', posterUrl: 'https://evil/x' } };
+    const missing = { ...row('p2'), tripAttachment: { posterMediaId: 'gone' } };
+    const store = { findPlayablePostsByIds: vi.fn(() => Promise.resolve([withPoster, missing])) } as unknown as FeedStore;
+    const media = {
+      getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, playback(id)])))),
+      getImages: vi.fn(() => Promise.resolve({ 'img-1': { url: 'https://cdn/poster.jpg', widthPx: 1080, heightPx: 1350 } })),
+    } as unknown as MediaFacade;
+    const feed = new FeedUseCases(store, media, undefined, undefined, () => 0);
+
+    const page = await feed.getByIds(['p1', 'p2'], null);
+
+    expect(media.getImages).toHaveBeenCalledWith(['img-1', 'gone']);
+    expect(page.items[0]!.tripAttachment).toMatchObject({ posterMediaId: 'img-1', posterUrl: 'https://cdn/poster.jpg' });
+    expect(page.items[0]!.tripAttachment).not.toHaveProperty('bookingId');
+    expect(page.items[1]!.tripAttachment).not.toHaveProperty('posterUrl');
+  });
+});
