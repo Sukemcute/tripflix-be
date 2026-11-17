@@ -94,6 +94,23 @@ const THREAT_PATTERN = new RegExp(
     ')\\b',
 );
 
+// Vế "đòi tiền": chuyển khoản/tiền/cọc, đặt cọc, cọc trước/giữ phòng, thanh toán trước, ck, xin/gửi stk.
+const OFF_PLATFORM_PAYMENT_PATTERN = new RegExp(
+  '\\b(?:' +
+    [
+      'chuyen (?:khoan|tien|coc)',
+      'ck (?:truoc|coc|giu)',
+      'dat coc',
+      'coc (?:truoc|giu (?:phong|cho|tour|ve))',
+      'thanh toan truoc',
+      '(?:gui|xin|cho|de|ib) (?:minh |em |anh |chi |ban )?(?:stk|so tai khoan)',
+    ].join('|') +
+    ')\\b',
+);
+// Vế "ra ngoài app": zalo, telegram, messenger, inbox/ib/nhắn riêng. Số điện thoại tính riêng qua PHONE_VN.
+const OFF_PLATFORM_CHANNEL_PATTERN =
+  /\b(?:zalo|zl|telegram|tele|messenger|mess|inbox|ib|nhan tin rieng|nt rieng|nhan rieng|ket ban)\b/;
+
 function foldChar(char: string): string {
   const folded = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   return folded.length === 1 ? folded : char;
@@ -226,6 +243,15 @@ export function evaluateRules(text: string, allowedDomains: string[] = []): Rule
     hits.push({ code: 'CONTACT_INVITE', category: 'SPAM_OR_COMMERCIAL', match: invite[0], weight: 20 });
   if (bank && /\b(?:chuyen (?:khoan|tien|coc)|dat coc|coc truoc)\b/.test(normalized)) {
     hits.push({ code: 'SCAM_PATTERN', category: 'SCAM', match: bank[0], weight: 95 });
+  }
+  // Dụ chuyển tiền/đặt cọc rồi kéo ra ngoài app nhưng chưa ghi số tài khoản (TF100). Chưa đủ chắc để tự ẩn
+  // như SCAM_PATTERN, nên chỉ đẩy lên đầu hàng chờ (dưới ngưỡng khẩn cấp 80). Cần cả hai vế: câu chỉ nói
+  // "đặt cọc trên app" hay chỉ "nhắn zalo hỏi đường" không khớp.
+  const payment = OFF_PLATFORM_PAYMENT_PATTERN.exec(normalized);
+  const hasOffPlatformChannel =
+    OFF_PLATFORM_CHANNEL_PATTERN.test(normalized) || hits.some((hit) => hit.code === 'PHONE_VN');
+  if (payment && hasOffPlatformChannel && !bank) {
+    hits.push({ code: 'OFF_PLATFORM_PAYMENT', category: 'SCAM', match: payment[0], weight: 65 });
   }
   const profanity = findProfanity(text);
   if (profanity) hits.push({ code: 'PROFANITY', category: 'HARASSMENT', match: profanity, weight: 45 });
