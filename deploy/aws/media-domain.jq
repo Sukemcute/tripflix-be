@@ -15,8 +15,10 @@
       MinimumProtocolVersion: "TLSv1.2_2021",
       CloudFrontDefaultCertificate: false
     }
+  # `dev/*` (set-dev-video.sh) phải đứng trước behavior video, nếu không video dev lại bị khoá.
   | .CacheBehaviors = (
-      ($videoPatterns | map(videoBehavior(.)))
-      + ($existing | map(select(.PathPattern as $p | $videoPatterns | index($p) | not)))
+      ($existing | map(select(.PathPattern == "dev/*")))
+      + ($videoPatterns | map(videoBehavior(.)))
+      + ($existing | map(select(.PathPattern as $p | $videoPatterns + ["dev/*"] | index($p) | not)))
       | {Quantity: length, Items: .}
     )
