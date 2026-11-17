@@ -104,6 +104,81 @@ export interface UserBuilder {
   build(items: UserBuildItem[], now: Date): Promise<UserBuildOutput[]>;
 }
 
+/** Một khách sạn cho hotel builder (F10, TF39). Thật: CommerceFacade.listCatalog + đơn đã trả trong bảng thô. */
+export interface HotelBuildItem {
+  hotelId: string;
+  provinceSlug: string;
+  /** Thành phố commerce ghi (có thể viết có dấu hoặc không); null khi chưa có. */
+  city: string | null;
+  stars: number | null;
+  /** Giá thấp nhất một đêm một phòng trong 30 ngày tới, gói mặc định; null khi không bán ngày nào. */
+  priceFrom: number | null;
+  rating: { average: number; count: number } | null;
+  location: { lat: number; lng: number } | null;
+  /** Mục phòng trong đơn đã trả 30 ngày qua (không tính đơn đã huỷ). */
+  bookings30d: number;
+}
+
+/** Điểm tham quan, quán ăn, quán cà phê (bảng discovery.points_of_interest). */
+export interface HotelPoint {
+  name: string;
+  kind: 'see' | 'food' | 'cafe';
+  lat: number;
+  lng: number;
+}
+
+export interface HotelBuildInput {
+  hotels: HotelBuildItem[];
+  points: HotelPoint[];
+}
+
+/** Sản phẩm commerce mà builder sản phẩm dựng hồ sơ (bảng recommend_product_features). */
+export type ProductType = 'hotel' | 'flight';
+
+/**
+ * Hồ sơ một sản phẩm. productId: mã khách sạn hoặc mã chuyến. groupKey: nhóm so sánh (tỉnh của khách sạn, tuyến "SGN-CXR").
+ * score 0..1 là chất lượng chung, không phụ thuộc người xem; features đọc lúc xếp hạng.
+ */
+export interface ProductBuildOutput {
+  productId: string;
+  groupKey: string;
+  score: number;
+  features: Record<string, unknown>;
+}
+
+export interface ProductBuilder<I> {
+  /** 'hotel_profile@v0', 'flight_profile@v0' */
+  key: string;
+  productType: ProductType;
+  featuresSchema: ZodType;
+  build(input: I, now: Date): Promise<ProductBuildOutput[]>;
+}
+
+export type HotelBuilder = ProductBuilder<HotelBuildInput>;
+
+/** Một chuyến bay cho flight builder (TF39). Thật: CommerceFacade.listCatalog (type flight) + đơn đã trả trong bảng thô. */
+export interface FlightBuildItem {
+  flightKey: string;
+  fromAirport: string;
+  toAirport: string;
+  airline: string | null;
+  /** "HH:MM"; null khi commerce chưa có. */
+  departTime: string | null;
+  arriveTime: string | null;
+  /** Giá thấp nhất một vé người lớn trong 30 ngày tới, gói mặc định; null khi không bán ngày nào. */
+  priceFrom: number | null;
+  /** Có ít nhất một gói giá hoàn huỷ được (giá có thể khác gói mặc định). */
+  hasRefundableFare: boolean;
+  /** Mục vé trong đơn đã trả 30 ngày qua (không tính đơn đã huỷ). */
+  bookings30d: number;
+}
+
+export interface FlightBuildInput {
+  flights: FlightBuildItem[];
+}
+
+export type FlightBuilder = ProductBuilder<FlightBuildInput>;
+
 /** own: bài người xem tự đăng gần đây (đề xuất mục 6.3), đọc thẳng bảng thô, không chờ job. */
 export type CandidateSource = 'hot' | 'taste' | 'fresh' | 'explore' | 'own';
 
