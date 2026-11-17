@@ -7854,6 +7854,14 @@
               "removed"
             ]
           },
+          "moderationState": {
+            "type": "string",
+            "enum": [
+              "hidden"
+            ],
+            "nullable": true,
+            "description": "Trạng thái kiểm duyệt hiển thị cho tác giả"
+          },
           "id": {
             "type": "string"
           },
@@ -7912,6 +7920,7 @@
           }
         },
         "required": [
+          "moderationState",
           "id",
           "postId",
           "authorId",

@@ -76,6 +76,7 @@ export class CommentsController {
     });
     return {
       ...comment,
+      moderationState: null,
       likeCount: 0,
       isLiked: false,
     };
@@ -149,6 +150,7 @@ export class CommentsController {
       : null;
     return {
       ...comment,
+      moderationState: null,
       likeCount: comment.likeCount ?? 0,
       isLiked: Boolean(reaction),
     };

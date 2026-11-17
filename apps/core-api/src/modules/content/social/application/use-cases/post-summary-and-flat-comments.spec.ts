@@ -147,6 +147,32 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       ]);
     });
 
+    it('redact nội dung bình luận bị ẩn và đánh dấu moderationState cho tác giả', async () => {
+      mockCommentRepo.findPage.mockResolvedValue([
+        {
+          id: 'hidden-comment',
+          postId,
+          authorId,
+          parentCommentId: null,
+          body: 'Nội dung vi phạm không được trả lại',
+          status: 'hidden',
+          createdAt: new Date(),
+          replyCount: 0,
+          isLiked: false,
+        },
+      ]);
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const result = await useCase.execute({ postId, viewerId: authorId });
+
+      expect(result.items[0]).toMatchObject({
+        id: 'hidden-comment',
+        body: '',
+        moderationState: 'hidden',
+      });
+      expect(result.items[0]?.body).not.toContain('Nội dung vi phạm');
+    });
+
     it('tự động fallback limit về 20 khi client truyền limit không hợp lệ (NaN hoặc số âm)', async () => {
       const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
 

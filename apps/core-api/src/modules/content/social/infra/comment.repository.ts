@@ -174,8 +174,13 @@ export class CommentRepository {
    * mỗi phần tử có sẵn parentCommentId phục vụ AI tóm tắt hoặc xây dựng cây bình luận.
    */
   private readableStatus(viewerId?: string, isStaff = false) {
-    return or(eq(comments.status, 'visible'), and(eq(comments.status, 'held'),
-      isStaff ? sql`true` : viewerId ? eq(comments.authorId, viewerId) : sql`false`))!;
+    return or(
+      eq(comments.status, 'visible'),
+      and(eq(comments.status, 'held'), isStaff ? sql`true` : viewerId ? eq(comments.authorId, viewerId) : sql`false`),
+      viewerId
+        ? and(inArray(comments.status, ['hidden', 'removed']), eq(comments.authorId, viewerId))
+        : sql`false`,
+    )!;
   }
 
   async holdWithVisibleReplies(id: string, isRoot: boolean): Promise<number> {
