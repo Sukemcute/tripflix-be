@@ -2877,6 +2877,59 @@
         ]
       }
     },
+    "/api/v1/feed/events": {
+      "post": {
+        "operationId": "FeedEventsController_record",
+        "parameters": [
+          {
+            "name": "x-anon-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Anon-Id",
+            "in": "header",
+            "description": "UUID app sinh cho khách; sai dạng thì bỏ qua",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedEventsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedEventsAcceptedDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Lô rỗng, quá nhiều sự kiện, hoặc sự kiện sai dạng"
+          }
+        },
+        "summary": "Nhận lô sự kiện hành vi từ app (xem Reels, bấm đặt từ lộ trình), tối đa 50 sự kiện. Khách cũng gửi được. Chỉ đẩy vào stream:app-events, không ghi bảng nào; sự kiện của bài không xem được trên feed bị bỏ qua.",
+        "tags": [
+          "feed"
+        ]
+      }
+    },
     "/api/v1/moderation/decisions/{id}/appeals": {
       "post": {
         "operationId": "ReportsController_submitAppeal",
@@ -9039,6 +9092,81 @@
         "required": [
           "items",
           "nextCursor"
+        ]
+      },
+      "FeedEventDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "App tự sinh; gửi lại cùng mã thì bên nhận coi là một"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "view",
+              "booking_click"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "watchedMs": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600000,
+            "description": "Chỉ với view: số mili giây đã xem thật (chỉ đếm lúc đang phát)"
+          },
+          "hotelId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chỉ với booking_click: khách sạn trong lộ trình"
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "reels",
+              "post_detail",
+              "reels_trip_plan"
+            ],
+            "description": "view: reels, post_detail; booking_click: reels_trip_plan"
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "postId",
+          "surface"
+        ]
+      },
+      "FeedEventsRequestDto": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedEventDto"
+            }
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "FeedEventsAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "number",
+            "description": "Số sự kiện đã nhận; sự kiện của bài không xem được trên feed bị bỏ qua"
+          }
+        },
+        "required": [
+          "accepted"
         ]
       },
       "SubmitAppealDto": {

@@ -410,6 +410,6 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     // 8. Facade cho các module khác
     ContentFacade,
   ],
-  exports: [ContentFacade, MediaModule],
+  exports: [ContentFacade, MediaModule, FeedModule],
 })
 export class ContentModule {}
