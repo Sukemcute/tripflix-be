@@ -42,7 +42,13 @@ describe('comment moderation notifications', () => {
       expect.objectContaining({ userId: id, link: '/account/moderation', type: 'moderation.appeal.decided' }),
     );
   });
-  it('thông báo tác giả lý do ẩn mà không tạo liên kết công khai', async () => {
+  it.each([
+    { action: 'hide', isAutomatic: false },
+    { action: 'remove', isAutomatic: false },
+    { action: 'restore', isAutomatic: false },
+    { action: 'remove', isAutomatic: true },
+    { action: 'restore', isAutomatic: true },
+  ])('vẫn thông báo khi action=$action, isAutomatic=$isAutomatic', async ({ action, isAutomatic }) => {
     const id = '11111111-1111-4111-8111-111111111111';
     const inbox = { insert: vi.fn().mockResolvedValue(null), countUnread: vi.fn() };
     const handlers = createContentStatusHandlers({ inbox, log: vi.fn() });
@@ -54,19 +60,46 @@ describe('comment moderation notifications', () => {
         targetId: id,
         postId: id,
         authorId: id,
-        action: 'hide',
+        action,
         reasonCode: 'HARASSMENT',
-        isAutomatic: true,
+        isAutomatic,
       },
     };
     await handlers['content.moderation.decided.v1']!(event as never);
     expect(inbox.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: id,
-        type: 'moderation.comment.hide',
-        link: '/account/moderation',
-        body: expect.stringContaining('Quấy rối'),
+        type: `moderation.comment.${action}`,
+        link: action === 'restore' ? `/trips/${id}` : '/account/moderation',
+        body: action === 'restore'
+          ? 'Bình luận của bạn đã hiển thị trở lại.'
+          : expect.stringContaining('Quấy rối'),
       }),
     );
+  });
+  it('tự ẩn bình luận: xử lý thành công nhưng không tạo inbox hay phát notification.created', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const inbox = { insert: vi.fn().mockResolvedValue({ user_id: id }), countUnread: vi.fn().mockResolvedValue(1) };
+    const realtime = { emitToUser: vi.fn() };
+    const handlers = createContentStatusHandlers({ inbox, realtime, log: vi.fn() });
+
+    const handled = await handlers['content.moderation.decided.v1']!({
+      eventId: id,
+      payload: {
+        caseId: id,
+        targetType: 'comment',
+        targetId: id,
+        postId: id,
+        authorId: id,
+        action: 'hide',
+        reasonCode: 'HARASSMENT',
+        isAutomatic: true,
+      },
+    } as never);
+
+    expect(handled).toBe(true);
+    expect(inbox.insert).not.toHaveBeenCalled();
+    expect(inbox.countUnread).not.toHaveBeenCalled();
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
   });
 });
