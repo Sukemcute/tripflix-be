@@ -18,7 +18,7 @@ export interface ListCommentsQuery {
   isStaff?: boolean;
 }
 
-export type EnrichedCommentItem = CommentRecord & {
+export type EnrichedCommentItem = Omit<CommentRecord, 'hiddenByActionId' | 'cascadeRootCommentId'> & {
   moderationState: 'hidden' | null;
   isLiked: boolean;
   likeCount: number;
@@ -140,8 +140,10 @@ export class ListCommentsUseCase {
     extras: { isLiked?: boolean; replyCount?: number } = {},
   ): EnrichedCommentItem {
     const moderated = comment.status === 'hidden' || comment.status === 'removed';
+    const { hiddenByActionId: _hiddenByActionId, cascadeRootCommentId: _cascadeRootCommentId, ...publicComment } = comment;
     return {
-      ...comment,
+      ...publicComment,
+      status: moderated ? 'hidden' : comment.status,
       body: moderated ? '' : comment.body,
       moderationState: moderated ? 'hidden' : null,
       authorName: authorNames.get(comment.authorId) ?? null,

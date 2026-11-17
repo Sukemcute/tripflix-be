@@ -147,7 +147,7 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       ]);
     });
 
-    it('redact nội dung bình luận bị ẩn và đánh dấu moderationState cho tác giả', async () => {
+    it.each(['hidden', 'removed'])('redact nội dung và metadata kiểm duyệt của bình luận %s', async (status) => {
       mockCommentRepo.findPage.mockResolvedValue([
         {
           id: 'hidden-comment',
@@ -155,7 +155,9 @@ describe('Post Summary and Flat Comments Use Cases', () => {
           authorId,
           parentCommentId: null,
           body: 'Nội dung vi phạm không được trả lại',
-          status: 'hidden',
+          status,
+          hiddenByActionId: 'internal-action-id',
+          cascadeRootCommentId: 'internal-root-id',
           createdAt: new Date(),
           replyCount: 0,
           isLiked: false,
@@ -168,9 +170,32 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       expect(result.items[0]).toMatchObject({
         id: 'hidden-comment',
         body: '',
+        status: 'hidden',
         moderationState: 'hidden',
       });
       expect(result.items[0]?.body).not.toContain('Nội dung vi phạm');
+      expect(result.items[0]).not.toHaveProperty('hiddenByActionId');
+      expect(result.items[0]).not.toHaveProperty('cascadeRootCommentId');
+    });
+
+    it.each(['hidden', 'removed', 'visible', 'held'])('focusCommentId không lộ ID nội bộ với status %s', async (status) => {
+      const id = '11111111-1111-4111-8111-111111111111';
+      mockCommentRepo.findById.mockResolvedValue({
+        id, postId, authorId, parentCommentId: null, status, body: 'Nội dung gốc',
+        hiddenByActionId: 'internal-action-id', cascadeRootCommentId: 'internal-root-id',
+      });
+      const useCase = new ListCommentsUseCase(mockPostRepo, mockCommentRepo);
+
+      const result = await useCase.execute({ postId, focusCommentId: id, viewerId: authorId });
+
+      const moderated = status === 'hidden' || status === 'removed';
+      expect(result.items[0]).toMatchObject({
+        status: moderated ? 'hidden' : status,
+        body: moderated ? '' : 'Nội dung gốc',
+        moderationState: moderated ? 'hidden' : null,
+      });
+      expect(result.items[0]).not.toHaveProperty('hiddenByActionId');
+      expect(result.items[0]).not.toHaveProperty('cascadeRootCommentId');
     });
 
     it('tự động fallback limit về 20 khi client truyền limit không hợp lệ (NaN hoặc số âm)', async () => {
