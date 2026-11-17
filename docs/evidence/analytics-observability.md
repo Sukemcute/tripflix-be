@@ -13,6 +13,8 @@
 
 ## Kiểm tra
 
+- Sau khi merge `origin/develop` ngày 2026-11-17 (`191232b`), sinh lại contracts thành công; lint/typecheck/test **49/49 tác vụ thành công**, core-api **2593 test pass**, 4 skip có sẵn; notification-service **122 test pass**.
+
 - `pnpm turbo run lint typecheck test --affected`: **49 tác vụ thành công**; riêng core-api **2553 test pass**, 4 test skip có sẵn.
 - Sau khi sửa chuẩn hóa Trace ID/Span ID: **12 test Analytics pass**, **3 test observability/log pass**.
 - Build dependency/backend cho core-api và notification-service: **12 tác vụ thành công**.
