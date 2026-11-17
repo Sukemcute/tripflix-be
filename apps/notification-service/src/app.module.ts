@@ -16,7 +16,7 @@ import {
   type SidBlocklist,
 } from '@tripflix/auth';
 import { loadEnv } from '@tripflix/config';
-import { createPool, ping } from '@tripflix/db';
+import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, createPool, ping } from '@tripflix/db';
 import { loggerModule } from '@tripflix/observability';
 import { Redis } from 'ioredis';
 import { createRemoteJWKSet } from 'jose';
@@ -29,6 +29,10 @@ import { envSchema, type Env } from './env.js';
 import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
 import { FollowerPostWorker } from './inbox/follower-post.worker.js';
 import { InboxController } from './inbox/inbox.controller.js';
+import { PostWatchController } from './inbox/post-watch.controller.js';
+import { PostWatchWorker } from './inbox/post-watch.worker.js';
+import { PushTokenController } from './push/push-token.controller.js';
+import { PushWorker } from './push/push.worker.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
 import { PostNotificationRepository } from './inbox/post-notification.repository.js';
 import { InboxRepository } from './inbox/inbox.repository.js';
@@ -36,6 +40,7 @@ import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RealtimeService } from './realtime/realtime.service.js';
+import { TelemetryLifecycle } from './telemetry.js';
 import { isRealtimeRedisReady, type RealtimeRedis } from './realtime/redis-io.adapter.js';
 import {
   DB,
@@ -96,7 +101,7 @@ export class MeController {
       provide: DB,
       inject: [ENV],
       useFactory: (env: Env) =>
-        createPool({ url: env.DATABASE_URL_NOTIFICATION, max: 10, applicationName: 'notification-service' }),
+        createPool({ url: env.DATABASE_URL_NOTIFICATION, max: 10, applicationName: 'notification-service', statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS }),
     },
     {
       provide: REDIS,
@@ -150,14 +155,17 @@ export class InfraModule {}
       }),
     }),
   ],
-  controllers: [HealthController, MeController, InboxController],
+  controllers: [HealthController, MeController, InboxController, PostWatchController, PushTokenController],
   providers: [
+    TelemetryLifecycle,
     NotificationConsumer,
     DeadLetterReplayJob,
     RealtimeService,
     RealtimeGateway,
     InboxRepository,
     FollowerPostWorker,
+    PostWatchWorker,
+    PushWorker,
     CommentNotificationRepository,
     PostNotificationRepository,
     ReactionNotificationRepository,

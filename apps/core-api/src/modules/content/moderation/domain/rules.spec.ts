@@ -364,3 +364,44 @@ describe('Ngưỡng severity', () => {
     expect(evaluateSeverity([], null, 20, config).shouldAutoHide).toBe(false);
   });
 });
+describe('Dụ chuyển khoản/đặt cọc ngoài app không kèm số tài khoản (TF100)', () => {
+  const config = { aiThreshold: 0.8, reportThreshold: 3 };
+  const codesOf = (text: string) => evaluateRules(text).map((hit) => hit.code);
+
+  it.each([
+    'ib zalo chuyển khoản cọc giữ phòng',
+    'inbox mình gửi stk đặt cọc trước nha',
+    'đặt cọc trước 500k, kết bạn zalo mình gửi số tài khoản',
+    'muốn giữ phòng thì ck cọc qua tele cho em',
+    'liên hệ 0912 345 678 chuyển khoản trước để giữ chỗ',
+    'phòng đẹp giá rẻ, ib em xin stk cọc giữ phòng',
+    'thanh toán trước qua messenger được giảm 10%',
+    'CHUYỂN KHOẢN CỌC TRƯỚC QUA ZALO NHA',
+  ])('đưa lên đầu hàng chờ nhưng không tự ẩn: %s', (text) => {
+    expect(codesOf(text)).toContain('OFF_PLATFORM_PAYMENT');
+    const verdict = evaluateSeverity(evaluateRules(text), null, 0, config);
+    expect(verdict.severity).toBeGreaterThanOrEqual(60);
+    expect(verdict.severity).toBeLessThan(80);
+    expect(verdict.shouldAutoHide).toBe(false);
+    expect(verdict.suspicious).toBe(true);
+  });
+
+  it.each([
+    'chuyển khoản qua app Tripflix nhé',
+    'đặt cọc trên app được không',
+    'khách sạn yêu cầu đặt cọc 30%',
+    'nhắn zalo cho bạn mình hỏi đường',
+    'zalo nhóm đi Đà Lạt',
+    'mình đặt cọc rồi, check-in lúc 2h chiều',
+    'tháng sau mình ib bạn kể tiếp chuyến đi',
+  ])('câu bình thường không khớp: %s', (text) => {
+    expect(codesOf(text)).not.toContain('OFF_PLATFORM_PAYMENT');
+  });
+
+  it('có số tài khoản thì vẫn là SCAM_PATTERN tự ẩn, không thêm OFF_PLATFORM_PAYMENT', () => {
+    const text = 'ib zalo chuyển khoản trước qua stk 0123456789 vcb nhé';
+    expect(codesOf(text)).toContain('SCAM_PATTERN');
+    expect(codesOf(text)).not.toContain('OFF_PLATFORM_PAYMENT');
+    expect(evaluateSeverity(evaluateRules(text), null, 0, config).autoHideReason).toBe('SCAM');
+  });
+});

@@ -30,6 +30,10 @@ export const orders = commerceSchema.table(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    /** Ai đổi trạng thái lần gần nhất (D1): "POST /api/v1/checkout", "job:expire-holds"... Trigger chép sang order_status_history. */
+    statusSource: text('status_source'),
+    /** x-request-id của request đổi trạng thái lần gần nhất; job thì là mã lượt chạy. */
+    statusRequestId: text('status_request_id'),
   },
   (t) => [
     check('ck_orders_status', sql`${t.status} in ('pending', 'paying', 'paid', 'cancelled', 'expired')`),
@@ -38,6 +42,8 @@ export const orders = commerceSchema.table(
     check('ck_orders_children', sql`${t.children} >= 0 and ${t.adults} + ${t.children} <= 9`),
     check('ck_orders_infants', sql`${t.infants} between 0 and ${t.adults}`),
     index('idx_orders_user_id').on(t.userId, t.createdAt),
+    // K3: mã xác nhận đọc cho khách nên không được trùng; trùng thì TX2 lỗi, job đối soát chạy lại với mã mới.
+    uniqueIndex('uq_orders_confirmation_code').on(t.confirmationCode),
     index('idx_orders_hold').on(t.status, t.holdExpiresAt),
     // Mỗi tài khoản một giỏ đang giữ: chống một người giữ nhiều giỏ để giam chỗ.
     uniqueIndex('uq_orders_one_pending_per_user').on(t.userId).where(sql`${t.status} = 'pending'`),
@@ -97,3 +103,25 @@ export const orderGuests = commerceSchema.table(
 
 export type OrderRow = typeof orders.$inferSelect;
 export type OrderItemRow = typeof orderItems.$inferSelect;
+
+/**
+ * Lịch sử trạng thái đơn (D1, rà soát 13/11): mỗi lần đổi trạng thái một dòng, do trigger trên orders ghi nên không đường
+ * ghi nào bị sót. Trả lời được: đơn đổi lúc nào, từ đâu (khách, job, IPN), thuộc request nào để lần sang log và sự kiện.
+ */
+export const orderStatusHistory = commerceSchema.table(
+  'order_status_history',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    orderId: uuid('order_id').notNull(),
+    /** null khi đơn vừa được tạo. */
+    fromStatus: text('from_status'),
+    toStatus: text('to_status').notNull(),
+    source: text('source'),
+    requestId: text('request_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ name: 'fk_order_status_history_order_id', columns: [t.orderId], foreignColumns: [orders.id] }),
+    index('idx_order_status_history_order_id').on(t.orderId, t.createdAt),
+  ],
+);

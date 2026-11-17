@@ -1,6 +1,6 @@
 # Gateway trên server: chỉ đi HTTPS, chỉ nhận đúng API_HOST. Máy dev dùng dynamic.yml.
 # Thêm service nào thì thêm router của service đó khi nó đã chạy.
-# AI chỉ mở đúng POST /ai/chat cho trợ lý Tripi (TF31); /moderate và /health vẫn chỉ trong mạng nội bộ.
+# AI chỉ mở đúng POST /ai/chat (và preflight OPTIONS của nó) cho trợ lý Tripi (TF31); /moderate và /health vẫn chỉ trong mạng nội bộ.
 http:
   middlewares:
     # Cùng mức với dynamic.yml, xem README.md.
@@ -14,6 +14,13 @@ http:
         average: 30
         period: 1m
         burst: 10
+    # Trợ lý Tripi (POST /ai/chat): mỗi lượt gọi LLM nên chặt hơn API thường. 20 lượt/phút mỗi IP, dồn tối đa 5;
+    # hạn mức theo tài khoản hoặc khách nằm trong ai-service (TF31).
+    rate-limit-chat:
+      rateLimit:
+        average: 20
+        period: 1m
+        burst: 5
 
     redirect-to-apex:
       redirectRegex:
@@ -50,6 +57,15 @@ http:
       rule: Host(`{{ env "API_HOST" }}`) && Method(`POST`) && Path(`/ai/chat`)
       service: ai-service
       entryPoints: [websecure]
+      middlewares: [rate-limit-chat, strip-ai-prefix]
+      tls:
+        certResolver: letsencrypt
+    # Web gọi /ai/chat khác origin nên trình duyệt hỏi OPTIONS trước; CORSMiddleware của ai-service trả lời.
+    # Không dùng rate-limit-chat để preflight không ăn mất nửa hạn mức chat.
+    ai-chat-preflight:
+      rule: Host(`{{ env "API_HOST" }}`) && Method(`OPTIONS`) && Path(`/ai/chat`)
+      service: ai-service
+      entryPoints: [websecure]
       middlewares: [rate-limit-api, strip-ai-prefix]
       tls:
         certResolver: letsencrypt
@@ -70,6 +86,16 @@ http:
       middlewares: [rate-limit-api]
       tls:
         certResolver: letsencrypt
+    # Link trong email mang ?token=, không ghi vào access log. Rule dài hơn router web nên được ưu tiên.
+    web-token-links:
+      rule: Host(`{{ env "WEB_HOST" }}`) && (Path(`/dat-lai-mat-khau`) || Path(`/xac-thuc-email`))
+      service: web
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+      observability:
+        accessLogs: false
     web-www:
       rule: Host(`www.{{ env "WEB_HOST" }}`)
       service: web

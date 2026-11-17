@@ -22,6 +22,7 @@
     "db:generate": "node scripts/db-generate.mjs"
   },
   "dependencies": {
+    "@aws-sdk/cloudfront-signer": "catalog:",
     "@nestjs-cls/transactional": "catalog:",
     "@nestjs-cls/transactional-adapter-drizzle-orm": "catalog:",
     "@nestjs/common": "catalog:",

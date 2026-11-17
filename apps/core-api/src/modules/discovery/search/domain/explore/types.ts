@@ -34,6 +34,9 @@ export interface ExploreObject {
   /** Mã gốc ở module nguồn (mã khách sạn, mã bài). */
   refId?: string;
   thumbnail?: string | null;
+  /** Bài: id tác giả và ngày đăng (ISO). Chỉ mục dựng trước khi có field này thì không có. */
+  authorId?: string | null;
+  createdAt?: string | null;
 }
 
 /** Một tài liệu trong chỉ mục của một nhánh. */
@@ -67,6 +70,9 @@ export interface CandidateFilter {
   tiers: string[];
   days: number | null;
   place: string | null;
+  /** Token (trong tf) của mọi bí danh của place: bài chưa rõ nơi chứa một trong số này là ứng viên (rank kiểm khớp đủ bí danh).
+   * Câu có từ (!isAll): mọi bài chưa rõ nơi là ứng viên. */
+  placeTerms: string[];
   center: { lat: number; lon: number } | null;
   /** Nửa bề rộng khung vĩ độ quanh center. */
   latSpan: number;

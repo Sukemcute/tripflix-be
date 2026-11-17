@@ -24,6 +24,7 @@ import { ModerationActionRepository } from '../../social/infra/moderation-action
 import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
 import { AddCommentUseCase } from '../../social/application/use-cases/add-comment.use-case.js';
 import { DeleteCommentUseCase } from '../../social/application/use-cases/delete-comment.use-case.js';
+import { EditCommentUseCase } from '../../social/application/use-cases/edit-comment.use-case.js';
 import { GetPostSummaryUseCase } from '../../social/application/use-cases/get-post-summary.use-case.js';
 import { SavePostSummaryUseCase } from '../../social/application/use-cases/save-post-summary.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
@@ -63,18 +64,19 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const visibility = new ChangeVisibilityUseCase(repository, posts, outbox, moderate);
     return {
       repository,
-      recovery: new ClaimDeferredScansUseCase(repository),
+      recovery: new ClaimDeferredScansUseCase(repository, outbox),
       comments,
       summaries,
       visibility,
       moderate,
       report: new SubmitReportUseCase(repository, visibility, outbox, CONFIG),
-      appeal: new SubmitAppealUseCase(repository),
+      appeal: new SubmitAppealUseCase(repository, outbox),
       decideAppeal: new DecideAppealUseCase(repository, visibility, outbox),
       decide: new DecideCaseUseCase(repository, visibility),
-      screen: new RecordScreeningUseCase(repository, visibility, CONFIG),
+      screen: new RecordScreeningUseCase(repository, visibility, CONFIG, outbox),
       add: new AddCommentUseCase(posts, comments, outbox),
       delete: new DeleteCommentUseCase(comments, posts, outbox),
+      edit: new EditCommentUseCase(comments, outbox, posts),
       saveSummary: new SavePostSummaryUseCase(posts, summaries),
       getSummary: new GetPostSummaryUseCase(posts, summaries, comments),
     };
@@ -137,6 +139,30 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     return (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
       .comment_count;
   }
+  it('scan ghi tín hiệu staff trong transaction và rollback khi outbox lỗi', async () => {
+    const eventId = randomUUID();
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    failOutbox = true;
+    await expect(cases.screen.execute(eventId, target, null)).rejects.toThrow('outbox unavailable');
+    expect(await cases.repository.scan(eventId)).toBeUndefined();
+    failOutbox = false;
+    await cases.screen.execute(eventId, target, null);
+    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
+    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'scan', id: eventId });
+  });
+
+  it('khiếu nại mới có tín hiệu staff và không lưu nếu outbox lỗi', async () => {
+    const root = await add();
+    const decision = await hide(root.id);
+    failOutbox = true;
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow('outbox unavailable');
+    expect(await cases.repository.appealsByUser(AUTHOR, 20, 0)).toHaveLength(0);
+    failOutbox = false;
+    const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
+    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
+    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'appeal', id: appeal.id });
+  });
+
   it('recovery có lease, giới hạn retry và staff có thể lên lịch lại', async () => {
     const eventId = randomUUID();
     const target = (await cases.repository.loadTarget('post', postId))!;
@@ -267,6 +293,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
         .map((comment) => ({
           postId,
           postAuthorId: AUTHOR,
+          postVisibility: 'public',
           commentId: comment.id,
           authorId: comment.authorId,
           parentCommentId: comment.parentCommentId,
@@ -705,6 +732,64 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await reasonOf(clean.id)).toBeUndefined();
     expect(await count()).toBe(1);
   });
+
+  it('dụ chuyển khoản ngoài app không có STK: không tự ẩn, hồ sơ mức 65, lý do SCAM (TF100)', async () => {
+    const comment = await cases.add.execute({
+      postId,
+      authorId: AUTHOR,
+      body: 'ib zalo 0912 345 678 chuyển khoản cọc giữ phòng nha',
+    });
+    const snapshot = await cases.repository.loadTarget('comment', comment.id);
+    await cases.screen.execute(randomUUID(), snapshot!, null);
+
+    const status = (await pool.query('select status from content.comments where id=$1', [comment.id])).rows[0]
+      .status;
+    const item = (
+      await pool.query(
+        "select severity, flags->>'reasonCode' as reason from content.moderation_cases where target_id=$1",
+        [comment.id],
+      )
+    ).rows[0];
+    expect(status).toBe('visible');
+    expect(item).toMatchObject({ severity: 65, reason: 'SCAM' });
+  });
+
+  it('mọi sự kiện bình luận mang postVisibility để realtime phát vào phòng của bài (TF101)', async () => {
+    const comment = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Cảnh đẹp quá' });
+    await cases.edit.execute({ commentId: comment.id, userId: AUTHOR, body: 'Cảnh đẹp quá trời' });
+    await hide(comment.id);
+    await hide(comment.id, 'restore');
+    const profane = await cases.add.execute({ postId, authorId: AUTHOR, body: 'đm thằng chủ homestay' });
+    const snapshot = await cases.repository.loadTarget('comment', profane.id);
+    await cases.screen.execute(randomUUID(), snapshot!, null);
+    await cases.delete.execute({ commentId: comment.id, userId: AUTHOR });
+
+    const { rows } = await pool.query(
+      `select type, payload->>'postVisibility' as visibility from content.outbox_events
+       where type in ('content.comment.created', 'content.comment.updated', 'content.comment.hidden',
+                      'content.comment.restored', 'content.comment.deleted')`,
+    );
+    const types = new Set(rows.map((row: { type: string }) => row.type));
+    expect(types).toEqual(
+      new Set([
+        'content.comment.created',
+        'content.comment.updated',
+        'content.comment.hidden',
+        'content.comment.restored',
+        'content.comment.deleted',
+      ]),
+    );
+    expect(rows.filter((row: { visibility: string | null }) => row.visibility !== 'public')).toEqual([]);
+
+    await pool.query("update content.posts set visibility='private' where id=$1", [postId]);
+    const privateComment = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Riêng tư' });
+    const privateEvent = await pool.query(
+      "select payload->>'postVisibility' as visibility from content.outbox_events where payload->>'commentId'=$1",
+      [privateComment.id],
+    );
+    expect(privateEvent.rows[0].visibility).toBe('private');
+  });
+
   it('AI nguy hiểm tự ẩn bình luận; queue/detail đọc được đúng nguồn và evidence', async () => {
     const root = await add();
     const snapshot = await cases.repository.loadTarget('comment', root.id);

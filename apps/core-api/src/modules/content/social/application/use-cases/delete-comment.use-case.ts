@@ -29,7 +29,7 @@ export class DeleteCommentUseCase {
       throw new CommentNotFoundException(command.commentId);
     }
     // Cùng thứ tự khóa với add/hide để không tạo phản hồi mới trong lúc cascade.
-    await this.postRepository.findByIdForUpdate(record.postId);
+    const post = await this.postRepository.findByIdForUpdate(record.postId);
 
     const domainComment = new Comment({
       id: record.id,
@@ -67,6 +67,7 @@ export class DeleteCommentUseCase {
           postId: deletedRec.postId,
           authorId: deletedRec.authorId,
           parentCommentId: deletedRec.parentCommentId ?? null,
+          ...(post ? { postVisibility: post.visibility } : {}),
           deletedBy: command.userId,
           isSuperAdmin: command.isSuperAdmin ?? false,
           deletedAt: (deletedRec.deletedAt ?? new Date()).toISOString(),

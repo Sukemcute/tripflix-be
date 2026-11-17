@@ -41,6 +41,8 @@ interface JobState {
   outcome: Outcome | null;
   lastSuccessAt: number | null;
   count: number | null;
+  /** Chu kỳ job đang chạy theo (admin đổi được); bản ghi cũ không có thì coi là mặc định. */
+  intervalMs?: number;
 }
 
 interface Snapshot {
@@ -58,8 +60,9 @@ function jobStatus(job: IndexJob, sample: Sample, now: number): JobStatus {
   if (now - sample.at >= OFFLINE_MS) return 'unknown';
   const state = sample.jobs[job];
   if (!state) return 'pending';
-  if (!state.outcome) return now - state.startedAt >= EXPLORE_INDEX_INTERVAL_MS ? 'stuck' : 'running';
-  if (job === 'explore' && now - state.startedAt >= EXPLORE_INDEX_INTERVAL_MS + SAMPLE_MS) return 'overdue';
+  const intervalMs = state.intervalMs ?? EXPLORE_INDEX_INTERVAL_MS;
+  if (!state.outcome) return now - state.startedAt >= intervalMs ? 'stuck' : 'running';
+  if (job === 'explore' && now - state.startedAt >= intervalMs + SAMPLE_MS) return 'overdue';
   return state.outcome;
 }
 
@@ -97,13 +100,14 @@ export class IndexHealth implements OnApplicationBootstrap, OnApplicationShutdow
     if (this.timer) clearInterval(this.timer);
   }
 
-  start(job: IndexJob, startedAt: number) {
+  start(job: IndexJob, startedAt: number, intervalMs?: number) {
     this.jobs[job] = {
       startedAt,
       finishedAt: null,
       outcome: null,
       lastSuccessAt: this.jobs[job]?.lastSuccessAt ?? null,
       count: this.jobs[job]?.count ?? null,
+      intervalMs,
     };
     this.record({ job, message: 'Bắt đầu dựng chỉ mục' });
   }
@@ -116,6 +120,7 @@ export class IndexHealth implements OnApplicationBootstrap, OnApplicationShutdow
       outcome,
       lastSuccessAt: outcome === 'succeeded' ? finishedAt : (this.jobs[job]?.lastSuccessAt ?? null),
       count: count ?? this.jobs[job]?.count ?? null,
+      intervalMs: this.jobs[job]?.intervalMs,
     };
     const errorMessage =
       error instanceof Error ? error.message : typeof error === 'string' ? error : 'Không có chi tiết lỗi';

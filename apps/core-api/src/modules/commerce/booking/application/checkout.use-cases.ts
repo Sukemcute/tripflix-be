@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { CommerceMetrics, type HoldOutcome } from '../../metrics/commerce-metrics.js';
 import { Transactional } from '@tripflix/db';
 import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type RoomTypeRecord, type Today } from '../../inventory/application/ports.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
@@ -19,7 +20,7 @@ import {
   type GuestInput,
 } from '../domain/order-rules.js';
 import { CellGate } from './cell-gate.js';
-import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore } from './ports.js';
+import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore, type RefundRecord } from './ports.js';
 
 export interface CheckoutItemInput {
   /** Mã loại phòng hoặc mã hạng ghế (productId trong danh mục). */
@@ -147,6 +148,25 @@ const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date
 /** Sắp xếp ô theo (sản phẩm, ngày) trước khi giữ: hai giỏ chạy cùng lúc khoá theo cùng thứ tự nên không deadlock. */
 const sortCells = (cells: InventoryCell[]) => [...cells].sort((a, b) => a.productId.localeCompare(b.productId) || a.date.localeCompare(b.date));
 
+/** Lý do giữ chỗ thất bại, để đếm (D1): hết chỗ, đông người, quá lượt, đầu vào sai, hay lỗi hệ thống. */
+function classifyHoldError(error: unknown): HoldOutcome {
+  if (!(error instanceof CommerceError)) return 'error';
+  const reason = error.details?.reason;
+  if (reason === 'SOLD_OUT') return 'sold_out';
+  if (reason === 'LOCK_BUSY' || reason === 'LOCK_TIMEOUT') return 'lock_busy';
+  if (error.code === 'rate_limited') return 'rate_limited';
+  return 'rejected';
+}
+
+/**
+ * Thứ tự chạm ô khi vừa nhả giỏ cũ vừa giữ giỏ mới: một danh sách sắp theo (sản phẩm, ngày), cùng ô thì nhả trước
+ * để chỗ vừa trả dùng lại được ngay. Mọi transaction khoá ô theo cùng thứ tự nên không chờ vòng nhau.
+ */
+export const listCellLockOrder = (releases: InventoryCell[], holds: InventoryCell[]) =>
+  [...releases.map((cell) => ({ cell, isRelease: true })), ...holds.map((cell) => ({ cell, isRelease: false }))].sort(
+    (a, b) => a.cell.productId.localeCompare(b.cell.productId) || a.cell.date.localeCompare(b.cell.date) || Number(b.isRelease) - Number(a.isRelease),
+  );
+
 /** Mọi ô của đơn, đúng thứ tự khoá ở trên: giữ, nhả và bán chạy cùng lúc đều không deadlock. */
 export const listSortedCells = (items: OrderItemRecord[]) => sortCells(items.flatMap(cellsOf));
 
@@ -161,16 +181,31 @@ export class CheckoutUseCases {
     @Inject(COMMERCE_STORE) private readonly catalog: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
+    // Không có (test dựng tay) thì không đếm.
+    @Optional() @Inject(CommerceMetrics) private readonly metrics?: CommerceMetrics,
   ) {}
 
   private readonly holdGate = new CellGate({ maxPerKey: MAX_CONCURRENT_HOLDS_PER_CELL, maxWaiting: MAX_WAITING_HOLDS, waitMs: HOLD_LOCK_WAIT_MS });
 
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutView> {
+    try {
+      const view = await this.holdAndView(userId, input);
+      this.metrics?.countHold('created');
+      return view;
+    } catch (error) {
+      this.metrics?.countHold(classifyHoldError(error));
+      throw error;
+    }
+  }
+
+  private async holdAndView(userId: string, input: CheckoutInput): Promise<CheckoutView> {
     const cells = [...new Set(input.items.map((i) => `${i.productId}|${i.checkIn}`))];
     if (!(await this.holdGate.acquire(cells))) {
       throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
     }
     const orderId = await this.holdAndCreateOrder(userId, input)
+      // Deadlock (K2): Postgres huỷ một bên, transaction đã rollback sạch nên chạy lại một lần là đủ an toàn.
+      .catch((error: unknown) => (this.orders.isDeadlock(error) ? this.holdAndCreateOrder(userId, input) : Promise.reject(error)))
       .catch((error: unknown) => {
         if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
         throw error;
@@ -204,16 +239,19 @@ export class CheckoutUseCases {
       throw new CommerceError('conflict', 'Bạn có một đơn đang thanh toán, vui lòng chờ kết quả trước khi giữ giỏ mới.');
     }
     // Mỗi tài khoản một giỏ đang giữ: giữ giỏ mới thì nhả giỏ cũ.
-    for (const old of active.filter((o) => o.status === 'pending')) {
-      await this.releaseOrder(old.id, 'cancelled', 'Đã giữ giỏ mới');
-    }
-
-    for (const cell of sortCells(priced.flatMap((p) => p.cells))) {
-      if (!(await this.orders.holdCell(cell))) {
+    // K2: ô nhả và ô giữ khoá chung một thứ tự (sản phẩm, ngày). Trước đây nhả hết giỏ cũ rồi mới giữ giỏ mới nên thứ tự
+    // khoá bị phá, đụng người đặt khác là deadlock và trả 500 (tái hiện 19/20 lượt ngày 13/11).
+    const oldOrders = active.filter((o) => o.status === 'pending');
+    const releases = (await Promise.all(oldOrders.map((o) => this.orders.findItems(o.id)))).flatMap((items) => items.flatMap(cellsOf));
+    for (const { cell, isRelease } of listCellLockOrder(releases, priced.flatMap((p) => p.cells))) {
+      if (isRelease) {
+        await this.orders.releaseCell(cell);
+      } else if (!(await this.orders.holdCell(cell))) {
         const item = priced.find((p) => p.productId === cell.productId)!;
         throw new CommerceError('conflict', `${item.productName} ngày ${cell.date} không đủ chỗ.`, 'items', { reason: 'SOLD_OUT', productId: cell.productId, date: cell.date });
       }
     }
+    for (const old of oldOrders) await this.orders.updateOrder(old.id, { status: 'cancelled', cancelReason: 'Đã giữ giỏ mới', cancelledAt: now });
     const total = priced.reduce((sum, p) => sum + p.lineTotal, 0);
     const orderId = await this.orders.insertOrder({
       userId,
@@ -224,6 +262,14 @@ export class CheckoutUseCases {
     });
     await this.orders.insertItems(orderId, priced.map(({ cells: _cells, ...item }) => item));
     return orderId;
+  }
+
+  findRoomTypes(ids: string[]): Promise<RoomTypeRecord[]> {
+    return this.catalog.catalog.findRoomTypesByIds(ids);
+  }
+
+  findFlights(ids: string[]): Promise<FlightRecord[]> {
+    return this.catalog.catalog.findFlightsByIds(ids);
   }
 
   /** Hành trình của các chuyến bay trong đơn, theo mã sản phẩm. */
@@ -407,10 +453,23 @@ export class CheckoutUseCases {
     return { orderId, status: 'cancelled' };
   }
 
-  async getCheckout(userId: string, orderId: string, options: { isNewOrder?: boolean } = {}): Promise<CheckoutView> {
-    const order = await this.ownOrder(userId, orderId);
-    const items = await this.orders.findItems(orderId);
-    const [refunds, guestBirthdates] = options.isNewOrder ? [[], []] : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
+  /**
+   * `known`: dữ liệu transaction vừa ghi đã có trong tay (trả tiền xong), dựng luôn không đọc lại database.
+   * Đo tải 16/11: đọc lại tốn 4 lượt gọi nối tiếp, khi Node quá tải mỗi lượt phải xếp hàng.
+   */
+  async getCheckout(
+    userId: string,
+    orderId: string,
+    options: { isNewOrder?: boolean; known?: { order: OrderRecord; items: OrderItemRecord[]; refunds: RefundRecord[]; guestBirthdates: (string | null)[] } } = {},
+  ): Promise<CheckoutView> {
+    const known = options.known?.order.id === orderId && options.known.order.userId === userId ? options.known : undefined;
+    const order = known?.order ?? (await this.ownOrder(userId, orderId));
+    const items = known?.items ?? (await this.orders.findItems(orderId));
+    const [refunds, guestBirthdates] = known
+      ? [known.refunds, known.guestBirthdates]
+      : options.isNewOrder
+        ? [[], []]
+        : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
     const passengerTypes = listRequiredPassengers(order, items);
     const passengersRequired = passengerTypes.length;
     return {

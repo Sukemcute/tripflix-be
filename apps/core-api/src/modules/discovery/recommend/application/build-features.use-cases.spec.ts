@@ -14,6 +14,7 @@ describe('BuildFeaturesUseCases', () => {
         { name: 'broken', postBuilder: 'hot@v9', userBuilder: 'none@v0', ranker: 'popular_v0' },
       ]),
       countPostInteractions: vi.fn().mockResolvedValue(new Map()),
+      listPostInteractionSamples: vi.fn().mockResolvedValue(new Map()),
       replacePostScores: vi.fn().mockResolvedValue(undefined),
       listActiveUserIds: vi.fn().mockResolvedValue(['u1']),
       listUserRows: vi.fn().mockResolvedValue([]),
@@ -61,5 +62,26 @@ describe('BuildFeaturesUseCases', () => {
       spy.mockRestore();
     }
     expect(store.replacePostScores).not.toHaveBeenCalled();
+  });
+
+  it('khi algo dùng hot@v1: đọc interactionSamples và ghi điểm hot@v1', async () => {
+    const { store, useCases } = setup();
+    store.listActiveAlgos.mockResolvedValue([{ name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' }]);
+    const listPostInteractionSamples = vi.fn().mockResolvedValue(
+      new Map([['p1', [{ kind: 'order_item', actorAgeDays: 10, count: 1 }, { kind: 'reaction', actorAgeDays: 1, count: 1 }]]]),
+    );
+    store.listPostInteractionSamples = listPostInteractionSamples;
+
+    const res = await useCases.runCycle(NOW);
+    expect(res).toEqual({ posts: 1, users: 1, failedBuilders: [] });
+    expect(listPostInteractionSamples).toHaveBeenCalledWith(NOW);
+    expect(store.replacePostScores).toHaveBeenCalledWith('hot@v1', [
+      expect.objectContaining({
+        postId: 'p1',
+        postType: 'video',
+        score: 1,
+        features: expect.objectContaining({ orders: 1, reactions: 1, signal: 10.2 }),
+      }),
+    ]);
   });
 });

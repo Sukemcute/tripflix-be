@@ -66,4 +66,23 @@ describe('DrizzleIdempotencyStore trên Postgres thật', () => {
     await pool.query(`update idem_test.idempotency_keys set expires_at = now() - interval '1 second' where key = 'k-exp'`);
     expect(await store.begin('u4 POST /orders', 'k-exp', 'new', 60)).toEqual({ kind: 'started' });
   });
+
+  it('L3: còn processing quá 60 giây (tiến trình chết giữa chừng) thì cho giữ lại', async () => {
+    await store.begin('u5 POST /pay', 'k-stale', 'h', 86_400);
+    await pool.query(`update idem_test.idempotency_keys set created_at = now() - interval '61 seconds' where key = 'k-stale'`);
+    expect(await store.begin('u5 POST /pay', 'k-stale', 'h', 86_400)).toEqual({ kind: 'started' });
+  });
+
+  it('L3: processing chưa tới 60 giây thì vẫn 409, không chạy chồng request còn sống', async () => {
+    await store.begin('u6 POST /pay', 'k-live', 'h', 86_400);
+    await pool.query(`update idem_test.idempotency_keys set created_at = now() - interval '30 seconds' where key = 'k-live'`);
+    expect(await store.begin('u6 POST /pay', 'k-live', 'h', 86_400)).toEqual({ kind: 'in_progress', requestHash: 'h' });
+  });
+
+  it('L3: đã completed thì dù cũ vẫn trả lại kết quả cũ', async () => {
+    await store.begin('u7 POST /pay', 'k-done', 'h', 86_400);
+    await store.complete('u7 POST /pay', 'k-done', 200, { ok: true });
+    await pool.query(`update idem_test.idempotency_keys set created_at = now() - interval '1 hour' where key = 'k-done'`);
+    expect(await store.begin('u7 POST /pay', 'k-done', 'h', 86_400)).toMatchObject({ kind: 'replay', responseStatus: 200 });
+  });
 });

@@ -24,7 +24,7 @@ export interface ScreeningConfig extends SeverityConfig {
 }
 
 export class SubmitAppealUseCase {
-  constructor(private readonly repository: ModerationRepository) {}
+  constructor(private readonly repository: ModerationRepository, private readonly outbox: ContentOutbox) {}
 
   @Transactional('content')
   async execute(decisionId: string, authorId: string, reason: string) {
@@ -70,6 +70,7 @@ export class SubmitAppealUseCase {
       .onConflictDoNothing()
       .returning();
     if (!appeal) throw new ConflictException('Quyết định đã được khiếu nại');
+    await this.outbox.add({ type: 'content.moderation.changed', userId: authorId, payload: { scope: 'appeal', id: appeal.id } });
     return appeal;
   }
 }
@@ -167,6 +168,7 @@ export class RecordScreeningUseCase {
     private readonly repository: ModerationRepository,
     private readonly visibility: ChangeVisibilityUseCase,
     private readonly config: ScreeningConfig,
+    private readonly outbox: ContentOutbox,
   ) {}
 
   @Transactional('content')
@@ -181,10 +183,14 @@ export class RecordScreeningUseCase {
       !target ||
       target.deleted ||
       target.version !== snapshot.version ||
-      (!['published', 'visible'].includes(target.status) &&
+      (!['published', 'visible', 'held'].includes(target.status) &&
         !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden))
     )
       return;
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
     if (occurredAt && (await this.repository.hasStaffDecisionAfter(target, occurredAt))) return;
     const attempts = (previousScan?.attempts ?? 0) + 1;
     const scanStatus =
@@ -218,10 +224,11 @@ export class RecordScreeningUseCase {
           updatedAt: new Date(),
         },
       });
+    await this.outbox.add({ type: 'content.moderation.changed', payload: { scope: 'scan', id: eventId } });
     const rules = evaluateRules(target.text, this.config.allowedDomains);
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
-    if (!verdict.suspicious) return;
+    if (!verdict.suspicious && target.status !== 'held') return;
     const item = await this.repository.upsertCase(target, {
       sources: [...(rules.length ? ['rule'] : []), ...(ai?.flagged ? ['ai'] : [])],
       severity: verdict.severity,
@@ -230,10 +237,14 @@ export class RecordScreeningUseCase {
         rules,
         ai,
         aiUnavailable: ai === null,
-        reasonCode: verdict.autoHideReason ?? rules[0]?.category ?? 'OTHER',
+        // Lý do theo luật nặng nhất, không theo luật khớp trước: "ib zalo 09… chuyển khoản cọc" là SCAM, không phải spam.
+        reasonCode:
+          verdict.autoHideReason ??
+          [...rules].sort((left, right) => right.weight - left.weight)[0]?.category ??
+          'OTHER',
       },
     });
-    if (verdict.shouldAutoHide && target.status !== 'hidden') {
+    if (verdict.shouldAutoHide && !['hidden', 'held'].includes(target.status)) {
       await this.visibility.execute({
         targetType: target.targetType,
         targetId: target.targetId,
@@ -248,6 +259,7 @@ export class RecordScreeningUseCase {
         .set({ isAutoHidden: true })
         .where(eq(moderationCases.id, item.id));
     }
+    await this.outbox.add({ type: 'content.moderation.changed', payload: { scope: 'case', id: item.id } });
   }
 }
 export class ScreenContentUseCase {
@@ -271,9 +283,14 @@ export class ScreenContentUseCase {
       return;
     }
     if (
-      !['published', 'visible'].includes(target.status) &&
+      !['published', 'visible', 'held'].includes(target.status) &&
       !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden)
     ) {
+      await this.repository.supersedeScan(eventId);
+      return;
+    }
+    if (target.status === 'held') await this.record.execute(eventId, target, null, occurredAt);
+    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
       await this.repository.supersedeScan(eventId);
       return;
     }

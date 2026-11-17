@@ -2,7 +2,7 @@
 
 - Chủ: Duy (backup Dũng)
 - Database: `core`, schema `discovery`, user Postgres `tf_discovery`
-- Bảng chính: `search_entities`, `search_documents`, `search_counts` (tìm kiếm); `recommend_*` (gợi ý bài, TF28)
+- Bảng chính: `search_entities`, `search_documents`, `search_counts`, `search_query_grams` (tìm kiếm); `recommend_*` (gợi ý bài, TF28)
 
 ## Phần con
 
@@ -34,16 +34,17 @@ Mỗi phần con (`search/`, `recommend/`) chia:
 | `GET /api/stays` | `search/api/stays.controller.ts` | Trang kết quả web OTA: khách sạn còn phòng ở một nơi cho ngày đã chọn, giá thật từ commerce; lọc sao, giá; sắp giá hoặc sao |
 | `GET /api/recommendations/home` | `recommend/api/home-recommendations.controller.ts` | Khối "Gợi ý dành cho bạn" trang chủ web, mỗi thẻ kèm lý do (TF12) |
 | `POST /api/search` | `search/api/explore.controller.ts` | Tìm khám phá của app: một ô tìm, kết quả chia vùng (Ở đâu, Lộ trình, Bài viết, Video). Xem mục 6 (TF11) |
-| Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút |
+| Bảng `search_documents`, `search_counts` | `db/schema/` | Chỉ mục tìm khám phá + mọi bộ đếm; job `search/jobs/rebuild-explore-index.job.ts` dựng lại mỗi 10 phút (admin đổi được, TF103) |
 | Gỡ bài ẩn khỏi chỉ mục + nạp tương tác cho gợi ý | `consumers/discovery-events.consumer.ts` | Consumer **duy nhất** của group `core-discovery` trên `stream:core.{content,commerce,access,discovery}`: mỗi sự kiện qua search (bài bị ẩn/xoá rời `search_documents` trong vài giây, TF33) rồi recommend (dòng thô `recommend_interactions`, TF28) |
 | `GET /api/recommendations/posts` | `recommend/api/post-recommendations.controller.ts` | Gợi ý bài `for_you`/`trending`, đăng nhập tuỳ chọn (TF28) |
 | Bảng `recommend_*` | `db/schema/recommend.ts` | Bảng thô `recommend_interactions`, metadata bài, điểm bài, đặc trưng người, `recommend_algos`, `recommend_job_state` |
-| Job đặc trưng gợi ý | `recommend/jobs/build-features.job.ts` | Lúc khởi động và mỗi 10 phút; dọn hạn lưu bảng thô mỗi 24 giờ (`purge-interactions.job.ts`) |
-| Admin theo dõi/chạy job | `jobs/admin-discovery-jobs.controller.ts`, `jobs/job-runs.ts` | `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin): 20 lần chạy gần nhất của `explore`, `suggest`, `recommend_build`, `recommend_purge` (Redis `discovery:job-runs:{job}`, 7 ngày) + số liệu gợi ý. `POST …/jobs/:job/run` (superadmin): chạy ngay, không chờ, không chạy chồng. Chạy trên process trả lời request (`APP_ROLE: all`) |
+| Job đặc trưng gợi ý | `recommend/jobs/build-features.job.ts` | Lúc khởi động và mỗi 10 phút (admin đổi được, TF103); dọn hạn lưu bảng thô mỗi 24 giờ (`purge-interactions.job.ts`) |
+| Khoảng trống từ vựng (TF102) | `search/domain/explore/vocab-gaps.ts`, `search/api/admin-vocab-gaps.controller.ts`, bảng `search_query_grams` | Mỗi lượt tìm khám phá và trang đầu tìm bài cộng n-gram 1–2 của câu (bỏ phần engine đã hiểu) theo ngày, không lưu người tìm, tối đa 5 câu mẫu, xoá sau 90 ngày (`PurgeInteractionsJob`). `GET /api/v1/admin/search/vocab-gaps?days&limit&minCount` (moderator, superadmin): so với `ng` của chỉ mục bằng G² (log-likelihood), gom kiểu viết gần nhau, để admin chọn từ thêm vào lexicon |
+| Admin theo dõi/chạy job | `jobs/admin-discovery-jobs.controller.ts`, `jobs/job-runs.ts` | `GET /api/v1/admin/discovery/jobs?group=search|recommend` (moderator, superadmin): 20 lần chạy gần nhất của `explore`, `suggest`, `recommend_build`, `recommend_purge` (Redis `discovery:job-runs:{job}`, 7 ngày) + số liệu gợi ý. `POST …/jobs/:job/run` (superadmin): chạy ngay, không chờ, không chạy chồng. `PUT …/jobs/:job/interval` (superadmin, TF103, `explore` và `recommend_build`): đổi chu kỳ tự chạy (1 phút–24 giờ, `null` về 10 phút), lưu Redis `discovery:job-interval:{job}`; job đọc lại mỗi phút nên có hiệu lực không cần khởi động lại. Chạy trên process trả lời request (`APP_ROLE: all`) |
 
 ## Giao tiếp
 
-- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`; danh mục cho gợi ý trang chủ) và `CommerceFacade.checkAvailability` (`/stays`); `ContentFacade.listPosts` (dựng chỉ mục tìm khám phá) và `ContentFacade.getVisiblePosts` (`/search`, bỏ bài đã ẩn). `DiscoveryModule` import `CommerceModule`, `ContentModule`.
+- Gọi: `CommerceFacade.listCatalog` (dựng chỉ mục gợi ý; danh sách khách sạn của `/stays`; danh mục cho gợi ý trang chủ) và `CommerceFacade.checkAvailability` (`/stays`); `ContentFacade.listPosts` (dựng chỉ mục tìm khám phá) và `ContentFacade.getVisiblePosts` (`/search`, bỏ bài đã ẩn); `AccessFacade.getDisplayNames` (tên tác giả trên thẻ bài của `/search`, `/search/posts`, một lần mỗi trang). `DiscoveryModule` import `CommerceModule`, `ContentModule`, `AccessModule`.
 - Nghe sự kiện: một consumer `DiscoveryEventsConsumer`, group `core-discovery` (thêm consumer thứ hai cùng group thì mỗi sự kiện chỉ tới một bên). Recommend (TF28): đổi sự kiện thành dòng thô theo `recommend/domain/ingest/to-raw-rows.ts`. Search (TF33, 09/11) nghe `content.post.moderated`, `content.post.deleted`, `content.post.updated` trên `stream:core.content`. Không đọc action trong payload mà gọi `ExploreUseCases.dropHidden([postId])`: hỏi lại `getVisiblePosts`, bài không còn hiện thì xoá `post:<id>` khỏi `search_documents`. Không sửa `search_counts`, không thêm lại bài khi restore (job 10 phút lo). Job dựng lại chỉ mục cũng gọi `dropHidden` cho mọi bài ngay sau khi commit, để bài bị ẩn trong lúc dựng không bị ghi lại.
 - Ngoài việc gỡ bài ẩn, search không bao giờ chờ sự kiện: request chỉ đọc bảng của discovery hoặc gọi hàm module khác trong tiến trình. Bản chép được làm mới bằng job nền (xem bảng 1, 3, 4). **Không nghe `commerce.ari.updated`**: discovery không giữ giá hay còn phòng thật (`/stays` gọi thẳng commerce), nên không có gì để cập nhật. Danh mục khách sạn v1 là seed, nạp lại lúc worker khởi động hoặc qua lệnh reindex. Cần cập nhật ngay thì thêm `commerce.catalog.updated { productIds }` (chỉ mang id, discovery tự gọi `listCatalog`).
 - Cho module khác: không export hàm nào (content, commerce bị discovery gọi nên không được gọi ngược).

@@ -1,5 +1,5 @@
 import type { Db } from '@tripflix/db';
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, eq, lt, or, sql } from 'drizzle-orm';
 import type { IdempotencyKeysTable } from './table.js';
 
 /** Kết quả giữ chỗ cho một (scope, key). */
@@ -8,8 +8,16 @@ export type IdempotencyBeginResult =
   | { kind: 'replay'; requestHash: string; responseStatus: number; responseBody: unknown }
   | { kind: 'in_progress'; requestHash: string };
 
+/**
+ * Dòng `processing` cũ hơn mức này coi như tiến trình đã chết giữa chừng (deploy, hết bộ nhớ, bị kill) và cho request mới
+ * giữ lại (L3, rà soát 13/11). Trước đây phải đợi hết 24 giờ, khách gửi lại cùng key nhận 409 suốt thời gian đó.
+ * Request thật dài nhất là trả tiền: cổng thanh toán tối đa 15 giây, mỗi câu SQL tối đa 10 giây (APP_STATEMENT_TIMEOUT_MS),
+ * nên 60 giây đủ xa để không chạy chồng một request còn sống. Chạy lại an toàn vì lệnh bên trong tự chống trùng.
+ */
+export const STALE_PROCESSING_SECONDS = 60;
+
 export interface IdempotencyStore {
-  /** Giữ chỗ (scope, key). Dòng cũ đã hết hạn thì coi như chưa có. */
+  /** Giữ chỗ (scope, key). Dòng cũ đã hết hạn, hoặc còn `processing` quá STALE_PROCESSING_SECONDS, thì coi như chưa có. */
   begin(scope: string, key: string, requestHash: string, ttlSeconds: number): Promise<IdempotencyBeginResult>;
   /** Lưu kết quả lần đầu để trả lại khi request bị gửi lại. */
   complete(scope: string, key: string, responseStatus: number, responseBody: unknown): Promise<void>;
@@ -26,14 +34,14 @@ export class DrizzleIdempotencyStore implements IdempotencyStore {
   async begin(scope: string, key: string, requestHash: string, ttlSeconds: number): Promise<IdempotencyBeginResult> {
     const t = this.table;
     const expiresAt = sql`now() + make_interval(secs => ${ttlSeconds})`;
-    // Ghi đè chỉ khi dòng cũ đã hết hạn; còn hạn thì giữ nguyên để trả lại kết quả cũ.
+    // Ghi đè khi dòng cũ đã hết hạn, hoặc còn `processing` quá lâu (tiến trình xử lý đã chết); còn lại giữ nguyên.
     const inserted = await this.db
       .insert(t)
       .values({ scope, key, requestHash, status: 'processing', expiresAt })
       .onConflictDoUpdate({
         target: [t.scope, t.key],
         set: { requestHash, status: 'processing', responseStatus: null, responseBody: null, createdAt: sql`now()`, expiresAt },
-        setWhere: lt(t.expiresAt, sql`now()`),
+        setWhere: or(lt(t.expiresAt, sql`now()`), and(eq(t.status, 'processing'), lt(t.createdAt, sql`now() - make_interval(secs => ${STALE_PROCESSING_SECONDS})`))),
       })
       .returning({ scope: t.scope });
     if (inserted.length > 0) return { kind: 'started' };
@@ -68,7 +76,7 @@ export class DrizzleIdempotencyStore implements IdempotencyStore {
 export class MemoryIdempotencyStore implements IdempotencyStore {
   readonly rows = new Map<
     string,
-    { requestHash: string; status: 'processing' | 'completed'; responseStatus: number | null; responseBody: unknown; expiresAt: number }
+    { requestHash: string; status: 'processing' | 'completed'; responseStatus: number | null; responseBody: unknown; createdAt: number; expiresAt: number }
   >();
 
   constructor(private readonly now: () => number = Date.now) {}
@@ -76,12 +84,14 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
   async begin(scope: string, key: string, requestHash: string, ttlSeconds: number): Promise<IdempotencyBeginResult> {
     const id = `${scope}\u0000${key}`;
     const row = this.rows.get(id);
-    if (!row || row.expiresAt < this.now()) {
+    const isStale = row?.status === 'processing' && row.createdAt < this.now() - STALE_PROCESSING_SECONDS * 1000;
+    if (!row || row.expiresAt < this.now() || isStale) {
       this.rows.set(id, {
         requestHash,
         status: 'processing',
         responseStatus: null,
         responseBody: null,
+        createdAt: this.now(),
         expiresAt: this.now() + ttlSeconds * 1000,
       });
       return { kind: 'started' };

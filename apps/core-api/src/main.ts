@@ -1,7 +1,9 @@
 import './platform/load-env.js';
+import './platform/telemetry.js';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
+import { createTelemetryMiddleware } from '@tripflix/observability';
 import { AppModule } from './app.module.js';
 import type { CoreEnv } from './platform/env.js';
 import { setupHttp } from './platform/http.js';
@@ -17,6 +19,7 @@ if (role === 'worker') {
   app.get(Logger).log('core-api chạy vai trò worker');
 } else {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.use(createTelemetryMiddleware());
   app.useLogger(app.get(Logger));
   const env = app.get<CoreEnv>(CORE_ENV);
   setupHttp(app, { swagger: env.NODE_ENV !== 'production', webOrigins: env.AUTH_WEB_ORIGINS });

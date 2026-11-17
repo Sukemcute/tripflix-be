@@ -102,3 +102,19 @@ export interface MediaAssetStore {
   /** Loại, chủ và trạng thái của từng id có tồn tại, để module khác kiểm media gắn vào bài. */
   findKinds(assetIds: string[]): Promise<MediaKindInfo[]>;
 }
+
+export const PLAYBACK_COOKIE_SIGNER = Symbol('PLAYBACK_COOKIE_SIGNER');
+export const PLAYBACK_SETTINGS = Symbol('PLAYBACK_SETTINGS');
+
+/** Ký cookie cho phép mở video trên CDN. Trả tên cookie và giá trị, như `CloudFront-Signature`. */
+export interface PlaybackCookieSigner {
+  signCookies(policy: string): Record<string, string>;
+}
+
+export interface PlaybackSettings {
+  /** Gốc CDN (MEDIA_CDN_URL). Trống thì không ký. */
+  cdnBaseUrl: string;
+  ttlSec: number;
+  /** Domain cookie cho web, ví dụ `.tripflix.io.vn`. Trống thì không đặt cookie trên trình duyệt. */
+  cookieDomain: string | undefined;
+}

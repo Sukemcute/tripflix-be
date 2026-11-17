@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
+import { isAfterCursor, isBeforeCursor } from './keyset-cursor.js';
 import {
   posts,
   type NewPostRecord,
@@ -100,6 +101,16 @@ export class PostRepository {
       .where(eq(posts.id, id));
   }
 
+  /** Tổng cảm xúc trên các bài công khai của tác giả (cùng điều kiện với GET /v1/posts?author_id=). */
+  async sumPublicReactions(authorId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ total: sql<string | null>`sum(${posts.reactionTotal})` })
+      .from(posts)
+      .where(and(eq(posts.authorId, authorId), eq(posts.status, 'published'), eq(posts.visibility, 'public'),
+        sql`${posts.deletedAt} IS NULL`));
+    return Number(row?.total ?? 0);
+  }
+
   /**
    * Truy vấn bảng tin công khai với Keyset Cursor Pagination (created_at DESC, id DESC).
    */
@@ -121,10 +132,7 @@ export class PostRepository {
 
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(
-        or(
-          lt(posts.createdAt, options.cursorCreatedAt),
-          and(eq(posts.createdAt, options.cursorCreatedAt), lt(posts.id, options.cursorId)),
-        )!,
+        isBeforeCursor(posts, posts.createdAt, posts.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
 
@@ -153,10 +161,7 @@ export class PostRepository {
 
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(
-        or(
-          lt(posts.createdAt, options.cursorCreatedAt),
-          and(eq(posts.createdAt, options.cursorCreatedAt), lt(posts.id, options.cursorId)),
-        )!,
+        isBeforeCursor(posts, posts.createdAt, posts.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
 
@@ -182,10 +187,7 @@ export class PostRepository {
     }
     if (options.cursorCreatedAt && options.cursorId) {
       conditions.push(
-        or(
-          lt(posts.createdAt, options.cursorCreatedAt),
-          and(eq(posts.createdAt, options.cursorCreatedAt), lt(posts.id, options.cursorId)),
-        )!,
+        isBeforeCursor(posts, posts.createdAt, posts.id, { time: options.cursorCreatedAt, id: options.cursorId }),
       );
     }
 
@@ -272,10 +274,7 @@ export class PostRepository {
 
     if (options.cursorUpdatedAt && options.cursorId) {
       conditions.push(
-        or(
-          gt(posts.updatedAt, options.cursorUpdatedAt),
-          and(eq(posts.updatedAt, options.cursorUpdatedAt), gt(posts.id, options.cursorId)),
-        )!,
+        isAfterCursor(posts, posts.updatedAt, posts.id, { time: options.cursorUpdatedAt, id: options.cursorId }),
       );
     }
 

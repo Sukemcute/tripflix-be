@@ -73,13 +73,13 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     expect(items).toEqual([expect.objectContaining({
       body: 'Trang đã trả lời bình luận của bạn.',
       link: `/trips/${payload.postId}?comment=${payload.commentId}`,
-      data: { postId: payload.postId, commentId: payload.commentId, parentCommentId: payload.parentCommentId },
+      data: { postId: payload.postId, commentId: payload.commentId, parentCommentId: payload.parentCommentId, excerpt: 'Nội dung thử' },
     })]);
   });
 
   it('báo cho tác giả lượt trả lời được nhắm tới và mở lượt trả lời mới', async () => {
     const replyToAuthorId = randomUUID();
-    const payload = comment({ authorDisplayName: 'Trang', replyToCommentId: randomUUID(), replyToAuthorId });
+    const payload = comment({ authorDisplayName: 'Trang', replyToCommentId: randomUUID(), replyToAuthorId, postVisibility: 'public' });
     await router.route(event('content.comment.created', payload));
     const { items } = await inbox.listForUser(replyToAuthorId, { limit: 20 });
     expect(items).toEqual([expect.objectContaining({
@@ -88,7 +88,9 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
       link: `/trips/${payload.postId}?comment=${payload.commentId}`,
       data: expect.objectContaining({ commentId: payload.commentId, parentCommentId: payload.parentCommentId }),
     })]);
-    expect(await inbox.countUnread(payload.parentCommentAuthorId!)).toBe(0);
+    // N2: tác giả bình luận gốc không được trả lời trực tiếp vẫn nhận dòng luồng, không nhận dòng trả lời.
+    const rootAuthorItems = (await inbox.listForUser(payload.parentCommentAuthorId!, { limit: 20 })).items;
+    expect(rootAuthorItems.map((item) => item.type)).toEqual(['comment.thread_replied']);
   });
 
   it('gộp hai vai trò của cùng một người và bỏ thông báo cho chính người bình luận', async () => {
@@ -127,5 +129,88 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
     const concurrent = comment();
     await Promise.all([router.route(event('content.comment.created', concurrent)), router.route(deletion(concurrent))]);
     expect((await inbox.listForUser(concurrent.postAuthorId, { limit: 20 })).items).toEqual([]);
+  });
+
+  describe('N2: theo dõi luồng trả lời', () => {
+    const postId = randomUUID();
+    const postAuthorId = randomUUID();
+    const [a, b, d, e] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    const rootId = randomUUID();
+
+    function reply(authorId: string, replyToAuthorId: string, authorDisplayName: string): ContentCommentCreatedV1 {
+      return comment({
+        postId, postAuthorId, authorId, authorDisplayName, parentCommentId: rootId, parentCommentAuthorId: a,
+        replyToCommentId: randomUUID(), replyToAuthorId, postVisibility: 'public',
+      });
+    }
+
+    async function threadRows(userId: string) {
+      const { items } = await inbox.listForUser(userId, { limit: 20 });
+      return items.filter((item) => item.type === 'comment.thread_replied');
+    }
+
+    it('A bình luận, B trả lời A, D trả lời B: B nhận trả lời trực tiếp, A nhận dòng luồng, không ai nhận trùng', async () => {
+      await router.route(event('content.comment.created', comment({
+        commentId: rootId, postId, postAuthorId, authorId: a, parentCommentId: null, parentCommentAuthorId: null,
+        postVisibility: 'public',
+      })));
+      await router.route(event('content.comment.created', reply(b, a, 'Bình')));
+      emitToUser.mockClear();
+      const fromD = reply(d, b, 'Dương');
+      await router.route(event('content.comment.created', fromD));
+
+      expect(await threadRows(a)).toEqual([expect.objectContaining({
+        title: 'Có trả lời mới trong luồng',
+        body: 'Dương đã trả lời trong luồng bạn tham gia.',
+        link: `/trips/${postId}?comment=${fromD.commentId}`,
+        data: { postId, commentId: fromD.commentId, parentCommentId: rootId, actorIds: [d], excerpt: 'Nội dung thử' },
+      })]);
+      expect((await inbox.listForUser(b, { limit: 20 })).items.map((item) => item.type)).toEqual(['comment.replied']);
+      expect(await inbox.countUnread(d)).toBe(0);
+      expect(await threadRows(postAuthorId)).toEqual([]);
+      // A còn dòng 'comment.replied' khi B trả lời A.
+      expect(emitToUser).toHaveBeenCalledWith(a, 'notification.created', expect.objectContaining({ unreadCount: 2 }));
+    });
+
+    it('gom vào dòng chưa đọc, đếm mỗi người một lần, gửi lại sự kiện không đổi gì', async () => {
+      emitToUser.mockClear();
+      const fromE = event('content.comment.created', reply(e, b, 'Em'));
+      await Promise.all([router.route(fromE), router.route({ ...fromE, eventId: fromE.eventId })]);
+      await router.route(event('content.comment.created', reply(d, e, 'Dương')));
+
+      const rows = await threadRows(a);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ body: 'Dương và 1 người khác đã trả lời trong luồng bạn tham gia.', data: { actorIds: [d, e] } });
+      expect(await inbox.countUnread(a)).toBe(2);
+      expect(emitToUser).toHaveBeenCalledWith(a, 'notification.read', { unreadCount: 2 });
+      // B đã trả lời trong luồng nên nhận dòng luồng khi D trả lời E.
+      expect(await threadRows(b)).toEqual([expect.objectContaining({ body: 'Dương đã trả lời trong luồng bạn tham gia.' })]);
+    });
+
+    it('đọc rồi thì trả lời sau tạo dòng mới; xoá bình luận mới nhất thì ẩn dòng gom', async () => {
+      const [read] = await threadRows(a);
+      expect(await inbox.markRead(a, read!.id)).toBe(true);
+      const latest = reply(b, d, 'Bình');
+      await router.route(event('content.comment.created', latest));
+      const rows = await threadRows(a);
+      expect(rows).toHaveLength(2);
+      expect(rows).toContainEqual(expect.objectContaining({ body: 'Bình đã trả lời trong luồng bạn tham gia.', read_at: null }));
+
+      await router.route(deletion(latest));
+      expect(await threadRows(a)).toEqual([expect.objectContaining({ id: read!.id })]);
+      expect(await inbox.countUnread(a)).toBe(1);
+    });
+
+    it('bài private hoặc sự kiện thiếu postVisibility thì không báo người trong luồng', async () => {
+      const otherPost = randomUUID();
+      const [root, x, y] = [randomUUID(), randomUUID(), randomUUID()];
+      const base = { postId: otherPost, parentCommentId: root, parentCommentAuthorId: x };
+      for (const postVisibility of ['private', undefined] as const) {
+        await router.route(event('content.comment.created', comment({ ...base, authorId: y, replyToAuthorId: x, postVisibility })));
+        await router.route(event('content.comment.created', comment({ ...base, authorId: randomUUID(), replyToAuthorId: y, postVisibility })));
+      }
+      expect(await threadRows(x)).toEqual([]);
+      expect((await pool.query('SELECT 1 FROM thread_participants WHERE parent_comment_id = $1', [root])).rowCount).toBe(0);
+    });
   });
 });

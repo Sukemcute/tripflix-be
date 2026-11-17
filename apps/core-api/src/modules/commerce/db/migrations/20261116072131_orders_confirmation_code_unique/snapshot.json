@@ -1,0 +1,57 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "97305e09-e64e-4b51-baee-5d4cc6c7b4bc",
+  "prevIds": [
+    "c46c960f-370a-4ac3-ac8b-7600ba8ff988"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "commerce",
+        "orders",
+        "uq_orders_confirmation_code"
+      ],
+      "writes": [
+        "s|idx|commerce.uq_orders_confirmation_code",
+        "n|idx|commerce.uq_orders_confirmation_code",
+        "e|idx|commerce.uq_orders_confirmation_code",
+        "n|rel|commerce.uq_orders_confirmation_code"
+      ],
+      "reads": [
+        "n|tbl|commerce.orders",
+        "n|sch|commerce",
+        "n|col|commerce.orders.confirmation_code"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "orders",
+        "name": "uq_orders_confirmation_code",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "confirmation_code",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

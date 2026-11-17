@@ -1,10 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
 import { getRefundStatus, type RefundSummaryStatus } from '../../booking/domain/refund-summary.js';
 import type { OutboxWriter } from '@tripflix/outbox';
 import { CheckoutUseCases, listRequiredPassengers, listSortedCells, passengerMixOf, type CheckoutView } from '../../booking/application/checkout.use-cases.js';
-import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type OrderStore, type PaymentRecord, type RefundRecord } from '../../booking/application/ports.js';
+import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type OrderItemRecord, type OrderRecord, type OrderStore, type PaymentRecord, type RefundRecord } from '../../booking/application/ports.js';
 import {
   MAX_FAILED_PAYMENTS,
   buildCancelRefundKey,
@@ -12,6 +12,7 @@ import {
   buildChargeKey,
   buildCompensationRefundKey,
   buildLateSuccessRefundKey,
+  CONFIRMATION_CODE_LENGTH,
   createConfirmationCode,
   hasCompleteGuests,
   isHoldExpired,
@@ -19,6 +20,8 @@ import {
 import { quoteCancellation, type CancelQuote, type CancelPolicyItem } from '../../booking/domain/cancel-policy.js';
 import { CommerceError } from '../../inventory/domain/errors.js';
 import { addDays } from '../../inventory/domain/sales-rules.js';
+import { TraceContext } from '../../trace-context.js';
+import { CommerceMetrics } from '../../metrics/commerce-metrics.js';
 import { PAYMENT_GATEWAY, type ChargeResult, type PaymentGateway } from './gateway.port.js';
 import { ACCEPTED_REFUND_REF, REFUND_GATEWAYS, SUBMITTED_REFUND_REF, type RefundClient, type RefundGateways, type RefundInput, type RefundOutcome, type RefundQueryOutcome } from './refund-gateways.port.js';
 
@@ -65,7 +68,9 @@ export type Prepared =
   | { kind: 'price_changed'; oldTotal: number; newTotal: number }
   | { kind: 'charge'; gatewayKey: string; amount: number };
 
-export type Applied = { kind: 'paid' } | { kind: 'compensated' } | { kind: 'requires_action'; challengeId: string } | { kind: 'failed'; code: string; message?: string };
+/** `view`: dữ liệu TX2 vừa ghi, để dựng response không phải đọc lại (chỉ có khi lần này chốt đơn). */
+export type PaidView = { order: OrderRecord; items: OrderItemRecord[]; guestBirthdates: (string | null)[]; payment: PaymentRecord };
+export type Applied = { kind: 'paid'; view?: PaidView } | { kind: 'compensated' } | { kind: 'requires_action'; challengeId: string } | { kind: 'failed'; code: string; message?: string };
 
 /**
  * Trả tiền (TF29): TX1 ghi ý định trả, đơn sang paying → gọi cổng NGOÀI transaction → TX2 ghi kết quả, chốt đơn,
@@ -84,9 +89,28 @@ export class PaymentUseCases {
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
     @Inject(CheckoutUseCases) private readonly checkout: CheckoutUseCases,
     @Inject(REFUND_GATEWAYS) private readonly refundGateways: RefundGateways = new Map(),
+    // Không có (test dựng tay) thì sự kiện không mang traceId, như trước.
+    @Optional() @Inject(TraceContext) private readonly trace?: TraceContext,
+    @Optional() @Inject(CommerceMetrics) private readonly metrics?: CommerceMetrics,
   ) {}
 
+  /** D1: mã request (hoặc lượt job) đi cùng sự kiện, để từ sự kiện lần ngược về log HTTP. */
+  private traceId(): string | undefined {
+    return this.trace?.current().requestId ?? undefined;
+  }
+
   async pay(userId: string, orderId: string, input: PayInput): Promise<PayResult> {
+    try {
+      const result = await this.payOnce(userId, orderId, input);
+      this.metrics?.countPayment(result.outcome);
+      return result;
+    } catch (error) {
+      this.metrics?.countPayment(error instanceof CommerceError ? (error.code === 'payment_failed' ? 'failed' : 'rejected') : 'error');
+      throw error;
+    }
+  }
+
+  private async payOnce(userId: string, orderId: string, input: PayInput): Promise<PayResult> {
     const prepared = await this.prepareCharge(userId, orderId, input, { gatewayName: this.gateway.name, buildKey: buildChargeKey });
     if (prepared.kind === 'price_changed') {
       throw new CommerceError('conflict', 'Giá đã thay đổi, vui lòng xác nhận giá mới.', 'expectedTotal', { reason: 'PRICE_CHANGED', oldTotal: prepared.oldTotal, newTotal: prepared.newTotal });
@@ -134,8 +158,10 @@ export class PaymentUseCases {
     if (applied.kind === 'failed') {
       throw new CommerceError('payment_failed', applied.message ?? 'Thanh toán không thành công.', 'paymentToken', { declineCode: applied.code });
     }
-    const checkout = await this.checkout.getCheckout(userId, orderId);
-    const payment = (await this.orders.findPaymentsByKey(gatewayKey))[0];
+    const view = applied.view;
+    // Vừa chốt đơn: dựng từ dữ liệu TX2, đơn mới trả chưa có khoản hoàn. Trả lại kết quả cũ thì đọc database như trước.
+    const checkout = await this.checkout.getCheckout(userId, orderId, view && { known: { order: view.order, items: view.items, refunds: [], guestBirthdates: view.guestBirthdates } });
+    const payment = view?.payment ?? (await this.orders.findPaymentsByKey(gatewayKey))[0];
     return { outcome: 'paid', orderId, confirmationCode: checkout.confirmationCode, checkout, ...this.describePaymentMetadata(payment) };
   }
 
@@ -183,6 +209,7 @@ export class PaymentUseCases {
     const repriced = await this.checkout.priceItems(
       items.map((i) => ({ productId: i.productId, checkIn: i.date, checkOut: i.productType === 'room' ? addDays(i.date, i.nights) : undefined, qty: i.productType === 'room' ? i.qty : undefined, ratePlanCode: i.ratePlanCode })),
       passengerMixOf(order),
+      await this.loadProductsOf(items),
     ).catch((error: unknown) => {
       // Giữ chỗ rồi thì luật bán (CTA, ngừng bán) không chặn được nữa: chỉ lấy giá mới, chỗ đã có.
       if (error instanceof CommerceError && error.code === 'conflict') return null;
@@ -197,14 +224,28 @@ export class PaymentUseCases {
         }),
       );
       total = repriced.reduce((sum, p) => sum + p.lineTotal, 0);
-      await this.orders.updateOrder(orderId, { total });
     }
-    if (input.expectedTotal !== total) return { kind: 'price_changed', oldTotal: input.expectedTotal, newTotal: total };
+    if (input.expectedTotal !== total) {
+      // Giá đổi: lưu giá mới để lần bấm sau (đã xác nhận giá mới) khớp.
+      if (total !== order.total) await this.orders.updateOrder(orderId, { total });
+      return { kind: 'price_changed', oldTotal: input.expectedTotal, newTotal: total };
+    }
 
     const gatewayKey = method.buildKey(orderId, failed + 1);
-    await this.orders.updateOrder(orderId, { status: 'paying', policyVersion: POLICY_VERSION, policyAcceptedAt: this.now() });
+    // Một câu cho cả tổng tiền (nếu đổi) và trạng thái: bớt một lượt gọi trong transaction đang khoá đơn.
+    await this.orders.updateOrder(orderId, { ...(total !== order.total && { total }), status: 'paying', policyVersion: POLICY_VERSION, policyAcceptedAt: this.now() });
     await this.orders.insertPayment({ orderId, userId, gatewayKey, amount: total, gateway: method.gatewayName });
     return { kind: 'charge', gatewayKey, amount: total };
+  }
+
+  /** Chỉ đọc bảng của loại sản phẩm đơn có: đơn chỉ có phòng thì không đọc bảng chuyến bay (bớt một lượt gọi trong TX1). */
+  private async loadProductsOf(items: { productType: string; productId: string }[]) {
+    const ids = (type: string) => [...new Set(items.filter((i) => i.productType === type).map((i) => i.productId))];
+    const [roomIds, flightIds] = [ids('room'), ids('flight')];
+    return {
+      roomTypes: roomIds.length ? await this.checkout.findRoomTypes(roomIds) : [],
+      flights: flightIds.length ? await this.checkout.findFlights(flightIds) : [],
+    };
   }
 
   /** TX2: ghi kết quả cổng trả về. Dùng chung cho luồng thường, 3DS và job đối soát; gọi lại nhiều lần vẫn an toàn. */
@@ -246,14 +287,18 @@ export class PaymentUseCases {
       for (const cell of listSortedCells(items)) {
         if (!(await this.orders.sellCell(cell))) throw new Error(`Không chuyển được chỗ đã giữ sang đã bán: ${cell.productId} ${cell.date}`);
       }
-      const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(6)) }));
+      const codes = items.map((item) => ({ id: item.id, code: createConfirmationCode(randomBytes(CONFIRMATION_CODE_LENGTH)) }));
       await this.orders.setItemConfirmationCodes(codes);
-      await this.orders.updateOrder(order.id, { status: 'paid', confirmationCode: codes[0]!.code, paidAt: this.now() });
+      const paidAt = this.now();
+      await this.orders.updateOrder(order.id, { status: 'paid', confirmationCode: codes[0]!.code, paidAt });
       const flightRoutes = await this.checkout.findFlightRoutes(items.filter((i) => i.productType === 'flight').map((i) => i.productId));
-      const guests = await this.orders.findGuests(order.id);
+      const guestRows = await this.orders.findGuests(order.id);
+      // Sự kiện giữ đúng hợp đồng cũ: không mang ngày sinh.
+      const guests = guestRows.map(({ fullName, passengerType }) => ({ fullName, passengerType }));
       await this.outbox.add({
         type: 'commerce.order.paid',
         userId: order.userId,
+        traceId: this.traceId(),
         payload: {
           orderId: order.id,
           userId: order.userId,
@@ -277,7 +322,15 @@ export class PaymentUseCases {
           contactEmail: order.contactEmail,
         },
       });
-      return { kind: 'paid' };
+      return {
+        kind: 'paid',
+        view: {
+          order: { ...order, status: 'paid', confirmationCode: codes[0]!.code, paidAt },
+          items: items.map((item, i) => ({ ...item, confirmationCode: codes[i]!.code })),
+          guestBirthdates: guestRows.map((g) => g.birthdate),
+          payment: { ...payment, status: 'succeeded', gatewayRef: result.ref ?? null, cardLast4: result.last4 ?? null, failureCode: null, ...metadata },
+        },
+      };
     }
 
     // Thẻ bị từ chối: chỗ vẫn giữ để thử thẻ khác, lần sau dùng khoá mới.
@@ -340,6 +393,7 @@ export class PaymentUseCases {
     await this.outbox.add({
       type: 'commerce.order.cancelled',
       userId: order.userId,
+      traceId: this.traceId(),
       payload: {
         orderId,
         userId: order.userId,

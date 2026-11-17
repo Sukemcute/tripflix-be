@@ -68,7 +68,7 @@ export class EventRouter {
     inbox?: Pick<InboxRepository, 'insert' | 'countUnread'>,
     realtime?: Pick<RealtimeService, 'emitToUser'>,
     directory?: Pick<DirectoryRepository, 'upsertUser' | 'upsertPost'>,
-    comments?: Pick<CommentNotificationRepository, 'create' | 'hide'>,
+    comments?: Pick<CommentNotificationRepository, 'create' | 'hide'> & Partial<Pick<CommentNotificationRepository, 'notifyThread'>>,
     reactions?: Pick<ReactionNotificationRepository, 'apply'>,
     posts?: Pick<PostNotificationRepository, 'moderate'>,
     followerPosts?: Pick<FollowerPostWorker, 'enqueue' | 'cancel' | 'applyFollow'>,

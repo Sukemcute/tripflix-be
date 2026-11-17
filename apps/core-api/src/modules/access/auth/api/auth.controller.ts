@@ -27,7 +27,7 @@ import {
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
-import { AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
+import { ADMIN_HANDOFF_FORBIDDEN_MESSAGE, AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
 import { BROWSER_PROOF_HEADER } from '../application/browser-session-proof.js';
 import { PasswordEncryption } from '../application/password-encryption.js';
 import { EncryptedPasswords } from './encrypted-passwords.js';
@@ -37,6 +37,9 @@ import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REF
 import { AccessError } from '../domain/errors.js';
 import { REGISTRATION_CODE_COOLDOWN_SECONDS } from '../domain/registration.js';
 import {
+  AdminHandoffDto,
+  AdminHandoffExchangeDto,
+  AdminHandoffExchangeRequestSchema,
   GoogleLoginDto,
   GoogleLoginRequestSchema,
   LoginCodeDto,
@@ -202,6 +205,38 @@ export class AuthController {
       if (isWeb && err instanceof AccessError) this.web.clearRefreshCookie(res, req);
       throw err;
     }
+  }
+
+  /** Web gọi khi nhân viên bấm "Mở trang quản trị": nhận mã một lần rồi chuyển sang admin kèm mã. */
+  @Post('admin-handoff')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Authenticated()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: AdminHandoffDto })
+  @ApiForbiddenResponse({ description: ADMIN_HANDOFF_FORBIDDEN_MESSAGE })
+  createAdminHandoff(@CurrentUser() user: AuthUser) {
+    return this.auth.createAdminHandoff(user);
+  }
+
+  /** Trang quản trị đổi mã lấy phiên riêng (chế độ web, cookie), gắn với khoá trình duyệt của admin. */
+  @Post('admin-handoff/exchange')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ ...WEB_CLIENT_API_HEADER, required: true })
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: true, description: 'Chữ ký từ khóa trình duyệt của trang quản trị' })
+  @ApiBody({ type: AdminHandoffExchangeDto })
+  @ApiOkResponse({ type: TokenPairDto })
+  @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
+  async exchangeAdminHandoff(
+    @Body(new ZodBody(AdminHandoffExchangeRequestSchema)) body: z.infer<typeof AdminHandoffExchangeRequestSchema>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.web.assertTrustedOrigin(req);
+    if (!isWebClient(req)) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    const pair = await this.auth.exchangeAdminHandoff(body.code, readRequestMeta(req), this.readBrowserProof(req));
+    return this.toWebResponse(req, res, pair);
   }
 
   /** Xoá phiên của access token; web có cookie thì xoá luôn cookie. */

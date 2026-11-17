@@ -1,10 +1,11 @@
 import type { CoreEnv } from '../../../../platform/env.js';
 import type { ExpireHoldsUseCases } from '../application/expire-holds.use-cases.js';
+import type { TraceContext } from '../../trace-context.js';
 import { ExpireHoldsJob } from './expire-holds.job.js';
 
 describe('ExpireHoldsJob', () => {
   const start = (env: Partial<CoreEnv>, expireHolds = vi.fn().mockResolvedValue({ expired: 0, skipped: 0, errors: 0 })) => {
-    const job = new ExpireHoldsJob({ expireHolds } as unknown as ExpireHoldsUseCases, env as CoreEnv);
+    const job = new ExpireHoldsJob({ expireHolds } as unknown as ExpireHoldsUseCases, env as CoreEnv, { runJob: (_name: string, run: () => Promise<unknown>) => run() } as unknown as TraceContext);
     job.onApplicationBootstrap();
     return { job, expireHolds };
   };

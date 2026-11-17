@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { STAY_SORTS, type StaySort } from '../domain/stays.js';
 import { POST_TYPES, type PostType } from '../application/explore.use-cases.js';
 import { SUGGEST_TYPES, type SuggestType } from '../domain/suggest-entity.js';
+import { POI_KINDS, type PoiKind } from '../domain/points-of-interest.js';
 
 // Schema zod để kiểm query; class bên dưới chỉ để Swagger sinh contracts/openapi.
 export const SuggestQuerySchema = z.object({
@@ -39,6 +40,49 @@ export class SuggestionDto {
 export class SuggestResponseDto {
   @ApiProperty({ type: [SuggestionDto], description: 'Đã xếp theo mức khớp; rỗng khi không khớp gì' })
   items!: SuggestionDto[];
+}
+
+export const PlacesQuerySchema = z
+  .object({
+    city: z.string().trim().min(2).max(60).optional(),
+    // "lat,lng", ví dụ "10.346,107.084"
+    near: z
+      .string()
+      .regex(/^-?\d{1,2}(\.\d+)?,-?\d{1,3}(\.\d+)?$/, 'near dạng "lat,lng"')
+      .transform((raw) => {
+        const [lat, lng] = raw.split(',').map(Number);
+        return { lat: lat!, lng: lng! };
+      })
+      .optional(),
+    kinds: z
+      .string()
+      .optional()
+      .transform((raw) => (raw ? raw.split(',').map((k) => k.trim()) : []))
+      .pipe(z.array(z.enum(POI_KINDS as [PoiKind, ...PoiKind[]]))),
+    radiusKm: z.coerce.number().min(1).max(50).default(15),
+    limit: z.coerce.number().int().min(1).max(100).default(40),
+  })
+  .refine((q) => q.city || q.near, { message: 'Cần city hoặc near', path: ['city'] });
+
+export class PointOfInterestDto {
+  @ApiProperty({ example: 'osm:node/123456789', description: 'Id OpenStreetMap, ổn định giữa các lần nạp' }) id!: string;
+  @ApiProperty({ example: 'Hải Đăng Vũng Tàu' }) name!: string;
+  @ApiProperty({ enum: POI_KINDS, description: 'see: tham quan · food: ăn uống · cafe · lodging: chỗ ở ngoài Tripflix' })
+  kind!: PoiKind;
+  @ApiProperty({ example: 10.3333 }) lat!: number;
+  @ApiProperty({ example: 107.0778 }) lng!: number;
+  @ApiProperty({ example: 'Vũng Tàu' }) city!: string;
+  @ApiProperty({ type: [String], example: ['viewpoint'], description: 'beach, viewpoint, museum, park, market, temple, indoor' })
+  tags!: string[];
+  @ApiProperty({ example: 0.9, description: '0–1, ước lượng từ dữ liệu OSM (có Wikipedia, Wikidata, website)' })
+  popularity!: number;
+}
+
+export class PlacesResponseDto {
+  @ApiProperty({ type: [PointOfInterestDto], description: 'Xếp theo độ phổ biến rồi khoảng cách; rỗng khi chưa có dữ liệu' })
+  items!: PointOfInterestDto[];
+  @ApiProperty({ example: '© OpenStreetMap contributors (ODbL)', description: 'Phải hiện kèm danh sách (giấy phép ODbL)' })
+  attribution!: string;
 }
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD');
@@ -121,6 +165,12 @@ export class ExploreRequestDto {
   loc?: ExploreLocationDto | null;
 }
 
+class ExploreAuthorDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String, nullable: true, example: 'Minh Anh', description: 'Tên hiển thị; null nếu không tìm thấy người dùng' }) name!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Chưa có dữ liệu, hiện luôn là null (như feed)' }) avatarUrl!: string | null;
+}
+
 export class ExploreItemDto {
   @ApiProperty({ example: 'hotel:P-h-dl-01', description: '`<loại>:<mã gốc>`, duy nhất' }) id!: string;
   @ApiProperty({ example: 'stay', description: 'stay · plan · post · video (food, cafe, see khi có nguồn dữ liệu)' }) kind!: string;
@@ -133,6 +183,16 @@ export class ExploreItemDto {
   priceFrom!: number | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Số ngày của lộ trình' }) days!: number | null;
   @ApiProperty({ type: ExploreLocationDto, nullable: true }) location!: ExploreLocationDto | null;
+  @ApiProperty({ type: Number, nullable: true, example: 120, description: 'plan/post/video: lượt thích · mục khác: null' }) likes!: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 8, description: 'plan/post/video: số bình luận · mục khác: null' }) comments!: number | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy',
+  })
+  createdAt!: string | null;
+  @ApiProperty({ type: ExploreAuthorDto, nullable: true, description: 'plan/post/video: tác giả · mục khác: null' }) author!: ExploreAuthorDto | null;
 }
 
 class ExploreSuggestItemDto extends ExploreItemDto {
@@ -203,7 +263,8 @@ export class SearchPostsRequestDto {
     enum: POST_TYPES,
     required: false,
     default: 'all',
-    description: 'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường',
+    description:
+      'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)',
   })
   postType?: PostType;
   @ApiProperty({ type: String, required: false, nullable: true, description: '`nextCursor` của trang trước' }) cursor?: string | null;

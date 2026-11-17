@@ -1,13 +1,16 @@
 import type { Db } from '@tripflix/db';
-import { and, arrayOverlaps, asc, between, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
-import { searchCounts, searchDocuments } from '../../db/schema/index.js';
+import { and, arrayOverlaps, asc, between, eq, gte, inArray, isNull, lt, lte, or, sql, type SQL } from 'drizzle-orm';
+import { searchCounts, searchDocuments, searchQueryGrams } from '../../db/schema/index.js';
 import type { ExploreStore } from '../application/ports.js';
 import { PHRASE_NS } from '../domain/explore/stats.js';
 import type { BuiltIndex, CandidateFilter, CountRow, IndexedDoc } from '../domain/explore/types.js';
+import { MAX_SAMPLES, type QueryGramRow } from '../domain/explore/vocab-gaps.js';
 
 const CHUNK = 1000;
 /** Khoá advisory của job dựng chỉ mục: hai worker cùng chạy thì một bên bỏ lượt. */
 const INDEX_LOCK = 'discovery.explore-index';
+// ponytail: chấm G² trên chừng này n-gram nhiều lượt nhất; đủ cho pilot, lớn hơn thì lọc thêm trong SQL.
+const MAX_QUERY_GRAMS = 2_000;
 
 export class DrizzleExploreStore implements ExploreStore {
   constructor(private readonly db: Db) {}
@@ -60,6 +63,8 @@ export class DrizzleExploreStore implements ExploreStore {
       where.push(
         or(
           eq(searchDocuments.place, f.place),
+          !f.isAll ? isNull(searchDocuments.place) : undefined, // điều kiện khớp từ bên dưới vẫn áp dụng
+          f.placeTerms.length ? and(isNull(searchDocuments.place), arrayOverlaps(searchDocuments.terms, f.placeTerms)) : undefined,
           f.center
             ? and(gte(searchDocuments.lat, f.center.lat - f.latSpan), lte(searchDocuments.lat, f.center.lat + f.latSpan))
             : undefined,
@@ -113,6 +118,46 @@ export class DrizzleExploreStore implements ExploreStore {
   async deleteDocuments(ids: string[]): Promise<number> {
     if (!ids.length) return 0;
     const deleted = await this.db.delete(searchDocuments).where(inArray(searchDocuments.id, ids)).returning({ id: searchDocuments.id });
+    return deleted.length;
+  }
+
+  async recordQueryGrams(day: string, rows: QueryGramRow[]): Promise<void> {
+    if (!rows.length) return;
+    const t = searchQueryGrams;
+    // `search_query_grams.x` trong DO UPDATE là dòng đang có; `excluded.x` là dòng vừa gửi.
+    await this.db
+      .insert(t)
+      .values(rows.map((r) => ({ day, gram: r.gram, hits: r.hits, samples: r.samples })))
+      .onConflictDoUpdate({
+        target: [t.day, t.gram],
+        set: {
+          hits: sql`search_query_grams.hits + excluded.hits`,
+          samples: sql`case when cardinality(search_query_grams.samples) < ${MAX_SAMPLES}
+            and not search_query_grams.samples @> excluded.samples
+            then search_query_grams.samples || excluded.samples else search_query_grams.samples end`,
+        },
+      });
+  }
+
+  async listQueryGrams(since: string, minCount: number): Promise<QueryGramRow[]> {
+    const t = searchQueryGrams;
+    const result = await this.db.execute<{ gram: string; hits: number; samples: string[] }>(sql`
+      select g.gram, sum(g.hits)::int as hits,
+        array(
+          select distinct s from ${t} g2, unnest(g2.samples) s
+          where g2.gram = g.gram and g2.day >= ${since} limit ${MAX_SAMPLES}
+        ) as samples
+      from ${t} g
+      where g.day >= ${since}
+      group by g.gram
+      having sum(g.hits) >= ${minCount} or g.gram like '#%'
+      order by sum(g.hits) desc
+      limit ${MAX_QUERY_GRAMS}`);
+    return result.rows;
+  }
+
+  async purgeQueryGrams(before: string): Promise<number> {
+    const deleted = await this.db.delete(searchQueryGrams).where(lt(searchQueryGrams.day, before)).returning({ day: searchQueryGrams.day });
     return deleted.length;
   }
 }

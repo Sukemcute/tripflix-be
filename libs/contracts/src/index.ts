@@ -165,6 +165,13 @@ export const ContentCommentReactionUpdatedV1Schema = z.object({
   likeCount: z.int().nonnegative(),
 });
 
+/**
+ * Quyền xem của bài lúc phát sự kiện bình luận (TF99). Tuỳ chọn để nhận sự kiện cũ;
+ * notification-service chỉ phát realtime vào phòng bài khi giá trị là 'public'.
+ */
+export const PostVisibilitySchema = z.enum(['public', 'private']);
+export type PostVisibility = z.infer<typeof PostVisibilitySchema>;
+
 /** content.comment.created v1: có bình luận mới dưới bài viết (hỗ trợ thông báo và AI worker tổng hợp). */
 export const ContentCommentCreatedV1Schema = z.object({
   commentId: z.uuid(),
@@ -178,6 +185,7 @@ export const ContentCommentCreatedV1Schema = z.object({
   authorDisplayName: z.string().min(1).optional(),
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentCreatedV1 = z.infer<typeof ContentCommentCreatedV1Schema>;
 
@@ -189,6 +197,7 @@ export const ContentCommentUpdatedV1Schema = z.object({
   parentCommentId: z.uuid().nullable(),
   body: z.string().min(1).max(10_000),
   updatedAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentUpdatedV1 = z.infer<typeof ContentCommentUpdatedV1Schema>;
 
@@ -201,6 +210,7 @@ export const ContentCommentDeletedV1Schema = z.object({
   deletedBy: z.uuid(),
   isSuperAdmin: z.boolean(),
   deletedAt: z.iso.datetime(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export type ContentCommentDeletedV1 = z.infer<typeof ContentCommentDeletedV1Schema>;
 
@@ -310,6 +320,7 @@ export const ContentCommentHiddenV1Schema = z.object({
   postId: z.uuid(),
   commentId: z.uuid(),
   authorId: z.uuid(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export const ContentCommentRestoredV1Schema = z.object({
   postId: z.uuid(),
@@ -319,6 +330,7 @@ export const ContentCommentRestoredV1Schema = z.object({
   body: z.string().min(1).max(10_000).optional(),
   parentCommentId: z.uuid().nullable().optional(),
   postAuthorId: z.uuid().optional(),
+  postVisibility: PostVisibilitySchema.optional(),
 });
 export const ContentPostHiddenV1Schema = z.object({
   postId: z.uuid(),
@@ -343,6 +355,15 @@ export const ContentModerationDecidedV1Schema = z.object({
 export const ContentAppealDecidedV1Schema = z.object({
   appealId: z.uuid(), authorId: z.uuid(), decisionId: z.uuid(),
   outcome: z.enum(['upheld', 'overturned']),
+});
+/** Tín hiệu dành cho staff: chỉ dùng để tải lại dữ liệu đã kiểm quyền qua HTTP. */
+export const ContentModerationChangedV1Schema = z.object({
+  scope: z.enum(['case', 'appeal', 'scan']),
+  id: z.uuid(),
+});
+export const ContentPostModeratedV1Schema = z.object({
+  actionId: z.uuid(), postId: z.uuid(), previousStatus: z.string(), postStatus: z.string(),
+  action: z.enum(['hide', 'remove', 'restore']), reasonCode: z.string(), moderatorId: z.uuid(),
 });
 export const ContentCommentModerationActionV1Schema = z.object({
   actionId: z.uuid(), postId: z.uuid(), commentId: z.uuid(), authorId: z.uuid(),
@@ -394,12 +415,22 @@ export const DiscoveryStaysSearchedV1Schema = z.object({
 });
 export type DiscoveryStaysSearchedV1 = z.infer<typeof DiscoveryStaysSearchedV1Schema>;
 
+/** Nội dung đang giữ: chỉ moderation nhận, không tạo thông báo công khai. */
+export const ContentPostHeldV1Schema = z.object({ postId: z.uuid(), authorId: z.uuid() });
+export const ContentCommentHeldV1Schema = z.object({ commentId: z.uuid(), postId: z.uuid(), authorId: z.uuid() });
+export type ContentPostHeldV1 = z.infer<typeof ContentPostHeldV1Schema>;
+export type ContentCommentHeldV1 = z.infer<typeof ContentCommentHeldV1Schema>;
+
 export const exportedSchemas: Record<string, z.ZodType> = {
+  'content.post.held.v1': ContentPostHeldV1Schema,
+  'content.comment.held.v1': ContentCommentHeldV1Schema,
   'content.comment.hidden.v1': ContentCommentHiddenV1Schema,
   'content.comment.restored.v1': ContentCommentRestoredV1Schema,
   'content.post.hidden.v1': ContentPostHiddenV1Schema,
   'content.post.restored.v1': ContentPostRestoredV1Schema,
   'content.moderation.decided.v1': ContentModerationDecidedV1Schema,
+  'content.moderation.changed.v1': ContentModerationChangedV1Schema,
+  'content.post.moderated.v1': ContentPostModeratedV1Schema,
   'content.appeal.decided.v1': ContentAppealDecidedV1Schema,
   'content.comment.moderation_action.v1': ContentCommentModerationActionV1Schema,
   'content.report.created.v1': ContentReportCreatedV1Schema,

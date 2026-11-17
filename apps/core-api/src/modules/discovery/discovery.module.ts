@@ -3,6 +3,7 @@ import { createDb } from '@tripflix/db';
 import { RedisStreamsEventBus } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import { AccessFacade, AccessModule } from '../access/index.js';
 import { CommerceFacade, CommerceModule, type CatalogHotel } from '../commerce/index.js';
 import { ContentFacade, ContentModule } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
@@ -19,11 +20,13 @@ import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
+import { AdminVocabGapsController } from './search/api/admin-vocab-gaps.controller.js';
 import { AdminDiscoveryJobsController } from './jobs/admin-discovery-jobs.controller.js';
 import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
+import { PlacesController } from './search/api/places.controller.js';
 import { ExploreUseCases } from './search/application/explore.use-cases.js';
 import {
   EXPLORE_CATALOG,
@@ -54,13 +57,14 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
 });
 
 /** Khách sạn + bài cho tìm khám phá. days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
-const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade): ExploreCatalog => ({
+const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade, access: AccessFacade): ExploreCatalog => ({
   listHotels: async (cursor) => {
     const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 30 });
     return { items: page.items.filter((item): item is CatalogHotel => item.type === 'hotel'), nextCursor: page.nextCursor };
   },
   listPosts: (cursor) => content.listPosts({ cursor, limit: 100 }),
   findVisiblePostIds: async (postIds) => new Set((await content.getVisiblePosts(postIds)).map((p) => p.id)),
+  getAuthorNames: (authorIds) => access.getDisplayNames(authorIds),
 });
 
 /** Bài + khách sạn → tỉnh cho bộ điều phối gợi ý. days: 1 vì chỉ cần tỉnh, không cần giá. */
@@ -76,24 +80,26 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
 
 /**
  * Module discovery. Chủ: Duy (backup Dũng). Xem README.md cùng thư mục.
- * Module khác chỉ dùng những gì được export trong index.ts. Gọi commerce, content qua facade (một chiều, trong tiến trình).
+ * Module khác chỉ dùng những gì được export trong index.ts. Gọi commerce, content, access qua facade (một chiều, trong tiến trình).
  */
 @Module({
-  imports: [CommerceModule, ContentModule],
+  imports: [CommerceModule, ContentModule, AccessModule],
   controllers: [
     SuggestController,
+    PlacesController,
     StaysController,
     ExploreController,
     HomeRecommendationsController,
     PostRecommendationsController,
     AdminIndexHealthController,
+    AdminVocabGapsController,
     AdminDiscoveryJobsController,
   ],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
     { provide: EXPLORE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleExploreStore(createDb(pools.discovery)) },
-    { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: exploreCatalog },
+    { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade, AccessFacade], useFactory: exploreCatalog },
     { provide: SEARCH_EVENT_BUS, inject: [REDIS], useFactory: (redis: Redis) => new RedisStreamsEventBus(redis) },
     SearchEventsPublisher,
     SuggestUseCases,

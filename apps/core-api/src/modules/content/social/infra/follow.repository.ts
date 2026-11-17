@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lte } from 'drizzle-orm';
+import { and, asc, count, eq, gt, lte } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { follows } from '../../db/schema/index.js';
 
@@ -29,6 +29,14 @@ export class FollowRepository {
   async unfollow(followerId: string, authorId: string) {
     const [row] = await this.db.delete(follows).where(this.match(followerId, authorId)).returning();
     return row;
+  }
+
+  async countFor(userId: string): Promise<{ followerCount: number; followingCount: number }> {
+    const [[followers], [following]] = await Promise.all([
+      this.db.select({ n: count() }).from(follows).where(eq(follows.authorId, userId)),
+      this.db.select({ n: count() }).from(follows).where(eq(follows.followerId, userId)),
+    ]);
+    return { followerCount: followers?.n ?? 0, followingCount: following?.n ?? 0 };
   }
 
   async reachesThreshold(authorId: string, threshold: number): Promise<boolean> {

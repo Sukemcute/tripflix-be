@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { TraceContext } from '../../trace-context.js';
 import { InjectTransactionHost, type Db } from '@tripflix/db';
 import { and, asc, count, desc, eq, exists, gte, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { flightInventory, orderGuests, orderItems, orders, payments, properties, refunds, roomInventory, roomTypes, type OrderItemRow, type OrderRow, type PaymentRow } from '../../db/schema/index.js';
 import { SUBMITTED_REFUND_REF } from '../../payment/application/refund-gateways.port.js';
 import type { OrderStatus, PassengerType } from '../domain/order-rules.js';
-import type { InventoryCell, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
+import type { InventoryCell, InventoryDrift, NewOrderItem, OrderItemRecord, OrderRecord, OrderStore, PaymentRecord, RefundRecord } from '../application/ports.js';
 
 /** host.tx là transaction đang mở của commerce, hoặc kết nối thường; test truyền { tx: db }. */
 export interface OrderDbHost {
@@ -55,10 +56,20 @@ const mapPayment = (row: PaymentRow): PaymentRecord => ({
 });
 
 const POSTGRES_LOCK_NOT_AVAILABLE = '55P03';
+const POSTGRES_DEADLOCK_DETECTED = '40P01';
 
 @Injectable()
 export class DrizzleOrderStore implements OrderStore {
-  constructor(@InjectTransactionHost('commerce') private readonly host: OrderDbHost) {}
+  constructor(
+    @InjectTransactionHost('commerce') private readonly host: OrderDbHost,
+    @Inject(TraceContext) private readonly trace: TraceContext,
+  ) {}
+
+  /** Ghi kèm ai đổi trạng thái trong cùng câu lệnh; trigger chép sang order_status_history (D1). */
+  private statusTrace() {
+    const { source, requestId } = this.trace.current();
+    return { statusSource: source, statusRequestId: requestId };
+  }
 
   private get db(): Db {
     return this.host.tx;
@@ -70,6 +81,11 @@ export class DrizzleOrderStore implements OrderStore {
 
   async limitLockWait(milliseconds: number) {
     await this.db.execute(sql`select set_config('lock_timeout', ${`${milliseconds}ms`}, true)`);
+  }
+
+  isDeadlock(error: unknown) {
+    const { code, cause } = error as { code?: string; cause?: { code?: string } };
+    return code === POSTGRES_DEADLOCK_DETECTED || cause?.code === POSTGRES_DEADLOCK_DETECTED;
   }
 
   isLockWaitTimeout(error: unknown) {
@@ -95,6 +111,36 @@ export class DrizzleOrderStore implements OrderStore {
   async lockOrdersOfUser(userId: string, statuses: OrderStatus[]) {
     const rows = await this.db.select().from(orders).where(and(eq(orders.userId, userId), inArray(orders.status, statuses))).for('update');
     return rows.map(mapOrder);
+  }
+
+  async findInventoryDrift(input: { fromDate: string; limit: number }): Promise<InventoryDrift[]> {
+    // Mỗi mục trải ra từng đêm (phòng) hoặc một ngày (vé bay), cộng theo ô rồi so với kho. Ô kho có held/sold > 0 mà
+    // không có đơn nào cũng là lệch, nên ghép hai phía bằng full join.
+    const result = await this.db.execute<{ product_type: 'room' | 'flight'; product_id: string; date: string; held: number; expected_held: number; sold: number; expected_sold: number }>(sql`
+      with expected as (
+        select i.product_type, i.product_id, (i.date + g.n)::date as date,
+               sum(i.qty) filter (where o.status in ('pending', 'paying'))::int as held,
+               sum(i.qty) filter (where o.status = 'paid')::int as sold
+        from commerce.order_items i
+        join commerce.orders o on o.id = i.order_id
+        cross join lateral generate_series(0, greatest(i.nights, 1) - 1) as g(n)
+        where o.status in ('pending', 'paying', 'paid') and (i.date + g.n) >= ${input.fromDate}::date
+        group by 1, 2, 3
+      ),
+      actual as (
+        select 'room' as product_type, room_type_id as product_id, date, held, sold from commerce.room_inventory where date >= ${input.fromDate}::date and (held > 0 or sold > 0)
+        union all
+        select 'flight', flight_id, date, held, sold from commerce.flight_inventory where date >= ${input.fromDate}::date and (held > 0 or sold > 0)
+      )
+      select coalesce(a.product_type, e.product_type) as product_type, coalesce(a.product_id, e.product_id) as product_id,
+             coalesce(a.date, e.date)::text as date, coalesce(a.held, 0) as held, coalesce(e.held, 0) as expected_held,
+             coalesce(a.sold, 0) as sold, coalesce(e.sold, 0) as expected_sold
+      from actual a
+      full join expected e on e.product_type = a.product_type and e.product_id = a.product_id and e.date = a.date
+      where coalesce(a.held, 0) <> coalesce(e.held, 0) or coalesce(a.sold, 0) <> coalesce(e.sold, 0)
+      order by 2, 3
+      limit ${input.limit}`);
+    return result.rows.map((r) => ({ productType: r.product_type, productId: r.product_id, date: r.date, held: r.held, expectedHeld: r.expected_held, sold: r.sold, expectedSold: r.expected_sold }));
   }
 
   async findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }) {
@@ -155,7 +201,7 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }) {
-    const [row] = await this.db.insert(orders).values(order).returning({ id: orders.id });
+    const [row] = await this.db.insert(orders).values({ ...order, ...this.statusTrace() }).returning({ id: orders.id });
     return row!.id;
   }
 
@@ -184,7 +230,10 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async updateOrder(orderId: string, patch: Parameters<OrderStore['updateOrder']>[1]) {
-    await this.db.update(orders).set({ ...patch, updatedAt: new Date() }).where(eq(orders.id, orderId));
+    await this.db
+      .update(orders)
+      .set({ ...patch, ...(patch.status !== undefined && this.statusTrace()), updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
   }
 
   async replaceGuests(orderId: string, guests: { fullName: string; birthdate: string | null; passengerType: PassengerType | null }[]) {
@@ -193,9 +242,9 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async findGuests(orderId: string) {
-    const rows = await this.db.select({ fullName: orderGuests.fullName, passengerType: orderGuests.passengerType }).from(orderGuests).where(eq(orderGuests.orderId, orderId));
+    const rows = await this.db.select({ fullName: orderGuests.fullName, passengerType: orderGuests.passengerType, birthdate: orderGuests.birthdate }).from(orderGuests).where(eq(orderGuests.orderId, orderId));
     const typeRank = (type: string | null) => (type === 'infant' ? 2 : type === 'child' ? 1 : 0);
-    return rows.map((row) => ({ fullName: row.fullName, passengerType: row.passengerType as PassengerType | null })).sort((a, b) => typeRank(a.passengerType) - typeRank(b.passengerType));
+    return rows.map((row) => ({ fullName: row.fullName, passengerType: row.passengerType as PassengerType | null, birthdate: row.birthdate })).sort((a, b) => typeRank(a.passengerType) - typeRank(b.passengerType));
   }
 
   async findGuestBirthdates(orderId: string) {

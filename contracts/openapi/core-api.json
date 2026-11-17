@@ -306,6 +306,91 @@
         ]
       }
     },
+    "/api/auth/admin-handoff": {
+      "post": {
+        "operationId": "AuthController_createAdminHandoff",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminHandoffDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tài khoản không có quyền vào trang quản trị"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin-handoff/exchange": {
+      "post": {
+        "operationId": "AuthController_exchangeAdminHandoff",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "description": "Chữ ký từ khóa trình duyệt của trang quản trị",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminHandoffExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -1935,6 +2020,44 @@
         ]
       }
     },
+    "/api/v1/users/{userId}/profile": {
+      "get": {
+        "operationId": "FollowsController_getProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Social - Follows"
+        ]
+      }
+    },
     "/api/v1/users/{authorId}/follow": {
       "get": {
         "operationId": "FollowsController_getStatus",
@@ -2636,6 +2759,29 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/playback-session": {
+      "post": {
+        "description": "Web: gọi kèm credentials (có Origin), trình duyệt nhận Set-Cookie cho tên miền media. App: không nhận Set-Cookie, ghép `cookies` thành header Cookie khi phát video.",
+        "operationId": "MediaPlaybackController_createSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cấp cookie xem video trên CDN",
         "tags": [
           "media"
         ]
@@ -3916,6 +4062,76 @@
         ]
       }
     },
+    "/api/places": {
+      "get": {
+        "description": "Dữ liệu © OpenStreetMap contributors (ODbL), nạp sẵn cho các thành phố demo. App phải hiện `attribution` kèm danh sách.\n\n- Cần `city` (tên có dấu hay không đều được, hoặc id như `vung-tau`) hoặc `near=lat,lng`.\n- `lodging` là chỗ ở ngoài Tripflix: chỉ để tham khảo, không có giá, không đặt được.\n- Không khớp thành phố thì `items: []` (không phải lỗi).",
+        "operationId": "PlacesController_places",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–100, mặc định 40",
+            "schema": {
+              "example": 40
+            }
+          },
+          {
+            "name": "radiusKm",
+            "required": false,
+            "in": "query",
+            "description": "1–50, mặc định 15",
+            "schema": {
+              "example": 15
+            }
+          },
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "Lọc loại: see, food, cafe, lodging",
+            "schema": {
+              "example": "see,food"
+            }
+          },
+          {
+            "name": "near",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "10.346,107.084"
+            }
+          },
+          {
+            "name": "city",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Vũng Tàu"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu cả `city` lẫn `near`, `near` sai dạng, `kinds` có loại lạ"
+          }
+        },
+        "summary": "Điểm tham quan, ăn uống, chỗ ở có toạ độ quanh một thành phố hoặc một toạ độ",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/stays": {
       "get": {
         "description": "Gọi sau khi người dùng chọn một địa điểm ở `/api/suggest` (dùng `refId` của dòng `place` làm `placeId`) và chọn ngày, số khách. Công khai.\n\n- Chọn tỉnh thì gồm cả các điểm đến trong tỉnh (Lâm Đồng gồm Đà Lạt); chọn điểm đến thì chỉ điểm đến đó.\n- Chỉ trả khách sạn **còn phòng** cho đúng ngày và số khách; giá là giá thật từ commerce, gói giá mặc định.\n- Lọc `minStars` (từ X sao trở lên), `stars` (đúng X sao; gửi cả hai thì áp cả hai), `priceMin`/`priceMax` theo giá một đêm một phòng.\n- `sort=price` (mặc định, rẻ trước), `price_desc` (đắt trước) hoặc `stars` (nhiều sao trước).\n- Không phải tìm theo chữ: muốn tìm theo tên thì dùng `/api/suggest`.",
@@ -4094,7 +4310,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`, `article`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần. `article` = `plan` + `post` nhưng bỏ mọi video, lọc ở server nên trang luôn đủ `limit`.\n- Mỗi bài có `likes`, `comments`, `createdAt`, `author` để hiện thẻ. Không có trạng thái đã thích/đã lưu của người xem.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -4249,6 +4465,65 @@
         ]
       }
     },
+    "/api/recommendations/reels": {
+      "get": {
+        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
+        "operationId": "PostRecommendationsController_recommendReels",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–20, mặc định 10",
+            "schema": {
+              "example": 10
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "for_you",
+                "trending"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReelRecommendationsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số sai hoặc `cursor` không do server cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gợi ý Reels phát được (trending hoặc for_you)",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/v1/admin/search/index-health": {
       "get": {
         "operationId": "AdminIndexHealthController_check",
@@ -4272,6 +4547,65 @@
         ],
         "tags": [
           "Admin Index Health"
+        ]
+      }
+    },
+    "/api/v1/admin/search/vocab-gaps": {
+      "get": {
+        "description": "So log câu tìm (tìm khám phá + trang đầu tìm bài, không lưu người tìm) với chỉ mục nội dung bằng log-likelihood ratio G².\nKhông gồm ngân sách, số ngày, từ dừng, nơi đã hiểu, và n-gram mà mọi từ đều đã khớp từ điển.\nKiểu viết gần nhau (cách 1–2 chữ, đã bỏ dấu) gom một nhóm. Ngày tính theo UTC.",
+        "operationId": "AdminVocabGapsController_list",
+        "parameters": [
+          {
+            "name": "minCount",
+            "required": false,
+            "in": "query",
+            "description": "Bỏ n-gram có ít câu tìm hơn; 1–1000, mặc định 3",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–200, mặc định 50",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "1–90, mặc định 7",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabGapsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số ngoài khoảng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Khoảng trống từ vựng: n-gram người tìm dùng nhiều hơn hẳn nội dung",
+        "tags": [
+          "Admin Search Vocab Gaps"
         ]
       }
     },
@@ -4355,6 +4689,64 @@
           }
         ],
         "summary": "Chạy ngay một job (không chờ xong); theo dõi bằng GET",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
+    "/api/v1/admin/discovery/jobs/{job}/interval": {
+      "put": {
+        "operationId": "AdminDiscoveryJobsController_setInterval",
+        "parameters": [
+          {
+            "name": "job",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "explore",
+                "suggest",
+                "recommend_build",
+                "recommend_purge"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetJobIntervalRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobIntervalDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Chu kỳ ngoài 1 phút–24 giờ, hoặc job này không đổi được chu kỳ"
+          },
+          "404": {
+            "description": "Không có job này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đổi chu kỳ tự chạy của job (explore, recommend_build); có hiệu lực trong vòng 1 phút, không cần khởi động lại",
         "tags": [
           "Admin Discovery Jobs"
         ]
@@ -5555,6 +5947,241 @@
           "mock-gateway"
         ]
       }
+    },
+    "/api/admin/commerce/metrics": {
+      "get": {
+        "operationId": "AdminMetricsController_getMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Số đo 5 giây gần nhất của từng instance và tổng; isAvailable=false khi Redis không đọc được"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/analytics/ai-usage": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả `from` và `to`. Mặc định 7 ngày tới hôm nay, tối đa 92 ngày. Chi phí là ước tính.",
+        "operationId": "AiUsageController_getAiUsage",
+        "parameters": [
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "feature",
+                "day",
+                "model"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to, quá 92 ngày hoặc groupBy lạ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số lần gọi, token và chi phí AI theo tính năng, ngày hoặc model",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/observability": {
+      "get": {
+        "operationId": "ObservabilityController_getOverview",
+        "parameters": [
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilityDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/observability/traces": {
+      "get": {
+        "operationId": "ObservabilityController_listTraces",
+        "parameters": [
+          {
+            "name": "minDurationMs",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "errorsOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/observability/traces/{traceId}": {
+      "get": {
+        "operationId": "ObservabilityController_getTrace",
+        "parameters": [
+          {
+            "name": "traceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
@@ -5864,6 +6491,36 @@
             "description": "App mobile gửi trong body. Web, admin bỏ trống, token nằm trong cookie tripflix_refresh"
           }
         }
+      },
+      "AdminHandoffDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã một lần để trang quản trị đổi lấy phiên"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 60,
+            "description": "Số giây mã còn hiệu lực"
+          }
+        },
+        "required": [
+          "code",
+          "expiresIn"
+        ]
+      },
+      "AdminHandoffExchangeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã một lần từ POST /auth/admin-handoff, sống 60 giây"
+          }
+        },
+        "required": [
+          "code"
+        ]
       },
       "MyProfileDto": {
         "type": "object",
@@ -6799,7 +7456,8 @@
           "status": {
             "type": "string",
             "enum": [
-              "published"
+              "published",
+              "held"
             ]
           },
           "isVerified": {
@@ -6807,7 +7465,8 @@
           },
           "publishedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "shareUrl": {
             "type": "string"
@@ -6974,6 +7633,15 @@
       "SocialCommentDto": {
         "type": "object",
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "held",
+              "hidden",
+              "removed"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -7262,6 +7930,36 @@
           "postId",
           "isBookmarked",
           "bookmarkCount"
+        ]
+      },
+      "PublicProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Bảo Lê"
+          },
+          "followerCount": {
+            "type": "number"
+          },
+          "followingCount": {
+            "type": "number"
+          },
+          "likeCount": {
+            "type": "number",
+            "description": "Tổng cảm xúc trên các bài công khai của người này"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "followerCount",
+          "followingCount",
+          "likeCount"
         ]
       },
       "FollowStatusDto": {
@@ -8063,6 +8761,33 @@
         "required": [
           "assetId",
           "status"
+        ]
+      },
+      "PlaybackSessionDto": {
+        "type": "object",
+        "properties": {
+          "cookies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "CloudFront-Policy": "…",
+              "CloudFront-Signature": "…",
+              "CloudFront-Key-Pair-Id": "K2…"
+            },
+            "description": "Cookie CloudFront để mở video. App ghép thành header Cookie khi phát; web đã nhận qua Set-Cookie nên bỏ qua. Rỗng khi server chưa bật ký cookie."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hết hạn lúc này; xin lại trước đó. Null khi không ký."
+          }
+        },
+        "required": [
+          "cookies",
+          "expiresAt"
         ]
       },
       "FeedAuthorDto": {
@@ -9213,6 +9938,88 @@
           "items"
         ]
       },
+      "PointOfInterestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "osm:node/123456789",
+            "description": "Id OpenStreetMap, ổn định giữa các lần nạp"
+          },
+          "name": {
+            "type": "string",
+            "example": "Hải Đăng Vũng Tàu"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "see",
+              "food",
+              "cafe",
+              "lodging"
+            ],
+            "description": "see: tham quan · food: ăn uống · cafe · lodging: chỗ ở ngoài Tripflix"
+          },
+          "lat": {
+            "type": "number",
+            "example": 10.3333
+          },
+          "lng": {
+            "type": "number",
+            "example": 107.0778
+          },
+          "city": {
+            "type": "string",
+            "example": "Vũng Tàu"
+          },
+          "tags": {
+            "example": [
+              "viewpoint"
+            ],
+            "description": "beach, viewpoint, museum, park, market, temple, indoor",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "popularity": {
+            "type": "number",
+            "example": 0.9,
+            "description": "0–1, ước lượng từ dữ liệu OSM (có Wikipedia, Wikidata, website)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "lat",
+          "lng",
+          "city",
+          "tags",
+          "popularity"
+        ]
+      },
+      "PlacesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Xếp theo độ phổ biến rồi khoảng cách; rỗng khi chưa có dữ liệu",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PointOfInterestDto"
+            }
+          },
+          "attribution": {
+            "type": "string",
+            "example": "© OpenStreetMap contributors (ODbL)",
+            "description": "Phải hiện kèm danh sách (giấy phép ODbL)"
+          }
+        },
+        "required": [
+          "items",
+          "attribution"
+        ]
+      },
       "StayProvinceDto": {
         "type": "object",
         "properties": {
@@ -9443,6 +10250,31 @@
           "fixed"
         ]
       },
+      "ExploreAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "example": "Minh Anh",
+            "description": "Tên hiển thị; null nếu không tìm thấy người dùng"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chưa có dữ liệu, hiện luôn là null (như feed)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ]
+      },
       "ExploreItemDto": {
         "type": "object",
         "properties": {
@@ -9498,6 +10330,34 @@
                 "$ref": "#/components/schemas/ExploreLocationDto"
               }
             ]
+          },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
           }
         },
         "required": [
@@ -9510,7 +10370,11 @@
           "reason",
           "priceFrom",
           "days",
-          "location"
+          "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author"
         ]
       },
       "ExploreSectionDto": {
@@ -9601,6 +10465,34 @@
               }
             ]
           },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
+          },
           "section": {
             "type": "string",
             "example": "Ở đâu",
@@ -9633,6 +10525,10 @@
           "priceFrom",
           "days",
           "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author",
           "section",
           "relaxed"
         ]
@@ -9742,6 +10638,34 @@
               }
             ]
           },
+          "likes": {
+            "type": "number",
+            "nullable": true,
+            "example": 120,
+            "description": "plan/post/video: lượt thích · mục khác: null"
+          },
+          "comments": {
+            "type": "number",
+            "nullable": true,
+            "example": 8,
+            "description": "plan/post/video: số bình luận · mục khác: null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "plan/post/video: ngày đăng. null với mục khác, hoặc tới lượt dựng lại chỉ mục kế tiếp (≤10 phút) sau khi deploy"
+          },
+          "author": {
+            "nullable": true,
+            "description": "plan/post/video: tác giả · mục khác: null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreAuthorDto"
+              }
+            ]
+          },
           "section": {
             "type": "string",
             "example": "Ở đâu",
@@ -9759,6 +10683,10 @@
           "priceFrom",
           "days",
           "location",
+          "likes",
+          "comments",
+          "createdAt",
+          "author",
           "section"
         ]
       },
@@ -9838,10 +10766,11 @@
               "all",
               "plan",
               "video",
-              "post"
+              "post",
+              "article"
             ],
             "default": "all",
-            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường"
+            "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)"
           },
           "cursor": {
             "type": "string",
@@ -10181,6 +11110,57 @@
           "nextCursor"
         ]
       },
+      "ReelRecommendationItemDto": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "description": "Thẻ Reels phát được từ FeedFacade.getByIds"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "taste",
+              "fresh",
+              "explore",
+              "own"
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RecommendReasonDto"
+          }
+        },
+        "required": [
+          "card",
+          "source",
+          "reason"
+        ]
+      },
+      "ReelRecommendationsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReelRecommendationItemDto"
+            }
+          },
+          "algo": {
+            "type": "string",
+            "example": "trending"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "algo",
+          "nextCursor"
+        ]
+      },
       "IndexJobLogDto": {
         "type": "object",
         "properties": {
@@ -10354,6 +11334,110 @@
           "workers"
         ]
       },
+      "VocabGapVariantDto": {
+        "type": "object",
+        "properties": {
+          "gram": {
+            "type": "string",
+            "example": "ha loii"
+          },
+          "queryHits": {
+            "type": "number",
+            "example": 4,
+            "description": "Số câu tìm có kiểu viết này"
+          }
+        },
+        "required": [
+          "gram",
+          "queryHits"
+        ]
+      },
+      "VocabGapDto": {
+        "type": "object",
+        "properties": {
+          "gram": {
+            "type": "string",
+            "example": "ha loi",
+            "description": "N-gram đã bỏ dấu, viết thường; kiểu viết có điểm cao nhất của nhóm"
+          },
+          "n": {
+            "type": "number",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "Số từ"
+          },
+          "score": {
+            "type": "number",
+            "example": 61.2,
+            "description": "G² (log-likelihood): càng cao càng chắc người tìm dùng nhiều hơn nội dung"
+          },
+          "queryHits": {
+            "type": "number",
+            "example": 21,
+            "description": "Tổng số câu tìm của cả nhóm"
+          },
+          "contentCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Số lần `gram` xuất hiện trong nội dung đã đánh chỉ mục"
+          },
+          "variants": {
+            "description": "Các kiểu viết gần nhau đã gom (gồm cả `gram`), nhiều điểm nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocabGapVariantDto"
+            }
+          },
+          "samples": {
+            "example": [
+              "hà lội ăn gì",
+              "homestay hà lội"
+            ],
+            "description": "Tối đa 5 câu tìm gốc",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "gram",
+          "n",
+          "score",
+          "queryHits",
+          "contentCount",
+          "variants",
+          "samples"
+        ]
+      },
+      "VocabGapsDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "example": 7
+          },
+          "queries": {
+            "type": "number",
+            "example": 1342,
+            "description": "Số câu tìm đã đếm trong khoảng ngày"
+          },
+          "items": {
+            "description": "Điểm cao nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocabGapDto"
+            }
+          }
+        },
+        "required": [
+          "days",
+          "queries",
+          "items"
+        ]
+      },
       "JobSummaryDto": {
         "type": "object",
         "properties": {
@@ -10464,7 +11548,16 @@
           "intervalMs": {
             "type": "number",
             "nullable": true,
-            "description": "Chu kỳ tự chạy (ms); null = chỉ chạy lúc khởi động"
+            "description": "Chu kỳ tự chạy đang dùng (ms); null = chỉ chạy lúc khởi động"
+          },
+          "defaultIntervalMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chu kỳ mặc định trong code (ms); null = chỉ chạy lúc khởi động"
+          },
+          "canChangeInterval": {
+            "type": "boolean",
+            "description": "Admin đổi được chu kỳ (PUT …/jobs/:job/interval)"
           },
           "isRunning": {
             "type": "boolean",
@@ -10482,6 +11575,8 @@
           "job",
           "group",
           "intervalMs",
+          "defaultIntervalMs",
+          "canChangeInterval",
           "isRunning",
           "runs"
         ]
@@ -10617,6 +11712,48 @@
         "required": [
           "accepted",
           "reason"
+        ]
+      },
+      "SetJobIntervalRequestDto": {
+        "type": "object",
+        "properties": {
+          "intervalMs": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 60000,
+            "maximum": 86400000,
+            "example": 1800000,
+            "description": "Chu kỳ mới (ms), 1 phút đến 24 giờ; null = về mặc định"
+          }
+        },
+        "required": [
+          "intervalMs"
+        ]
+      },
+      "JobIntervalDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest",
+              "recommend_build",
+              "recommend_purge"
+            ]
+          },
+          "intervalMs": {
+            "type": "number",
+            "description": "Chu kỳ đang dùng sau khi đổi (ms)"
+          },
+          "defaultIntervalMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "job",
+          "intervalMs",
+          "defaultIntervalMs"
         ]
       },
       "ProvinceDto": {
@@ -12773,6 +13910,423 @@
           "paymentToken",
           "last4",
           "isTestCard"
+        ]
+      },
+      "AiUsageRowDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "chat",
+            "description": "Tính năng (chat, summary, moderation), ngày YYYY-MM-DD hoặc tên model"
+          },
+          "calls": {
+            "type": "number",
+            "example": 120
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 350000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 42000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0132,
+            "description": "USD, ước tính theo bảng giá ai-service"
+          }
+        },
+        "required": [
+          "key",
+          "calls",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiUsageTotalDto": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "number",
+            "example": 120
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 350000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 42000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0132
+          }
+        },
+        "required": [
+          "calls",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiUsageResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-11-10T17:00:00.000Z",
+            "description": "Đầu khoảng (gồm)"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-17T17:00:00.000Z",
+            "description": "Cuối khoảng (không gồm)"
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "day",
+              "model"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiUsageRowDto"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/AiUsageTotalDto"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "groupBy",
+          "rows",
+          "total"
+        ]
+      },
+      "TelemetrySourceDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "unavailable",
+              "not_configured"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "TelemetrySummaryDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p50Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "requests",
+          "requestRate",
+          "errorRate",
+          "p50Ms",
+          "p95Ms"
+        ]
+      },
+      "TelemetryPointDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "requestRate",
+          "errorRate",
+          "p95Ms"
+        ]
+      },
+      "TelemetryServiceDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p50Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "isHealthy": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": "number",
+            "nullable": true
+          },
+          "memoryBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "requests",
+          "requestRate",
+          "errorRate",
+          "p50Ms",
+          "p95Ms",
+          "name",
+          "isHealthy",
+          "lastSeenAt",
+          "memoryBytes",
+          "uptimeSeconds"
+        ]
+      },
+      "TelemetryRouteDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "number"
+          },
+          "errorRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "service",
+          "method",
+          "route",
+          "requests",
+          "errorRate",
+          "p95Ms"
+        ]
+      },
+      "ObservabilityDto": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "number"
+          },
+          "from": {
+            "type": "number"
+          },
+          "to": {
+            "type": "number"
+          },
+          "metricsSource": {
+            "$ref": "#/components/schemas/TelemetrySourceDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TelemetrySummaryDto"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryPointDto"
+            }
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryServiceDto"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryRouteDto"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "from",
+          "to",
+          "metricsSource",
+          "summary",
+          "series",
+          "services",
+          "routes"
+        ]
+      },
+      "TraceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "traceId",
+          "service",
+          "operation",
+          "startedAt",
+          "durationMs"
+        ]
+      },
+      "TraceListDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/TelemetrySourceDto"
+          },
+          "traces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceSummaryDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "traces",
+          "limit"
+        ]
+      },
+      "TelemetrySpanDto": {
+        "type": "object",
+        "properties": {
+          "spanId": {
+            "type": "string"
+          },
+          "parentSpanId": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "isError": {
+            "type": "boolean"
+          },
+          "httpStatus": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "spanId",
+          "parentSpanId",
+          "service",
+          "operation",
+          "startedAt",
+          "durationMs",
+          "isError",
+          "httpStatus"
+        ]
+      },
+      "TraceDetailDto": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string"
+          },
+          "spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetrySpanDto"
+            }
+          }
+        },
+        "required": [
+          "traceId",
+          "spans"
         ]
       }
     }

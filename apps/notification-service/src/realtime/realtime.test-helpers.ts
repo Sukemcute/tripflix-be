@@ -54,6 +54,8 @@ export function testEnv(jwksUrl: string, redisUrl = 'redis://127.0.0.1:6379'): E
     NOTIFICATION_CONSUMER_ENABLED: false,
     NOTIFICATION_CONSUMER_NAME: undefined,
     NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: 60_000,
+    PUSH_ENABLED: false,
+    EXPO_PUSH_URL: 'https://exp.host/--/api/v2/push/send',
   };
 }
 
