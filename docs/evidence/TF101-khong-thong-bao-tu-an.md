@@ -21,9 +21,9 @@
 ## Kết quả kiểm tra
 - `pnpm contracts:build`: thành công.
 - `pnpm --filter @tripflix/contracts test`: 23/23 test đạt.
-- Notification handler: 10/10 test đạt. Core moderation integration từng đạt 36/36 trước khi đổi phép nhận diện sang `hiddenByActionId`.
+- Notification handler: 10/10 test đạt; contracts 23/23 test đạt.
 - `pnpm turbo run lint typecheck test --affected`: 49/49 task đạt; core-api 2772 test đạt, 4 skipped có sẵn.
-- Lượt `test:int` sau thay đổi cuối không khởi tạo được Postgres Testcontainers (hook timeout 180 giây); ổ C còn dưới 1 MB và Docker không phản hồi. Cần chạy lại integration để xác nhận assertion mới trên `hiddenByActionId`.
+- `pnpm test:int` trên CI pass với thay đổi cuối, xác nhận integration trên Postgres/Testcontainers. Lượt chạy local bị chặn vì ổ C còn dưới 1 MB và Docker không phản hồi; CI đã xác nhận thay thế.
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/notification-service test -- src/consumers/handlers/content-status.spec.ts`
