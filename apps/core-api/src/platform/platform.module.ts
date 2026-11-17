@@ -7,6 +7,7 @@ import { ClsModule } from 'nestjs-cls';
 import { coreEnvSchema, dbUrlOf, type CoreEnv } from './env.js';
 import { HealthController } from './health.controller.js';
 import { TRACE_SOURCE_KEY } from './trace.js';
+import { TelemetryLifecycle } from './telemetry.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from './tokens.js';
 
 const DRIZZLE_TOKENS = MODULES.map((m) => buildDrizzleToken(m));
@@ -90,6 +91,7 @@ export function resolveRequestId(req: TracedRequest): string {
     }),
   ],
   controllers: [HealthController],
+  providers: [TelemetryLifecycle],
   exports: [PlatformCoreModule],
 })
 export class PlatformModule {}

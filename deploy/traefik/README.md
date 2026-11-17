@@ -14,6 +14,15 @@
 
 `/.well-known/jwks.json` không đi qua gateway: service khác gọi thẳng `core-api` trong mạng nội bộ.
 
+## Access log trên server
+
+`compose.server.yaml` bật access log JSON ra stdout: mỗi request một dòng có IP, đường dẫn, mã trả về, thời gian xử lý. Không ghi header nên không lộ token, cookie.
+
+- Log có IP người dùng: chỉ xem nội bộ, không chép ra ngoài.
+- Giữ khoảng 30 MB xoay vòng (logging json-file 10 MB × 3).
+- `/dat-lai-mat-khau`, `/xac-thuc-email` (link email mang `?token=`) không ghi log: router `web-token-links` trong `server.yml`.
+- Xem: `dc logs -f --tail 50 traefik`.
+
 ## Rate limit theo IP
 
 | Middleware | Áp cho | Giới hạn mỗi IP |

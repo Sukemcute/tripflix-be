@@ -35,6 +35,11 @@ x-core-env: &core-env
   S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
   S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
   MEDIA_CDN_URL: ${MEDIA_CDN_URL:?}
+  # Cookie ký cho video trên CloudFront (TF82, deploy/aws/README.md). Trống: không ký, video phát không cần cookie.
+  CLOUDFRONT_KEY_PAIR_ID: ${CLOUDFRONT_KEY_PAIR_ID:-}
+  CLOUDFRONT_PRIVATE_KEY: ${CLOUDFRONT_PRIVATE_KEY:-}
+  MEDIA_COOKIE_DOMAIN: ${MEDIA_COOKIE_DOMAIN:-}
+  MEDIA_PLAYBACK_TTL_SEC: ${MEDIA_PLAYBACK_TTL_SEC:-}
   VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
   VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
   VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
@@ -315,6 +320,9 @@ services:
       - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
       - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
       - --ping=true
+      # Mỗi request một dòng JSON ra stdout, xoay vòng theo logging ở trên (tối đa 30 MB). Có IP người dùng: chỉ xem nội bộ.
+      - --accesslog=true
+      - --accesslog.format=json
     environment:
       API_HOST: ${API_HOST:?}
       WEB_HOST: ${WEB_HOST:?}

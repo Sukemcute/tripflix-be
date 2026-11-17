@@ -1,5 +1,6 @@
 /** Đường dẫn Socket.IO; gateway (traefik) chuyển /ws về notification-service. */
 export const WS_PATH = '/ws';
+export const STAFF_ROOM = 'staff:moderation';
 
 /** Chỉ nhận WebSocket: không long-polling nên nhiều replica không cần sticky session. */
 export const WS_TRANSPORTS = ['websocket'] as const;

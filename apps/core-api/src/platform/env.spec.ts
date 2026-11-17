@@ -41,3 +41,23 @@ describe('AUTH_WEB_ORIGINS', () => {
     }
   });
 });
+
+describe('CLOUDFRONT_KEY_PAIR_ID, CLOUDFRONT_PRIVATE_KEY', () => {
+  const signing = { CLOUDFRONT_KEY_PAIR_ID: 'K2TEST', CLOUDFRONT_PRIVATE_KEY: 'cGVt', MEDIA_CDN_URL: 'https://media.test' };
+
+  it('để trống cả hai là không ký; đủ cả hai cùng MEDIA_CDN_URL là hợp lệ', () => {
+    expect(coreEnvSchema.parse({ ...required, CLOUDFRONT_KEY_PAIR_ID: '', CLOUDFRONT_PRIVATE_KEY: '' }).CLOUDFRONT_KEY_PAIR_ID).toBeUndefined();
+    expect(coreEnvSchema.safeParse({ ...required, ...signing }).success).toBe(true);
+  });
+
+  it('từ chối khi thiếu một trong hai, hoặc thiếu MEDIA_CDN_URL', () => {
+    expect(coreEnvSchema.safeParse({ ...required, ...signing, CLOUDFRONT_PRIVATE_KEY: '' }).success).toBe(false);
+    expect(coreEnvSchema.safeParse({ ...required, ...signing, CLOUDFRONT_KEY_PAIR_ID: '' }).success).toBe(false);
+    expect(coreEnvSchema.safeParse({ ...required, ...signing, MEDIA_CDN_URL: '' }).success).toBe(false);
+  });
+
+  it('MEDIA_PLAYBACK_TTL_SEC trong khoảng 5 phút đến 1 ngày', () => {
+    expect(coreEnvSchema.parse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '3600' }).MEDIA_PLAYBACK_TTL_SEC).toBe(3600);
+    expect(coreEnvSchema.safeParse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '60' }).success).toBe(false);
+  });
+});

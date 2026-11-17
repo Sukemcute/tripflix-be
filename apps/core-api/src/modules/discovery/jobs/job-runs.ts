@@ -35,9 +35,20 @@ export interface JobResult {
   error?: string;
 }
 
+/** Job có chu kỳ admin đổi được đọc lại chu kỳ mỗi nhịp này: đổi có hiệu lực trong vòng một nhịp, không cần khởi động lại. */
+export const SCHEDULE_TICK_MS = 60_000;
+
+/**
+ * Đến lượt chạy chưa. Chừa nửa nhịp: lượt trước ghi giờ bắt đầu trễ vài ms sau nhịp (chờ Redis), so `>=` đúng
+ * chu kỳ thì lượt sau trượt thêm một nhịp (10 phút thành 11). Chạy tay lệch nhịp thì lượt sau có thể sớm tối đa nửa nhịp.
+ */
+export const isDue = (lastStartedAt: number, intervalMs: number, now = Date.now()) =>
+  now - lastStartedAt >= intervalMs - SCHEDULE_TICK_MS / 2;
+
 const KEEP = 20;
 const TTL_SECONDS = 7 * 24 * 3600;
 const key = (job: JobKey) => `discovery:job-runs:${job}`;
+const intervalKey = (job: JobKey) => `discovery:job-interval:${job}`;
 
 /** Lịch sử 20 lần chạy gần nhất của mỗi job discovery (Redis hash runId → JSON), cho trang admin theo dõi. */
 @Injectable()
@@ -58,6 +69,23 @@ export class JobRuns {
       await this.finish(job, run, 'failed', null, (error instanceof Error ? error.message : String(error)).slice(0, 1000));
       throw error;
     }
+  }
+
+  /** Chu kỳ admin đặt cho job (ms). Chưa đặt, giá trị hỏng hay Redis lỗi thì `fallback`: job vẫn chạy theo mặc định. */
+  async getIntervalMs(job: JobKey, fallback: number): Promise<number> {
+    try {
+      const value = Number(await this.redis.get(intervalKey(job)));
+      return Number.isInteger(value) && value > 0 ? value : fallback;
+    } catch (err) {
+      this.logger.warn({ err, job }, 'Đọc chu kỳ job lỗi (Redis), dùng mặc định');
+      return fallback;
+    }
+  }
+
+  /** Đặt chu kỳ (ms) cho job; null = về mặc định. Không hết hạn. Lỗi Redis ném ra để admin biết chưa lưu được. */
+  async setIntervalMs(job: JobKey, intervalMs: number | null): Promise<void> {
+    if (intervalMs === null) await this.redis.del(intervalKey(job));
+    else await this.redis.set(intervalKey(job), String(intervalMs));
   }
 
   /** Mới nhất trước. */

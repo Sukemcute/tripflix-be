@@ -1,16 +1,12 @@
 /**
- * Distributed tracing bằng OpenTelemetry (TF99). Chỉ nạp SDK khi có OTEL_EXPORTER_OTLP_ENDPOINT:
- * không đặt biến thì không import gì, không tốn gì.
+ * Đo từng câu SQL (pg) và lệnh Redis (ioredis) cho bộ OpenTelemetry chung `startTelemetry` (TF99).
  *
- * Service ESM phải nạp qua `node --import @tripflix/observability/register` (hoặc NODE_OPTIONS) để hook kịp bọc
- * pg, ioredis, express trước khi app import chúng; gọi startTracing() sau khi app đã import thì không đo được.
- * Sampling, endpoint, header dùng biến chuẩn của OpenTelemetry (OTEL_TRACES_SAMPLER, OTEL_TRACES_SAMPLER_ARG...).
+ * Service ESM chỉ bọc được pg, ioredis khi nạp qua `node --import @tripflix/observability/register`
+ * (hook ESM phải đăng ký trước khi app import các thư viện này). Không nạp như vậy thì phần đo này không tạo span,
+ * các span HTTP, metric của startTelemetry vẫn chạy như cũ.
  */
-
-export interface TracingOptions {
-  /** Tên service trong trace, ví dụ core-api. OTEL_SERVICE_NAME (nếu có) được ưu tiên. */
-  service: string;
-}
+import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
+import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 
 /** Lệnh Redis chỉ ghi tên lệnh: tham số chứa khoá phiên, token, dữ liệu người dùng. */
 export function redisStatementWithoutArgs(commandName: string): string {
@@ -21,7 +17,6 @@ export function redisStatementWithoutArgs(commandName: string): string {
  * Cấu hình đo cho từng thư viện. Tách riêng để test được các ràng buộc riêng tư:
  * - pg: không ghi giá trị tham số (câu SQL chỉ có $1, $2), nội dung bình luận, email không lọt vào trace.
  * - pg, ioredis: chỉ tạo span khi đang trong một request; job nền (outbox relay quét 500 ms) không sinh trace rác.
- * - http: không ghi header, body (mặc định của thư viện).
  */
 export function instrumentationConfig() {
   return {
@@ -30,45 +25,13 @@ export function instrumentationConfig() {
   } as const;
 }
 
-export function isTracingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim());
+/** Chỉ gọi khi đã bật tracing: tạo instrumentation là đăng ký hook bọc thư viện ngay. */
+export function createDatabaseInstrumentations() {
+  const config = instrumentationConfig();
+  return [new PgInstrumentation(config.pg), new IORedisInstrumentation(config.ioredis)];
 }
 
-/** Bật tracing. Trả hàm dừng (đẩy nốt span còn trong bộ đệm), hoặc undefined khi không bật. */
-export async function startTracing({ service }: TracingOptions): Promise<(() => Promise<void>) | undefined> {
-  if (!isTracingEnabled()) return undefined;
-
-  const [
-    { NodeSDK },
-    { OTLPTraceExporter },
-    { HttpInstrumentation },
-    { ExpressInstrumentation },
-    { PgInstrumentation },
-    { IORedisInstrumentation },
-    { PinoInstrumentation },
-  ] = await Promise.all([
-    import('@opentelemetry/sdk-node'),
-    import('@opentelemetry/exporter-trace-otlp-proto'),
-    import('@opentelemetry/instrumentation-http'),
-    import('@opentelemetry/instrumentation-express'),
-    import('@opentelemetry/instrumentation-pg'),
-    import('@opentelemetry/instrumentation-ioredis'),
-    import('@opentelemetry/instrumentation-pino'),
-  ]);
-
-  const config = instrumentationConfig();
-  const sdk = new NodeSDK({
-    serviceName: process.env.OTEL_SERVICE_NAME?.trim() || service,
-    traceExporter: new OTLPTraceExporter(),
-    instrumentations: [
-      new HttpInstrumentation(),
-      new ExpressInstrumentation(),
-      new PgInstrumentation(config.pg),
-      new IORedisInstrumentation(config.ioredis),
-      // Gắn trace_id, span_id vào mỗi dòng log pino để từ log nhảy sang trace.
-      new PinoInstrumentation(),
-    ],
-  });
-  sdk.start();
-  return () => sdk.shutdown();
+/** Cùng điều kiện với startTelemetry: có endpoint và không tắt SDK. */
+export function isTracingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OTEL_SDK_DISABLED !== 'true' && Boolean(env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim());
 }

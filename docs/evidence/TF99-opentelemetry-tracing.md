@@ -4,6 +4,9 @@
 - Dũng (chủ `libs/observability`) đồng ý cách làm và review; anh Thành duyệt thêm 9 thư viện `@opentelemetry/*`.
 
 ## Đã làm
+
+> **Gộp với #229 (Trang) ngày 2026-11-17**, Trang và Dũng đồng ý: một bộ OpenTelemetry chung là `startTelemetry` của Trang (span HTTP qua middleware, metric cho trang Analytics, `traceId` trong log). Nhánh này chỉ còn thêm: đo `pg`, `ioredis` (giữ cấu hình riêng tư), `startTelemetry` tạo SDK một lần trong tiến trình, `--import @tripflix/observability/register` bật SDK sớm để bọc được `pg`, `ioredis`. Bỏ phần đo HTTP, Express, pino và exporter proto của bản đầu vì trùng với #229. Các mục dưới là bản đầu, số đo giữ nguyên để so.
+
 - `libs/observability`: `startTracing({ service })` và điểm vào `--import @tripflix/observability/register` cho core-api, notification-service, video-worker. Không có `OTEL_EXPORTER_OTLP_ENDPOINT` thì không nạp SDK.
 - Service là ESM nên phải nạp trước app qua `NODE_OPTIONS="--import @tripflix/observability/register"` (hook của `@opentelemetry/instrumentation`); không sửa code, Dockerfile của app.
 - Đo HTTP, Express, `pg`, `ioredis`; gắn `trace_id` vào log pino.

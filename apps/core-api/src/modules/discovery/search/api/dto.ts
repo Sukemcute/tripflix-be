@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { STAY_SORTS, type StaySort } from '../domain/stays.js';
 import { POST_TYPES, type PostType } from '../application/explore.use-cases.js';
 import { SUGGEST_TYPES, type SuggestType } from '../domain/suggest-entity.js';
+import { POI_KINDS, type PoiKind } from '../domain/points-of-interest.js';
 
 // Schema zod để kiểm query; class bên dưới chỉ để Swagger sinh contracts/openapi.
 export const SuggestQuerySchema = z.object({
@@ -39,6 +40,49 @@ export class SuggestionDto {
 export class SuggestResponseDto {
   @ApiProperty({ type: [SuggestionDto], description: 'Đã xếp theo mức khớp; rỗng khi không khớp gì' })
   items!: SuggestionDto[];
+}
+
+export const PlacesQuerySchema = z
+  .object({
+    city: z.string().trim().min(2).max(60).optional(),
+    // "lat,lng", ví dụ "10.346,107.084"
+    near: z
+      .string()
+      .regex(/^-?\d{1,2}(\.\d+)?,-?\d{1,3}(\.\d+)?$/, 'near dạng "lat,lng"')
+      .transform((raw) => {
+        const [lat, lng] = raw.split(',').map(Number);
+        return { lat: lat!, lng: lng! };
+      })
+      .optional(),
+    kinds: z
+      .string()
+      .optional()
+      .transform((raw) => (raw ? raw.split(',').map((k) => k.trim()) : []))
+      .pipe(z.array(z.enum(POI_KINDS as [PoiKind, ...PoiKind[]]))),
+    radiusKm: z.coerce.number().min(1).max(50).default(15),
+    limit: z.coerce.number().int().min(1).max(100).default(40),
+  })
+  .refine((q) => q.city || q.near, { message: 'Cần city hoặc near', path: ['city'] });
+
+export class PointOfInterestDto {
+  @ApiProperty({ example: 'osm:node/123456789', description: 'Id OpenStreetMap, ổn định giữa các lần nạp' }) id!: string;
+  @ApiProperty({ example: 'Hải Đăng Vũng Tàu' }) name!: string;
+  @ApiProperty({ enum: POI_KINDS, description: 'see: tham quan · food: ăn uống · cafe · lodging: chỗ ở ngoài Tripflix' })
+  kind!: PoiKind;
+  @ApiProperty({ example: 10.3333 }) lat!: number;
+  @ApiProperty({ example: 107.0778 }) lng!: number;
+  @ApiProperty({ example: 'Vũng Tàu' }) city!: string;
+  @ApiProperty({ type: [String], example: ['viewpoint'], description: 'beach, viewpoint, museum, park, market, temple, indoor' })
+  tags!: string[];
+  @ApiProperty({ example: 0.9, description: '0–1, ước lượng từ dữ liệu OSM (có Wikipedia, Wikidata, website)' })
+  popularity!: number;
+}
+
+export class PlacesResponseDto {
+  @ApiProperty({ type: [PointOfInterestDto], description: 'Xếp theo độ phổ biến rồi khoảng cách; rỗng khi chưa có dữ liệu' })
+  items!: PointOfInterestDto[];
+  @ApiProperty({ example: '© OpenStreetMap contributors (ODbL)', description: 'Phải hiện kèm danh sách (giấy phép ODbL)' })
+  attribution!: string;
 }
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD');

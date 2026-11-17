@@ -27,13 +27,14 @@
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
-    "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
     "@opentelemetry/instrumentation": "catalog:",
-    "@opentelemetry/instrumentation-express": "catalog:",
-    "@opentelemetry/instrumentation-http": "catalog:",
     "@opentelemetry/instrumentation-ioredis": "catalog:",
     "@opentelemetry/instrumentation-pg": "catalog:",
-    "@opentelemetry/instrumentation-pino": "catalog:",
+    "@opentelemetry/instrumentation-undici": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
     "nestjs-pino": "catalog:",
     "pino": "catalog:",
@@ -41,15 +42,15 @@
     "pino-pretty": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "oxlint": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
     "reflect-metadata": "catalog:",
-    "rxjs": "catalog:"
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^12.0.0",

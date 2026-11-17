@@ -86,6 +86,16 @@ http:
       middlewares: [rate-limit-api]
       tls:
         certResolver: letsencrypt
+    # Link trong email mang ?token=, không ghi vào access log. Rule dài hơn router web nên được ưu tiên.
+    web-token-links:
+      rule: Host(`{{ env "WEB_HOST" }}`) && (Path(`/dat-lai-mat-khau`) || Path(`/xac-thuc-email`))
+      service: web
+      entryPoints: [websecure]
+      middlewares: [rate-limit-api]
+      tls:
+        certResolver: letsencrypt
+      observability:
+        accessLogs: false
     web-www:
       rule: Host(`www.{{ env "WEB_HOST" }}`)
       service: web
