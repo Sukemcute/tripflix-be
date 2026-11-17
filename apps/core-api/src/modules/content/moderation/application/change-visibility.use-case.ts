@@ -52,6 +52,7 @@ export class ChangeVisibilityUseCase {
           (target.targetType === 'comment' && target.status === 'removed' && command.action !== 'restore')))
     )
       throw new ConflictException('Nội dung đã bị xoá, không thể khôi phục hoặc kiểm duyệt lại');
+    let previouslyAutoHidden = false;
     let actionId: string = randomUUID();
     const changes: {
       id: string;
@@ -93,6 +94,13 @@ export class ChangeVisibilityUseCase {
       const db = this.repository.db;
       const [root] = await db.select().from(comments).where(eq(comments.id, target.targetId));
       if (!root) throw new NotFoundException('Không tìm thấy bình luận');
+      if (command.action === 'restore' && root.status === 'hidden' && root.hiddenByActionId) {
+        const [hideAction] = await db
+          .select({ action: moderationActions.action })
+          .from(moderationActions)
+          .where(eq(moderationActions.id, root.hiddenByActionId));
+        previouslyAutoHidden = hideAction?.action === 'auto_hide';
+      }
       if (command.action === 'restore' && root.parentCommentId) {
         const [parent] = await db.select().from(comments).where(eq(comments.id, root.parentCommentId));
         if (!parent || parent.status !== 'visible' || parent.deletedAt)
@@ -260,6 +268,7 @@ export class ChangeVisibilityUseCase {
           action: command.action,
           reasonCode: command.reasonCode,
           isAutomatic: command.actorType === 'system',
+          ...(previouslyAutoHidden ? { previouslyAutoHidden: true } : {}),
         },
       });
     if (
@@ -278,6 +287,7 @@ export class ChangeVisibilityUseCase {
           authorId: target.authorId,
           action: command.action,
           reasonCode: command.reasonCode,
+          ...(previouslyAutoHidden ? { previouslyAutoHidden: true } : {}),
         },
       });
     return { actionId, changedCount: changes.length, previousStatus: target.status, status: newStatus };

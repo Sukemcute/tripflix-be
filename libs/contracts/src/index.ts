@@ -383,6 +383,7 @@ export const ContentModerationDecidedV1Schema = z.object({
   action: z.enum(['hide', 'restore', 'remove', 'dismiss']),
   reasonCode: z.string(),
   isAutomatic: z.boolean(),
+  previouslyAutoHidden: z.boolean().optional(),
 });
 export const ContentAppealDecidedV1Schema = z.object({
   appealId: z.uuid(), authorId: z.uuid(), decisionId: z.uuid(),
@@ -400,6 +401,7 @@ export const ContentPostModeratedV1Schema = z.object({
 export const ContentCommentModerationActionV1Schema = z.object({
   actionId: z.uuid(), postId: z.uuid(), commentId: z.uuid(), authorId: z.uuid(),
   action: z.enum(['hide', 'remove', 'restore']), reasonCode: z.string(),
+  previouslyAutoHidden: z.boolean().optional(),
 });
 export const ContentReportCreatedV1Schema = z.object({
   reportId: z.uuid(),

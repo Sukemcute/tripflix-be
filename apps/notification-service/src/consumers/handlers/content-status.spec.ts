@@ -25,6 +25,29 @@ describe('comment moderation notifications', () => {
       }),
     );
   });
+  it('không thông báo khôi phục trực tiếp nếu lần ẩn trước do hệ thống tự động', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const inbox = { insert: vi.fn().mockResolvedValue({ user_id: id }), countUnread: vi.fn().mockResolvedValue(1) };
+    const realtime = { emitToUser: vi.fn() };
+    const handlers = createContentStatusHandlers({ inbox, realtime, log: vi.fn() });
+    const handled = await handlers['content.comment.moderation_action.v1']!({
+      eventId: id,
+      payload: {
+        actionId: id,
+        postId: id,
+        commentId: id,
+        authorId: id,
+        action: 'restore',
+        reasonCode: 'HARASSMENT',
+        previouslyAutoHidden: true,
+      },
+    } as never);
+
+    expect(handled).toBe(true);
+    expect(inbox.insert).not.toHaveBeenCalled();
+    expect(inbox.countUnread).not.toHaveBeenCalled();
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
+  });
   it('gửi kết quả khiếu nại và đường dẫn tới trạng thái kiểm duyệt', async () => {
     const id = '11111111-1111-4111-8111-111111111111';
     const inbox = { insert: vi.fn().mockResolvedValue(null), countUnread: vi.fn() };
@@ -94,6 +117,31 @@ describe('comment moderation notifications', () => {
         action: 'hide',
         reasonCode: 'HARASSMENT',
         isAutomatic: true,
+      },
+    } as never);
+
+    expect(handled).toBe(true);
+    expect(inbox.insert).not.toHaveBeenCalled();
+    expect(inbox.countUnread).not.toHaveBeenCalled();
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
+  });
+  it('không thông báo khôi phục qua moderation case nếu trước đó tự ẩn', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const inbox = { insert: vi.fn().mockResolvedValue({ user_id: id }), countUnread: vi.fn().mockResolvedValue(1) };
+    const realtime = { emitToUser: vi.fn() };
+    const handlers = createContentStatusHandlers({ inbox, realtime, log: vi.fn() });
+    const handled = await handlers['content.moderation.decided.v1']!({
+      eventId: id,
+      payload: {
+        caseId: id,
+        targetType: 'comment',
+        targetId: id,
+        postId: id,
+        authorId: id,
+        action: 'restore',
+        reasonCode: 'HARASSMENT',
+        isAutomatic: false,
+        previouslyAutoHidden: true,
       },
     } as never);
 
