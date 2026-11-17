@@ -191,6 +191,13 @@ it('can show successful CORS preflights without dropping the other trace filters
   expect(TraceQuerySchema.safeParse({ includeSuccessfulPreflights: 'yes' }).success).toBe(false);
 });
 
+it('uses a valid match-all TraceQL predicate when every trace filter is cleared', async () => {
+  const fetch = vi.fn(async (_input: URL) => new Response(JSON.stringify({ traces: [] })));
+  vi.stubGlobal('fetch', fetch);
+  await new ObservabilityService(env).listTraces(TraceQuerySchema.parse({ includeSuccessfulPreflights: 'true' }));
+  expect((fetch.mock.calls[0]![0] as unknown as URL).searchParams.get('q')).toBe('{ duration >= 0ms }');
+});
+
 it('trace detail returns only allowlisted fields, not arbitrary attributes or exception messages', async () => {
   vi.stubGlobal(
     'fetch',
