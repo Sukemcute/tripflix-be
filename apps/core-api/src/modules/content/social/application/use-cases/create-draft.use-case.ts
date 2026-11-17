@@ -1,5 +1,5 @@
 import { PostRepository } from '../../infra/post.repository.js';
-import { assertPostMediaAllowed } from '../common/post-media.js';
+import { assertPostMediaAllowed, prepareTripAttachment } from '../common/post-media.js';
 import type { PostMediaPort } from '../ports/post-media.port.js';
 import type {
   NewPostRecord,
@@ -37,6 +37,7 @@ export class CreateDraftUseCase {
       authorId: command.authorId,
       mediaIds: command.mediaIds ?? [],
     });
+    const tripAttachment = await prepareTripAttachment(this.postMedia, command.authorId, command.tripAttachment);
 
     const newPost: NewPostRecord = {
       authorId: command.authorId,
@@ -49,7 +50,7 @@ export class CreateDraftUseCase {
       isVerified: false,
       mediaIds: command.mediaIds ?? [],
       coverMediaId: command.coverMediaId,
-      tripAttachment: command.tripAttachment ?? null,
+      tripAttachment: tripAttachment ?? null,
       reactionCounts: {},
       reactionTotal: 0,
       commentCount: 0,

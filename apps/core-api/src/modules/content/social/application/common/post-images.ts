@@ -5,6 +5,7 @@ export type WithPostImages<T> = T & { images: PostImage[] };
 export interface PostLike {
   postType: string;
   mediaIds: string[];
+  tripAttachment?: { posterMediaId?: string; posterUrl?: string } | null;
 }
 
 /**
@@ -16,9 +17,12 @@ export class PostImagesResolver {
 
   async attach<T extends PostLike>(posts: T[]): Promise<Array<WithPostImages<T>>> {
     const imageIds = posts.filter((post) => post.postType === 'vlog').flatMap((post) => post.mediaIds);
-    const images = imageIds.length > 0 ? await this.postMedia.getImages(imageIds) : new Map<string, PostImage>();
+    const posterIds = posts.flatMap((post) => (post.tripAttachment?.posterMediaId ? [post.tripAttachment.posterMediaId] : []));
+    const allIds = [...imageIds, ...posterIds];
+    const images = allIds.length > 0 ? await this.postMedia.getImages(allIds) : new Map<string, PostImage>();
     return posts.map((post) => ({
       ...post,
+      ...withTripPoster(post, images),
       images:
         post.postType === 'vlog'
           ? post.mediaIds.flatMap((mediaId) => {
@@ -40,4 +44,11 @@ export class PostImagesResolver {
   ): Promise<Omit<P, 'items'> & { items: Array<WithPostImages<T>> }> {
     return { ...page, items: await this.attach(page.items) };
   }
+}
+
+/** Poster lộ trình (TF105): đổi posterMediaId thành link; ảnh chưa sẵn sàng hoặc đã xoá thì bỏ qua để dùng poster video. */
+function withTripPoster<T extends PostLike>(post: T, images: Map<string, PostImage>): Partial<Pick<T, 'tripAttachment'>> {
+  const posterId = post.tripAttachment?.posterMediaId;
+  const poster = posterId ? images.get(posterId) : undefined;
+  return poster ? { tripAttachment: { ...post.tripAttachment!, posterUrl: poster.url } } : {};
 }
