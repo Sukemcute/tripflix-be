@@ -4,6 +4,7 @@ import {
   Catch,
   ConflictException,
   type ExceptionFilter,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   NotFoundException,
@@ -40,6 +41,9 @@ export class AccessErrorFilter implements ExceptionFilter {
         break;
       case 'not_found':
         http = new NotFoundException(err.message);
+        break;
+      case 'forbidden':
+        http = new ForbiddenException(err.message);
         break;
       case 'staff_rule':
         // Quy tắc quản lý nhân viên chặn thao tác (tự khoá mình, hạ quyền superadmin...).
