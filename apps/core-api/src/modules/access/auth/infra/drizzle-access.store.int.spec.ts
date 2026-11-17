@@ -180,14 +180,14 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
 
   it('TF06M: thông tin cá nhân lưu, xoá được; DB chặn giá trị sai dù bỏ qua kiểm tra của API', async () => {
     const user = await store.users.insert({ email: 'personal@example.com', passwordHash: 'x', displayName: 'C', role: 'member' });
-    expect(user!.personal).toEqual({ phone: null, dateOfBirth: null, gender: null, nationality: null });
+    expect(user!.personal).toEqual({ phone: null, dateOfBirth: null, gender: null, nationality: null, travelPreferences: null });
     const saved = await store.users.updateProfile(user!.id, {
       phone: '+84912345678',
       dateOfBirth: '2000-05-20',
       gender: 'female',
       nationality: 'VN',
     });
-    expect(saved?.personal).toEqual({ phone: '+84912345678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN' });
+    expect(saved?.personal).toEqual({ phone: '+84912345678', dateOfBirth: '2000-05-20', gender: 'female', nationality: 'VN', travelPreferences: null });
     expect((await store.users.findById(user!.id))?.personal.dateOfBirth).toBe('2000-05-20');
     expect((await store.users.updateProfile(user!.id, { phone: null, gender: null }))?.personal).toMatchObject({ phone: null, gender: null, nationality: 'VN' });
     for (const bad of [{ gender: 'unknown' }, { nationality: 'vn' }, { phone: '12ab' }] as never[]) {

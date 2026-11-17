@@ -20,6 +20,7 @@ import { mapMyProfile, type MyProfile } from '../../auth/application/public-user
 import { TOO_MANY_ATTEMPTS_MESSAGE } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
+import { isStaleTravelPreferences } from '../domain/travel-preferences.js';
 
 export const WRONG_CURRENT_PASSWORD_MESSAGE = 'Mật khẩu hiện tại không đúng';
 export const SESSION_NOT_FOUND_MESSAGE = 'Không tìm thấy phiên đăng nhập';
@@ -112,10 +113,14 @@ export class AccountUseCases {
   private async applyProfileUpdate(userId: string, input: ProfilePatch, meta: RequestMeta): Promise<UserRecord> {
     const before = await this.loadUser(userId);
     const current: Required<ProfilePatch> = { displayName: before.displayName, ...before.personal };
+    // travelPreferences là object: so theo nội dung; bản cũ hơn bản đang lưu thì bỏ, không đè.
+    const isSame = (key: keyof ProfilePatch, value: unknown) =>
+      key === 'travelPreferences'
+        ? JSON.stringify(value) === JSON.stringify(current.travelPreferences) ||
+          isStaleTravelPreferences(input.travelPreferences ?? null, current.travelPreferences)
+        : value === current[key];
     const changes = Object.fromEntries(
-      Object.entries(input).filter(
-        ([key, value]) => value !== undefined && value !== current[key as keyof ProfilePatch],
-      ),
+      Object.entries(input).filter(([key, value]) => value !== undefined && !isSame(key as keyof ProfilePatch, value)),
     ) as ProfilePatch;
     const changedFields = Object.keys(changes);
     if (changedFields.length === 0) return before;

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
-import { ENC_PASSWORD_DESCRIPTION, PLAIN_PASSWORD_DESCRIPTION } from '../../auth/api/dto.js';
+import { ENC_PASSWORD_DESCRIPTION, PLAIN_PASSWORD_DESCRIPTION, TravelPreferencesDto } from '../../auth/api/dto.js';
 import {
   currentPasswordField,
   dateOfBirthField,
@@ -12,6 +12,27 @@ import {
 import { NEW_PASSWORD_MAX, PASSWORD_MIN } from '../../auth/domain/credentials.js';
 import { DISPLAY_NAME_MAX } from '../../auth/domain/text-rules.js';
 import { GENDERS, MAX_AGE, MIN_AGE, normalizePhone, PHONE_PATTERN } from '../domain/personal-info.js';
+import {
+  TRAVEL_BUDGET_LEVELS,
+  TRAVEL_INTERESTS,
+  TRAVEL_PREFERENCES_STATUSES,
+  TRAVEL_REGIONS,
+  type TravelPreferences,
+} from '../domain/travel-preferences.js';
+
+const uniqueCodes = <T extends readonly [string, ...string[]]>(codes: T) =>
+  z
+    .array(z.enum(codes))
+    .max(codes.length)
+    .refine((ids) => new Set(ids).size === ids.length, 'Không được chọn trùng');
+
+export const TravelPreferencesSchema = z.strictObject({
+  status: z.enum(TRAVEL_PREFERENCES_STATUSES),
+  interests: uniqueCodes(TRAVEL_INTERESTS),
+  regions: uniqueCodes(TRAVEL_REGIONS),
+  budgetLevels: uniqueCodes(TRAVEL_BUDGET_LEVELS),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
 
 /** Chuỗi trống (hoặc chỉ có khoảng trắng) nghĩa là xoá trường đó. */
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
@@ -32,6 +53,7 @@ export const UpdateProfileRequestSchema = z
     dateOfBirth: z.preprocess(blankToNull, dateOfBirthField().nullable()).optional(),
     gender: z.preprocess(blankToNull, genderField().nullable()).optional(),
     nationality: z.preprocess(blankToNull, nationalityField().nullable()).optional(),
+    travelPreferences: TravelPreferencesSchema.nullable().optional(),
   })
   .refine((v) => Object.values(v).some((field) => field !== undefined), 'Cần ít nhất một trường để cập nhật');
 
@@ -59,6 +81,8 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({ enum: GENDERS, nullable: true }) gender?: (typeof GENDERS)[number] | null;
   @ApiPropertyOptional({ type: String, nullable: true, example: 'VN', description: 'ISO 3166-1 alpha-2' })
   nationality?: string | null;
+  @ApiPropertyOptional({ type: TravelPreferencesDto, nullable: true, description: 'null để xoá (làm lại khảo sát)' })
+  travelPreferences?: TravelPreferences | null;
 }
 
 export class ChangePasswordDto {

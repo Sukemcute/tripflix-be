@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "6b4cb5ae-fc27-493d-bc51-0a8c011d7ee3",
+  "prevIds": [
+    "f3b1ae53-c5e0-408b-8b7d-2e41a937c4d2"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "travel_preferences"
+      ],
+      "writes": [
+        "s|col|access.users.travel_preferences",
+        "n|col|access.users.travel_preferences",
+        "e|col|access.users.travel_preferences"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "travel_preferences",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

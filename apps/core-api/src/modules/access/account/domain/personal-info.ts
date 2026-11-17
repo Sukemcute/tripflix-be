@@ -2,6 +2,8 @@
  * Thông tin cá nhân trong hồ sơ (TF06M). Chỉ chủ tài khoản xem và sửa; không gửi sang module khác.
  * Quy tắc ở đây dùng chung cho kiểm tra đầu vào (dto.ts) và test; DB có check tương ứng (db/schema).
  */
+import type { TravelPreferences } from './travel-preferences.js';
+
 export const GENDERS = ['male', 'female', 'other'] as const;
 export type Gender = (typeof GENDERS)[number];
 
@@ -18,6 +20,7 @@ export interface PersonalInfo {
   dateOfBirth: string | null;
   gender: Gender | null;
   nationality: string | null;
+  travelPreferences: TravelPreferences | null;
 }
 
 export function normalizePhone(value: string): string {

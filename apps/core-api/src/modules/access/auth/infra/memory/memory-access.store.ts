@@ -49,7 +49,7 @@ export class MemoryAccessStore implements AccessStore {
         status: 'active',
         createdAt: new Date(),
         emailVerifiedAt,
-        personal: { phone: null, dateOfBirth: null, gender: null, nationality: null, ...personal },
+        personal: { phone: null, dateOfBirth: null, gender: null, nationality: null, travelPreferences: null, ...personal },
       };
       if (terms) this.acceptedTerms.set(row.id, terms);
       this.userRows.set(row.id, row);
