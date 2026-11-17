@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException, ServiceUnavailableException } f
 import { ObservabilityService } from './observability.service.js';
 import { ObservabilityController } from '../api/observability.controller.js';
 import { TelemetryEnvSchema } from '../infra/telemetry-store.js';
+import { TraceQuerySchema } from '../api/dto.js';
 
 const sample = (stat: string, value: string, labels = {}) => ({
   metric: { stat, ...labels },
@@ -26,7 +27,7 @@ it('distinguishes unconfigured sources from measured zero without making request
     summary: { requests: null, errorRate: null },
     services: [],
   });
-  expect(await service.listTraces({ range: '1h', errorsOnly: false, minDurationMs: 0 })).toMatchObject({
+  expect(await service.listTraces(TraceQuerySchema.parse({}))).toMatchObject({
     source: { status: 'not_configured' },
   });
   expect(fetch).not.toHaveBeenCalled();
@@ -163,6 +164,7 @@ it('builds bounded TraceQL filters, sorts traces and retains nanosecond precisio
     service: 'core-api',
     errorsOnly: true,
     minDurationMs: 100,
+    includeSuccessfulPreflights: false,
   });
   expect(result.traces[0]).toMatchObject({
     traceId: `0${'a'.repeat(31)}`,
@@ -172,7 +174,21 @@ it('builds bounded TraceQL filters, sorts traces and retains nanosecond precisio
   const url = fetch.mock.calls[0]![0] as unknown as URL;
   expect(url.searchParams.get('q')).toContain('resource.service.name = "core-api"');
   expect(url.searchParams.get('q')).toContain('status = error');
+  expect(url.searchParams.get('q')).toContain('trace:rootName != "OPTIONS CORS preflight"');
   expect(url.searchParams.get('limit')).toBe('50');
+});
+
+it('can show successful CORS preflights without dropping the other trace filters', async () => {
+  const fetch = vi.fn(async (_input: URL) => new Response(JSON.stringify({ traces: [] })));
+  vi.stubGlobal('fetch', fetch);
+  await new ObservabilityService(env).listTraces(TraceQuerySchema.parse({ includeSuccessfulPreflights: 'true', service: 'core-api', errorsOnly: 'true', minDurationMs: '100' }));
+  const query = fetch.mock.calls[0]![0].searchParams.get('q');
+  expect(query).not.toContain('trace:rootName');
+  expect(query).toContain('resource.service.name = "core-api"');
+  expect(query).toContain('status = error');
+  expect(query).toContain('duration >= 100ms');
+  expect(TraceQuerySchema.parse({}).includeSuccessfulPreflights).toBe(false);
+  expect(TraceQuerySchema.safeParse({ includeSuccessfulPreflights: 'yes' }).success).toBe(false);
 });
 
 it('trace detail returns only allowlisted fields, not arbitrary attributes or exception messages', async () => {

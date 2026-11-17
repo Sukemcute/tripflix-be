@@ -81,6 +81,22 @@ interface RoutedRequest extends IncomingMessage {
   route?: { path?: unknown };
 }
 
+export const SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME = 'OPTIONS CORS preflight';
+
+function isSuccessfulCorsPreflight(req: IncomingMessage, res: ServerResponse, status: number): boolean {
+  const origin = req.headers.origin;
+  const requestedMethod = req.headers['access-control-request-method'];
+  if (req.method !== 'OPTIONS' || typeof origin !== 'string' || !origin || typeof requestedMethod !== 'string' || !requestedMethod || status < 200 || status >= 300) return false;
+  const allowsCredentials = res.getHeader('access-control-allow-credentials') === 'true';
+  const allowedOrigin = res.getHeader('access-control-allow-origin');
+  if (allowedOrigin !== origin && !(allowedOrigin === '*' && !allowsCredentials)) return false;
+  const allowedMethods = String(res.getHeader('access-control-allow-methods') ?? '').split(',').map((value) => value.trim());
+  if (!allowedMethods.includes(requestedMethod)) return false;
+  const allowedHeaders = String(res.getHeader('access-control-allow-headers') ?? '').toLowerCase().split(',').map((value) => value.trim());
+  const requestedHeaders = String(req.headers['access-control-request-headers'] ?? '').toLowerCase().split(',').map((value) => value.trim()).filter(Boolean);
+  return requestedHeaders.every((header) => allowedHeaders.includes(header) || (header !== 'authorization' && allowedHeaders.includes('*') && !allowsCredentials));
+}
+
 export function createTelemetryMiddleware() {
   const tracer = trace.getTracer('tripflix-http');
   const duration = metrics
@@ -115,7 +131,8 @@ export function createTelemetryMiddleware() {
         'http.route': route,
         'http.response.status_code': status,
       };
-      span.updateName(`${method} ${route}`);
+      // Name only confirmed successful preflights; keep unknown/failed CORS requests searchable by default.
+      span.updateName(isSuccessfulCorsPreflight(req, res, status) ? SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME : `${method} ${route}`);
       span.setAttributes(attributes);
       if (status >= 500 || status === 499) span.setStatus({ code: SpanStatusCode.ERROR });
       duration.record((performance.now() - start) / 1000, attributes, active);

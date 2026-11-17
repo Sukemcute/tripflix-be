@@ -4,7 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { pino, type Logger } from 'pino';
 import type { StdSerializedResults } from 'pino-http';
 import { currentTraceFields } from './telemetry.js';
-export { startTelemetry, createTelemetryMiddleware, currentTraceFields } from './telemetry.js';
+export { startTelemetry, createTelemetryMiddleware, currentTraceFields, SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME } from './telemetry.js';
 
 export interface LoggerOptions {
   service: string;

@@ -10,6 +10,7 @@ export const ObservabilityQuerySchema = z.object({
     .optional(),
 });
 export const TraceQuerySchema = ObservabilityQuerySchema.extend({
+  includeSuccessfulPreflights: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   errorsOnly: z
     .enum(['true', 'false'])
     .default('false')

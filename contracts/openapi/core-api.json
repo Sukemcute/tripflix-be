@@ -6186,6 +6186,19 @@
             }
           },
           {
+            "name": "includeSuccessfulPreflights",
+            "required": false,
+            "in": "query",
+            "description": "Hiện cả preflight CORS đã xác nhận thành công; mặc định ẩn",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "name": "errorsOnly",
             "required": false,
             "in": "query",

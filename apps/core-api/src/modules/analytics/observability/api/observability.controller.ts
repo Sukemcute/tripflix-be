@@ -33,6 +33,7 @@ export class ObservabilityController {
   @ApiQuery({ name: 'range', required: false, enum: ['15m', '1h', '6h', '24h'] })
   @ApiQuery({ name: 'service', required: false, type: String })
   @ApiQuery({ name: 'errorsOnly', required: false, enum: ['true', 'false'] })
+  @ApiQuery({ name: 'includeSuccessfulPreflights', required: false, enum: ['true', 'false'], description: 'Hiện cả preflight CORS đã xác nhận thành công; mặc định ẩn' })
   @ApiQuery({ name: 'minDurationMs', required: false, type: Number })
   @ApiOkResponse({ type: TraceListDto })
   listTraces(@Query() raw: unknown): Promise<TraceListDto> {

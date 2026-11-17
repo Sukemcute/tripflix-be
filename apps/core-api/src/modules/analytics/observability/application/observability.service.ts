@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { z } from 'zod';
+import { SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME } from '@tripflix/observability';
 import {
   RANGE_SECONDS,
   type ObservabilityDto,
@@ -255,6 +256,7 @@ export class ObservabilityService {
     const empty = { source: { status: 'not_configured' }, traces: [], limit: 50 } satisfies TraceListDto;
     if (!base) return empty;
     const predicates: string[] = [];
+    if (!query.includeSuccessfulPreflights) predicates.push(`trace:rootName != ${JSON.stringify(SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME)}`);
     if (query.service) predicates.push(`resource.service.name = ${JSON.stringify(query.service)}`);
     if (query.errorsOnly) predicates.push('status = error');
     if (query.minDurationMs) predicates.push(`duration >= ${query.minDurationMs}ms`);
