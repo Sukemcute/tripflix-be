@@ -11,7 +11,7 @@ const seed = buildReelSeed({ authorIds, hotels: catalog.hotels, flights: catalog
 const hotelsById = new Map(catalog.hotels.map((h) => [h.id, h]));
 const routes = new Set(catalog.flights.map((f) => `${f.fromAirport}-${f.toAirport}`));
 
-describe('reel mẫu sinh từ 60 video', () => {
+describe('reel mẫu sinh từ các video mẫu', () => {
   it('đủ 1000 bài reel, 400 bài có lộ trình, mỗi bài một video riêng của chính người đăng', () => {
     expect(seed.posts).toHaveLength(1000);
     expect(seed.posts.filter((p) => p.tripAttachment)).toHaveLength(400);
@@ -24,7 +24,7 @@ describe('reel mẫu sinh từ 60 video', () => {
       expect(asset.ownerId).toBe(post.authorId);
       expect(hlsPrefixes.has(asset.hlsPrefix)).toBe(true);
     }
-    expect(new Set(seed.mediaAssets.map((m) => m.hlsPrefix)).size).toBe(60);
+    expect(new Set(seed.mediaAssets.map((m) => m.hlsPrefix)).size).toBe(videos.length);
   });
 
   it('tiêu đề và nội dung không bài nào trùng nhau', () => {
