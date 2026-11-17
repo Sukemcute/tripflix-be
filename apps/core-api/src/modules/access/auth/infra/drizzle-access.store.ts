@@ -54,6 +54,7 @@ const mapUserRow = (row: UserRow): UserRecord => ({
     dateOfBirth: row.dateOfBirth,
     gender: row.gender as UserRecord['personal']['gender'],
     nationality: row.nationality,
+    travelPreferences: row.travelPreferences,
   },
 });
 
@@ -177,7 +178,7 @@ class DrizzleUserRepository implements UserRepository {
   private async patch(
     id: string,
     values: Partial<
-      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality'>
+      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality' | 'travelPreferences'>
     >,
   ) {
     const [row] = await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, id)).returning();

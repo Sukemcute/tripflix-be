@@ -2877,6 +2877,59 @@
         ]
       }
     },
+    "/api/v1/feed/events": {
+      "post": {
+        "operationId": "FeedEventsController_record",
+        "parameters": [
+          {
+            "name": "x-anon-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Anon-Id",
+            "in": "header",
+            "description": "UUID app sinh cho khách; sai dạng thì bỏ qua",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedEventsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedEventsAcceptedDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Lô rỗng, quá nhiều sự kiện, hoặc sự kiện sai dạng"
+          }
+        },
+        "summary": "Nhận lô sự kiện hành vi từ app (xem Reels, bấm đặt từ lộ trình), tối đa 50 sự kiện. Khách cũng gửi được. Chỉ đẩy vào stream:app-events, không ghi bảng nào; sự kiện của bài không xem được trên feed bị bỏ qua.",
+        "tags": [
+          "feed"
+        ]
+      }
+    },
     "/api/v1/moderation/decisions/{id}/appeals": {
       "post": {
         "operationId": "ReportsController_submitAppeal",
@@ -6522,6 +6575,83 @@
           "code"
         ]
       },
+      "TravelPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "skipped"
+            ],
+            "description": "skipped: bỏ qua hoặc không chọn sở thích nào"
+          },
+          "interests": {
+            "type": "array",
+            "example": [
+              "coast",
+              "food"
+            ],
+            "description": "Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "coast",
+                "nature",
+                "culture",
+                "food",
+                "city",
+                "stays"
+              ]
+            }
+          },
+          "regions": {
+            "type": "array",
+            "example": [
+              "central"
+            ],
+            "description": "Vùng muốn đi. Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "north",
+                "central",
+                "highlands",
+                "south"
+              ]
+            }
+          },
+          "budgetLevels": {
+            "type": "array",
+            "example": [
+              "saving",
+              "moderate"
+            ],
+            "description": "Mức chi phí muốn đi: saving tiết kiệm, moderate vừa phải, premium cao cấp. Không trùng; có thể rỗng",
+            "items": {
+              "type": "string",
+              "enum": [
+                "saving",
+                "moderate",
+                "premium"
+              ]
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-17T10:00:00.000Z",
+            "description": "Lúc người dùng bấm xong trên máy. PATCH bản cũ hơn bản đang lưu thì server giữ bản đang lưu."
+          }
+        },
+        "required": [
+          "status",
+          "interests",
+          "regions",
+          "budgetLevels",
+          "updatedAt"
+        ]
+      },
       "MyProfileDto": {
         "type": "object",
         "properties": {
@@ -6575,6 +6705,16 @@
             "type": "string",
             "nullable": true,
             "example": "VN"
+          },
+          "travelPreferences": {
+            "nullable": true,
+            "description": "null: chưa làm khảo sát sở thích",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravelPreferencesDto"
+              }
+            ]
           }
         },
         "required": [
@@ -6587,7 +6727,8 @@
           "phone",
           "dateOfBirth",
           "gender",
-          "nationality"
+          "nationality",
+          "travelPreferences"
         ]
       },
       "UpdateProfileDto": {
@@ -6625,6 +6766,16 @@
             "nullable": true,
             "example": "VN",
             "description": "ISO 3166-1 alpha-2"
+          },
+          "travelPreferences": {
+            "nullable": true,
+            "description": "null để xoá (làm lại khảo sát)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravelPreferencesDto"
+              }
+            ]
           }
         }
       },
@@ -6973,6 +7124,29 @@
           "hasMore"
         ]
       },
+      "TripItemHotelDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-1",
+            "description": "ID khách sạn"
+          },
+          "productId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-1--DLX",
+            "description": "Loại phòng người đăng chọn"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Gói giá người đăng chọn"
+          }
+        },
+        "required": [
+          "hotelId"
+        ]
+      },
       "TripTransportDto": {
         "type": "object",
         "properties": {
@@ -7022,6 +7196,20 @@
             "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
             "description": "Ghi chú"
           },
+          "time": {
+            "type": "string",
+            "example": "16:30",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Giờ trong ngày (HH:mm)"
+          },
+          "hotel": {
+            "description": "Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripItemHotelDto"
+              }
+            ]
+          },
           "transport": {
             "description": "Phương tiện được chọn khi soạn lộ trình",
             "allOf": [
@@ -7059,6 +7247,21 @@
             "example": "Phú Quốc, Kiên Giang",
             "description": "Điểm đến"
           },
+          "destinationPlaceId": {
+            "type": "string",
+            "example": "phu-quoc",
+            "description": "refId điểm đến lấy từ /api/suggest"
+          },
+          "hotelProductId": {
+            "type": "string",
+            "example": "P-h-pq-01--DLX",
+            "description": "Loại phòng người đăng chọn (productId)"
+          },
+          "hotelRatePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Gói giá của loại phòng người đăng chọn"
+          },
           "daysCount": {
             "type": "number",
             "example": 3,
@@ -7073,6 +7276,15 @@
             "type": "string",
             "example": "Giá chỉ mang tính chất tham khảo",
             "description": "Lưu ý giá tham khảo"
+          },
+          "posterMediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Ảnh poster riêng của lộ trình (asset ảnh đã tải lên); bỏ trống thì dùng poster video"
+          },
+          "posterUrl": {
+            "type": "string",
+            "description": "Chỉ có trong phản hồi: link ảnh poster của lộ trình"
           },
           "items": {
             "description": "Các mục trong lịch trình",
@@ -9039,6 +9251,81 @@
         "required": [
           "items",
           "nextCursor"
+        ]
+      },
+      "FeedEventDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "App tự sinh; gửi lại cùng mã thì bên nhận coi là một"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "view",
+              "booking_click"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "watchedMs": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600000,
+            "description": "Chỉ với view: số mili giây đã xem thật (chỉ đếm lúc đang phát)"
+          },
+          "hotelId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chỉ với booking_click: khách sạn trong lộ trình"
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "reels",
+              "post_detail",
+              "reels_trip_plan"
+            ],
+            "description": "view: reels, post_detail; booking_click: reels_trip_plan"
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "postId",
+          "surface"
+        ]
+      },
+      "FeedEventsRequestDto": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedEventDto"
+            }
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "FeedEventsAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "number",
+            "description": "Số sự kiện đã nhận; sự kiện của bài không xem được trên feed bị bỏ qua"
+          }
+        },
+        "required": [
+          "accepted"
         ]
       },
       "SubmitAppealDto": {
@@ -13206,6 +13493,23 @@
             "type": "string",
             "nullable": true,
             "description": "Tên khách sạn của mục phòng; vé bay là null"
+          },
+          "propertyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã khách sạn của mục phòng; vé bay là null"
+          },
+          "fromAirport": {
+            "type": "string",
+            "nullable": true,
+            "example": "SGN",
+            "description": "Sân bay đi của vé bay; phòng là null"
+          },
+          "toAirport": {
+            "type": "string",
+            "nullable": true,
+            "example": "CXR",
+            "description": "Sân bay đến của vé bay; phòng là null"
           },
           "date": {
             "type": "string",

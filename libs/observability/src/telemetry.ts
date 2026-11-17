@@ -8,10 +8,17 @@ import { AggregationType, PeriodicExportingMetricReader } from '@opentelemetry/s
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
+import { createDatabaseInstrumentations } from './tracing.js';
+
+// Một tiến trình chỉ một SDK: register (--import) bật trước, app gọi lại thì nhận đúng SDK đó (TF99).
+const STARTED_SDK = Symbol.for('tripflix.observability.sdk');
+type GlobalWithSdk = typeof globalThis & { [STARTED_SDK]?: NodeSDK };
 
 /** Explicit HTTP spans avoid ESM loader hooks and never capture bodies, query strings or raw URLs. */
 export function startTelemetry(serviceName: string): NodeSDK | undefined {
   if (process.env.OTEL_SDK_DISABLED === 'true' || !process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
+  const started = (globalThis as GlobalWithSdk)[STARTED_SDK];
+  if (started) return started;
   const endpoint = new URL(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
   if (!['http:', 'https:'].includes(endpoint.protocol))
     throw new Error('OTEL_EXPORTER_OTLP_ENDPOINT phải là HTTP(S)');
@@ -42,6 +49,8 @@ export function startTelemetry(serviceName: string): NodeSDK | undefined {
           'url.query': '',
         }),
       }),
+      // Từng câu SQL, lệnh Redis: không ghi tham số, chỉ trong request. Chỉ có span khi nạp qua register.
+      ...createDatabaseInstrumentations(),
     ],
     views: [
       {
@@ -54,6 +63,7 @@ export function startTelemetry(serviceName: string): NodeSDK | undefined {
     ],
   });
   sdk.start();
+  (globalThis as GlobalWithSdk)[STARTED_SDK] = sdk;
   const meter = metrics.getMeter('tripflix-runtime');
   meter
     .createObservableGauge('tripflix.service.heartbeat')
