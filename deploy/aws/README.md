@@ -25,6 +25,7 @@ Chạy lại an toàn. Sau đó tạo access key cho `tripflix-dev-<tên>` trong
 | `bucket-policy.template.json` | CloudFront chỉ đọc `dev/*/videos/*` và `dev/*/images/*` | File gốc không phát công khai. `images/` chứa ảnh công khai như ảnh khách sạn, không để giấy tờ hay chứng từ ở đây |
 | `cloudfront-distribution.template.json` | Chỉ HTTPS, cache theo `Cache-Control` của file, CORS cho web | `master.m3u8` cache 60 giây, còn đoạn video cache 1 năm |
 | `media-domain.jq` | Gắn `media.tripflix.io.vn`, tách behavior `*.m3u8` và `*.ts` từ behavior mặc định | Trình duyệt chỉ gửi cookie ký cho tên miền con của `tripflix.io.vn`, không gửi cho `*.cloudfront.net` |
+| `video-cors.jq` | Gắn policy CORS có credentials `tripflix-video-cors` cho hai behavior video | hls.js gửi cookie bằng XHR, cần origin cụ thể thay vì `*` |
 | `video-lock.jq` | Bật hoặc tắt key group trên hai behavior video | Chỉ video cần cookie ký; ảnh vẫn công khai để không phải sửa màn nào |
 | `iam-dev-member-policy.template.json` | Ghi và đọc `dev/<tên>/*`, liệt kê bucket | Có `s3:ListBucket` thì file thiếu trả 404 như production, nên `libs/storage` báo đúng lỗi |
 
@@ -58,6 +59,7 @@ DNS của `tripflix.io.vn` quản lý ở tenten.vn. Ô Tên chỉ nhập phần
    sed -i 's#^MEDIA_CDN_URL=.*#MEDIA_CDN_URL=https://media.tripflix.io.vn#' ~/tripflix-be/deploy/.env.server
    ```
    Kiểm: `curl -s -X POST https://api.tripflix.io.vn/api/media/playback-session` trả `cookies` có 3 khoá.
-5. Khi app và web đã gửi cookie: `./set-video-lock.sh on`. Kiểm `curl` một file `.m3u8` không kèm cookie phải ra 403, app và web vẫn phát được. Video lỗi thì `./set-video-lock.sh off`, vài phút sau là như cũ.
+5. Trước khi deploy bản web dùng hls.js (TF64): `./setup-video-cors.sh`. Chrome và Firefox máy tính phát qua hls.js với `withCredentials`, và trình duyệt không nhận `Access-Control-Allow-Origin: *` khi request có cookie. Policy `tripflix-video-cors` chỉ gắn cho `*.m3u8`, `*.ts`, trả đúng origin (mặc định `https://tripflix.io.vn`, đổi bằng `WEB_ORIGINS`) kèm `Access-Control-Allow-Credentials: true`. Kiểm: `curl -sI -H 'Origin: https://tripflix.io.vn' <link .m3u8>` có `access-control-allow-origin: https://tripflix.io.vn` và `access-control-allow-credentials: true`.
+6. Khi app và web đã gửi cookie: `./set-video-lock.sh on`. Kiểm `curl` một file `.m3u8` không kèm cookie phải ra 403, app và web vẫn phát được. Video lỗi thì `./set-video-lock.sh off`, vài phút sau là như cũ.
 
 **Xoay khoá**: tạo cặp khoá mới trên server như bước 3, `./add-playback-key.sh` với public key mới (key group giữ cả hai khoá), đổi hai biến `CLOUDFRONT_*` trong `.env.server` và tạo lại core-api. Đợi hết hạn cookie cũ (`MEDIA_PLAYBACK_TTL_SEC`, mặc định 6 giờ) rồi gỡ khoá cũ khỏi key group trên Console. Lộ khoá riêng thì làm ngay, và gỡ khoá cũ không cần đợi.
