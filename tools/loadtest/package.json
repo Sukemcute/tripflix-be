@@ -1,0 +1,9 @@
+{
+  "name": "tripflix-loadtest",
+  "private": true,
+  "type": "module",
+  "description": "Script test tải chạy trên máy bắn tải, ngoài workspace pnpm",
+  "dependencies": {
+    "socket.io-client": "4.8.3"
+  }
+}

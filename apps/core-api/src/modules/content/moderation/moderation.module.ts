@@ -106,12 +106,13 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     },
     {
       provide: RecordScreeningUseCase,
-      inject: [ModerationRepository, ChangeVisibilityUseCase, CONFIG],
+      inject: [ModerationRepository, ChangeVisibilityUseCase, CONFIG, OUTBOX],
       useFactory: (
         repository: ModerationRepository,
         visibility: ChangeVisibilityUseCase,
         config: ScreeningConfig,
-      ) => new RecordScreeningUseCase(repository, visibility, config),
+        outbox: ContentOutbox,
+      ) => new RecordScreeningUseCase(repository, visibility, config, outbox),
     },
     {
       provide: ScreenContentUseCase,
@@ -144,8 +145,8 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     },
     {
       provide: SubmitAppealUseCase,
-      inject: [ModerationRepository],
-      useFactory: (repository: ModerationRepository) => new SubmitAppealUseCase(repository),
+      inject: [ModerationRepository, OUTBOX],
+      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) => new SubmitAppealUseCase(repository, outbox),
     },
     {
       provide: DecideCaseUseCase,
@@ -156,8 +157,8 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     ScreeningConsumer,
     {
       provide: ClaimDeferredScansUseCase,
-      inject: [ModerationRepository],
-      useFactory: (repository: ModerationRepository) => new ClaimDeferredScansUseCase(repository),
+      inject: [ModerationRepository, OUTBOX],
+      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) => new ClaimDeferredScansUseCase(repository, outbox),
     },
   ],
 })

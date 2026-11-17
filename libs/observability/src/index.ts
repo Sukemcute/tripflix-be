@@ -3,6 +3,8 @@ import type { DynamicModule } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { pino, type Logger } from 'pino';
 import type { StdSerializedResults } from 'pino-http';
+import { currentTraceFields } from './telemetry.js';
+export { startTelemetry, createTelemetryMiddleware, currentTraceFields } from './telemetry.js';
 
 export interface LoggerOptions {
   service: string;
@@ -23,6 +25,7 @@ export function loggerModule({ service, level = 'info', pretty }: LoggerOptions)
       name: service,
       level,
       transport: transport(pretty),
+      mixin: currentTraceFields,
       serializers: {
         // Keep diagnostic metadata without copying cookies, bearer tokens, bodies or query values into logs.
         req: ({ id, method, url }: StdSerializedResults['req']) => ({

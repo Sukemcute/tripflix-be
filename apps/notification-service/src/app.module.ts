@@ -40,6 +40,7 @@ import { DirectoryRepository } from './directory/directory.repository.js';
 import { SmtpMailer, type Mailer } from './outapp/mailer.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RealtimeService } from './realtime/realtime.service.js';
+import { TelemetryLifecycle } from './telemetry.js';
 import { isRealtimeRedisReady, type RealtimeRedis } from './realtime/redis-io.adapter.js';
 import {
   DB,
@@ -156,6 +157,7 @@ export class InfraModule {}
   ],
   controllers: [HealthController, MeController, InboxController, PostWatchController, PushTokenController],
   providers: [
+    TelemetryLifecycle,
     NotificationConsumer,
     DeadLetterReplayJob,
     RealtimeService,
