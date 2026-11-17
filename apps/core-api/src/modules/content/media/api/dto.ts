@@ -100,3 +100,22 @@ export class MediaErrorDto {
   @ApiProperty({ example: 'MEDIA_TOO_LARGE' }) code!: string;
   @ApiProperty() message!: string;
 }
+
+export class PlaybackSessionDto {
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    example: { 'CloudFront-Policy': '…', 'CloudFront-Signature': '…', 'CloudFront-Key-Pair-Id': 'K2…' },
+    description:
+      'Cookie CloudFront để mở video. App ghép thành header Cookie khi phát; web đã nhận qua Set-Cookie nên bỏ qua. Rỗng khi server chưa bật ký cookie.',
+  })
+  cookies!: Record<string, string>;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Hết hạn lúc này; xin lại trước đó. Null khi không ký.',
+  })
+  expiresAt!: string | null;
+}
