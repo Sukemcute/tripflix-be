@@ -12,7 +12,9 @@
 - **1000 reel** chia cho 200 tài khoản `loadtestNNNN@tripflix.local` (có sẵn trên server từ TF07), mỗi tài khoản ít nhất 1 bài, vài người đăng nhiều. Mỗi bài một dòng `media_assets` riêng (chủ là người đăng) trỏ vào HLS dùng chung của 1 trong 60 video, mỗi video 16–17 bài, hai bài cùng video cách nhau ít nhất 15 bài trên feed.
 - Nội dung giống bài reel trên develop (`postType: video`, tiêu đề, nội dung, hashtag, đếm cảm xúc, bình luận, lưu, chia sẻ, ngày đăng rải 120 ngày); **không trùng tiêu đề, không trùng nội dung**. `isVerified = false`, `bookingId` để trống vì không có đơn thật.
 - **400 bài có lộ trình**, mỗi lộ trình 1–5 điểm đặt được trên Tripi: khách sạn (`hotel { hotelId, productId, ratePlanCode }` có thật trong catalog) và chặng bay (`fromAirport`, `toAirport` có chuyến trong catalog). Xen giữa là quán ăn, cà phê, chỗ chơi và chặng xe tự túc, không gắn khách sạn hay chuyến bay. Giờ trong ngày hợp lý: bay sáng, đi xe tới rồi mới nhận phòng, ngày cuối đi xe ra sân bay trước chuyến bay về.
-- Tương tác thật: 21.199 cảm xúc, 3.789 bookmark, 4.156 bình luận (có trả lời), không ai tự thả tim bài mình.
+- Tương tác thật: 23.130 cảm xúc, 4.096 bookmark, 4.453 bình luận (có trả lời), không ai tự thả tim bài mình.
+- Lịch từng ngày: không ngày trống (hết quán thì lấy loại khác, cuối cùng là "Tự do khám phá"), ngày cuối luôn có trả phòng nên số ngày khớp `daysCount`, không trùng giờ, chợ phiên chỉ xếp buổi sáng.
+- **Seed lại an toàn** (`seedReels`): xoá cảm xúc, bookmark, bình luận mẫu cũ theo dải id của seed rồi nạp lại, đặt lại người đăng và chủ video. Thêm video hoặc đổi bộ sinh rồi seed lại server không bị lỗi trùng (bài, người), không xoá tương tác của người dùng thật.
 - `seed-content.ts`: thêm `seedContentData(db, seed)` để nạp dữ liệu sinh trong bộ nhớ; `seedContent(db, file)` giữ nguyên chữ ký và hành vi. `cli/seed.ts`: tìm 200 tài khoản load test, có thì sinh reel mẫu, không có thì bỏ qua.
 
 ## Đối chiếu yêu cầu
@@ -25,12 +27,14 @@
 | 400 bài có lộ trình, 1–5 điểm Tripi đặt được | Có | test: đủ 1, 2, 3, 4, 5 điểm; khách sạn, loại phòng, gói giá, tuyến bay đều có trong catalog |
 | Xen quán ăn, cà phê, chỗ chơi không gắn link | Có | test: mỗi lộ trình có điểm không gắn khách sạn, chuyến bay |
 | Chạy lại không tạo trùng | Có | Chạy `pnpm db:seed` 2 lần, số dòng giữ nguyên |
+| Seed lại sau khi dữ liệu sinh đổi | Có | `reel-seed.int.spec.ts` (Postgres thật): cách nạp cũ lỗi `idx_reactions_post_user`, cách mới qua; giữ cảm xúc của người dùng thật, người đăng khớp dữ liệu mới |
+| Lịch trình hợp lý | Có | test: không ngày trống, đúng `daysCount`, không trùng giờ, chợ phiên buổi sáng; soát cả 1000 bài bằng script: không lỗi |
 
 ## Kết quả kiểm tra
-- `pnpm turbo run lint typecheck test --affected`: 48/49 task; core-api 2709 test qua, 2 lỗi, 4 bỏ qua. 2 lỗi có sẵn trên develop, không liên quan (`comment.entity.spec.ts`, `post-summary-and-flat-comments.spec.ts`, giới hạn bình luận 2.000 ký tự).
+- `pnpm turbo run lint typecheck test --affected`: 48/49 task; core-api 2710 test qua, 2 lỗi, 4 bỏ qua. 2 lỗi có sẵn trên develop, không liên quan (`comment.entity.spec.ts`, `post-summary-and-flat-comments.spec.ts`, giới hạn bình luận 2.000 ký tự).
 - `pnpm turbo run build test:int --affected`: 19/19.
-- `generate-reels.spec.ts`: 6/6.
-- Chạy thật local (Postgres, Redis, core-api, video-worker): `pnpm db:seed` khoảng 3 phút, in "reel mẫu: 1000 bài của 200 tài khoản load test, 4156 bình luận, 21199 cảm xúc, 3789 bookmark". Lướt hết `/api/v1/feed` (51 trang): 1008 thẻ, đủ 1000 reel mẫu, 400 thẻ có lộ trình, không trùng.
+- `generate-reels.spec.ts`: 7/7; `reel-seed.int.spec.ts`: 1/1.
+- Chạy thật local (Postgres, Redis, core-api, video-worker): `pnpm db:seed` khoảng 3 phút, in "reel mẫu: 1000 bài của 200 tài khoản load test, 4453 bình luận, 23130 cảm xúc, 4096 bookmark"; seed lại trên dữ liệu bản trước cũng qua. Lướt hết `/api/v1/feed` (51 trang): 1008 thẻ, đủ 1000 reel mẫu, 400 thẻ có lộ trình, không trùng.
 
 ## Cách kiểm lại
 1. Có tài khoản load test: `LOADTEST_PASSWORD=<mật khẩu> node tools/loadtest/gen-users-sql.mjs 200`, chạy SQL vào database access.
