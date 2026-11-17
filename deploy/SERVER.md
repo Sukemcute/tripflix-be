@@ -507,3 +507,20 @@ dc exec -T postgres pg_restore -U postgres -d core --clean --if-exists --single-
 /opt/tripflix/deploy-api.sh core-api sha-<bản cũ>   # core-api đang dừng nên chỉ ghi tag
 dc --profile api --profile ai up -d --wait core-api ai-summary-worker
 ```
+
+### Quay về bản trước bảng đệm bình luận (TF99)
+
+Từ #236, bình luận không cộng thẳng `content.posts.comment_count` mà ghi một dòng vào `content.post_counter_deltas`, và job của core-api cộng dồn vào `comment_count` khoảng mỗi giây. Bản core-api cũ hơn không có job này, nên quay về bản đó thì các dòng còn trong bảng đệm không bao giờ được cộng, và số bình luận của bài bị thiếu. Không cần khôi phục database: bảng đệm để nguyên, bản cũ không đụng tới, deploy lại bản mới thì migrate bỏ qua.
+
+Sau khi bản cũ đã chạy (từ lúc đó không còn dòng đệm mới), cộng nốt phần còn lại bằng tay. Lệnh xoá và cộng cùng một transaction, chạy lại được, hết dòng thì không làm gì:
+
+```bash
+dc exec -T postgres psql -U postgres -d core -v ON_ERROR_STOP=1 -c "
+WITH taken AS (DELETE FROM content.post_counter_deltas RETURNING post_id, comment_delta),
+sums AS (SELECT post_id, sum(comment_delta)::int AS delta FROM taken GROUP BY post_id)
+UPDATE content.posts p SET comment_count = GREATEST(0, p.comment_count + s.delta), updated_at = now()
+FROM sums s WHERE p.id = s.post_id;"
+dc exec -T postgres psql -U postgres -d core -tAc "select count(*) from content.post_counter_deltas"   # phải ra 0
+```
+
+Lúc bản mới đang chạy, bảng này cũng phải về 0 sau vài giây không có bình luận mới. Đọng lại lâu thì job không chạy: xem log core-api, và kiểm `APP_ROLE` là `worker` hoặc `all`.
