@@ -276,6 +276,12 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await count()).toBe(0);
     expect(await cases.comments.findByPostId({ postId, flat: true, limit: 200 })).toEqual([]);
     await hide(root.id, 'restore');
+    const restoreDecision = await pool.query(
+      `select payload from content.outbox_events
+       where type='content.comment.moderation_action' and payload->>'action'='restore'`,
+    );
+    expect(restoreDecision.rows).toHaveLength(1);
+    expect(restoreDecision.rows[0].payload).not.toHaveProperty('previouslyAutoHidden');
     expect(await count()).toBe(2);
     expect(
       (await cases.comments.findByPostId({ postId, flat: true, limit: 200 })).map((c) => c.id).sort(),
@@ -300,6 +306,62 @@ describe('TF32 moderation: transaction Postgres thật', () => {
           body: comment.body,
         })),
     );
+  });
+  it('đánh dấu restore nếu quyết định ẩn gần nhất của bình luận là tự động', async () => {
+    const comment = await add();
+    await cases.visibility.execute({
+      targetType: 'comment',
+      targetId: comment.id,
+      action: 'hide',
+      actorId: AUTHOR,
+      actorType: 'system',
+      reasonCode: 'HARASSMENT',
+    });
+    await hide(comment.id, 'restore');
+
+    const restored = await pool.query(
+      `select payload from content.outbox_events
+       where type='content.comment.moderation_action' and payload->>'action'='restore'`,
+    );
+    expect(restored.rows).toHaveLength(1);
+    expect(restored.rows[0].payload).toMatchObject({
+      commentId: comment.id,
+      action: 'restore',
+      previouslyAutoHidden: true,
+    });
+  });
+  it('đánh dấu restore tự ẩn trong event của moderation case', async () => {
+    const comment = await add();
+    const caseId = randomUUID();
+    await cases.visibility.execute({
+      targetType: 'comment',
+      targetId: comment.id,
+      action: 'hide',
+      actorId: AUTHOR,
+      actorType: 'system',
+      reasonCode: 'HARASSMENT',
+    });
+    await cases.visibility.execute({
+      targetType: 'comment',
+      targetId: comment.id,
+      action: 'restore',
+      actorId: AUTHOR,
+      actorType: 'staff',
+      reasonCode: 'HARASSMENT',
+      caseId,
+    });
+
+    const restored = await pool.query(
+      `select payload from content.outbox_events
+       where type='content.moderation.decided' and payload->>'action'='restore'`,
+    );
+    expect(restored.rows).toHaveLength(1);
+    expect(restored.rows[0].payload).toMatchObject({
+      caseId,
+      targetId: comment.id,
+      action: 'restore',
+      previouslyAutoHidden: true,
+    });
   });
   it('quyết định ẩn riêng sau cascade ngăn khôi phục phản hồi', async () => {
     const root = await add();
