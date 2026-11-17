@@ -6973,6 +6973,29 @@
           "hasMore"
         ]
       },
+      "TripItemHotelDto": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-1",
+            "description": "ID khách sạn"
+          },
+          "productId": {
+            "type": "string",
+            "example": "P-vn-h-da-lat-1--DLX",
+            "description": "Loại phòng người đăng chọn"
+          },
+          "ratePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Gói giá người đăng chọn"
+          }
+        },
+        "required": [
+          "hotelId"
+        ]
+      },
       "TripTransportDto": {
         "type": "object",
         "properties": {
@@ -7022,6 +7045,20 @@
             "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
             "description": "Ghi chú"
           },
+          "time": {
+            "type": "string",
+            "example": "16:30",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Giờ trong ngày (HH:mm)"
+          },
+          "hotel": {
+            "description": "Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripItemHotelDto"
+              }
+            ]
+          },
           "transport": {
             "description": "Phương tiện được chọn khi soạn lộ trình",
             "allOf": [
@@ -7059,6 +7096,21 @@
             "example": "Phú Quốc, Kiên Giang",
             "description": "Điểm đến"
           },
+          "destinationPlaceId": {
+            "type": "string",
+            "example": "phu-quoc",
+            "description": "refId điểm đến lấy từ /api/suggest"
+          },
+          "hotelProductId": {
+            "type": "string",
+            "example": "P-h-pq-01--DLX",
+            "description": "Loại phòng người đăng chọn (productId)"
+          },
+          "hotelRatePlanCode": {
+            "type": "string",
+            "example": "RO",
+            "description": "Gói giá của loại phòng người đăng chọn"
+          },
           "daysCount": {
             "type": "number",
             "example": 3,
@@ -7073,6 +7125,15 @@
             "type": "string",
             "example": "Giá chỉ mang tính chất tham khảo",
             "description": "Lưu ý giá tham khảo"
+          },
+          "posterMediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Ảnh poster riêng của lộ trình (asset ảnh đã tải lên); bỏ trống thì dùng poster video"
+          },
+          "posterUrl": {
+            "type": "string",
+            "description": "Chỉ có trong phản hồi: link ảnh poster của lộ trình"
           },
           "items": {
             "description": "Các mục trong lịch trình",
@@ -13206,6 +13267,23 @@
             "type": "string",
             "nullable": true,
             "description": "Tên khách sạn của mục phòng; vé bay là null"
+          },
+          "propertyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã khách sạn của mục phòng; vé bay là null"
+          },
+          "fromAirport": {
+            "type": "string",
+            "nullable": true,
+            "example": "SGN",
+            "description": "Sân bay đi của vé bay; phòng là null"
+          },
+          "toAirport": {
+            "type": "string",
+            "nullable": true,
+            "example": "CXR",
+            "description": "Sân bay đến của vé bay; phòng là null"
           },
           "date": {
             "type": "string",
