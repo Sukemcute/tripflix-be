@@ -260,6 +260,7 @@ export class ObservabilityService {
     if (query.service) predicates.push(`resource.service.name = ${JSON.stringify(query.service)}`);
     if (query.errorsOnly) predicates.push('status = error');
     if (query.minDurationMs) predicates.push(`duration >= ${query.minDurationMs}ms`);
+    if (!predicates.length) predicates.push('duration >= 0ms');
     const end = Math.floor(Date.now() / 1000);
     try {
       const payload = TraceSearchSchema.parse(

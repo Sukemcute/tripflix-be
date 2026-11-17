@@ -10,6 +10,7 @@ for (let attempt = 0; attempt < 45; attempt++) {
   await setTimeout(1000);
 }
 const service = new ObservabilityService({ ANALYTICS_TEMPO_URL: base });
+const serviceName = `preflight-test-${randomBytes(6).toString('hex')}`;
 const now = BigInt(Date.now()) * 1_000_000n;
 const cases = [
   { name: 'OPTIONS CORS preflight', code: 204, child: true, hidden: true },
@@ -26,9 +27,9 @@ const spans = cases.flatMap((fixture) => {
   const root = { traceId: fixture.id, spanId: id, name: fixture.name, kind: 2, startTimeUnixNano: String(now), endTimeUnixNano: String(now + 100_000_000n), attributes: [{ key: 'http.response.status_code', value: { intValue: String(fixture.code) } }], status: { code: fixture.code >= 500 ? 2 : 0 } };
   return fixture.child ? [root, { ...root, spanId: randomBytes(8).toString('hex'), parentSpanId: id, name: 'SQL child must not bypass root filter', kind: 3 }] : [root];
 });
-const ingest = await fetch('http://127.0.0.1:4319/v1/traces', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resourceSpans: [{ resource: { attributes: [{ key: 'service.name', value: { stringValue: 'preflight-test' } }] }, scopeSpans: [{ scope: { name: 'regression' }, spans }] }] }) });
+const ingest = await fetch('http://127.0.0.1:4319/v1/traces', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resourceSpans: [{ resource: { attributes: [{ key: 'service.name', value: { stringValue: serviceName } }] }, scopeSpans: [{ scope: { name: 'regression' }, spans }] }] }) });
 assert(ingest.ok, `OTLP ingestion: ${ingest.status}`);
-const query = { range: '1h', service: 'preflight-test', errorsOnly: false, minDurationMs: 0 };
+const query = { range: '1h', service: serviceName, errorsOnly: false, minDurationMs: 0 };
 let all;
 for (let attempt = 0; attempt < 45; attempt++) {
   all = await service.listTraces({ ...query, includeSuccessfulPreflights: true });
@@ -43,4 +44,6 @@ const errors = await service.listTraces({ ...query, includeSuccessfulPreflights:
 assert.deepEqual(errors.traces.map((trace) => trace.traceId), cases.filter((fixture) => fixture.code >= 500).map((fixture) => fixture.id));
 const slow = await service.listTraces({ ...query, includeSuccessfulPreflights: false, minDurationMs: 150 });
 assert.equal(slow.traces.length, 0);
+const showAllUnfiltered = await service.listTraces({ range: '1h', errorsOnly: false, minDurationMs: 0, includeSuccessfulPreflights: true });
+assert.equal(showAllUnfiltered.source.status, 'ready', 'Show-all with no other filters uses a valid TraceQL selector');
 console.log(JSON.stringify({ passed: true, all: all.traces.length, default: filtered.traces.length, errors: errors.traces.length, cases: ['hide confirmed preflight with child', 'keep failed preflight', 'keep legacy OPTIONS', 'keep ordinary OPTIONS', 'keep HTTP/non-preflight traces', 'preserve error/duration filters'] }));
