@@ -11,6 +11,7 @@
 - Mọi lượt đổi `comment_count` qua `PostRepository.incrementCounter` (xoá, sửa bình luận bị giữ, kiểm duyệt) gộp luôn phần đệm của bài trong cùng câu. Lỗi tìm ra khi chạy cả bộ test: xoá gốc lúc 8 trả lời còn trong bảng đệm thì trừ 9 trên số 1, `GREATEST(0, …)` chặn về 0, job cộng thêm 8 → còn 0 bình luận mà số đếm là 8.
 - Job cộng dồn khoá các dòng bài (theo thứ tự id) trước rồi mới lấy dòng đệm của đúng các bài đó; làm ngược lại thì khoá chết với lượt xoá đang giữ dòng bài và gộp phần đệm.
 - Migration mới `20261117051316_post_counter_deltas` (chỉ tạo bảng), bảng có trong schema Drizzle. Đã báo anh Phong, Trang.
+- Theo góp ý của anh Phong: đầu migration có `SET LOCAL lock_timeout = '5s'`, vì `ADD CONSTRAINT … REFERENCES posts` chặn ghi bảng `posts`; quá 5 giây thì migrate dừng, không giữ hàng chờ. Đã kiểm migration chạy trong transaction nên `SET LOCAL` có tác dụng (đọc `current_setting('lock_timeout')` lúc migrate = `5s`).
 - Lý do chọn và các hướng đã bỏ (KEY SHARE gây khoá chết, đệm mọi lượt làm lệch số khi kiểm duyệt): artifact "Bình luận chịu tải và realtime", mục 2.4.
 
 ## Đối chiếu "Xong khi"
@@ -20,6 +21,8 @@
 | Số bình luận đúng, chậm ≤ ~1 s | Đạt | Test 30 người gửi: đã cộng + đang đệm = 30, sau job = 30; 3 job chạy cùng lúc không cộng trùng. Sau W1: `comment_count` 19.154 = 19.154 bình luận thật. Tuổi dòng đệm cũ nhất p95 0,97 s |
 | Không chen trả lời vào luồng đang xoá | Đạt | Test "gửi trả lời cùng lúc với xoá gốc" (5 vòng); unit "bài đông nhưng bài vừa bị ẩn" |
 | Xoá, ẩn bình luận khi còn phần đệm: số không lệch | Đạt | Test "xoá gốc khi các trả lời còn nằm trong bảng đệm" (code cũ: 8, sau sửa: 0); "xoá bình luận cùng lúc với lượt cộng dồn: không khoá chết"; test tranh chấp xoá gốc chạy cả bộ 3/3 lần |
+| Phần đệm được cộng đúng một lần (Trang hỏi) | Đạt | Test "lượt cộng dồn lỗi giữa chừng (rollback): phần đệm còn nguyên, lượt sau cộng đúng một lần"; "hai lượt cộng dồn chạy cùng lúc: không cộng trùng" |
+| Lỗi DB không bị hiểu là bài đông (Trang hỏi) | Đạt | Unit "lỗi DB lúc thử khoá dòng bài: ném lỗi ra ngoài, không thêm bình luận, không ghi +1". Chỉ coi là bài đông khi câu khoá chạy thành công mà không trả dòng nào và bài vẫn còn |
 | Bài vắng, kiểm duyệt không đổi hành vi | Đạt | Test "một người gửi một mình: cộng ngay"; `moderation.int.spec.ts`, `pre-publication.int.spec.ts` pass không sửa |
 
 ## Kết quả đo W1 (người gửi liên tục vào cùng một bài, trung vị 3 lần, tắt tracing, cùng máy trong ngày)
@@ -38,8 +41,8 @@ Lưu ý: bộ lấy mẫu gọi `docker exec` liên tục nên tốn thêm CPU t
 
 ## Kết quả kiểm tra
 - `pnpm turbo run lint typecheck test --affected`: 49/49 (lần đầu 48/49, core-api test hết thời gian khi chạy song song cả repo; chạy lại riêng: 2656 pass, 4 skip có sẵn; chạy lại cả repo 49/49).
-- Test tích hợp content 107/107, chạy cả bộ 3 lần liên tiếp đều pass (trước khi sửa: test tranh chấp "trả lời cùng lúc với xoá gốc" fail 3/3 khi chạy cả bộ vì số đếm lệch 7–21); `post-row-lock.int.spec.ts` 9/9.
-- Sau khi sửa: `pnpm turbo run lint typecheck test --affected` 49/49 (core-api 2661 pass, 4 skip có sẵn).
+- Test tích hợp content 107/107, chạy cả bộ 3 lần liên tiếp đều pass (trước khi sửa: test tranh chấp "trả lời cùng lúc với xoá gốc" fail 3/3 khi chạy cả bộ vì số đếm lệch 7–21); `post-row-lock.int.spec.ts` 10/10.
+- Sau khi sửa: `pnpm turbo run lint typecheck test --affected` 49/49 (core-api 2662 pass, 4 skip có sẵn); test tích hợp content 108/108.
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/core-api db:migrate`.

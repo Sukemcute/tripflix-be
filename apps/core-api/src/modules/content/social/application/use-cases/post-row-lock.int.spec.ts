@@ -154,6 +154,30 @@ describe('Khoá dòng bài khi thêm bình luận, thả tim, lưu bài (Postgre
     expect((await readPost()).comment_count).toBe(1);
   });
 
+  it('lượt cộng dồn lỗi giữa chừng (rollback): phần đệm còn nguyên, lượt sau cộng đúng một lần', async () => {
+    await pool.query(
+      'insert into content.post_counter_deltas (post_id, comment_delta) select $1, 1 from generate_series(1, 12)',
+      [postId],
+    );
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const repository = new PostCounterDeltaRepository(createDb(client as unknown as pg.Pool));
+      expect(await repository.flushCommentDeltas(5000)).toEqual({ deltaRows: 12, postCount: 1 });
+      // Giả lập process chết hoặc lỗi sau khi đã cộng và xoá nhưng trước COMMIT.
+      await client.query('rollback');
+    } finally {
+      client.release();
+    }
+    expect((await readPost()).comment_count).toBe(0);
+    expect(await pendingDeltas()).toBe(12);
+
+    await cases.flush.execute();
+    await cases.flush.execute();
+    expect((await readPost()).comment_count).toBe(12);
+    expect(await pendingDeltas()).toBe(0);
+  });
+
   it('xoá gốc khi các trả lời còn nằm trong bảng đệm: số đếm về đúng 0, cộng dồn sau đó không làm lệch', async () => {
     const root = await cases.add.execute({ postId, authorId: AUTHOR, body: 'Gốc' });
     const holder = await pool.connect();
