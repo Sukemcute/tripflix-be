@@ -40,8 +40,8 @@
 - Câu đếm vẫn là câu tốn nhất. Nó tăng theo số bình luận của bài, chỉ nhẹ hơn khoảng 8 lần. Bỏ hẳn câu đếm ở các trang sau thuộc S1, là việc riêng.
 
 ## Kết quả kiểm tra
-- `pnpm turbo run lint typecheck test --affected`: 49/49 (core-api 2661 pass, 4 skip có sẵn).
-- Test tích hợp content: 108/108, chạy 2 lần.
+- `pnpm turbo run lint typecheck test --affected`: 49/49 (core-api 2662 pass, 4 skip có sẵn).
+- Test tích hợp content: 108/108 (2 lần); sau khi gộp bản sửa của #236 và develop mới nhất: 109/109.
 
 ## Cách kiểm lại
 1. `pnpm --filter @tripflix/core-api db:migrate`.
@@ -53,4 +53,5 @@
 
 ## Ảnh hưởng tới phần của người khác
 - `content/db` dùng chung (anh Phong, Trang): thêm 2 index và migration mới, đã báo và được đồng ý.
+- Đầu migration có `SET LOCAL lock_timeout = '5s'` (như góp ý của anh Phong cho migration bảng đệm): phải chờ khoá bảng `comments` quá 5 giây thì migrate dừng, không giữ hàng chờ.
 - `CREATE INDEX` không dùng `CONCURRENTLY`, vì migration chạy trong transaction, nên lúc tạo index sẽ chặn ghi bảng `comments`. Bảng hiện nhỏ nên chỉ chặn trong tích tắc. Khi bảng lớn thì cần tạo index tay bằng `CONCURRENTLY` trước khi chạy migration.
