@@ -325,4 +325,25 @@ describe('tìm', () => {
     // Câu chỉ có nơi: không kéo bài chưa rõ nơi lên.
     expect((await searchExplore(src(videos), 'hà nội')).fallback?.items.map((i) => i.obj.id) ?? []).toEqual([]);
   });
+
+  it('completeness: có thì cộng 0.3×completeness vào quality (post & video), không có giữ công thức cũ', async () => {
+    const posts = [
+      o({ id: 'p_empty', kind: 'post', title: 'Đà Lạt', place: 'Đà Lạt', likes: 10, completeness: 0 }),
+      o({ id: 'p_full', kind: 'post', title: 'Đà Lạt', place: 'Đà Lạt', likes: 10, completeness: 1 }),
+    ];
+    expect(await ids(posts, 'đà lạt')).toEqual(['p_full', 'p_empty']);
+
+    const videos = [
+      o({ id: 'v_empty', kind: 'video', title: 'Đà Lạt', place: 'Đà Lạt', views: 1000, completeness: 0 }),
+      o({ id: 'v_full', kind: 'video', title: 'Đà Lạt', place: 'Đà Lạt', views: 1000, completeness: 1 }),
+    ];
+    expect(await ids(videos, 'đà lạt')).toEqual(['v_full', 'v_empty']);
+
+    // Không có completeness: bài nhiều likes hơn vẫn đứng trên như cũ
+    const legacy = [
+      o({ id: 'p_low', kind: 'post', title: 'Đà Lạt', place: 'Đà Lạt', likes: 5 }),
+      o({ id: 'p_high', kind: 'post', title: 'Đà Lạt', place: 'Đà Lạt', likes: 100 }),
+    ];
+    expect(await ids(legacy, 'đà lạt')).toEqual(['p_high', 'p_low']);
+  });
 });

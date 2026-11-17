@@ -36,9 +36,10 @@ export interface ExploreObject {
   /** Khách sạn: mã trên URL trang chi tiết. Chỉ mục dựng trước khi có field này thì không có. */
   slug?: string | null;
   thumbnail?: string | null;
-  /** Bài: id tác giả và ngày đăng (ISO). Chỉ mục dựng trước khi có field này thì không có. */
+  /** Bài: id tác giả, ngày đăng (ISO) và điểm hoàn thiện 0..1. Chỉ mục dựng trước khi có field này thì không có. */
   authorId?: string | null;
   createdAt?: string | null;
+  completeness?: number | null;
 }
 
 /** Một tài liệu trong chỉ mục của một nhánh. */

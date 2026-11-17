@@ -378,6 +378,16 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     return this.db.select({ postId, authorId, postType, tags, placeId }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
   }
 
+  async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {
+    if (!postIds.length) return new Map();
+    const { builder, version } = splitKey(builderKey);
+    const rows = await this.db
+      .select({ postId: recommendPostScores.postId, score: recommendPostScores.score })
+      .from(recommendPostScores)
+      .where(and(eq(recommendPostScores.builder, builder), eq(recommendPostScores.version, version), inArray(recommendPostScores.postId, postIds)));
+    return new Map(rows.map((r) => [r.postId, Number(r.score)]));
+  }
+
   listHotCandidates(q: CandidateQuery) {
     return this.candidates(q, 'hot', [desc(recommendPostScores.score), desc(recommendPosts.publishedAt), desc(recommendPosts.postId)]);
   }

@@ -82,13 +82,19 @@ export const VERTICALS: readonly Vertical[] = [
     ...base,
     name: 'videos',
     sections: (o) => ['video', ...(o.topics?.includes('plan') ? ['plan'] : [])], // video lộ trình hiện cả ở vùng Lộ trình
-    quality: (o) => Math.min(1, Math.log10(o.views || 1000) / 6.5),
+    quality: (o) => {
+      const baseQ = Math.min(1, Math.log10(o.views || 1000) / 6.5);
+      return typeof o.completeness === 'number' ? 0.7 * baseQ + 0.3 * o.completeness : baseQ;
+    },
     reason: (_, o) => (o.views ? [`${o.views.toLocaleString('en-US').replace(/,/g, '.')} lượt xem`] : []),
   },
   {
     ...base,
     name: 'plans',
-    quality: (o) => (o.kind === 'post' ? Math.min(1, Math.log10((o.likes || 1) + 1) / 4) : bayesQuality(o)),
+    quality: (o) => {
+      const baseQ = o.kind === 'post' ? Math.min(1, Math.log10((o.likes || 1) + 1) / 4) : bayesQuality(o);
+      return typeof o.completeness === 'number' ? 0.7 * baseQ + 0.3 * o.completeness : baseQ;
+    },
     reason: (u, o, isOverBudget) => {
       const why = o.kind === 'plan' ? starsReason(o) : [`♥ ${o.likes ?? 0} · ${o.n ?? 0} bình luận`];
       if (o.cost) why.push(`~${(o.cost / 1e6).toFixed(1)}tr/người${budgetNote(u, isOverBudget)}`);

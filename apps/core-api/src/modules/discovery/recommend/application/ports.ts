@@ -195,6 +195,8 @@ export interface RecommendStore {
   listOwnRecentPostIds(q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]>;
   /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
   findPostMetas(postIds: string[]): Promise<PostMeta[]>;
+  /** Điểm của một post builder (vd 'hot@v2') theo danh sách postId. Bài chưa có điểm không có trong Map. */
+  findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */
   listHotCandidates(q: CandidateQuery): Promise<Candidate[]>;
   /** Bài đăng trong `hours` giờ tới now, mới nhất trước. */
