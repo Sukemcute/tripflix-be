@@ -177,27 +177,31 @@ export class FeedUseCases {
   }
 
   private async buildCards(rows: FeedPostRow[]): Promise<FeedCard[]> {
-    const [playback, authorNames] = await Promise.all([
+    const posterIds = rows.flatMap((row) => (row.tripAttachment?.posterMediaId ? [row.tripAttachment.posterMediaId] : []));
+    const [playback, authorNames, posters] = await Promise.all([
       this.media.getPlayback(rows.flatMap((row) => row.mediaIds)),
       this.access
         ? this.access.getDisplayNames(rows.map((r) => r.authorId)).catch(() => new Map<string, string>())
         : new Map<string, string>(),
+      posterIds.length > 0 ? this.media.getImages(posterIds) : Promise.resolve({} as Awaited<ReturnType<MediaFacade['getImages']>>),
     ]);
     return rows.flatMap((row) => {
       // Một bài có thể có nhiều media; lấy video đầu tiên phát được.
       const mediaId = row.mediaIds.find((id) => playback[id]);
       const video = mediaId ? playback[mediaId] : undefined;
       if (!video) return [];
-      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null)];
+      const posterId = row.tripAttachment?.posterMediaId;
+      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null, posterId ? posters[posterId]?.url : undefined)];
     });
   }
 }
 
-function maskTripAttachment(attachment: TripAttachmentData | null): TripAttachmentData | null {
+function maskTripAttachment(attachment: TripAttachmentData | null, posterUrl?: string): TripAttachmentData | null {
   if (!attachment) return null;
-  const { bookingId: _bookingId, ...rest } = attachment;
+  const { bookingId: _bookingId, posterUrl: _storedPosterUrl, ...rest } = attachment;
   return {
     ...rest,
+    ...(posterUrl ? { posterUrl } : {}),
     priceDisclaimer: attachment.priceDisclaimer ?? 'Giá chỉ mang tính chất tham khảo',
   };
 }
@@ -207,6 +211,7 @@ function buildCard(
   video: PlaybackInfo,
   viewerState: FeedCard['viewerState'],
   authorName: string | null = null,
+  posterUrl?: string,
 ): FeedCard {
   return {
     postId: row.id,
@@ -218,7 +223,7 @@ function buildCard(
     region: null,
     tags: row.hashtags,
     linkedProductIds: [],
-    tripAttachment: maskTripAttachment(row.tripAttachment),
+    tripAttachment: maskTripAttachment(row.tripAttachment, posterUrl),
     counts: {
       likes: row.reactionTotal,
       comments: row.commentCount,
