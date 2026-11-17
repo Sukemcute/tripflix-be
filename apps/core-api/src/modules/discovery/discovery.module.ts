@@ -27,9 +27,11 @@ import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
 import { PlacesController } from './search/api/places.controller.js';
+import { POINTS_OF_INTEREST } from './search/domain/points-of-interest.data.js';
 import { ExploreUseCases } from './search/application/explore.use-cases.js';
 import {
   EXPLORE_CATALOG,
+  EXPLORE_POINTS,
   EXPLORE_STORE,
   HOTEL_CATALOG,
   SUGGEST_STORE,
@@ -99,6 +101,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
     { provide: EXPLORE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleExploreStore(createDb(pools.discovery)) },
+    { provide: EXPLORE_POINTS, useValue: POINTS_OF_INTEREST },
     { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade, AccessFacade], useFactory: exploreCatalog },
     { provide: SEARCH_EVENT_BUS, inject: [REDIS], useFactory: (redis: Redis) => new RedisStreamsEventBus(redis) },
     SearchEventsPublisher,

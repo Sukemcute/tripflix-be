@@ -6,6 +6,8 @@ export const SUGGEST_STORE = Symbol('SUGGEST_STORE');
 export const HOTEL_CATALOG = Symbol('HOTEL_CATALOG');
 export const EXPLORE_STORE = Symbol('EXPLORE_STORE');
 export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
+/** Điểm tham quan, quán ăn, cà phê (OSM, tĩnh) đưa vào chỉ mục. Thật: POINTS_OF_INTEREST. */
+export const EXPLORE_POINTS = Symbol('EXPLORE_POINTS');
 
 /** Chỉ mục tìm khám phá trên Postgres. */
 export interface ExploreStore extends ExploreSource {
