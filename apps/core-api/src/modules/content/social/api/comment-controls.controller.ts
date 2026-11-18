@@ -39,10 +39,24 @@ export class CreatorReviewCommentDto {
   @ApiProperty() id!: string;
   @ApiProperty() postId!: string;
   @ApiProperty() authorId!: string;
+  @ApiProperty({ type: String, nullable: true }) authorName!: string | null;
   @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() platformBlocked!: boolean;
+  @ApiProperty() canApprove!: boolean;
+  @ApiProperty() willPublish!: boolean;
+  @ApiProperty({ type: String, enum: ['post_unavailable', 'parent_unavailable'], nullable: true })
+  approvalBlockReason!: 'post_unavailable' | 'parent_unavailable' | null;
+  @ApiProperty({ type: () => CreatorCommentContextDto, nullable: true })
+  parentContext!: CreatorCommentContextDto | null;
   @ApiProperty() createdAt!: string;
+}
+export class CreatorCommentContextDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['reply', 'thread'] }) kind!: 'reply' | 'thread';
+  @ApiProperty({ type: String, nullable: true }) authorName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) body!: string | null;
+  @ApiProperty() unavailable!: boolean;
 }
 export class CreatorReviewPageDto {
   @ApiProperty({ type: [CreatorReviewCommentDto] }) items!: CreatorReviewCommentDto[];
@@ -111,14 +125,14 @@ export class CommentControlsController {
     @Query(
       new ZodBody(
         z.object({
-          cursor: z.coerce.number().int().min(0).max(1000000).default(0),
+          cursor: z.string().max(1024).optional(),
           limit: z.coerce.number().int().min(1).max(50).default(20),
         }),
       ),
     )
     query: CreatorQueueQueryDto,
   ) {
-    return this.controls.queue(id, user.userId, Number(query.cursor ?? 0), Number(query.limit ?? 20));
+    return this.controls.queue(id, user.userId, query.cursor, Number(query.limit ?? 20));
   }
 
   @Post('comments/:id/creator-decisions')

@@ -6627,6 +6627,134 @@
           "analytics"
         ]
       }
+    },
+    "/api/analytics/user-activity": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày tới hôm nay, tối đa 90 ngày. Sắp theo hoạt động gần nhất.",
+        "operationId": "UserActivityController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActivityListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to, quá 90 ngày hoặc phân trang lạ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số lượt thích, bình luận, chia sẻ, xem, chat",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/user-activity/{userId}": {
+      "get": {
+        "operationId": "UserActivityController_detail",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActivityDetailResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "userId không phải UUID hoặc ngày sai"
+          },
+          "404": {
+            "description": "Không có tài khoản với userId này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết hành vi một người dùng: tên, email đăng ký, số lượt trong khoảng và 50 sự kiện gần nhất",
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
@@ -7569,6 +7697,39 @@
           "keywords"
         ]
       },
+      "CreatorCommentContextDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "thread"
+            ]
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "unavailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "authorName",
+          "body",
+          "unavailable"
+        ]
+      },
       "CreatorReviewCommentDto": {
         "type": "object",
         "properties": {
@@ -7581,6 +7742,10 @@
           "authorId": {
             "type": "string"
           },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
           "parentCommentId": {
             "type": "string",
             "nullable": true
@@ -7591,6 +7756,29 @@
           "platformBlocked": {
             "type": "boolean"
           },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "willPublish": {
+            "type": "boolean"
+          },
+          "approvalBlockReason": {
+            "type": "string",
+            "enum": [
+              "post_unavailable",
+              "parent_unavailable"
+            ],
+            "nullable": true
+          },
+          "parentContext": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CreatorCommentContextDto"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string"
           }
@@ -7599,9 +7787,14 @@
           "id",
           "postId",
           "authorId",
+          "authorName",
           "parentCommentId",
           "body",
           "platformBlocked",
+          "canApprove",
+          "willPublish",
+          "approvalBlockReason",
+          "parentContext",
           "createdAt"
         ]
       },
@@ -15997,6 +16190,237 @@
         "required": [
           "traceId",
           "spans"
+        ]
+      },
+      "UserActivityListItemDto": {
+        "type": "object",
+        "properties": {
+          "reactions": {
+            "type": "number",
+            "example": 12,
+            "description": "Lượt thích (đặt hoặc đổi cảm xúc)"
+          },
+          "comments": {
+            "type": "number",
+            "example": 3
+          },
+          "shares": {
+            "type": "number",
+            "example": 2
+          },
+          "views": {
+            "type": "number",
+            "example": 40,
+            "description": "Lượt xem đủ điều kiện"
+          },
+          "chats": {
+            "type": "number",
+            "example": 5,
+            "description": "Lượt chat với Tripi"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-18T10:20:00.000Z"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null khi tài khoản không còn"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email đăng ký; null khi tài khoản không còn"
+          }
+        },
+        "required": [
+          "reactions",
+          "comments",
+          "shares",
+          "views",
+          "chats",
+          "lastActiveAt",
+          "userId",
+          "displayName",
+          "email"
+        ]
+      },
+      "UserActivityListResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-11-11T17:00:00.000Z",
+            "description": "Đầu khoảng (gồm)"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-18T17:00:00.000Z",
+            "description": "Cuối khoảng (không gồm)"
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 57,
+            "description": "Số người có hoạt động trong khoảng"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserActivityListItemDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "UserActivityCountsDto": {
+        "type": "object",
+        "properties": {
+          "reactions": {
+            "type": "number",
+            "example": 12,
+            "description": "Lượt thích (đặt hoặc đổi cảm xúc)"
+          },
+          "comments": {
+            "type": "number",
+            "example": 3
+          },
+          "shares": {
+            "type": "number",
+            "example": 2
+          },
+          "views": {
+            "type": "number",
+            "example": 40,
+            "description": "Lượt xem đủ điều kiện"
+          },
+          "chats": {
+            "type": "number",
+            "example": 5,
+            "description": "Lượt chat với Tripi"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-18T10:20:00.000Z"
+          }
+        },
+        "required": [
+          "reactions",
+          "comments",
+          "shares",
+          "views",
+          "chats",
+          "lastActiveAt"
+        ]
+      },
+      "UserActivityEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reaction",
+              "comment",
+              "share",
+              "view",
+              "chat"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2026-11-18T10:20:00.000Z"
+          },
+          "targetId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Bài viết liên quan; null với lượt chat"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Chat: question, intent, answerKind, isAction, conversationId. Thích: reaction. Xem: watchedMs, surface."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "occurredAt",
+          "targetId",
+          "detail"
+        ]
+      },
+      "UserActivityDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email đăng ký"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-01T03:00:00.000Z",
+            "description": "Ngày đăng ký"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/UserActivityCountsDto"
+          },
+          "recentEvents": {
+            "description": "50 sự kiện gần nhất trong khoảng",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserActivityEventDto"
+            }
+          },
+          "from": {
+            "type": "string",
+            "example": "2026-11-11T17:00:00.000Z"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-18T17:00:00.000Z"
+          }
+        },
+        "required": [
+          "userId",
+          "displayName",
+          "email",
+          "createdAt",
+          "counts",
+          "recentEvents",
+          "from",
+          "to"
         ]
       }
     }

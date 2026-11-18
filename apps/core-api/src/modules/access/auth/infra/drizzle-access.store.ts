@@ -100,6 +100,14 @@ class DrizzleUserRepository implements UserRepository {
     return this.db.select({ id: users.id, displayName: users.displayName }).from(users).where(inArray(users.id, ids));
   }
 
+  async findContactsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.db
+      .select({ id: users.id, displayName: users.displayName, email: users.email, createdAt: users.createdAt })
+      .from(users)
+      .where(inArray(users.id, ids));
+  }
+
   async lockById(id: string) {
     const [row] = await this.db.select().from(users).where(eq(users.id, id)).for('no key update');
     return row ? mapUserRow(row) : null;
