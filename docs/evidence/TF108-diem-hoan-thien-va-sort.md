@@ -18,6 +18,11 @@
   - Bổ sung `completeness` vào `ExplorePost`, `ExploreObject` (`postToObject`), và công thức `quality` trong `rank.ts` (`0.7 × cũ + 0.3 × completeness` khi có số).
   - Chạy `pnpm contracts:build`.
 
+- **Sửa sau review (18/11)**:
+  - `findPostMetas()` trả thêm `hasPlan`: thiếu cột này thì mode `has_plan` loại mọi bài tự đăng. Test: `post-recommendations.use-cases.spec.ts` (bài tự đăng có/không lịch trình), `drizzle-recommend.store.int.spec.ts`.
+  - `build-features.use-cases.int.spec.ts` kiểm `hot@v2` thay vì `hot@v1` (migration đã chuyển thuật toán sang `hot@v2`).
+  - Điểm lịch trình chấm theo mức đầy đủ thay vì có/không: `0,3 × (0,6 × độ phủ ngày + 0,4 × tỉ lệ mục có nơi)`; độ phủ ngày = số ngày 1..`daysCount` có mục ÷ `daysCount` (thiếu thì lấy ngày lớn nhất). Thông tin chuyến chia đều điểm đến / số ngày / chi phí (mỗi thứ 0,05). `hasPlan` cần ít nhất một mục lịch trình (chỉ ghi số ngày không tính). Mọi phần là tỉ lệ nên không ưu tiên chuyến dài hơn. Test: `completeness.spec.ts`.
+
 ## Đối chiếu "Xong khi"
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
