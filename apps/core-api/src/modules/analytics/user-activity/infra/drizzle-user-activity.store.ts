@@ -13,7 +13,8 @@ const countColumns = {
   shares: countKind('share'),
   views: countKind('view'),
   chats: countKind('chat'),
-  lastActiveAt: sql<Date | null>`max(${userActivityEvents.occurredAt})`,
+  // Drizzle chỉ đổi chuỗi thời gian sang Date cho cột khai báo; giá trị từ SQL thô vẫn là chuỗi.
+  lastActiveAt: sql<Date | string | null>`max(${userActivityEvents.occurredAt})`,
 };
 
 export class DrizzleUserActivityStore implements UserActivityStore {
@@ -89,13 +90,13 @@ export class DrizzleUserActivityStore implements UserActivityStore {
   }
 }
 
-function toCounts(row: {
+export function toCounts(row: {
   reactions: number;
   comments: number;
   shares: number;
   views: number;
   chats: number;
-  lastActiveAt: Date | null;
+  lastActiveAt: Date | string | null;
 } | undefined): UserActivityCounts {
   return {
     reactions: Number(row?.reactions ?? 0),
@@ -103,7 +104,7 @@ function toCounts(row: {
     shares: Number(row?.shares ?? 0),
     views: Number(row?.views ?? 0),
     chats: Number(row?.chats ?? 0),
-    lastActiveAt: row?.lastActiveAt ?? null,
+    lastActiveAt: row?.lastActiveAt ? new Date(row.lastActiveAt) : null,
   };
 }
 
