@@ -59,6 +59,10 @@ export function assertMediaKindsForPostType(
   }
 }
 
+/** Loại điểm gợi ý trong lộ trình; app dùng để chọn icon (TF105). */
+export const TRIP_ITEM_CATEGORIES = ['cafe', 'food', 'fun', 'other'] as const;
+export type TripItemCategory = (typeof TRIP_ITEM_CATEGORIES)[number];
+
 export interface TripItineraryItem {
   day: number;
   title: string;
@@ -66,6 +70,8 @@ export interface TripItineraryItem {
   notes?: string;
   /** Giờ trong ngày (HH:mm), tuỳ chọn (TF105). */
   time?: string;
+  /** Loại điểm gợi ý để app chọn icon, tuỳ chọn (TF105). */
+  category?: TripItemCategory;
   /** Khách sạn và loại phòng của điểm khách sạn này; một chuyến có thể ở nhiều khách sạn (TF105). */
   hotel?: {
     hotelId: string;
@@ -287,6 +293,7 @@ export class Post {
         location: item.location,
         notes: item.notes,
         time: item.time,
+        ...(item.category && { category: item.category }),
         ...(item.hotel && {
           hotel: {
             hotelId: item.hotel.hotelId,

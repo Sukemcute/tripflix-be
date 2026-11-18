@@ -1,4 +1,9 @@
-import { assertMediaKindsForPostType, PostMediaNotAllowedException, type PostMediaInfo } from '../../domain/index.js';
+import {
+  assertMediaKindsForPostType,
+  PostMediaNotAllowedException,
+  TRIP_ITEM_CATEGORIES,
+  type PostMediaInfo,
+} from '../../domain/index.js';
 import type { PostType, TripAttachmentData } from '../../../db/schema/index.js';
 import type { PostMediaPort } from '../ports/post-media.port.js';
 
@@ -30,9 +35,11 @@ export async function prepareTripAttachment<T extends TripAttachmentData | null 
 ): Promise<T> {
   if (!attachment) return attachment;
   const { posterUrl: _posterUrl, ...rest } = attachment;
-  const items = rest.items?.map(({ time, hotel, ...item }) => ({
+  const items = rest.items?.map(({ time, hotel, category, ...item }) => ({
     ...item,
     ...(time && TRIP_TIME_PATTERN.test(time) ? { time } : {}),
+    // Loại điểm gợi ý (TF105): chỉ giữ giá trị app biết, giá trị lạ thì bỏ để app tự đoán icon.
+    ...(category && (TRIP_ITEM_CATEGORIES as readonly string[]).includes(category) ? { category } : {}),
     // Khách sạn của từng điểm (TF105): chỉ giữ khi có mã khách sạn, bỏ trường lạ client gửi kèm.
     ...(hotel && typeof hotel.hotelId === 'string' && hotel.hotelId
       ? {
