@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MediaFacade, PlaybackInfo } from '../../media/media.facade.js';
-import type { FeedCursor } from '../domain/feed-cursor.js';
-import { FEED_FIRST_PAGE_TTL_SECONDS, FeedUseCases } from './feed.use-cases.js';
+import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
+import { FEED_FIRST_PAGE_TTL_SECONDS, FeedUseCases, HOT_IDS_MAX_LIMIT, InvalidHotCursorError } from './feed.use-cases.js';
 import type { FeedPageCache, FeedPostRow, FeedStore, SharedFeedPage } from './ports.js';
 
 const row = (id: string): FeedPostRow => ({
@@ -231,3 +231,63 @@ describe('FeedUseCases poster lộ trình (TF105)', () => {
     expect(page.items.map((card) => card.isVerified)).toEqual([true, false]);
   });
 });
+
+describe('FeedUseCases.getHotIds (TF110)', () => {
+  it('trả id theo đúng thứ tự tab hot, mỗi bài kèm cursor hot có seed của trang đầu', async () => {
+    const { store, feed } = setup();
+
+    const page = await feed.getHotIds({ limit: 10, cursor: null });
+
+    expect(page.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(page.nextCursor).toBeNull();
+    expect(store.listHotPosts).toHaveBeenCalledWith({ limit: 11, after: null, seed: 0 });
+    expect(peekCursor(page.items[0]!.cursor)).toMatchObject({ id: 'p2', score: 1, seed: 0 });
+  });
+
+  it('bỏ bài chưa có video phát được nhưng cursor vẫn đi qua bài đó', async () => {
+    const { store, feed, media } = setupWithMedia((ids) => ids.filter((id) => id !== 'media-p1'));
+    store.listHotPosts.mockResolvedValueOnce([row('p2'), row('p1'), row('p3')]);
+
+    const page = await feed.getHotIds({ limit: 2, cursor: null });
+
+    expect(page.items.map((item) => item.postId)).toEqual(['p2']);
+    expect(peekCursor(page.nextCursor!)).toMatchObject({ id: 'p1' });
+    expect(media.getPlayback).toHaveBeenCalledWith(['media-p2', 'media-p1']);
+  });
+
+  it('trang sau dùng cursor của bài đã dùng cuối cùng và giữ seed', async () => {
+    const { store, feed } = setup();
+    const cursor = encodeFeedCursor({ at: '2026-11-11T00:00:00.000000Z', id: '11111111-1111-4111-8111-111111111111', score: 3, seed: 5 });
+
+    await feed.getHotIds({ limit: 5, cursor });
+
+    expect(store.listHotPosts).toHaveBeenCalledWith({ limit: 6, after: expect.objectContaining({ score: 3, seed: 5 }), seed: 5 });
+  });
+
+  it('cursor hỏng hoặc của tab Dành cho bạn thì báo InvalidHotCursorError, limit sai thì RangeError', async () => {
+    const { feed } = setup();
+    const forYouCursor = encodeFeedCursor({
+      at: '2026-11-11T00:00:00.000000Z',
+      id: '11111111-1111-4111-8111-111111111111',
+      rank: 0.5,
+      seed: 1,
+      asOf: '2026-11-11T00:00:00.000Z',
+    });
+
+    await expect(feed.getHotIds({ limit: 5, cursor: 'khong-phai-cursor' })).rejects.toBeInstanceOf(InvalidHotCursorError);
+    await expect(feed.getHotIds({ limit: 5, cursor: forYouCursor })).rejects.toBeInstanceOf(InvalidHotCursorError);
+    await expect(feed.getHotIds({ limit: 0, cursor: null })).rejects.toBeInstanceOf(RangeError);
+    await expect(feed.getHotIds({ limit: HOT_IDS_MAX_LIMIT + 1, cursor: null })).rejects.toBeInstanceOf(RangeError);
+  });
+});
+
+/** Id trong test không phải uuid nên decodeFeedCursor sẽ từ chối; chỉ đọc nội dung cursor. */
+const peekCursor = (cursor: string) => JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as FeedCursor;
+
+function setupWithMedia(playableIds: (ids: string[]) => string[]) {
+  const base = setup();
+  const media = {
+    getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(playableIds(ids).map((id) => [id, playback(id)])))),
+  } as unknown as MediaFacade;
+  return { store: base.store, media, feed: new FeedUseCases(base.store, media, undefined, undefined, () => 0) };
+}
