@@ -471,6 +471,7 @@ export const ContentPostSharedV1Schema = z.object({
 /**
  * ai.chat.turn.recorded v1 (stream:ai, TF177): một lượt chat của người đã đăng nhập; khách không có sự kiện.
  * Khớp contracts/events/ai.chat.turn.recorded.v1.schema.json bên tripflix-ai. intent và answerKind là chuỗi để dễ thêm giá trị mới.
+ * Mô tả cả phong bì (eventId, userId…) vì tripflix-ai phát sự kiện này theo phong bì đầy đủ, như ai.usage.recorded.
  */
 export const AiChatTurnRecordedV1Schema = z.object({
   eventId: z.uuid(),
