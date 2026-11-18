@@ -211,7 +211,7 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     const stats = await store.getAdminStats(new Date());
     expect(stats).toMatchObject({ interactionsLast10m: 2, interactionsLast24h: 2, posts: 1, usersWithFeatures: 1 });
     expect(stats.jobStates).toContainEqual({ name: 'hot@v0', lastRunAt: NOW, lastError: 'boom' });
-    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat' }]);
+    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', hasPlan: false }]);
   });
 
   it('khoá advisory: lượt thứ hai cùng lúc bỏ lượt', async () => {

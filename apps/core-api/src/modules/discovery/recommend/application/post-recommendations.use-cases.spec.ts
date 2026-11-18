@@ -42,7 +42,7 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
     findPostMetas: vi.fn(async (postIds: string[]) =>
-      postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang' })),
+      postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang', hasPlan: false })),
     ),
   };
   /** Bài vừa tương tác: id → lúc (ms), như ZSET 2 giờ trong Redis. */
@@ -326,6 +326,24 @@ describe('PostRecommendationUseCases', () => {
     // Trang sau qua cursor giữ nguyên mode has_plan dù request không truyền hoặc truyền khác
     const page2 = await useCases.recommend(query({ mode: 'has_plan', limit: 5, cursor: userPage.nextCursor, userId: U }));
     expect(page2.items.every((i) => !userPage.items.map((x) => x.post.id).includes(i.post.id))).toBe(true);
+  });
+
+  it('mode has_plan: bài tự đăng có lịch trình vẫn hiện, bài tự đăng không lịch trình bị lọc (findPostMetas trả hasPlan)', async () => {
+    const { useCases, store } = setup();
+    const hotPlan = Array.from({ length: 6 }, (_, i) => cand(`hp0${i}`, { score: 0.9 - i / 100, hasPlan: true }));
+    store.listHotCandidates.mockImplementation(async (q: CandidateQuery) => (q.hasPlan ? hotPlan : []));
+    store.listFreshCandidates.mockResolvedValue([]);
+    store.listExplorePool.mockResolvedValue([]);
+    store.listOwnRecentPostIds.mockResolvedValue(['own-plan', 'own-no-plan']);
+    store.findPostMetas.mockImplementation(async (postIds: string[]) =>
+      postIds.map((postId) => ({ postId, authorId: U, postType: 'video', tags: ['dalat'], placeId: 'da-lat', hasPlan: postId === 'own-plan' })),
+    );
+
+    const page = await useCases.recommend(query({ mode: 'has_plan', limit: 5, userId: U }));
+    const ids = page.items.map((i) => i.post.id);
+    expect(ids).toContain('own-plan');
+    expect(ids).not.toContain('own-no-plan');
+    expect(page.items.find((i) => i.post.id === 'own-plan')!.reason.code).toBe('own_post');
   });
 
   it('mode recent: đúng thứ tự mới nhất, không explore/ranker, phân trang không lặp không sót', async () => {

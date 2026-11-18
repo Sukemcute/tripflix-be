@@ -374,8 +374,9 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
 
   async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
     if (!postIds.length) return [];
-    const { postId, authorId, postType, tags, placeId } = recommendPosts;
-    return this.db.select({ postId, authorId, postType, tags, placeId }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
+    const { postId, authorId, postType, tags, placeId, hasPlan } = recommendPosts;
+    // hasPlan: mode has_plan lọc bài tự đăng (own) theo cờ này; thiếu thì mọi bài tự đăng bị loại.
+    return this.db.select({ postId, authorId, postType, tags, placeId, hasPlan }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
   }
 
   async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {
