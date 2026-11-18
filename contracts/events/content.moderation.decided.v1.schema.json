@@ -46,6 +46,9 @@
     },
     "previouslyAutoHidden": {
       "type": "boolean"
+    },
+    "resultingStatus": {
+      "type": "string"
     }
   },
   "required": [

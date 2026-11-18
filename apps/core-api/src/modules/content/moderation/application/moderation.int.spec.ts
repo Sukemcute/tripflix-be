@@ -25,6 +25,7 @@ import { AdminModeratePostUseCase } from '../../social/application/use-cases/adm
 import { AddCommentUseCase } from '../../social/application/use-cases/add-comment.use-case.js';
 import { DeleteCommentUseCase } from '../../social/application/use-cases/delete-comment.use-case.js';
 import { EditCommentUseCase } from '../../social/application/use-cases/edit-comment.use-case.js';
+import { CommentControlsUseCases } from '../../social/application/comment-controls.use-cases.js';
 import { GetPostSummaryUseCase } from '../../social/application/use-cases/get-post-summary.use-case.js';
 import { SavePostSummaryUseCase } from '../../social/application/use-cases/save-post-summary.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
@@ -66,6 +67,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       repository,
       recovery: new ClaimDeferredScansUseCase(repository, outbox),
       comments,
+      controls: new CommentControlsUseCases(() => tx.tx, outbox),
       summaries,
       visibility,
       moderate,
@@ -139,6 +141,121 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     return (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
       .comment_count;
   }
+  it('chủ bài bật/tắt bình luận và người khác không được đổi cài đặt hoặc xem hàng chờ', async () => {
+    const member = randomUUID();
+    await expect(cases.controls.updateSettings(postId, member, { enabled: false, keywords: [] })).rejects.toThrow('Chỉ chủ bài');
+    await expect(cases.controls.queue(postId, member, 0, 20)).rejects.toThrow('Chỉ chủ bài');
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: false, keywords: ['đặt cọc'] });
+    await expect(cases.add.execute({ postId, authorId: member, body: 'Bình thường' })).rejects.toThrow('Chủ bài đã tắt');
+    expect((await cases.controls.permissions(postId)).enabled).toBe(false);
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: [] });
+    expect((await cases.controls.permissions(postId)).enabled).toBe(true);
+  });
+
+  it('keyword giữ bình luận, không đếm public; duyệt lặp chỉ công khai và phát created đúng một lần', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['đặt cọc'] });
+    const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Xin ĐẶT CỌC trước nhé' });
+    expect(held).toMatchObject({ status: 'held', creatorReview: 'pending', platformHeld: false });
+    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(0);
+    expect((await cases.controls.queue(postId, AUTHOR, 0, 1)).items[0]?.id).toBe(held.id);
+    await Promise.all([cases.controls.decide(held.id, AUTHOR, 'approve'), cases.controls.decide(held.id, AUTHOR, 'approve')]);
+    expect((await cases.comments.findById(held.id))?.status).toBe('visible');
+    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(1);
+    expect((await pool.query("select id from content.outbox_events where type='content.comment.created' and payload->>'commentId'=$1", [held.id])).rowCount).toBe(1);
+  });
+
+  it('creator approve không vượt platform hold; platform restore không vượt creator reject', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Cần lọc bình luận này' });
+    await pool.query('update content.comments set platform_held=true where id=$1', [held.id]);
+    await cases.controls.decide(held.id, AUTHOR, 'approve');
+    expect((await cases.comments.findById(held.id))?.status).toBe('held');
+    await hide(held.id, 'restore');
+    expect((await cases.comments.findById(held.id))?.status).toBe('visible');
+    const rejected = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Cần lọc tiếp' });
+    await cases.controls.decide(rejected.id, AUTHOR, 'reject');
+    await hide(rejected.id);
+    await hide(rejected.id, 'restore');
+    expect((await cases.comments.findById(rejected.id))).toMatchObject({ status: 'held', creatorReview: 'rejected' });
+  });
+
+  it('đổi settings không tự nhả bình luận đã giữ; quyết định creator rollback nếu outbox lỗi', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Cần lọc tiếp' });
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: [] });
+    expect((await cases.comments.findById(held.id))?.status).toBe('held');
+    failOutbox = true;
+    await expect(cases.controls.decide(held.id, AUTHOR, 'approve')).rejects.toThrow('outbox unavailable');
+    expect((await cases.comments.findById(held.id))).toMatchObject({ status: 'held', creatorReview: 'pending' });
+  });
+
+  it('từ chối lặp không đổi đếm; người khác không được duyệt; tác giả xóa thì rời hàng chờ', async () => {
+    const member = randomUUID();
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({ postId, authorId: member, body: 'Cần lọc' });
+    await expect(cases.controls.decide(held.id, member, 'approve')).rejects.toThrow('Chỉ chủ bài');
+    await cases.controls.decide(held.id, AUTHOR, 'reject');
+    await cases.controls.decide(held.id, AUTHOR, 'reject');
+    await expect(cases.controls.decide(held.id, AUTHOR, 'approve')).rejects.toThrow('đã được xử lý');
+    expect(await count()).toBe(0);
+    const pending = await cases.add.execute({ postId, authorId: member, body: 'Cần lọc tiếp' });
+    await cases.delete.execute({ commentId: pending.id, userId: member });
+    expect((await cases.controls.queue(postId, AUTHOR, 0, 20)).items).toHaveLength(0);
+    await expect(cases.controls.decide(pending.id, AUTHOR, 'approve')).rejects.toThrow('Không tìm thấy');
+    expect(await count()).toBe(0);
+  });
+
+  it('không tự nhả khi sửa bỏ keyword; chủ bài được bỏ qua bộ lọc của chính mình', async () => {
+    const member = randomUUID();
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const own = await cases.add.execute({ postId, authorId: AUTHOR, body: 'lọc' });
+    expect(own.status).toBe('visible');
+    const held = await cases.add.execute({ postId, authorId: member, body: 'Cần lọc' });
+    await cases.edit.execute({ commentId: held.id, userId: member, body: 'Đã sửa sạch' });
+    expect(await cases.comments.findById(held.id)).toMatchObject({ status: 'held', creatorReview: 'pending' });
+    await cases.controls.decide(held.id, AUTHOR, 'approve');
+    expect(await count()).toBe(2);
+  });
+
+  it('hàng chờ phân trang và không lộ cài đặt bài riêng tư khi tắt bình luận', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    for (let i = 0; i < 3; i++) await cases.add.execute({ postId, authorId: randomUUID(), body: `Cần lọc ${i}` });
+    const first = await cases.controls.queue(postId, AUTHOR, 0, 2);
+    const next = await cases.controls.queue(postId, AUTHOR, Number(first.nextCursor), 2);
+    expect(new Set([...first.items, ...next.items].map(item => item.id)).size).toBe(3);
+    expect(next.nextCursor).toBeNull();
+    await pool.query("update content.posts set visibility='private', comments_enabled=false where id=$1", [postId]);
+    await expect(cases.controls.permissions(postId)).rejects.toThrow('Không tìm thấy');
+    await expect(cases.add.execute({ postId, authorId: randomUUID(), body: 'Bình thường' })).rejects.toThrow('Không tìm thấy');
+  });
+
+  it('AI gắn cờ khi creator đang giữ phải thêm platform hold trước khi chủ bài duyệt', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Cần lọc tiếp' });
+    const target = (await cases.repository.loadTarget('comment', held.id))!;
+    await cases.screen.execute(randomUUID(), target, { id: `comment:${held.id}`, flagged: false, scores: {}, categories: {}, model: 'clean' });
+    expect((await cases.repository.queue({ view: 'pending', limit: 20, offset: 0 })).total).toBe(0);
+    await cases.screen.execute(randomUUID(), target, { id: `comment:${held.id}`, flagged: true, scores: { harassment: 0.99 }, categories: { harassment: true }, model: 'test' });
+    expect((await cases.comments.findById(held.id))?.platformHeld).toBe(true);
+    await cases.controls.decide(held.id, AUTHOR, 'approve');
+    expect((await cases.comments.findById(held.id))?.status).toBe('held');
+  });
+
+  it('sửa gốc bị keyword giữ phải giữ reply; staff restore không nhả reply khi chủ bài chưa duyệt', async () => {
+    const member = randomUUID();
+    const root = await cases.add.execute({ postId, authorId: member, body: 'Bình thường' });
+    const child = await cases.add.execute({ postId, authorId: randomUUID(), parentCommentId: root.id, body: 'Phản hồi sạch' });
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    await cases.edit.execute({ commentId: root.id, userId: member, body: 'Cần lọc' });
+    expect((await cases.comments.findById(child.id))?.status).toBe('held');
+    await hide(root.id, 'restore');
+    expect((await cases.comments.findById(child.id))?.status).toBe('held');
+    await cases.controls.decide(root.id, AUTHOR, 'approve');
+    expect((await cases.comments.findById(root.id))?.status).toBe('visible');
+    expect((await cases.comments.findById(child.id))?.status).toBe('visible');
+    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(2);
+  });
+
   it('scan ghi tín hiệu staff trong transaction và rollback khi outbox lỗi', async () => {
     const eventId = randomUUID();
     const target = (await cases.repository.loadTarget('post', postId))!;

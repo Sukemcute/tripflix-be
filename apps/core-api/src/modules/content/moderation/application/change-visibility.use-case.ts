@@ -150,16 +150,21 @@ export class ChangeVisibilityUseCase {
           }
           continue;
         }
-        if ((record.status === 'removed' && command.action !== 'restore') || record.status === newStatus)
+        const creatorRestricted = (record.creatorReview && record.creatorReview !== 'approved') ||
+          (isChild && root.creatorReview && root.creatorReview !== 'approved');
+        const recordStatus = command.action === 'restore' && creatorRestricted ? 'held' : newStatus;
+        if ((record.status === 'removed' && command.action !== 'restore') || (record.status === recordStatus && command.action !== 'restore'))
           continue;
         const [updated] = await db
           .update(comments)
           .set({
-            status: newStatus as 'visible' | 'hidden' | 'removed',
+            status: recordStatus as 'visible' | 'held' | 'hidden' | 'removed',
+            ...(command.action === 'restore' ? { platformHeld: false } : {}),
+            ...(recordStatus === 'visible' ? { publishedAt: record.publishedAt ?? new Date() } : {}),
             updatedAt: new Date(),
             deletedAt: null,
-            hiddenByActionId: ['hide', 'remove'].includes(command.action) ? actionId : null,
-            cascadeRootCommentId: ['hide', 'remove'].includes(command.action) && isChild ? root.id : null,
+            hiddenByActionId: ['hide', 'remove'].includes(command.action) ? actionId : recordStatus === 'held' ? record.hiddenByActionId : null,
+            cascadeRootCommentId: ['hide', 'remove'].includes(command.action) && isChild ? root.id : recordStatus === 'held' ? record.cascadeRootCommentId : null,
           })
           .where(
             and(eq(comments.id, record.id), eq(comments.status, record.status), isNull(comments.deletedAt)),
@@ -172,7 +177,7 @@ export class ChangeVisibilityUseCase {
             body: updated.body,
             parentCommentId: updated.parentCommentId,
             previousStatus: record.status,
-            wasPublic: Boolean(record.hiddenByActionId),
+            wasPublic: record.publishedAt === undefined ? Boolean(record.hiddenByActionId) : Boolean(record.publishedAt),
             status: updated.status,
           });
       }
@@ -181,6 +186,7 @@ export class ChangeVisibilityUseCase {
         0,
       );
       if (delta) await this.postRepository.incrementCounter(target.postId, 'commentCount', delta);
+      newStatus = (await this.repository.loadTarget(command.targetType, command.targetId))?.status ?? newStatus;
     }
     if (target.targetType === 'comment' || command.action === 'dismiss')
       await this.repository.db.insert(moderationActions).values({
@@ -268,6 +274,7 @@ export class ChangeVisibilityUseCase {
           action: command.action,
           reasonCode: command.reasonCode,
           isAutomatic: command.actorType === 'system',
+          resultingStatus: newStatus,
           ...(previouslyAutoHidden ? { previouslyAutoHidden: true } : {}),
         },
       });
@@ -287,6 +294,7 @@ export class ChangeVisibilityUseCase {
           authorId: target.authorId,
           action: command.action,
           reasonCode: command.reasonCode,
+          resultingStatus: newStatus,
           ...(previouslyAutoHidden ? { previouslyAutoHidden: true } : {}),
         },
       });

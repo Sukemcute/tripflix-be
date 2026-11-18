@@ -85,6 +85,7 @@ export class ListBookmarksUseCase {
       const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
       return {
         ...post,
+        commentKeywords: undefined,
         tripAttachment: domainPost.getMaskedTripAttachment(),
         authorName: authorNames.get(post.authorId) ?? null,
         viewerContext: { myReaction: myReactions.get(post.id) ?? null, isBookmarked: true },

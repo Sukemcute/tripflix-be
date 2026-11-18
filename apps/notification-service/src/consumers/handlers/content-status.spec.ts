@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { createContentStatusHandlers } from './content-status.js';
 
 describe('comment moderation notifications', () => {
+  it.each(['content.comment.moderation_action.v1', 'content.moderation.decided.v1'] as const)('không thông báo đã hiển thị khi chủ bài vẫn giữ: %s', async (type) => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const inbox = { insert: vi.fn(), countUnread: vi.fn() };
+    const handlers = createContentStatusHandlers({ inbox, log: vi.fn() });
+    await handlers[type]!({ eventId: id, payload: {
+      actionId: id, caseId: id, postId: id, commentId: id, targetId: id, targetType: 'comment',
+      authorId: id, action: 'restore', reasonCode: 'OTHER', isAutomatic: false, resultingStatus: 'held',
+    } } as never);
+    expect(inbox.insert).not.toHaveBeenCalled();
+  });
   it('thông báo quyết định bình luận trực tiếp kèm mã quyết định', async () => {
     const id = '11111111-1111-4111-8111-111111111111';
     const inbox = { insert: vi.fn().mockResolvedValue(null), countUnread: vi.fn() };

@@ -12,6 +12,10 @@ import { PostShareLinks } from './social/application/post-share-links.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { createCommerceServicePort } from './social/infra/commerce-service.adapter.js';
 import { FollowsController } from './social/api/follows.controller.js';
+import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
+import { contentIdempotencyKeys } from './db/schema/index.js';
+import { CommentControlsController } from './social/api/comment-controls.controller.js';
+import { CommentControlsUseCases } from './social/application/comment-controls.use-cases.js';
 import { FollowRepository } from './social/infra/follow.repository.js';
 import { ContentFacade } from './content.facade.js';
 import { contentOutboxEvents } from './db/schema/index.js';
@@ -91,8 +95,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
  * Module khác chỉ dùng những gì được export trong index.ts (ContentFacade).
  */
 @Module({
-  imports: [MediaModule, FeedModule, AccessModule, ModerationModule],
+  imports: [MediaModule, FeedModule, AccessModule, ModerationModule,
+    IdempotencyModule.forFeature({ inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleIdempotencyStore(createDb(pools.content), contentIdempotencyKeys) }),
+  ],
   controllers: [
+    CommentControlsController,
     PostsController,
     ReactionsController,
     CommentsController,
@@ -103,6 +110,11 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     AiSummaryInternalController,
   ],
   providers: [
+    {
+      provide: CommentControlsUseCases,
+      inject: [buildTransactionHostToken('content'), CONTENT_OUTBOX],
+      useFactory: (host: ModuleTransactionHost, outbox: ContentOutbox) => new CommentControlsUseCases(() => host.tx, outbox),
+    },
     // Link chia sẻ bài trỏ về web theo môi trường (WEB_APP_URL), không ghi cứng tên miền.
     {
       provide: PostShareLinks,

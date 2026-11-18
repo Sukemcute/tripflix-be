@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "75fbaaf7-c3d8-4861-99b9-c4f6cfcd447e",
+  "prevIds": [
+    "e499436a-43f1-46b6-9087-80fd2c966088"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "comments",
+        "published_at"
+      ],
+      "writes": [
+        "s|col|content.comments.published_at",
+        "n|col|content.comments.published_at",
+        "e|col|content.comments.published_at"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "published_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

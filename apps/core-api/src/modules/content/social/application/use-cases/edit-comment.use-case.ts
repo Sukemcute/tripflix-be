@@ -6,6 +6,7 @@ import { CommentRepository } from '../../infra/comment.repository.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostVisibility } from '../../../db/schema/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
+import { matchesCommentKeywords } from '../../domain/comment-filter.js';
 
 export interface EditCommentCommand {
   commentId: string;
@@ -34,6 +35,8 @@ export class EditCommentUseCase {
       throw new CommentNotFoundException(command.commentId);
     }
     let postVisibility: PostVisibility | undefined;
+    let creatorHeld = record.creatorReview === 'pending' || record.creatorReview === 'rejected';
+    const platformHeld = shouldHold || Boolean(record.platformHeld);
     if (this.postRepository) {
       const post = this.postRepository.findByIdForUpdate
         ? await this.postRepository.findByIdForUpdate(record.postId)
@@ -41,6 +44,7 @@ export class EditCommentUseCase {
       if (!post || post.status !== 'published' || post.deletedAt)
         throw new CommentNotFoundException(command.commentId);
       postVisibility = post.visibility;
+      creatorHeld ||= command.userId !== post.authorId && matchesCommentKeywords(command.body, post.commentKeywords ?? []);
     }
 
     // Khoá theo cùng thứ tự với moderation: bài trước, bình luận sau.
@@ -63,6 +67,7 @@ export class EditCommentUseCase {
 
     domainComment.updateBody(command.userId, command.body);
 
+    shouldHold ||= creatorHeld;
     let heldCount = 0;
     if (shouldHold && record.status === 'visible') {
       if (!this.postRepository) throw new Error('PostRepository is required to hold an edited comment');
@@ -71,6 +76,8 @@ export class EditCommentUseCase {
     const updated = await this.commentRepository.update(command.commentId, {
       body: domainComment.body,
       isEdited: true,
+      ...(platformHeld ? { platformHeld: true } : {}),
+      ...(creatorHeld ? { creatorReview: 'pending' as const } : {}),
       ...(shouldHold ? { status: 'held' as const } : {}),
     });
 
