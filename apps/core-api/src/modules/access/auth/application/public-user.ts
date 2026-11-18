@@ -28,8 +28,9 @@ export interface MyProfile extends PublicUser {
   dateOfBirth: string | null;
   gender: UserRecord['personal']['gender'];
   nationality: string | null;
+  avatarUrl: string | null;
 }
 
 export function mapMyProfile(user: UserRecord): MyProfile {
-  return { ...mapPublicUser(user), emailVerified: user.emailVerifiedAt !== null, ...user.personal };
+  return { ...mapPublicUser(user), emailVerified: user.emailVerifiedAt !== null, ...user.personal, avatarUrl: user.avatarUrl };
 }

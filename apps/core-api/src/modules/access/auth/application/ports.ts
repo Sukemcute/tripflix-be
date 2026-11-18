@@ -18,7 +18,13 @@ export interface UserRecord {
   emailVerifiedAt: Date | null;
   /** Thông tin cá nhân (TF06M), chỉ trả cho chủ tài khoản. */
   personal: PersonalInfo;
+  /** Ảnh đại diện (TF109); null: chưa có ảnh. */
+  avatarUrl: string | null;
+  /** null: chưa từng có ảnh. none: tự xoá, Google không ghi lại. */
+  avatarSource: AvatarSource | null;
 }
+
+export type AvatarSource = 'upload' | 'google' | 'none';
 
 /** Các trường hồ sơ chủ tài khoản tự sửa; trường nào không có thì giữ nguyên. */
 export type ProfilePatch = Partial<Pick<UserRecord, 'displayName'> & PersonalInfo>;
@@ -86,6 +92,8 @@ export interface GoogleIdentity {
   subject: string;
   email: string;
   name: string | null;
+  /** Claim picture: link ảnh Google, null nếu không có. */
+  picture: string | null;
 }
 
 export interface GoogleIdTokenVerifier {
@@ -114,7 +122,17 @@ export type NewUser = Pick<UserRecord, 'email' | 'passwordHash' | 'displayName' 
   emailVerifiedAt?: Date | null;
   personal?: Pick<PersonalInfo, 'dateOfBirth' | 'gender' | 'nationality'>;
   terms?: { version: string; acceptedAt: Date };
+  /** Chỉ khi tạo qua Google có ảnh (TF109). */
+  avatar?: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>;
 };
+
+export const AVATAR_IMAGES = Symbol('AVATAR_IMAGES');
+
+/** Ảnh người dùng đã tải lên qua /media/uploads (module content/media). */
+export interface AvatarImages {
+  /** Link CDN của ảnh đã tải xong thuộc ownerId; id không tồn tại, của người khác, là video hay chưa xong thì null. */
+  findOwnedImageUrl(ownerId: string, mediaId: string): Promise<string | null>;
+}
 
 export interface PublicUserSearchOptions {
   /** Từ khoá đã chuẩn hoá và bỏ dấu (foldVietnamese). */
@@ -149,6 +167,7 @@ export interface UserRepository {
   updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;
   /** passwordHash null: xoá mật khẩu (tài khoản chỉ còn đăng nhập Google). */
   updatePasswordHash(id: string, passwordHash: string | null): Promise<UserRecord | null>;
+  updateAvatar(id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>): Promise<UserRecord | null>;
   /** Đặt email_verified_at nếu đang trống (giữ mốc đầu tiên); trả người dùng sau khi đổi. */
   markEmailVerified(id: string, at: Date): Promise<UserRecord | null>;
 }
@@ -179,6 +198,7 @@ export type AuditAction =
   | 'auth.logout_all'
   | 'auth.session_revoked'
   | 'auth.profile_updated'
+  | 'auth.avatar_updated'
   | 'auth.password_changed'
   | 'auth.password_change_failed'
   | 'auth.password_reset_requested'

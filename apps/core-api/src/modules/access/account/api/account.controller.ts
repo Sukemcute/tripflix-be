@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Req,
   Res,
   UseFilters,
@@ -28,6 +29,8 @@ import {
   ChangePasswordDto,
   ChangePasswordRequestSchema,
   SessionDto,
+  SetAvatarDto,
+  SetAvatarRequestSchema,
   UpdateProfileDto,
   UpdateProfileRequestSchema,
 } from './dto.js';
@@ -55,6 +58,25 @@ export class AccountController {
     @Req() req: Request,
   ) {
     return this.account.updateProfile(user, body, readRequestMeta(req));
+  }
+
+  /** Đặt ảnh đại diện (TF109): tải ảnh lên qua POST /media/uploads trước, rồi gửi mediaId. Ảnh không hợp lệ: 400. */
+  @Put('me/avatar')
+  @ApiBody({ type: SetAvatarDto })
+  @ApiOkResponse({ type: MyProfileDto })
+  setAvatar(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(SetAvatarRequestSchema)) body: z.infer<typeof SetAvatarRequestSchema>,
+    @Req() req: Request,
+  ) {
+    return this.account.setAvatar(user, body.mediaId, readRequestMeta(req));
+  }
+
+  /** Xoá ảnh đại diện; đăng nhập Google sau đó không tự gắn lại ảnh Google. */
+  @Delete('me/avatar')
+  @ApiOkResponse({ type: MyProfileDto })
+  removeAvatar(@CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.account.removeAvatar(user, readRequestMeta(req));
   }
 
   /** Sai mật khẩu hiện tại: 400. Đổi xong thì các thiết bị khác bị đăng xuất, thiết bị này vẫn dùng tiếp. */

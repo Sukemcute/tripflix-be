@@ -27,6 +27,10 @@ export const users = accessSchema.table(
     // Sở thích chọn ở onboarding (TF106): { status, interests, regions, budgetLevels, updatedAt }, kiểm ở dto. Chỉ lưu, chưa module nào đọc.
     travelPreferences: jsonb('travel_preferences').$type<TravelPreferences>(),
     // Bản Điều khoản sử dụng đã đồng ý và lúc đồng ý (TF06O). Trống: tài khoản tạo trước đó hoặc qua Google.
+    // Ảnh đại diện (TF109): link ảnh hiển thị. source: upload tự tải lên, google lấy từ claim picture, none tự xoá.
+    // Trống cả hai: chưa từng có ảnh; đăng nhập Google chỉ ghi ảnh khi source trống hoặc google.
+    avatarUrl: text('avatar_url'),
+    avatarSource: text('avatar_source'),
     termsVersion: text('terms_version'),
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     role: text('role').notNull().default('member'),
@@ -41,6 +45,7 @@ export const users = accessSchema.table(
     check('ck_users_role', sql`${t.role} in ('member', 'moderator', 'superadmin')`),
     check('ck_users_status', sql`${t.status} in ('active', 'locked')`),
     check('ck_users_email_lowercase', sql`${t.email} = lower(${t.email})`),
+    check('ck_users_avatar_source', sql`${t.avatarSource} is null or ${t.avatarSource} in ('upload', 'google', 'none')`),
     check('ck_users_gender', sql`${t.gender} is null or ${t.gender} in ('male', 'female', 'other')`),
     check('ck_users_nationality', sql`${t.nationality} is null or ${t.nationality} ~ '^[A-Z]{2}$'`),
     check('ck_users_phone', sql`${t.phone} is null or ${t.phone} ~ '^[+]?[0-9]{8,15}$'`),

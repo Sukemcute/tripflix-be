@@ -14,7 +14,7 @@ import type { CoreEnv } from '../../platform/env.js';
 import { applyGlobalPrefix } from '../../platform/http.js';
 import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
 import { AccessModule } from './access.module.js';
-import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER, PASSWORD_HASHER } from './auth/application/ports.js';
+import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, AVATAR_IMAGES, LOGIN_RATE_LIMITER, PASSWORD_HASHER, type AvatarImages } from './auth/application/ports.js';
 import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
 import { GOOGLE_LOGIN_FAILED_MESSAGE, INVALID_CREDENTIALS_MESSAGE } from './auth/domain/credentials.js';
 import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
@@ -24,6 +24,9 @@ const WEB_CLIENT_ID = 'tripflix-web.apps.googleusercontent.com';
 const ANDROID_CLIENT_ID = 'tripflix-android.apps.googleusercontent.com';
 const KID = 'google-fake-1';
 const PASSWORD = 'mat-khau-an-toan';
+const GOOGLE_PHOTO = 'https://lh3.googleusercontent.com/a/anh-google';
+const UPLOADED_MEDIA_ID = '11111111-1111-4111-8111-111111111111';
+const UPLOADED_URL = 'https://cdn.example.com/media/anh-tu-tai.jpg';
 
 describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
   let app: INestApplication;
@@ -98,6 +101,11 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
       .useValue(new MemoryLoginRateLimiter())
       .overrideProvider(ACCESS_SID_BLOCKLIST)
       .useValue(new MemorySidBlocklist())
+      // Ảnh đã tải xong của đúng chủ thì nhận; id khác coi như của người khác hay chưa xong.
+      .overrideProvider(AVATAR_IMAGES)
+      .useValue({
+        findOwnedImageUrl: async (_ownerId, mediaId) => (mediaId === UPLOADED_MEDIA_ID ? UPLOADED_URL : null),
+      } satisfies AvatarImages)
       .compile();
     app = moduleRef.createNestApplication({ logger: false });
     applyGlobalPrefix(app);
@@ -250,5 +258,49 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
     expect(res.body).not.toHaveProperty('refreshToken');
     expect(String(res.headers['set-cookie'])).toMatch(/tripflix_refresh=.+HttpOnly/);
     await google(token, { 'X-Tripflix-Client': 'web', Origin: 'https://evil.example' }).expect(403);
+  });
+
+  describe('TF109: ảnh đại diện', () => {
+    const profileEvents = (userId: string) =>
+      store.outboxRows.filter((e) => e.type === 'access.user.profile_updated' && e.userId === userId).map((e) => e.payload);
+    const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+    it('Google lần đầu: lấy picture làm ảnh, sự kiện registered mang ảnh; đổi ảnh Google thì lần sau cập nhật', async () => {
+      const first = await google(await googleToken({ sub: 'sub-anh', email: 'anh@gmail.com', picture: GOOGLE_PHOTO })).expect(200);
+      const userId = decodeJwt(first.body.accessToken).sub!;
+      const me = await http().get('/api/auth/me').set(bearer(first.body.accessToken)).expect(200);
+      expect(me.body.avatarUrl).toBe(GOOGLE_PHOTO);
+      expect(store.outboxRows.find((e) => e.type === 'access.user.registered' && e.userId === userId)?.payload).toMatchObject({ avatarUrl: GOOGLE_PHOTO });
+
+      await google(await googleToken({ sub: 'sub-anh', email: 'anh@gmail.com', picture: `${GOOGLE_PHOTO}-moi` })).expect(200);
+      expect(store.userRows.get(userId)).toMatchObject({ avatarUrl: `${GOOGLE_PHOTO}-moi`, avatarSource: 'google' });
+      expect(profileEvents(userId)).toEqual([{ userId, displayName: 'Khang Nguyễn', avatarUrl: `${GOOGLE_PHOTO}-moi` }]);
+      await http().get(`/api/v1/users/${userId}/avatar`).expect(302).expect('Location', `${GOOGLE_PHOTO}-moi`);
+    });
+
+    it('tự tải ảnh rồi đăng nhập Google: không bị ghi đè; xoá ảnh thì Google cũng không gắn lại', async () => {
+      const first = await google(await googleToken({ sub: 'sub-tu-tai', email: 'tu-tai@gmail.com', picture: GOOGLE_PHOTO })).expect(200);
+      const userId = decodeJwt(first.body.accessToken).sub!;
+
+      const set = await http().put('/api/auth/me/avatar').set(bearer(first.body.accessToken)).send({ mediaId: UPLOADED_MEDIA_ID }).expect(200);
+      expect(set.body.avatarUrl).toBe(UPLOADED_URL);
+      await google(await googleToken({ sub: 'sub-tu-tai', email: 'tu-tai@gmail.com', picture: `${GOOGLE_PHOTO}-khac` })).expect(200);
+      expect(store.userRows.get(userId)).toMatchObject({ avatarUrl: UPLOADED_URL, avatarSource: 'upload' });
+
+      const removed = await http().delete('/api/auth/me/avatar').set(bearer(first.body.accessToken)).expect(200);
+      expect(removed.body.avatarUrl).toBeNull();
+      await google(await googleToken({ sub: 'sub-tu-tai', email: 'tu-tai@gmail.com', picture: GOOGLE_PHOTO })).expect(200);
+      expect(store.userRows.get(userId)).toMatchObject({ avatarUrl: null, avatarSource: 'none' });
+      expect(profileEvents(userId).map((e) => e.avatarUrl)).toEqual([UPLOADED_URL, null]);
+      await http().get(`/api/v1/users/${userId}/avatar`).expect(404);
+    });
+
+    it('ảnh không phải của mình hoặc chưa tải xong: 400; mediaId sai dạng: 400; chưa đăng nhập: 401', async () => {
+      const res = await google(await googleToken({ sub: 'sub-sai-anh', email: 'sai-anh@gmail.com' })).expect(200);
+      await http().put('/api/auth/me/avatar').set(bearer(res.body.accessToken)).send({ mediaId: '22222222-2222-4222-8222-222222222222' }).expect(400);
+      await http().put('/api/auth/me/avatar').set(bearer(res.body.accessToken)).send({ mediaId: 'khong-phai-uuid' }).expect(400);
+      await http().put('/api/auth/me/avatar').send({ mediaId: UPLOADED_MEDIA_ID }).expect(401);
+      expect(store.userRows.get(decodeJwt(res.body.accessToken).sub!)?.avatarUrl).toBeNull();
+    });
   });
 });

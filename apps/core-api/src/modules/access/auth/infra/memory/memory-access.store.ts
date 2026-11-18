@@ -41,7 +41,7 @@ export class MemoryAccessStore implements AccessStore {
         return u ? [{ id: u.id, displayName: u.displayName }] : [];
       }),
     lockById: async (id: string) => this.userRows.get(id) ?? null,
-    insert: async ({ emailVerifiedAt = null, personal, terms, ...user }: NewUser) => {
+    insert: async ({ emailVerifiedAt = null, personal, terms, avatar, ...user }: NewUser) => {
       if ([...this.userRows.values()].some((u) => u.email === user.email)) return null;
       const row: UserRecord = {
         ...user,
@@ -50,6 +50,8 @@ export class MemoryAccessStore implements AccessStore {
         createdAt: new Date(),
         emailVerifiedAt,
         personal: { phone: null, dateOfBirth: null, gender: null, nationality: null, travelPreferences: null, ...personal },
+        avatarUrl: avatar?.avatarUrl ?? null,
+        avatarSource: avatar?.avatarSource ?? null,
       };
       if (terms) this.acceptedTerms.set(row.id, terms);
       this.userRows.set(row.id, row);
@@ -86,6 +88,7 @@ export class MemoryAccessStore implements AccessStore {
       });
     },
     updatePasswordHash: async (id: string, passwordHash: string | null) => this.patchUser(id, { passwordHash }),
+    updateAvatar: async (id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>) => this.patchUser(id, avatar),
     markEmailVerified: async (id: string, at: Date) => {
       const row = this.userRows.get(id);
       if (!row) return null;

@@ -64,7 +64,7 @@ const SHARED_INBOX_ROWS = `
   SELECT job.post_id AS id, f.follower_id AS user_id, 'follow.post.published' AS type,
     'Có bài viết mới' AS title,
     COALESCE(NULLIF(btrim(actor.display_name), ''), 'Người bạn theo dõi') || ' vừa đăng bài mới.' AS body,
-    '/trips/' || job.post_id AS link, jsonb_build_object('postId', job.post_id) AS data,
+    '/trips/' || job.post_id AS link, jsonb_build_object('postId', job.post_id, 'actorIds', jsonb_build_array(f.author_id::text)) AS data,
     'follower-post:' || job.post_id AS source_event_id, job.shared_created_at AS created_at, receipt.read_at
   FROM notification_follows f
   JOIN follower_post_jobs job ON job.author_id = f.author_id

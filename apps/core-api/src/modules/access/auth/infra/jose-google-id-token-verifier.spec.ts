@@ -29,7 +29,17 @@ describe('JoseGoogleIdTokenVerifier', () => {
       subject: 'sub-1',
       email: 'a@gmail.com',
       name: null,
+      picture: null,
     });
+  });
+
+  it('TF109: lấy ảnh picture khi là link https, link khác thì bỏ', async () => {
+    const verifier = new JoseGoogleIdTokenVerifier(keys, ['web-client']);
+    const verify = async (picture: unknown) =>
+      (await verifier.verify(await sign({ email: 'a@gmail.com', email_verified: true, picture }))).picture;
+    expect(await verify('https://lh3.googleusercontent.com/a/x')).toBe('https://lh3.googleusercontent.com/a/x');
+    expect(await verify('http://lh3.googleusercontent.com/a/x')).toBeNull();
+    expect(await verify(42)).toBeNull();
   });
 
   it('thiếu email: google_invalid', async () => {

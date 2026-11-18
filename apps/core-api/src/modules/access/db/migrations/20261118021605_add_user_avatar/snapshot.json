@@ -1,0 +1,110 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "35a887ec-e254-4894-a732-957a16ec442f",
+  "prevIds": [
+    "6b4cb5ae-fc27-493d-bc51-0a8c011d7ee3"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "avatar_url"
+      ],
+      "writes": [
+        "s|col|access.users.avatar_url",
+        "n|col|access.users.avatar_url",
+        "e|col|access.users.avatar_url"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "avatar_source"
+      ],
+      "writes": [
+        "s|col|access.users.avatar_source",
+        "n|col|access.users.avatar_source",
+        "e|col|access.users.avatar_source"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "access",
+        "users"
+      ],
+      "writes": [
+        "s|ck|access.users.ck_users_avatar_source",
+        "n|ck|access.users.ck_users_avatar_source",
+        "e|ck|access.users.ck_users_avatar_source",
+        "n|con|access.users.ck_users_avatar_source"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.avatar_source"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "avatar_url",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "avatar_source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "ck_users_avatar_source",
+        "value": "\"avatar_source\" is null or \"avatar_source\" in ('upload', 'google', 'none')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

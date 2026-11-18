@@ -49,6 +49,7 @@ export class AccessErrorFilter implements ExceptionFilter {
         // Quy tắc quản lý nhân viên chặn thao tác (tự khoá mình, hạ quyền superadmin...).
         http = new ConflictException(err.message);
         break;
+      case 'invalid_avatar':
       case 'invalid_reset_token':
       case 'invalid_verify_token':
       case 'invalid_registration_code':

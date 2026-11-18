@@ -47,6 +47,19 @@ describe('Directory của Notification trên PostgreSQL', () => {
     expect(mailer.sent).toHaveLength(0);
   });
 
+  it('TF109: lưu ảnh đại diện; sự kiện cũ không có avatarUrl thì giữ ảnh, null thì xoá', async () => {
+    const userId = randomUUID();
+    const at = (minute: number) => `2026-11-12T10:0${minute}:00.000Z`;
+    const avatarOf = async () =>
+      (await pool.query('SELECT avatar_url FROM user_directory WHERE user_id = $1', [userId])).rows[0]?.avatar_url;
+    await router.route(event('access.user.registered', at(1), { userId, displayName: 'An', avatarUrl: 'https://anh/1' }));
+    expect(await avatarOf()).toBe('https://anh/1');
+    await router.route(event('access.user.profile_updated', at(2), { userId, displayName: 'An mới' }));
+    expect(await avatarOf()).toBe('https://anh/1');
+    await router.route(event('access.user.profile_updated', at(3), { userId, displayName: 'An mới', avatarUrl: null }));
+    expect(await avatarOf()).toBeNull();
+  });
+
   it('đồng bộ bài đã đăng và giữ dấu xóa khi nhận sai thứ tự', async () => {
     const authorId = randomUUID();
     const publishedId = randomUUID();

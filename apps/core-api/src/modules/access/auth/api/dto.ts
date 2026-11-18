@@ -223,6 +223,8 @@ export class MyProfileDto extends UserDto {
   @ApiProperty({ type: String, nullable: true, example: 'VN' }) nationality!: string | null;
   @ApiProperty({ type: TravelPreferencesDto, nullable: true, description: 'null: chưa làm khảo sát sở thích' })
   travelPreferences!: TravelPreferencesDto | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Ảnh đại diện (TF109). null: chưa có, app hiện chữ cái đầu của tên' })
+  avatarUrl!: string | null;
 }
 
 export class JwksDto {

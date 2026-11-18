@@ -1,5 +1,5 @@
-import { Controller, Get, Header, Inject, Query, Req, UseFilters } from '@nestjs/common';
-import { ApiOkResponse, ApiProperty, ApiQuery, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
+import { Controller, Get, Header, Inject, NotFoundException, Param, ParseUUIDPipe, Query, Redirect, Req, UseFilters } from '@nestjs/common';
+import { ApiFoundResponse, ApiNotFoundResponse, ApiOkResponse, ApiProperty, ApiQuery, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
@@ -79,5 +79,21 @@ export class UserSearchController {
   @ApiTooManyRequestsResponse({ description: TOO_MANY_SEARCHES_MESSAGE })
   search(@Query(new ZodBody(UserSearchQuerySchema)) query: z.infer<typeof UserSearchQuerySchema>, @Req() req: Request) {
     return this.users.searchPublic({ ...query, ip: readRequestMeta(req).ip });
+  }
+
+  /**
+   * Ảnh đại diện của một người (TF109): chuyển hướng 302 tới ảnh. Web và app chỉ cần id tác giả là hiện được ảnh,
+   * không cần API bài viết hay bình luận trả thêm link. Chưa có ảnh: 404, app hiện chữ cái đầu của tên.
+   */
+  @Get(':id/avatar')
+  // shortcut: ảnh mới đổi chậm tối đa 5 phút ở máy người khác; cần nhanh hơn thì thêm ?v= theo lần đổi.
+  @Header('Cache-Control', 'public, max-age=300')
+  @Redirect()
+  @ApiFoundResponse({ description: 'Location là link ảnh' })
+  @ApiNotFoundResponse({ description: 'Chưa có ảnh' })
+  async avatar(@Param('id', new ParseUUIDPipe()) userId: string) {
+    const url = await this.users.findAvatarUrl(userId);
+    if (!url) throw new NotFoundException('Chưa có ảnh đại diện');
+    return { url, statusCode: 302 };
   }
 }

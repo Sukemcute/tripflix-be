@@ -24,8 +24,11 @@
 | `POST /api/auth/google` `{ idToken, deviceName? }` | Ai cũng được | Như `login`. Lần đầu tạo `member` không có mật khẩu (hoặc liên kết vào tài khoản trùng email), lần sau vào đúng tài khoản đó. Token sai: `401 "Đăng nhập bằng Google không thành công"`. Chưa đặt `GOOGLE_CLIENT_IDS`: `503`. Chế độ web (cookie) như `login` |
 | `POST /api/auth/refresh` `{ refreshToken }` | Có refresh token | Cặp token mới, token cũ hết dùng được. Web, admin để body trống, token đọc từ cookie (xem "Web, admin: refresh token trong cookie") |
 | `POST /api/auth/logout` | Bearer access token | `204`. Xoá phiên, access token của phiên bị từ chối ngay. Có cookie thì xoá cookie |
-| `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `emailVerified`, `phone`, `dateOfBirth`, `gender`, `nationality` (có thể `null`) |
+| `GET /api/auth/me` | Bearer access token | Hồ sơ của chính mình: thông tin người dùng + `emailVerified`, `phone`, `dateOfBirth`, `gender`, `nationality`, `avatarUrl` (có thể `null`) |
 | `PATCH /api/auth/me` `{ displayName?, phone?, dateOfBirth?, gender?, nationality? }` | Bearer access token | Hồ sơ sau khi sửa. Chỉ gửi trường muốn đổi, gửi `null` hoặc `""` để xoá (trừ tên). Sai định dạng: `400 { errors: [{ field, message }] }` (xem "Thông tin cá nhân" bên dưới) |
+| `PUT /api/auth/me/avatar` `{ mediaId }` | Bearer access token | TF109: đặt ảnh đại diện từ ảnh đã tải xong qua `POST /api/media/uploads`. Ảnh của người khác, video hay chưa tải xong: `400`. Trả hồ sơ có `avatarUrl` |
+| `DELETE /api/auth/me/avatar` | Bearer access token | TF109: xoá ảnh; đăng nhập Google sau đó không tự gắn lại ảnh Google |
+| `GET /api/v1/users/:id/avatar` | Không | TF109: `302` tới ảnh đại diện (cache 5 phút), chưa có ảnh hoặc tài khoản khoá: `404`. Web, app chỉ cần id tác giả là hiện được ảnh |
 | `POST /api/auth/password/change` `{ encCurrentPassword, encNewPassword }` | Bearer access token | `204`. Thiết bị khác bị đăng xuất, thiết bị đang gọi dùng tiếp. Sai mật khẩu hiện tại: `400` (không phải `401`, để client không tưởng token hết hạn) |
 | `GET /api/auth/sessions` | Bearer access token | Thiết bị đang đăng nhập: `{ id, deviceName, userAgent, createdAt, lastUsedAt, isCurrent }`, dùng gần nhất trước |
 | `DELETE /api/auth/sessions/{id}` | Bearer access token | `204`. Thoát thiết bị đó, token của nó nhận `401` ngay. Phiên không phải của mình: `404` |
@@ -291,3 +294,9 @@ Transaction: use case đặt `@Transactional('access')` trên hàm nhỏ chỉ g
 - Redis giới hạn yêu cầu gửi mã theo IP và địa chỉ email, đồng thời giới hạn thử mã theo IP và mã yêu cầu. Dịch vụ từ chối xử lý khi không đọc được bộ giới hạn.
 - Audit: `auth.email_verification_requested` (`meta.reason`), `auth.email_verified` (`meta.via`: `link`, `google`).
 - Gửi email thật trên server: `deploy/SERVER.md`, Giai đoạn 4 (Amazon SES).
+
+## Ảnh đại diện (TF109)
+
+- `users.avatar_url` là link ảnh, `avatar_source` cho biết nguồn: `upload` tự tải, `google` lấy từ claim `picture`, `none` đã tự xoá.
+- Đăng nhập Google chỉ ghi ảnh khi `avatar_source` trống hoặc là `google`, và ghi lại mỗi lần đăng nhập vì link Google đổi khi họ đổi ảnh. Không copy ảnh Google về kho.
+- Đổi ảnh phát `access.user.profile_updated` có `avatarUrl` (null là đã xoá); notification-service lưu vào `user_directory.avatar_url`.

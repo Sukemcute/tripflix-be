@@ -470,6 +470,66 @@
         ]
       }
     },
+    "/api/auth/me/avatar": {
+      "put": {
+        "operationId": "AccountController_setAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAvatarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      },
+      "delete": {
+        "operationId": "AccountController_removeAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/password/change": {
       "post": {
         "operationId": "AccountController_changePassword",
@@ -1052,6 +1112,32 @@
           },
           "429": {
             "description": "Bạn tìm kiếm quá nhanh, vui lòng thử lại sau ít phút"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/avatar": {
+      "get": {
+        "operationId": "UserSearchController_avatar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Location là link ảnh"
+          },
+          "404": {
+            "description": "Chưa có ảnh"
           }
         },
         "tags": [
@@ -6982,6 +7068,11 @@
                 "$ref": "#/components/schemas/TravelPreferencesDto"
               }
             ]
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ảnh đại diện (TF109). null: chưa có, app hiện chữ cái đầu của tên"
           }
         },
         "required": [
@@ -6995,7 +7086,8 @@
           "dateOfBirth",
           "gender",
           "nationality",
-          "travelPreferences"
+          "travelPreferences",
+          "avatarUrl"
         ]
       },
       "UpdateProfileDto": {
@@ -7045,6 +7137,19 @@
             ]
           }
         }
+      },
+      "SetAvatarDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "assetId của ảnh đã tải lên xong qua POST /media/uploads"
+          }
+        },
+        "required": [
+          "mediaId"
+        ]
       },
       "ChangePasswordDto": {
         "type": "object",
