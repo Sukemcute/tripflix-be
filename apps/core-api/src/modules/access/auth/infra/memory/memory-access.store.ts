@@ -40,6 +40,11 @@ export class MemoryAccessStore implements AccessStore {
         const u = this.userRows.get(id);
         return u ? [{ id: u.id, displayName: u.displayName }] : [];
       }),
+    findContactsByIds: async (ids: string[]) =>
+      ids.flatMap((id) => {
+        const u = this.userRows.get(id);
+        return u ? [{ id: u.id, displayName: u.displayName, email: u.email, createdAt: u.createdAt }] : [];
+      }),
     lockById: async (id: string) => this.userRows.get(id) ?? null,
     insert: async ({ emailVerifiedAt = null, personal, terms, avatar, ...user }: NewUser) => {
       if ([...this.userRows.values()].some((u) => u.email === user.email)) return null;

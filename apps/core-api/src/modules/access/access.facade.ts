@@ -18,4 +18,20 @@ export class AccessFacade {
     const users = await this.store.users.findDisplayNamesByIds(ids);
     return new Map(users.map((u) => [u.id, u.displayName]));
   }
+
+  /** Tên, email đăng ký và ngày đăng ký theo id, cho trang admin theo dõi hành vi (TF177). Id không tồn tại thì không có trong Map. */
+  async getUserContacts(userIds: string[]): Promise<Map<string, UserContact>> {
+    const ids = [...new Set(userIds)].filter((id) => UUID.test(id));
+    if (ids.length === 0) return new Map();
+    const users = await this.store.users.findContactsByIds(ids);
+    return new Map(
+      users.map((u) => [u.id, { displayName: u.displayName, email: u.email, createdAt: u.createdAt }]),
+    );
+  }
+}
+
+export interface UserContact {
+  displayName: string;
+  email: string;
+  createdAt: Date;
 }

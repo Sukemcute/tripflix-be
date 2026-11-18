@@ -152,6 +152,8 @@ export interface UserRepository {
   findByIds(ids: string[]): Promise<UserRecord[]>;
   /** Chỉ id và tên hiển thị theo id, không đọc hash mật khẩu hay thông tin cá nhân; id không tồn tại thì bỏ qua. */
   findDisplayNamesByIds(ids: string[]): Promise<Pick<UserRecord, 'id' | 'displayName'>[]>;
+  /** Tên, email đăng ký và ngày đăng ký theo id (cho trang admin theo dõi hành vi, TF177); không đọc hash mật khẩu. */
+  findContactsByIds(ids: string[]): Promise<Pick<UserRecord, 'id' | 'displayName' | 'email' | 'createdAt'>[]>;
   /** Trả null khi email đã có người dùng. */
   insert(user: NewUser): Promise<UserRecord | null>;
   listStaff(): Promise<UserRecord[]>;
