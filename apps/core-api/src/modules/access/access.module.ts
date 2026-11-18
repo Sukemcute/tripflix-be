@@ -1,4 +1,5 @@
 import { Logger, Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import {
   AuthModule,
   RedisSidBlocklist,
@@ -27,6 +28,7 @@ import { AuthUseCases } from './auth/application/auth.use-cases.js';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  AVATAR_IMAGES,
   ACTION_RATE_LIMITER,
   CLOCK,
   GOOGLE_VERIFIER,
@@ -54,6 +56,7 @@ import { ServiceTokenController } from './service/api/service-token.controller.j
 import { ServiceTokenUseCases } from './service/application/service-token.use-cases.js';
 import { CORE_API_SERVICE_AUDIENCE } from './service/domain/service-client-rules.js';
 import { AccessFacade } from './access.facade.js';
+import { createMediaAvatarImages } from './account/infra/media-avatar-images.js';
 import { AdminController } from './staff/api/admin.controller.js';
 import { StaffUseCases } from './staff/application/staff.use-cases.js';
 
@@ -181,6 +184,7 @@ export class AccessInfraModule {}
     AccessOutboxRelay,
     AccessCleanupJob,
     AccessFacade,
+    { provide: AVATAR_IMAGES, inject: [ModuleRef], useFactory: (moduleRef: ModuleRef) => createMediaAvatarImages(moduleRef) },
   ],
   exports: [AccessFacade],
 })

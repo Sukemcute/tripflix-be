@@ -38,6 +38,7 @@ export class JoseGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
       subject: payload.sub,
       email: payload.email,
       name: typeof payload.name === 'string' && payload.name.trim() ? payload.name.trim() : null,
+      picture: typeof payload.picture === 'string' && payload.picture.startsWith('https://') ? payload.picture : null,
     };
   }
 }

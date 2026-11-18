@@ -6,6 +6,7 @@ import type {
   AccessRegistrationAttemptedExistingV1,
   AccessRegistrationCodeRequestedV1,
   AccessSessionReuseDetectedV1,
+  AccessUserProfileUpdatedV1,
   AccessUserRegisteredV1,
   AccessUserWelcomeEmailRequestedV1,
 } from '@tripflix/contracts';
@@ -446,7 +447,7 @@ export class AuthUseCases {
     });
     if (!created) return null;
     await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
-    const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName };
+    const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName, avatarUrl: created.avatarUrl };
     await this.store.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
     const welcome: AccessUserWelcomeEmailRequestedV1 = {
       userId: created.id,
@@ -474,7 +475,7 @@ export class AuthUseCases {
     const linkedUserId = await this.store.identities.findUserId('google', identity.subject);
     if (linkedUserId) {
       const linked = await this.store.users.findById(linkedUserId);
-      if (linked) return { user: await this.ensureVerified(linked, meta), revokedSids: [] };
+      if (linked) return { user: await this.syncGoogleAvatar(await this.ensureVerified(linked, meta), identity.picture), revokedSids: [] };
     }
     const email = normalizeEmail(identity.email);
     const link = { provider: 'google' as const, subject: identity.subject, email };
@@ -492,13 +493,31 @@ export class AuthUseCases {
         meta: { email, ...(isTakeoverRisk ? { clearedUnverifiedPassword: true, revokedSessions: revokedSids.length } : {}) },
       });
       const current = (await this.store.users.findById(existing.id)) ?? existing;
-      return { user: await this.ensureVerified(current, meta), revokedSids };
+      return { user: await this.syncGoogleAvatar(await this.ensureVerified(current, meta), identity.picture), revokedSids };
     }
-    const created = await this.insertMember({ email, passwordHash: null, displayName: buildDisplayName(identity.name, email) }, meta, 'google');
+    const avatar = identity.picture ? { avatarUrl: identity.picture, avatarSource: 'google' as const } : undefined;
+    const created = await this.insertMember(
+      { email, passwordHash: null, displayName: buildDisplayName(identity.name, email), ...(avatar ? { avatar } : {}) },
+      meta,
+      'google',
+    );
     // Request khác vừa tạo cùng email: lỗi để client thử lại, lần sau sẽ vào nhánh liên kết ở trên.
     if (!created) throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
     await this.linkIdentity({ ...link, userId: created.id });
     return { user: created, revokedSids: [] };
+  }
+
+  /**
+   * Gọi trong transaction đang mở. Ảnh Google chỉ ghi khi người dùng chưa tự tải hay tự xoá ảnh (TF109); mỗi lần
+   * đăng nhập ghi lại vì link Google đổi khi họ đổi ảnh, nên không copy ảnh về kho của mình.
+   */
+  private async syncGoogleAvatar(user: UserRecord, picture: string | null): Promise<UserRecord> {
+    const isGoogleOwned = user.avatarSource === null || user.avatarSource === 'google';
+    if (!picture || !isGoogleOwned || user.avatarUrl === picture) return user;
+    const updated = (await this.store.users.updateAvatar(user.id, { avatarUrl: picture, avatarSource: 'google' })) ?? user;
+    const payload: AccessUserProfileUpdatedV1 = { userId: user.id, displayName: updated.displayName, avatarUrl: picture };
+    await this.store.outbox.add({ type: 'access.user.profile_updated', userId: user.id, payload });
+    return updated;
   }
 
   /** Gọi trong transaction đang mở: đăng nhập bằng Google chứng minh sở hữu email, đánh dấu đã xác thực nếu chưa. */

@@ -6,14 +6,20 @@ import { DB } from '../tokens.js';
 export class DirectoryRepository {
   constructor(@Inject(DB) private readonly pool: pg.Pool) {}
 
-  async upsertUser(user: { userId: string; displayName: string }, updatedAt: string): Promise<void> {
+  /** avatarUrl undefined (sự kiện cũ, chỉ đổi tên): giữ ảnh đang lưu. */
+  async upsertUser(
+    user: { userId: string; displayName: string; avatarUrl?: string | null | undefined },
+    updatedAt: string,
+  ): Promise<void> {
     await this.pool.query(
-      `INSERT INTO user_directory (user_id, display_name, updated_at)
-       VALUES ($1, $2, $3)
+      `INSERT INTO user_directory (user_id, display_name, avatar_url, updated_at)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id) DO UPDATE
-       SET display_name = EXCLUDED.display_name, updated_at = EXCLUDED.updated_at
+       SET display_name = EXCLUDED.display_name,
+           avatar_url = CASE WHEN $5 THEN EXCLUDED.avatar_url ELSE user_directory.avatar_url END,
+           updated_at = EXCLUDED.updated_at
        WHERE user_directory.updated_at < EXCLUDED.updated_at`,
-      [user.userId, user.displayName, updatedAt],
+      [user.userId, user.displayName, user.avatarUrl ?? null, updatedAt, user.avatarUrl !== undefined],
     );
   }
 

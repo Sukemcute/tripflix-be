@@ -30,6 +30,8 @@ export type EventEnvelope<P extends Record<string, unknown> = Record<string, unk
 export const AccessUserRegisteredV1Schema = z.object({
   userId: z.uuid(),
   displayName: z.string().min(1),
+  /** Ảnh đại diện (TF109); không có trong sự kiện cũ. */
+  avatarUrl: z.string().nullable().optional(),
 });
 export type AccessUserRegisteredV1 = z.infer<typeof AccessUserRegisteredV1Schema>;
 
@@ -50,10 +52,14 @@ export type AccessUserLockedV1 = z.infer<typeof AccessUserLockedV1Schema>;
 export const AccessUserUnlockedV1Schema = z.object({ userId: z.uuid(), unlockedBy: z.uuid() });
 export type AccessUserUnlockedV1 = z.infer<typeof AccessUserUnlockedV1Schema>;
 
-/** access.user.profile_updated v1: người dùng đổi tên hiển thị. Module nào lưu tên từ access.user.registered thì cập nhật theo. */
+/**
+ * access.user.profile_updated v1: người dùng đổi tên hiển thị hoặc ảnh đại diện. Module nào lưu tên từ
+ * access.user.registered thì cập nhật theo. avatarUrl không có (sự kiện cũ): giữ ảnh đang lưu; null: đã xoá ảnh.
+ */
 export const AccessUserProfileUpdatedV1Schema = z.object({
   userId: z.uuid(),
   displayName: z.string().min(1),
+  avatarUrl: z.string().nullable().optional(),
 });
 export type AccessUserProfileUpdatedV1 = z.infer<typeof AccessUserProfileUpdatedV1Schema>;
 

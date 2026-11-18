@@ -56,6 +56,8 @@ const mapUserRow = (row: UserRow): UserRecord => ({
     nationality: row.nationality,
     travelPreferences: row.travelPreferences,
   },
+  avatarUrl: row.avatarUrl,
+  avatarSource: row.avatarSource as UserRecord['avatarSource'],
 });
 
 const mapSessionRow = (row: SessionRow): SessionRecord => ({
@@ -103,8 +105,8 @@ class DrizzleUserRepository implements UserRepository {
     return row ? mapUserRow(row) : null;
   }
 
-  async insert({ personal, terms, ...user }: NewUser) {
-    const values = { ...user, ...personal, termsVersion: terms?.version, termsAcceptedAt: terms?.acceptedAt };
+  async insert({ personal, terms, avatar, ...user }: NewUser) {
+    const values = { ...user, ...personal, ...avatar, termsVersion: terms?.version, termsAcceptedAt: terms?.acceptedAt };
     const [row] = await this.db.insert(users).values(values).onConflictDoNothing({ target: users.email }).returning();
     return row ? mapUserRow(row) : null;
   }
@@ -165,6 +167,10 @@ class DrizzleUserRepository implements UserRepository {
     return this.patch(id, { passwordHash });
   }
 
+  async updateAvatar(id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>) {
+    return this.patch(id, avatar);
+  }
+
   async markEmailVerified(id: string, at: Date) {
     // coalesce: đã xác thực rồi thì giữ mốc đầu tiên, không đổi updated_at vô ích.
     const [row] = await this.db
@@ -178,7 +184,7 @@ class DrizzleUserRepository implements UserRepository {
   private async patch(
     id: string,
     values: Partial<
-      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality' | 'travelPreferences'>
+      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality' | 'travelPreferences' | 'avatarUrl' | 'avatarSource'>
     >,
   ) {
     const [row] = await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, id)).returning();

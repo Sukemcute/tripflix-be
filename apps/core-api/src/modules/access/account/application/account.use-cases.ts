@@ -5,10 +5,12 @@ import { Transactional } from '@tripflix/db';
 import {
   ACCESS_SID_BLOCKLIST,
   ACCESS_STORE,
+  AVATAR_IMAGES,
   CLOCK,
   LOGIN_RATE_LIMITER,
   PASSWORD_HASHER,
   type AccessStore,
+  type AvatarImages,
   type Clock,
   type LoginRateLimiter,
   type PasswordHasher,
@@ -25,6 +27,7 @@ import { isStaleTravelPreferences } from '../domain/travel-preferences.js';
 export const WRONG_CURRENT_PASSWORD_MESSAGE = 'Mật khẩu hiện tại không đúng';
 export const SESSION_NOT_FOUND_MESSAGE = 'Không tìm thấy phiên đăng nhập';
 const USER_NOT_FOUND_MESSAGE = 'Không tìm thấy người dùng';
+export const INVALID_AVATAR_MESSAGE = 'Ảnh không hợp lệ: hãy tải ảnh lên xong rồi chọn lại';
 
 /** Một thiết bị đang đăng nhập; isCurrent là phiên của access token đang gọi. */
 export interface SessionView {
@@ -49,7 +52,20 @@ export class AccountUseCases {
     @Inject(LOGIN_RATE_LIMITER) private readonly limiter: LoginRateLimiter,
     @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
     @Inject(CLOCK) private readonly now: Clock,
+    @Inject(AVATAR_IMAGES) private readonly avatars: AvatarImages,
   ) {}
+
+  /** Đặt ảnh đại diện từ ảnh đã tải lên qua /media/uploads; chỉ nhận ảnh của chính mình đã tải xong. */
+  async setAvatar(actor: AuthUser, mediaId: string, meta: RequestMeta): Promise<MyProfile> {
+    const avatarUrl = await this.avatars.findOwnedImageUrl(actor.userId, mediaId);
+    if (!avatarUrl) throw new AccessError('invalid_avatar', INVALID_AVATAR_MESSAGE);
+    return mapMyProfile(await this.applyAvatar(actor.userId, { avatarUrl, avatarSource: 'upload' }, meta));
+  }
+
+  /** Xoá ảnh; đăng nhập Google sau đó cũng không tự gắn lại ảnh Google. */
+  async removeAvatar(actor: AuthUser, meta: RequestMeta): Promise<MyProfile> {
+    return mapMyProfile(await this.applyAvatar(actor.userId, { avatarUrl: null, avatarSource: 'none' }, meta));
+  }
 
   /** Chỉ ghi các trường thật sự đổi. Trả hồ sơ đầy đủ của chính mình (có thông tin cá nhân). */
   async updateProfile(actor: AuthUser, input: ProfilePatch, meta: RequestMeta): Promise<MyProfile> {
@@ -142,6 +158,17 @@ export class AccountUseCases {
       const payload: AccessUserProfileUpdatedV1 = { userId, displayName: changes.displayName };
       await this.store.outbox.add({ type: 'access.user.profile_updated', userId, payload });
     }
+    return user;
+  }
+
+  @Transactional('access')
+  private async applyAvatar(userId: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>, meta: RequestMeta): Promise<UserRecord> {
+    const before = await this.loadUser(userId);
+    if (before.avatarUrl === avatar.avatarUrl && before.avatarSource === avatar.avatarSource) return before;
+    const user = (await this.store.users.updateAvatar(userId, avatar))!;
+    await this.store.audit.record({ action: 'auth.avatar_updated', actorUserId: userId, ...meta, meta: { source: avatar.avatarSource } });
+    const payload: AccessUserProfileUpdatedV1 = { userId, displayName: user.displayName, avatarUrl: user.avatarUrl };
+    await this.store.outbox.add({ type: 'access.user.profile_updated', userId, payload });
     return user;
   }
 

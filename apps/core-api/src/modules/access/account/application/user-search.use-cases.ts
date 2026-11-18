@@ -34,6 +34,12 @@ export class UserSearchUseCases {
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
+  /** Ảnh đại diện công khai (TF109); tài khoản không tồn tại, bị khoá hay chưa có ảnh thì null. */
+  async findAvatarUrl(userId: string): Promise<string | null> {
+    const user = await this.store.users.findById(userId);
+    return user?.status === 'active' ? user.avatarUrl : null;
+  }
+
   /** `q` đã chuẩn hoá ở API (normalizeSearchQuery); `ip` là IP người gọi (đã qua trust proxy). */
   async searchPublic(options: { q: string; page: number; ip: string }): Promise<PublicUserSearchPage> {
     const ipKey = buildIpRateKey(options.ip);

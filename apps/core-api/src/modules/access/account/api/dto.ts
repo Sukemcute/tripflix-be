@@ -57,6 +57,12 @@ export const UpdateProfileRequestSchema = z
   })
   .refine((v) => Object.values(v).some((field) => field !== undefined), 'Cần ít nhất một trường để cập nhật');
 
+export const SetAvatarRequestSchema = z.object({ mediaId: z.uuid('Mã ảnh không hợp lệ') });
+
+export class SetAvatarDto {
+  @ApiProperty({ format: 'uuid', description: 'assetId của ảnh đã tải lên xong qua POST /media/uploads' }) mediaId!: string;
+}
+
 export const ChangePasswordRequestSchema = z
   .object({
     currentPassword: currentPasswordField(),
