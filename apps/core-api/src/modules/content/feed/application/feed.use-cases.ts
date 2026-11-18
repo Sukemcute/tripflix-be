@@ -2,7 +2,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { AccessFacade } from '../../../access/index.js';
 import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
-import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
+import { decodeFeedCursor, encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 import { pickFeedSeed } from '../domain/feed-rank.js';
 import { calculateHotScore } from '../domain/hot-score.js';
 import {
@@ -39,6 +39,23 @@ export interface FeedPage {
   items: FeedCard[];
   nextCursor: string | null;
 }
+
+/** Một bài trong danh sách Hot cho module khác, kèm cursor để trang sau bắt đầu ngay sau bài này. */
+export interface HotFeedEntry {
+  postId: string;
+  cursor: string;
+}
+
+export interface HotFeedIdPage {
+  items: HotFeedEntry[];
+  /** Cursor sau bài cuối đã đọc (kể cả bài bị bỏ vì video chưa phát được); null nghĩa là hết bài. */
+  nextCursor: string | null;
+}
+
+/** Số bài tối đa mỗi lần getHotIds, để module khác không kéo cả danh sách trong một lần. */
+export const HOT_IDS_MAX_LIMIT = 50;
+
+export class InvalidHotCursorError extends Error {}
 
 /** Trang đầu giống nhau với mọi người nên giữ ngắn trong Redis; bài mới hay số đếm trễ tối đa chừng này giây. */
 export const FEED_FIRST_PAGE_TTL_SECONDS = 10;
@@ -92,6 +109,36 @@ export class FeedUseCases {
     const byId = new Map(cards.map((card) => [card.postId, card]));
     const items = ids.flatMap((id) => byId.get(id) ?? []);
     return { items: viewerId ? await this.withViewerState(items, viewerId) : items, nextCursor: null };
+  }
+
+  /**
+   * Id bài của tab Đang hot theo đúng thứ tự tab đó (TF110), cho discovery trộn vào Reels.
+   * Không dựng thẻ: chỉ hỏi media để bỏ bài chưa có video phát được, bên gọi dựng thẻ bằng getByIds.
+   * Mỗi bài kèm cursor riêng, vì bên gọi có thể chỉ dùng vài bài đầu của trang.
+   */
+  async getHotIds(query: { limit: number; cursor: string | null }): Promise<HotFeedIdPage> {
+    if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > HOT_IDS_MAX_LIMIT) {
+      throw new RangeError(`limit phải từ 1 đến ${HOT_IDS_MAX_LIMIT}`);
+    }
+    const after = query.cursor === null ? null : decodeFeedCursor(query.cursor);
+    // Cursor của tab khác (không có score, hoặc có rank của Dành cho bạn) sẽ cắt danh sách sai vị trí.
+    if (query.cursor !== null && (!after || after.score === undefined || after.rank !== undefined)) {
+      throw new InvalidHotCursorError('Cursor không thuộc danh sách Hot');
+    }
+    const seed = after ? (after.seed ?? 0) : pickFeedSeed(this.random);
+    const rows = await this.store.listHotPosts({ limit: query.limit + 1, after, seed });
+    const pageRows = rows.slice(0, query.limit);
+    const playback = pageRows.length > 0 ? await this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)) : {};
+    const cursorAfter = (row: FeedPostRow) =>
+      encodeFeedCursor({ at: row.cursorAt, id: row.id, score: calculateHotScore(row), seed });
+
+    const last = pageRows.at(-1);
+    return {
+      items: pageRows
+        .filter((row) => row.mediaIds.some((id) => playback[id]))
+        .map((row) => ({ postId: row.id, cursor: cursorAfter(row) })),
+      nextCursor: rows.length > query.limit && last ? cursorAfter(last) : null,
+    };
   }
 
   /** Thích, lưu là của từng người nên luôn đọc mới, kể cả khi phần chung lấy từ cache. */

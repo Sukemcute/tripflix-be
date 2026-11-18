@@ -445,6 +445,35 @@ describe('Feed trên Postgres thật', () => {
       await expect(readHotPages(20)).resolves.toEqual([playable]);
     });
 
+    it('getHotIds (TF110): cùng thứ tự với tab hot, bỏ bài không phát được; đi tiếp từ cursor của bài đã dùng thì không lặp không rớt', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const scored = await Promise.all(
+        Array.from({ length: 6 }, async (_, i) => {
+          const id = await insertPost([asset], { createdAt: daysAgo(1) });
+          await setCounts(id, { likes: 10 - i });
+          return id;
+        }),
+      );
+      const processing = await insertPost([await insertAsset('processing')]);
+      await setCounts(processing, { likes: 100 });
+
+      const tabOrder = await readHotPages(20);
+      // Mỗi lần lấy 3 bài nhưng chỉ dùng 2 bài đầu, như discovery khi trộn 1/4 ô là hot.
+      const ids: string[] = [];
+      let cursor: string | null = null;
+      for (;;) {
+        const page = await feed.getHotIds({ limit: 3, cursor });
+        const used = page.items.slice(0, 2);
+        ids.push(...used.map((item) => item.postId));
+        if (used.length === 0) break;
+        cursor = used.at(-1)!.cursor;
+      }
+
+      expect(tabOrder).toEqual(scored);
+      expect(ids).toEqual(scored);
+      expect(ids).not.toContain(processing);
+    });
+
     it(`chỉ xếp hạng bài trong ${HOT_WINDOW_DAYS} ngày gần đây; bài cũ hơn dù nhiều tương tác vẫn có ở for_you`, async () => {
       const asset = await insertAsset('ready', [360]);
       const recent = await insertPost([asset], { createdAt: daysAgo(HOT_WINDOW_DAYS - 1) });
