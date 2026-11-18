@@ -141,7 +141,7 @@ export class FollowerPostWorker implements OnApplicationBootstrap, OnModuleDestr
           `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id)
            SELECT recipient, 'follow.post.published', 'Có bài viết mới',
              COALESCE(NULLIF(btrim(actor.display_name), ''), 'Người bạn theo dõi') || ' vừa đăng bài mới.',
-             $3, jsonb_build_object('postId', $1::uuid), 'follower-post:' || $1::text
+             $3, jsonb_build_object('postId', $1::uuid, 'actorIds', jsonb_build_array($4::text)), 'follower-post:' || $1::text
            FROM unnest($2::uuid[]) AS recipients(recipient)
            LEFT JOIN user_directory AS actor ON actor.user_id = $4
            WHERE recipient <> $4
