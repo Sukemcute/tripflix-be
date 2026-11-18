@@ -230,6 +230,14 @@ export interface RankInput {
   candidates: Candidate[];
   userFeatures: Record<string, unknown> | null;
   now: Date;
+  /** Dữ liệu thô của người xem, chỉ có khi ranker khai báo needsViewerRows và người xem đã đăng nhập. */
+  viewer?: ViewerRaw | null;
+}
+
+/** Dòng thô 30 ngày của người xem + nơi (tỉnh) của sản phẩm trong đơn. Use case chỉ đọc và đưa vào, không xử lý. */
+export interface ViewerRaw {
+  rows: RawRow[];
+  productPlaces: Record<string, string>;
 }
 
 /** Tất định: không Math.random. Trả đúng các ứng viên được đưa vào (lọc hết thì rỗng). */
@@ -237,6 +245,10 @@ export interface Ranker {
   /** Khớp recommend_algos.ranker */
   name: string;
   accepts: { postBuilders: string[]; userBuilders: string[] };
+  /** Số ứng viên hot tối đa use case đọc (mặc định 150). Ranker v1 đọc toàn bộ bài. */
+  candidateLimit?: number;
+  /** Cần dòng thô của người xem lúc gọi (RankInput.viewer). */
+  needsViewerRows?: boolean;
   rank(input: RankInput, params?: Record<string, unknown>): RankedItem[];
 }
 

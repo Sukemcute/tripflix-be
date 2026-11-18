@@ -372,6 +372,16 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     return rows.flatMap((r) => (r.id ? [r.id] : []));
   }
 
+  async findProductPlaces(productIds: string[]): Promise<Record<string, string>> {
+    if (!productIds.length) return {};
+    const t = recommendProductFeatures;
+    const rows = await this.db
+      .selectDistinct({ productId: t.productId, groupKey: t.groupKey })
+      .from(t)
+      .where(and(eq(t.productType, 'hotel'), inArray(t.productId, productIds)));
+    return Object.fromEntries(rows.map((r) => [r.productId, r.groupKey]));
+  }
+
   async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
     if (!postIds.length) return [];
     const { postId, authorId, postType, tags, placeId, hasPlan } = recommendPosts;

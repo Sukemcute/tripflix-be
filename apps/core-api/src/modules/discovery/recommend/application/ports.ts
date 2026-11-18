@@ -193,6 +193,8 @@ export interface RecommendStore {
   listInteractedPostIds(userId: string, now: Date): Promise<string[]>;
   /** Bài người dùng tự đăng trong (since, until], mới nhất trước, đọc dòng `publish` của bảng thô (có ngay, không chờ job). */
   listOwnRecentPostIds(q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]>;
+  /** Tỉnh (group_key) của khách sạn theo hồ sơ hotel_profile@v0; khách sạn chưa có hồ sơ thì không có trong kết quả. */
+  findProductPlaces(productIds: string[]): Promise<Record<string, string>>;
   /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
   findPostMetas(postIds: string[]): Promise<PostMeta[]>;
   /** Điểm của một post builder (vd 'hot@v2') theo danh sách postId. Bài chưa có điểm không có trong Map. */

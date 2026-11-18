@@ -1,10 +1,13 @@
 import { SESSION_KINDS } from '../application/ingest.use-cases.js';
+import { profileFeaturesOf } from '../domain/builders/post-profile.js';
 import { tagAffinityV0 } from '../domain/builders/tag-affinity.js';
+import { tripProfileV1 } from '../domain/builders/trip-profile.js';
 import { assignBins } from '../domain/bins.js';
 import { mergeCandidates } from '../domain/candidates.js';
 import type { Candidate, PostMeta, RankedItem } from '../domain/contracts.js';
 import { applyFeedPolicy } from '../domain/feed-policy.js';
 import { tagAffinityRankerV0 } from '../domain/rankers/rankers.js';
+import { tripRankerV1 } from '../domain/rankers/trip-v1.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import { RECENT_WINDOW_MS } from '../infra/redis-recent-posts.store.js';
 import { hitAt, maxSamePlaceRun, placeCoverageAt, placeShareAt } from './metrics.js';
@@ -70,6 +73,26 @@ export const forYouV0: EvalAlgo = {
       interacted: interactedPostIds(persona),
       ownRecent: new Set(),
     });
+  },
+};
+
+/** for_you v1: post_profile@v1 + trip_profile@v1 + trip_v1, đọc toàn bộ bài và dòng thô của người xem như use case. */
+export const forYouV1: EvalAlgo = {
+  name: 'v1 (trip_v1, đọc toàn bộ bài)',
+  async recommend(persona, posts, now) {
+    const candidates: Candidate[] = posts
+      .filter((p) => Date.parse(p.publishedAt) <= now.getTime())
+      .map((p) => ({ ...toCandidate(p, 'hot'), postFeatures: profileFeaturesOf(toMeta(p)) }));
+    const isGuest = persona.stage === 'guest';
+    let userFeatures: Record<string, unknown> | null = null;
+    if (!isGuest) {
+      const metas = Object.fromEntries(posts.map((p) => [p.postId, toMeta(p)]));
+      const [built] = await tripProfileV1.build([{ userId: persona.id, rows: persona.rows, posts: metas, productPlaces: persona.productPlaces }], now);
+      userFeatures = built?.features ?? null;
+    }
+    const viewer = isGuest ? null : { rows: persona.rows, productPlaces: persona.productPlaces };
+    const ranked = tripRankerV1.rank({ candidates, userFeatures, now, viewer });
+    return applyFeedPolicy(ranked, { userId: isGuest ? null : persona.id, seen: new Set(), interacted: interactedPostIds(persona), ownRecent: new Set() });
   },
 };
 

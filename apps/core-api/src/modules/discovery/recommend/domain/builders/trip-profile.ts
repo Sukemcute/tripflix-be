@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { assignBins } from '../bins.js';
-import { round4, type Kind, type PostMeta, type UserBuilder } from '../contracts.js';
+import { round4, type Kind, type PostMeta, type RawRow, type UserBuilder } from '../contracts.js';
 
 /**
  * trip_profile@v1 (TF28 v1): câu trả lời DÀI HẠN của người dùng, mỗi câu hỏi một histogram trên ngăn.
@@ -25,11 +25,39 @@ export type TripProfileV1Features = z.infer<typeof TripProfileV1FeaturesSchema>;
 const question = (bin: string) => bin.slice(0, bin.indexOf(':'));
 
 /** Bài mà một dòng nói tới: thả tim/lưu/... lên bài, hoặc đơn đặt từ bài (sourcePostId). */
-function postOf(row: { targetType: string | null; targetId: string | null; detail: Record<string, unknown> | null }, posts: Record<string, PostMeta>) {
+function postOf(row: RawRow, posts: Record<string, PostMeta>) {
   if (row.targetType === 'post' && row.targetId) return posts[row.targetId];
   const source = row.detail?.sourcePostId;
   return typeof source === 'string' ? posts[source] : undefined;
 }
+
+/**
+ * Cộng các dòng tương tác lên bài thành câu trả lời dài hạn (chưa làm tròn).
+ * Builder dùng cho 30 ngày; ranker dùng lại cho vài phút gần nhất (job chưa kịp chạy) để feed đổi ngay sau khi thả tim.
+ */
+export function accumulateInterest(rows: RawRow[], posts: Record<string, PostMeta>, now: Date) {
+  const answers: Record<string, Record<string, number>> = {};
+  const evidence: Record<string, number> = {};
+  const creators: Record<string, number> = {};
+  for (const row of rows) {
+    const wKind = row.isRemoved ? undefined : INTEREST_KINDS[row.kind];
+    const post = wKind ? postOf(row, posts) : undefined;
+    if (!wKind || !post) continue;
+    const ageDays = Math.max(0, (now.getTime() - Date.parse(row.occurredAt)) / 86_400_000);
+    const w = wKind * 0.5 ** (ageDays / HALF_LIFE_DAYS);
+    const touched = new Set<string>();
+    for (const [bin, binW] of Object.entries(assignBins(post))) {
+      const q = question(bin);
+      (answers[q] ??= {})[bin] = (answers[q][bin] ?? 0) + w * binW;
+      touched.add(q);
+    }
+    for (const q of touched) evidence[q] = (evidence[q] ?? 0) + w;
+    creators[post.authorId] = (creators[post.authorId] ?? 0) + w;
+  }
+  return { answers, evidence, creators };
+}
+
+const roundAll = (m: Record<string, number>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round4(v)]));
 
 export const tripProfileV1: UserBuilder = {
   key: 'trip_profile@v1',
@@ -37,31 +65,12 @@ export const tripProfileV1: UserBuilder = {
   build(items, now) {
     return Promise.resolve(
       items.map((item) => {
-        const answers: Record<string, Record<string, number>> = {};
-        const evidence: Record<string, number> = {};
-        const creators: Record<string, number> = {};
-        const active = item.rows.filter((r) => !r.isRemoved);
-        for (const row of active) {
-          const wKind = INTEREST_KINDS[row.kind];
-          const post = wKind ? postOf(row, item.posts) : undefined;
-          if (!wKind || !post) continue;
-          const ageDays = Math.max(0, (now.getTime() - Date.parse(row.occurredAt)) / 86_400_000);
-          const w = wKind * 0.5 ** (ageDays / HALF_LIFE_DAYS);
-          const touched = new Set<string>();
-          for (const [bin, binW] of Object.entries(assignBins(post))) {
-            const q = question(bin);
-            (answers[q] ??= {})[bin] = (answers[q][bin] ?? 0) + w * binW;
-            touched.add(q);
-          }
-          for (const q of touched) evidence[q] = (evidence[q] ?? 0) + w;
-          creators[post.authorId] = (creators[post.authorId] ?? 0) + w;
-        }
-        const roundAll = (m: Record<string, number>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round4(v)]));
+        const { answers, evidence, creators } = accumulateInterest(item.rows, item.posts, now);
         const features: TripProfileV1Features = {
           answers: Object.fromEntries(Object.entries(answers).map(([q, m]) => [q, roundAll(m)])),
           evidence: roundAll(evidence),
           creators: roundAll(creators),
-          interactionCount: active.length,
+          interactionCount: item.rows.filter((r) => !r.isRemoved).length,
         };
         return { userId: item.userId, features };
       }),

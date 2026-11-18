@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domain/candidates.js';
-import type { CandidateSource, RankedItem } from '../domain/contracts.js';
+import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts.js';
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
@@ -27,6 +27,7 @@ const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
 const EXPLORE_POOL_LIMIT = 500;
 const EXPLORE_DAYS = 30;
+const FULL_READ_EXPLORE_SKIP = 100;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
 
@@ -207,29 +208,32 @@ export class PostRecommendationUseCases {
       excludePostIds: [],
       now,
     };
-    const [hot, fresh] = await Promise.all([
-      this.store.listHotCandidates({ ...base, limit: HOT_LIMIT }),
+    const [hot, fresh, rawExplorePool, viewer] = await Promise.all([
+      this.store.listHotCandidates({ ...base, limit: algo.ranker.candidateLimit ?? HOT_LIMIT }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
+      this.store.listExplorePool({ ...base, excludePostIds: interacted, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS }),
+      algo.ranker.needsViewerRows && q.userId ? this.loadViewer(q.userId, new Date(sessionAt)) : null,
     ]);
     const candidates = mergeCandidates(hot, fresh);
     const inCandidates = new Set(candidates.map((c) => c.postId));
-    const explorePool = (
-      await this.store.listExplorePool({ ...base, excludePostIds: interacted, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS })
-    ).filter(
-      (c) => !inCandidates.has(c.postId) && !seen.has(c.postId),
-    );
 
     const slots = exploreSlots(q.limit);
     // Bài vừa đăng chưa qua job thì chưa là ứng viên: thêm thẳng, tầng chính sách đưa lên đầu.
     const ownExtra: RankedItem[] = ownRecent
       .filter((postId) => !inCandidates.has(postId))
       .map((postId) => ({ postId, authorId: q.userId!, score: 0, source: 'own', breakdown: {}, reason: OWN_POST_REASON }));
-    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now }), ...ownExtra], {
+    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now, viewer }), ...ownExtra], {
       userId: q.userId,
       seen,
       interacted: new Set(interacted),
       ownRecent: new Set(ownRecent),
     });
+    // Ranker đọc toàn bộ bài thì mọi bài đều là ứng viên: ô khám phá lấy bài xếp ngoài top, không lấy bài ngoài ứng viên.
+    // ponytail: người cuộn sâu quá top có thể gặp lại bài khám phá ở vị trí xếp hạng của nó.
+    const topIds = new Set(ranked.slice(0, FULL_READ_EXPLORE_SKIP).map((r) => r.postId));
+    const explorePool = rawExplorePool.filter(
+      (c) => !seen.has(c.postId) && (algo.ranker.candidateLimit ? !topIds.has(c.postId) : !inCandidates.has(c.postId)),
+    );
     const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, page * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
     const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
@@ -364,6 +368,13 @@ export class PostRecommendationUseCases {
   }
 
   /** Redis lỗi thì bỏ gu trong phiên, vẫn dùng gu dài hạn. */
+  /** Dữ liệu thô của người xem cho ranker cần nó: dòng 30 ngày + tỉnh của khách sạn trong đơn. Không xử lý gì ở đây. */
+  private async loadViewer(userId: string, until: Date): Promise<ViewerRaw> {
+    const rows = await this.store.listUserRows([userId], until);
+    const productIds = [...new Set(rows.flatMap((r) => (r.kind === 'order_item' && r.targetId ? [r.targetId] : [])))];
+    return { rows, productPlaces: await this.store.findProductPlaces(productIds) };
+  }
+
   private async listRecent(userId: string, until: Date): Promise<Array<{ postId: string; at: number }>> {
     try {
       return await this.recentPosts.list(userId, until);

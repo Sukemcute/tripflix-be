@@ -5,6 +5,7 @@ import { tripProfileV1 } from './builders/trip-profile.js';
 import { tagAffinityV0 } from './builders/tag-affinity.js';
 import type { PostBuilder, Ranker, UserBuilder } from './contracts.js';
 import { popularRankerV0, tagAffinityRankerV0 } from './rankers/rankers.js';
+import { tripRankerV1 } from './rankers/trip-v1.js';
 
 /** 'tên@version' → builder. Thêm builder = viết hàm + thêm một dòng ở đây. */
 export const BUILDERS = new Map<string, { kind: 'post'; builder: PostBuilder } | { kind: 'user'; builder: UserBuilder }>([
@@ -18,7 +19,7 @@ export const BUILDERS = new Map<string, { kind: 'post'; builder: PostBuilder } |
 ]);
 
 /** tên → ranker, khớp recommend_algos.ranker. */
-export const RANKERS = new Map<string, Ranker>([tagAffinityRankerV0, popularRankerV0].map((r) => [r.name, r]));
+export const RANKERS = new Map<string, Ranker>([tagAffinityRankerV0, popularRankerV0, tripRankerV1].map((r) => [r.name, r]));
 
 export interface AlgoRow {
   name: string;

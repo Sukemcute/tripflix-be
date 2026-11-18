@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { answerLive } from '../domain/live-answers.js';
 import { hitAt, maxSamePlaceRun, placeCoverageAt, placeShareAt } from './metrics.js';
 import { buildPersonas, EVAL_NOW, type EvalPost } from './personas.js';
-import { formatBinStats, formatReport, forYouV0, runEval, toMeta } from './run-eval.js';
+import { formatBinStats, formatReport, forYouV0, forYouV1, runEval, toMeta } from './run-eval.js';
 
 /**
  * Bộ đo offline for-you (TF28, thiết kế v1 mục 4).
@@ -58,7 +58,7 @@ describe('báo cáo bộ đo', () => {
   it('ghi kết quả từng thuật toán vào report.md', async () => {
     const personas = buildPersonas(posts);
     const sections = [];
-    for (const algo of [forYouV0]) sections.push(formatReport(algo, await runEval(algo, personas, posts, EVAL_NOW)));
+    for (const algo of [forYouV0, forYouV1]) sections.push(formatReport(algo, await runEval(algo, personas, posts, EVAL_NOW)));
     const intro = [
       '# Bộ đo offline for-you (TF28)',
       '',

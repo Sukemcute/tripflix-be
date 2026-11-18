@@ -1,0 +1,162 @@
+import { PLACES } from '../../../search/domain/places.js';
+import { accumulateInterest } from '../builders/trip-profile.js';
+import { round4, type Candidate, type PostMeta, type Ranker } from '../contracts.js';
+import { answerLive, type LiveAnswers, type Stage } from '../live-answers.js';
+import { EXP_LABEL, type Exp } from '../topics.js';
+import { sortByFinal, TRENDING, weightMap, type Scored } from './rankers.js';
+
+/**
+ * trip_v1 (TF28 v1, thiết kế v1 mục 3.5): gợi ý = trả lời câu hỏi du lịch.
+ * Mỗi câu hỏi: khớp = cosine(histogram câu trả lời của người, ngăn của bài) có idf, nhân độ tin; cộng có trọng số theo giai đoạn.
+ * Mọi hằng chỉnh được nằm ở đầu file. Đổi công thức chỉ sửa file này.
+ */
+
+type Part = 'exploring' | 'trip' | 'interestExp' | 'interestPlace' | 'fit' | 'global';
+
+/** Trọng số khởi điểm theo giai đoạn (chỉnh bằng bộ đo). trip âm ở "vừa về": hạ nơi vừa đi. */
+const STAGE_WEIGHTS: Record<Stage, Record<Part, number>> = {
+  dreaming: { exploring: 0, trip: 0, interestExp: 0.35, interestPlace: 0.2, fit: 0.1, global: 0.35 },
+  planning: { exploring: 0.45, trip: 0, interestExp: 0.15, interestPlace: 0.05, fit: 0.15, global: 0.2 },
+  upcoming: { exploring: 0, trip: 0.4, interestExp: 0.2, interestPlace: 0, fit: 0.1, global: 0.3 },
+  on_trip: { exploring: 0, trip: 0.45, interestExp: 0.2, interestPlace: 0, fit: 0.05, global: 0.3 },
+  after_trip: { exploring: 0, trip: -0.3, interestExp: 0.4, interestPlace: 0.1, fit: 0.1, global: 0.4 },
+};
+/** Điểm toàn cục = hot + đặt được ngay + đúng mùa; lên kế hoạch thì "đặt được ngay" nặng gấp đôi. */
+const GLOBAL = { hot: 0.6, bookable: 0.25, season: 0.15 };
+/** Độ tin đầy khi tổng trọng số dấu hiệu đạt mức này (thả tim = 2, lưu = 4; tìm = 1, tìm phòng = 3). */
+const FULL_EVIDENCE = { interest: 10, exploring: 3, live: 1 };
+/** Ngăn có ít bài hơn thì không tính khi so tầm giá / đi với ai / số ngày (chốt 18/11). */
+const MIN_BIN_POSTS = 10;
+/** Tương tác mới hơn mốc này chưa có trong gu dài hạn (job 10 phút): cộng thêm lúc gọi. */
+const FRESH_MS = 15 * 60_000;
+/** Sắp đi / đang đi: ở nơi đã đặt, bài về ăn chơi tại chỗ được nhiều hơn; bài khoe khách sạn khác bị hạ. */
+const ON_SITE_EXP = new Set(['exp:an_uong', 'exp:cafe', 'exp:vui_choi', 'exp:ve_dem', 'exp:van_hoa']);
+const OTHER_HOTEL_FACTOR = 0.5;
+const NO_LOCAL_EXP_FACTOR = 0.6;
+
+const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? id;
+const ofQuestion = (m: Record<string, number>, q: string) => Object.fromEntries(Object.entries(m).filter(([b]) => b.startsWith(`${q}:`)));
+const conf = (evidence: number | undefined, full: number) => Math.min(1, (evidence ?? 0) / full);
+const SEASON_BY_MONTH = ['dong', 'xuan', 'xuan', 'xuan', 'he', 'he', 'he', 'he', 'thu', 'thu', 'thu', 'dong'];
+
+function cosine(u: Record<string, number>, p: Record<string, number>, idf: Map<string, number>): number {
+  let dot = 0;
+  let nu = 0;
+  let np = 0;
+  for (const [b, w] of Object.entries(u)) nu += (w * (idf.get(b) ?? 0)) ** 2;
+  for (const [b, w] of Object.entries(p)) {
+    const i = idf.get(b) ?? 0;
+    np += (w * i) ** 2;
+    dot += (u[b] ?? 0) * i * w * i;
+  }
+  return nu > 0 && np > 0 ? dot / Math.sqrt(nu * np) : 0;
+}
+
+function mergeInto(target: Record<string, Record<string, number>>, add: Record<string, Record<string, number>>) {
+  for (const [q, m] of Object.entries(add)) for (const [b, w] of Object.entries(m)) (target[q] ??= {})[b] = (target[q][b] ?? 0) + w;
+}
+
+/** Ngăn exp mạnh nhất mà người và bài cùng có; tránh "sống ảo" khi có lựa chọn khác (chốt 18/11). */
+function bestSharedExp(u: Record<string, number>, p: Record<string, number>): string | null {
+  const shared = Object.keys(p)
+    .filter((b) => b.startsWith('exp:') && (u[b] ?? 0) > 0)
+    .sort((a, b) => u[b]! * p[b]! - u[a]! * p[a]!);
+  return shared.find((b) => b !== 'exp:song_ao') ?? shared[0] ?? null;
+}
+const expLabel = (bin: string) => EXP_LABEL[bin.slice(4) as Exp] ?? bin.slice(4);
+const primaryPlace = (bins: Record<string, number>) => Object.keys(bins).find((b) => b.startsWith('place:'))?.slice(6) ?? null;
+
+export const tripRankerV1: Ranker = {
+  name: 'trip_v1',
+  accepts: { postBuilders: ['post_profile@v1'], userBuilders: ['trip_profile@v1'] },
+  // ponytail: đọc toàn bộ bài mỗi lượt gọi, ổn tới vài nghìn bài; lớn hơn thì lấy theo ngăn có index (thiết kế v1 mục 3.2).
+  candidateLimit: 5000,
+  needsViewerRows: true,
+  rank({ candidates, userFeatures, now, viewer }) {
+    const postBins = new Map(candidates.map((c) => [c.postId, weightMap(c.postFeatures.bins)]));
+    const metas: Record<string, PostMeta> = Object.fromEntries(candidates.map((c) => [c.postId, c]));
+
+    // idf trên kho bài đang xét: ngăn ai cũng có (ăn uống, sống ảo) nhẹ đi.
+    const df = new Map<string, number>();
+    for (const bins of postBins.values()) for (const b of Object.keys(bins)) df.set(b, (df.get(b) ?? 0) + 1);
+    const n = candidates.length;
+    const idf = new Map([...df].map(([b, d]) => [b, Math.log((n + 1) / d) / Math.log(n + 1)]));
+
+    // Câu trả lời dài hạn (job) + tương tác vài phút gần nhất chưa vào job.
+    const answers: Record<string, Record<string, number>> = {};
+    const evidence: Record<string, number> = {};
+    mergeInto(answers, (userFeatures?.answers as Record<string, Record<string, number>> | undefined) ?? {});
+    Object.assign(evidence, weightMap(userFeatures?.evidence));
+    if (viewer) {
+      const fresh = accumulateInterest(viewer.rows.filter((r) => now.getTime() - Date.parse(r.occurredAt) <= FRESH_MS), metas, now);
+      mergeInto(answers, fresh.answers);
+      for (const [q, w] of Object.entries(fresh.evidence)) evidence[q] = (evidence[q] ?? 0) + w;
+    }
+    const live: LiveAnswers | null = viewer ? answerLive({ rows: viewer.rows, posts: metas, productPlaces: viewer.productPlaces, now }) : null;
+
+    const hasSignal = Object.keys(evidence).length > 0 || (live !== null && (live.stage !== 'dreaming' || live.evidence.exploring > 0));
+    if (!hasSignal) {
+      return sortByFinal(
+        candidates.map((c) => ({ candidate: c, final: c.score, item: { postId: c.postId, score: round4(c.score), source: c.source, breakdown: { global: round4(c.score), final: round4(c.score) }, reason: TRENDING } })),
+      );
+    }
+
+    const stage: Stage = live?.stage ?? 'dreaming';
+    const w = STAGE_WEIGHTS[stage];
+    const season = `season:${SEASON_BY_MONTH[now.getUTCMonth()]}`;
+    const fitQuestions: Array<[string, Record<string, number>, number]> = [
+      ['cost', { ...ofQuestion(answers.cost ?? {}, 'cost'), ...live?.budget }, (evidence.cost ?? 0) / FULL_EVIDENCE.interest + (live?.evidence.budget ?? 0) / FULL_EVIDENCE.live],
+      ['with', { ...ofQuestion(answers.with ?? {}, 'with'), ...live?.party }, (evidence.with ?? 0) / FULL_EVIDENCE.interest + (live?.evidence.party ?? 0) / FULL_EVIDENCE.live],
+      ['len', { ...ofQuestion(answers.len ?? {}, 'len'), ...live?.len }, (evidence.len ?? 0) / FULL_EVIDENCE.interest + (live?.evidence.len ?? 0) / FULL_EVIDENCE.live],
+    ];
+    const tripBin = live?.trip ? `place:${live.trip.placeId}` : null;
+
+    const scored: Scored[] = candidates.map((c: Candidate) => {
+      const bins = postBins.get(c.postId)!;
+      const places = ofQuestion(bins, 'place');
+      const parts: Record<Part, number> = {
+        exploring: conf(live?.evidence.exploring, FULL_EVIDENCE.exploring) * cosine(live?.exploring ?? {}, places, idf),
+        trip: tripBin ? (bins[tripBin] ?? 0) * (stage === 'after_trip' || Object.keys(bins).some((b) => ON_SITE_EXP.has(b)) ? 1 : NO_LOCAL_EXP_FACTOR) : 0,
+        interestExp: conf(evidence.exp, FULL_EVIDENCE.interest) * cosine(answers.exp ?? {}, ofQuestion(bins, 'exp'), idf),
+        interestPlace: conf(evidence.place, FULL_EVIDENCE.interest) * cosine(answers.place ?? {}, places, idf),
+        fit: 0,
+        global: 0,
+      };
+      const fits = fitQuestions.flatMap(([q, u, e]) => {
+        const p = Object.fromEntries(Object.entries(ofQuestion(bins, q)).filter(([b]) => (df.get(b) ?? 0) >= MIN_BIN_POSTS));
+        return Object.keys(u).length && Object.keys(p).length ? [Math.min(1, e) * cosine(u, p, idf)] : [];
+      });
+      parts.fit = fits.length ? fits.reduce((a, b) => a + b, 0) / fits.length : 0;
+      const bookable = typeof c.postFeatures.bookable === 'number' ? c.postFeatures.bookable : 0;
+      parts.global = GLOBAL.hot * c.score + GLOBAL.bookable * bookable * (stage === 'planning' ? 2 : 1) + GLOBAL.season * (bins[season] ?? 0);
+
+      let final = (Object.keys(parts) as Part[]).reduce((sum, k) => sum + w[k] * parts[k], 0);
+      const postHotel = typeof c.postFeatures.hotelId === 'string' ? c.postFeatures.hotelId : null;
+      const isOtherHotel = (stage === 'upcoming' || stage === 'on_trip') && tripBin && bins[tripBin] && postHotel && postHotel !== live!.trip!.hotelId;
+      if (isOtherHotel) final *= OTHER_HOTEL_FACTOR;
+      final = Math.max(0, final);
+
+      // Lý do = thành phần dương góp nhiều nhất (chỉ dùng reason.code có sẵn trong API).
+      const top = (['exploring', 'trip', 'interestExp', 'interestPlace'] as Part[])
+        .map((k) => ({ k, v: w[k] * parts[k] }))
+        .filter((x) => x.v > 0)
+        .sort((a, b) => b.v - a.v)[0];
+      let reason = TRENDING;
+      const place = primaryPlace(bins);
+      const exp = bestSharedExp(answers.exp ?? {}, bins);
+      if (top?.k === 'exploring' && place) reason = { code: 'matches_place', text: `Vì bạn đang tìm hiểu ${placeName(place)}` };
+      else if (top?.k === 'trip' && live?.trip) {
+        const [, m, d] = live.trip.checkIn.split('-');
+        reason = { code: 'matches_place', text: `Cho chuyến ${placeName(live.trip.placeId)} ${d}/${m} của bạn` };
+      } else if (top?.k === 'interestExp' && exp) {
+        reason = stage === 'after_trip' && live?.trip
+          ? { code: 'matches_interest', text: `Bạn vừa đi ${placeName(live.trip.placeId)}, thử thêm bài về ${expLabel(exp)}` }
+          : { code: 'matches_interest', text: `Vì bạn hay xem bài về ${expLabel(exp)}` };
+      } else if (top?.k === 'interestPlace' && place) reason = { code: 'matches_place', text: `Vì bạn quan tâm ${placeName(place)}` };
+
+      const breakdown = Object.fromEntries([...Object.entries(parts).map(([k, v]) => [k, round4(v)]), ['final', round4(final)]]);
+      return { candidate: c, final, item: { postId: c.postId, score: round4(final), source: c.source, breakdown, reason } };
+    });
+    return sortByFinal(scored);
+  },
+};

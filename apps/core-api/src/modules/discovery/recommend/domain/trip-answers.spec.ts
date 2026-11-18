@@ -1,6 +1,7 @@
 import { tripProfileV1 } from './builders/trip-profile.js';
 import type { PostMeta, RawRow } from './contracts.js';
 import { answerLive } from './live-answers.js';
+import { tripRankerV1 } from './rankers/trip-v1.js';
 
 const NOW = new Date('2026-11-13T00:00:00Z');
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -93,5 +94,34 @@ describe('answerLive', () => {
     expect(live([order('2026-11-05')], places).stage).toBe('after_trip');
     expect(live([order('2026-10-20')], places).stage).toBe('dreaming');
     expect(live([order('2026-11-16', true)], places).stage).toBe('dreaming');
+  });
+});
+
+describe('trip_v1', () => {
+  const cand = (postId: string, score: number, bins: Record<string, number>, hotelId: string | null = null) => ({
+    postId, authorId: 'a', postType: 'video', tags: [], placeId: null, score, source: 'hot' as const,
+    postFeatures: { bins, bookable: 0, hotelId },
+  });
+
+  it('không có dấu hiệu nào (khách) thì xếp như trending', () => {
+    const out = tripRankerV1.rank({ candidates: [cand('low', 0.2, {}), cand('high', 0.9, {})], userFeatures: null, now: NOW, viewer: null });
+    expect(out.map((r) => [r.postId, r.reason.code])).toEqual([['high', 'trending'], ['low', 'trending']]);
+  });
+
+  it('sắp đi: bài ăn uống ở nơi đã đặt lên đầu; bài khoe khách sạn khác ở đó bị hạ', () => {
+    const order = row({ kind: 'order_item', targetType: 'hotel', targetId: 'H1', occurredAt: daysAgo(2), detail: { date: '2026-11-16', nights: 2 } });
+    const out = tripRankerV1.rank({
+      candidates: [
+        cand('food', 0.1, { 'place:nha-trang': 1, 'exp:an_uong': 1 }),
+        cand('other-hotel', 0.1, { 'place:nha-trang': 1, 'exp:an_uong': 1 }, 'H2'),
+        cand('hot-elsewhere', 0.9, { 'place:da-lat': 1 }),
+      ],
+      userFeatures: null,
+      now: NOW,
+      viewer: { rows: [order], productPlaces: { H1: 'nha-trang' } },
+    });
+    expect(out.map((r) => r.postId)).toEqual(['food', 'other-hotel', 'hot-elsewhere']);
+    expect(out[0]!.reason.text).toBe('Cho chuyến Nha Trang 16/11 của bạn');
+    expect(out[1]!.score).toBeCloseTo(out[0]!.score / 2, 3);
   });
 });
