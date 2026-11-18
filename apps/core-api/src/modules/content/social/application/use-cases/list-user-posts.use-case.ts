@@ -58,6 +58,7 @@ export class ListUserPostsUseCase {
 
     const enrichedItems: EnrichedUserPostItem[] = items.map((post) => ({
       ...post,
+      commentKeywords: undefined,
       authorName,
     }));
 

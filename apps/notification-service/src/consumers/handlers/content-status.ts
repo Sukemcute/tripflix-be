@@ -104,7 +104,7 @@ export function createContentStatusHandlers(options: {
     const decision = ContentModerationDecidedV1Schema.parse(event.payload);
     if (decision.targetType !== 'comment' || decision.action === 'dismiss') return true;
     if (decision.isAutomatic && decision.action === 'hide') return true;
-    if (decision.action === 'restore' && decision.previouslyAutoHidden) return true;
+    if (decision.action === 'restore' && (decision.previouslyAutoHidden || decision.resultingStatus === 'held')) return true;
     const restored = decision.action === 'restore';
     const title = restored
       ? 'Bình luận đã được khôi phục'
@@ -127,7 +127,7 @@ export function createContentStatusHandlers(options: {
 
   async function directCommentDecision(event: EventEnvelope): Promise<boolean> {
     const decision = ContentCommentModerationActionV1Schema.parse(event.payload);
-    if (decision.action === 'restore' && decision.previouslyAutoHidden) return true;
+    if (decision.action === 'restore' && (decision.previouslyAutoHidden || decision.resultingStatus === 'held')) return true;
     const restored = decision.action === 'restore';
     const title = restored
       ? 'Bình luận đã được khôi phục'

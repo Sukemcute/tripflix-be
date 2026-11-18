@@ -77,6 +77,8 @@ export const posts = contentSchema.table(
     reactionCounts: jsonb('reaction_counts').$type<Record<string, number>>().notNull().default({}),
     reactionTotal: integer('reaction_total').notNull().default(0),
     commentCount: integer('comment_count').notNull().default(0),
+    commentsEnabled: boolean('comments_enabled').notNull().default(true),
+    commentKeywords: jsonb('comment_keywords').$type<string[]>().notNull().default([]),
     shareCount: integer('share_count').notNull().default(0),
     bookmarkCount: integer('bookmark_count').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }),
@@ -91,5 +93,6 @@ export const posts = contentSchema.table(
   ],
 );
 
-export type PostRecord = typeof posts.$inferSelect;
+type StoredPost = typeof posts.$inferSelect;
+export type PostRecord = Omit<StoredPost, 'commentsEnabled' | 'commentKeywords'> & Partial<Pick<StoredPost, 'commentsEnabled' | 'commentKeywords'>>;
 export type NewPostRecord = typeof posts.$inferInsert;

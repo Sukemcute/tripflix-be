@@ -1,4 +1,6 @@
 import type { ContentGatePort } from '../ports/content-gate.port.js';
+import { ForbiddenException } from '@nestjs/common';
+import { matchesCommentKeywords } from '../../domain/comment-filter.js';
 import { Transactional } from '@tripflix/db';
 import { Comment, CommentNotFoundException, Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
@@ -74,10 +76,18 @@ export class AddCommentUseCase {
     const threadRootId = prepared.thread?.root.id ?? null;
     const parentCommentAuthorId = prepared.thread?.root.authorId ?? null;
     const replyToAuthorId = prepared.thread?.parent.authorId ?? null;
-    const { authorDisplayName, replyToName, shouldHold } = prepared;
+    const { authorDisplayName, replyToName } = prepared;
+    let shouldHold = prepared.shouldHold;
     const body = command.body;
+    const settingsPost = lockedPost ?? await this.postRepository.findById(command.postId);
+    this.assertCanComment(settingsPost, command);
+    const creatorHeld = command.authorId !== settingsPost.authorId && matchesCommentKeywords(body, settingsPost.commentKeywords ?? []);
+    shouldHold ||= creatorHeld;
+    if (creatorHeld && !prepared.shouldHold && lockedPost) {
+      await this.postRepository.incrementCounter(command.postId, 'commentCount', -1);
+    }
 
-    const comment = await this.commentRepository.create({
+    let comment = await this.commentRepository.create({
       postId: command.postId,
       authorId: command.authorId,
       parentCommentId: threadRootId,
@@ -85,6 +95,9 @@ export class AddCommentUseCase {
       body,
       isEdited: false,
       status: shouldHold ? 'held' : 'visible',
+      creatorReview: creatorHeld ? 'pending' : 'approved',
+      platformHeld: prepared.shouldHold,
+      publishedAt: shouldHold ? null : new Date(),
     });
 
     // Bài đông (dòng bài đang bị giữ): không chờ. Từ lúc INSERT, khoá ngoại giữ nhẹ dòng bài (KEY SHARE) nên ẩn, xoá
@@ -97,7 +110,12 @@ export class AddCommentUseCase {
         command,
         prepared.thread,
       );
-      await this.counterDeltas!.addCommentDelta(command.postId, 1);
+      // The FK now holds the post stable; settings may have changed while INSERT waited.
+      if (!creatorHeld && command.authorId !== post.authorId && matchesCommentKeywords(body, post.commentKeywords ?? [])) {
+        shouldHold = true;
+        comment = await this.commentRepository.update(comment.id, { status: 'held', creatorReview: 'pending', publishedAt: null });
+      }
+      if (!shouldHold) await this.counterDeltas!.addCommentDelta(command.postId, 1);
     }
 
     // Ghi sự kiện outbox content.comment.created trong cùng transaction DB (phục vụ notification)
@@ -156,6 +174,7 @@ export class AddCommentUseCase {
     if (post.status === 'held' || !domainPost.canBeViewedBy(command.authorId)) {
       throw new PostNotFoundException(command.postId);
     }
+    if (post.commentsEnabled === false) throw new ForbiddenException({ code: 'comments_disabled', message: 'Chủ bài đã tắt bình luận.' });
   }
 
   private assertReplyTarget(

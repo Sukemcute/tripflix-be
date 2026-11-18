@@ -863,6 +863,22 @@ describe('Social Application Use Cases', () => {
         expect(counterDeltas.addCommentDelta).not.toHaveBeenCalled();
       });
 
+      it('bài đông: áp dụng keyword mới sau khi INSERT chờ chủ bài cập nhật xong', async () => {
+        const post = samplePostRecord({ status: 'published', authorId: 'post-owner' });
+        mockPostRepo.findById.mockResolvedValueOnce(post).mockResolvedValueOnce(post)
+          .mockResolvedValue({ ...post, commentKeywords: ['lọc'] });
+        mockPostRepo.tryLockAndIncrementCounter = vi.fn().mockResolvedValue({ status: 'busy' });
+        const comment = { ...rootComment(), id: 'c-late-keyword', body: 'Cần lọc', status: 'visible' };
+        mockCommentRepo.create.mockResolvedValue(comment);
+        mockCommentRepo.update.mockResolvedValue({ ...comment, status: 'held', creatorReview: 'pending', publishedAt: null });
+        const counterDeltas = { addCommentDelta: vi.fn() };
+        const useCase = new AddCommentUseCase(mockPostRepo, mockCommentRepo, mockOutbox, undefined, undefined, counterDeltas as never);
+        const result = await useCase.execute({ postId, authorId: 'member', body: 'Cần lọc' });
+        expect(result).toMatchObject({ status: 'held', creatorReview: 'pending', publishedAt: null });
+        expect(counterDeltas.addCommentDelta).not.toHaveBeenCalled();
+        expect(mockOutbox.add).toHaveBeenCalledWith(expect.objectContaining({ type: 'content.comment.held' }));
+      });
+
       it('bài đông nhưng bài vừa bị ẩn: kiểm lại sau INSERT thì từ chối, không ghi +1 (rollback cả bình luận)', async () => {
         mockPostRepo.findById
           .mockResolvedValueOnce(samplePostRecord({ status: 'published' }))

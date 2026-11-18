@@ -7,6 +7,7 @@ import {
   moderationCases,
   moderationScans,
   reports,
+  comments,
   type ModerationTarget,
 } from '../../db/schema/index.js';
 import { MediaFacade } from '../../media/media.facade.js';
@@ -228,7 +229,10 @@ export class RecordScreeningUseCase {
     const rules = evaluateRules(target.text, this.config.allowedDomains);
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
-    if (!verdict.suspicious && target.status !== 'held') return;
+    if (!verdict.suspicious && (target.status !== 'held' || (target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld))) return;
+    if (verdict.suspicious && target.targetType === 'comment' && target.status === 'held') {
+      await this.repository.db.update(comments).set({ platformHeld: true }).where(eq(comments.id, target.targetId));
+    }
     const item = await this.repository.upsertCase(target, {
       sources: [...(rules.length ? ['rule'] : []), ...(ai?.flagged ? ['ai'] : [])],
       severity: verdict.severity,
@@ -289,7 +293,7 @@ export class ScreenContentUseCase {
       await this.repository.supersedeScan(eventId);
       return;
     }
-    if (target.status === 'held') await this.record.execute(eventId, target, null, occurredAt);
+    if (target.status === 'held' && !(target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld)) await this.record.execute(eventId, target, null, occurredAt);
     if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
       await this.repository.supersedeScan(eventId);
       return;

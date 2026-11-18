@@ -98,6 +98,7 @@ export class GetPostDetailUseCase {
     return {
       post: {
         ...record,
+        commentKeywords: undefined,
         tripAttachment: maskedTrip,
         authorName,
       },

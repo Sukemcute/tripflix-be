@@ -78,6 +78,7 @@ export class SharedPostDto {
   @ApiProperty() shareCount!: number;
 }
 export class SocialCommentDto {
+  @ApiPropertyOptional({ enum: ['approved', 'pending', 'rejected'] }) creatorReview?: string;
   @ApiPropertyOptional({ enum: ['visible', 'held', 'hidden', 'removed'] }) status?: string;
   @ApiProperty({ enum: ['hidden'], nullable: true, description: 'Trạng thái kiểm duyệt hiển thị cho tác giả' })
   moderationState!: 'hidden' | null;

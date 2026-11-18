@@ -24,6 +24,9 @@ export const comments = contentSchema.table(
       .notNull()
       .default('visible'),
     hiddenByActionId: uuid('hidden_by_action_id'),
+    creatorReview: varchar('creator_review', { length: 12 }).$type<'approved' | 'pending' | 'rejected'>().notNull().default('approved'),
+    platformHeld: boolean('platform_held').notNull().default(false),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
     cascadeRootCommentId: uuid('cascade_root_comment_id'),
     likeCount: integer('like_count').notNull().default(0),
     isEdited: boolean('is_edited').notNull().default(false),
@@ -33,6 +36,7 @@ export const comments = contentSchema.table(
   },
   (t) => [
     check('ck_comments_status', sql`${t.status} IN ('visible', 'held', 'hidden', 'removed')`),
+    check('ck_comments_creator_review', sql`${t.creatorReview} IN ('approved', 'pending', 'rejected')`),
     index('idx_comments_post_created').on(t.postId, t.createdAt),
     index('idx_comments_parent').on(t.parentCommentId),
     index('idx_comments_author').on(t.authorId),
@@ -49,5 +53,5 @@ export const comments = contentSchema.table(
 );
 
 type StoredComment = typeof comments.$inferSelect;
-export type CommentRecord = Omit<StoredComment, 'replyToName'> & Partial<Pick<StoredComment, 'replyToName'>>;
+export type CommentRecord = Omit<StoredComment, 'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt'> & Partial<Pick<StoredComment, 'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt'>>;
 export type NewCommentRecord = typeof comments.$inferInsert;

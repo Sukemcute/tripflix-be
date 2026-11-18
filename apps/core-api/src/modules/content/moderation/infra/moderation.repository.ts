@@ -20,6 +20,8 @@ import {
 } from '../../db/schema/index.js';
 
 export interface TargetSnapshot {
+  creatorReview?: string;
+  platformHeld?: boolean;
   targetType: ModerationTarget;
   targetId: string;
   postId: string;
@@ -319,6 +321,8 @@ export class ModerationRepository {
           postId: comment.postId,
           authorId: comment.authorId,
           text: comment.body,
+          creatorReview: comment.creatorReview,
+          platformHeld: comment.platformHeld,
           status: comment.status,
           version: contentVersion(comment.body, null),
           coverMediaId: null,

@@ -172,7 +172,7 @@ export class ListUserPostsQueryDto {
   @ApiPropertyOptional({ description: 'Keyset cursor' })
   cursor?: string;
 
-  @ApiPropertyOptional({ enum: ['all', 'draft', 'published'], default: 'all', description: 'Trạng thái bài' })
+  @ApiPropertyOptional({ enum: ['all', 'draft', 'published', 'held'], default: 'all', description: 'Trạng thái bài' })
   status?: PostStatus | 'all';
 
   @ApiPropertyOptional({
