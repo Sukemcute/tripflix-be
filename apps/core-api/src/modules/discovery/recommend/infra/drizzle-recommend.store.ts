@@ -21,7 +21,7 @@ const chunks = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / CHUNK)
 
 /** Hạn lưu bảng thô (đề xuất mục 4). Dòng thêm mới (ref = eventId) giữ ngắn hơn dòng trạng thái. */
 const RETENTION = { removedDays: 7, appendOnlyDays: 90, otherDays: 180 };
-const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_search'];
+const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_search', 'booking_click'];
 
 const excluded = (column: string) => sql.raw(`excluded."${column}"`);
 

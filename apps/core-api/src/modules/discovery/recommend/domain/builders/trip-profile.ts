@@ -11,6 +11,16 @@ import { round4, type Kind, type PostMeta, type RawRow, type UserBuilder } from 
  */
 const INTEREST_KINDS: Partial<Record<Kind, number>> = { order_item: 5, bookmark: 4, share: 4, comment: 3, reaction: 2 };
 const HALF_LIFE_DAYS = 14;
+/** Xem reels (chốt 18/11): xem ≥ 80% ngang comment, xem thật (≥ 15 s hoặc ≥ 50%) nhẹ, lướt < 2 s trừ nhẹ. */
+export const VIEW_WEIGHTS = { fullRatio: 0.8, full: 3, qualified: 1, skipMs: 2_000, skip: -0.5 };
+
+/** Trọng số một lượt xem reels; 0 = không nói lên gì (xem nửa vời). */
+export function viewWeight(row: RawRow): number {
+  const watchedMs = typeof row.detail?.watchedMs === 'number' ? row.detail.watchedMs : 0;
+  if (row.value !== null && row.value >= VIEW_WEIGHTS.fullRatio) return VIEW_WEIGHTS.full;
+  if (row.detail?.isQualified === true) return VIEW_WEIGHTS.qualified;
+  return watchedMs < VIEW_WEIGHTS.skipMs ? VIEW_WEIGHTS.skip : 0;
+}
 
 export const TripProfileV1FeaturesSchema = z.object({
   /** câu hỏi ('place', 'exp', 'cost', 'with', 'len', 'season') → ngăn → tổng trọng số (chưa chuẩn hoá: ranker lấy cosine). */
@@ -40,7 +50,7 @@ export function accumulateInterest(rows: RawRow[], posts: Record<string, PostMet
   const evidence: Record<string, number> = {};
   const creators: Record<string, number> = {};
   for (const row of rows) {
-    const wKind = row.isRemoved ? undefined : INTEREST_KINDS[row.kind];
+    const wKind = row.isRemoved ? undefined : row.kind === 'view_post' ? viewWeight(row) : INTEREST_KINDS[row.kind];
     const post = wKind ? postOf(row, posts) : undefined;
     if (!wKind || !post) continue;
     const ageDays = Math.max(0, (now.getTime() - Date.parse(row.occurredAt)) / 86_400_000);
@@ -51,9 +61,12 @@ export function accumulateInterest(rows: RawRow[], posts: Record<string, PostMet
       (answers[q] ??= {})[bin] = (answers[q][bin] ?? 0) + w * binW;
       touched.add(q);
     }
-    for (const q of touched) evidence[q] = (evidence[q] ?? 0) + w;
+    // Lướt qua chỉ hạ gu, không tính là "biết thêm" về người này.
+    for (const q of touched) evidence[q] = (evidence[q] ?? 0) + Math.max(0, w);
     creators[post.authorId] = (creators[post.authorId] ?? 0) + w;
   }
+  // Trừ nhiều hơn cộng thì về 0: cosine không dùng giá trị âm.
+  for (const m of [...Object.values(answers), creators]) for (const [k, v] of Object.entries(m)) if (v <= 0) delete m[k];
   return { answers, evidence, creators };
 }
 

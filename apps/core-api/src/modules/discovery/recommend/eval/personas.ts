@@ -208,6 +208,42 @@ export function buildPersonas(posts: EvalPost[]): Persona[] {
     });
   }
 
+  // Chỉ xem reels, không thả tim: xem gần hết bài biển (mỗi ngày một bài, không dồn), lướt qua bài ăn uống.
+  {
+    const id = 'mo-xem-reels-bien';
+    const watched = pick(posts.filter(hasTag('bien', 'dulichbien', 'bienvietnam')), id, 8);
+    const skipped = pick(posts.filter(hasTag('anuong', 'streetfood')), id, 6);
+    const view = (p: EvalPost, daysAgo: number, ratio: number) =>
+      row(id, 'view_post', p.postId, daysAgo, {
+        targetType: 'post',
+        targetId: p.postId,
+        value: ratio,
+        detail: { watchedMs: Math.round(ratio * 30_000), durationSec: 30, isQualified: ratio >= 0.5, surface: 'reels' },
+      });
+    const rows = [...watched.map((p, i) => view(p, 12 - i * 1.5, 0.92)), ...skipped.map((p, i) => view(p, 11 - i * 1.7, 0.03))];
+    const { rows: kept, holdout } = withHoldout(rows, watched, 2);
+    personas.push({ ...base, id, stage: 'dreaming', note: 'xem gần hết 8 reels biển (mỗi ngày một bài), lướt qua 6 reels ăn uống', rows: kept, holdout });
+  }
+
+  // Bấm "Đặt" trên lộ trình của một reels Đà Nẵng hôm nay, trước đó chỉ thích vài bài chung chung.
+  {
+    const id = 'kh-bam-dat-reels-danang';
+    const liked = pick(posts.filter(hasTag('cafe')), id, 4);
+    const target = pick(posts.filter(atPlace('da-nang')), id, 1)[0]!;
+    personas.push({
+      ...base,
+      id,
+      stage: 'planning',
+      note: 'thích 4 bài cà phê (10–4 ngày trước); hôm nay bấm Đặt trên reels Đà Nẵng',
+      rows: [
+        ...engage(id, liked, 10, 4),
+        row(id, 'booking_click', `click:${target.postId}`, 0.1, { targetType: 'post', targetId: target.postId, detail: { hotelId: null, surface: 'reels_trip_plan' } }),
+      ],
+      // Hội An thuộc tỉnh Đà Nẵng (sau sáp nhập): bài Hội An là "gần nơi đang nhắm", tính là đúng nơi.
+      targetPlaces: ['da-nang', 'hoi-an'],
+    });
+  }
+
   personas.push({ ...base, id: 'khach', stage: 'guest', note: 'chưa đăng nhập', rows: [] });
   return personas;
 }

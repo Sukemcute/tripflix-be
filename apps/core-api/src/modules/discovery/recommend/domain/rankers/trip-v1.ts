@@ -2,6 +2,7 @@ import { PLACES } from '../../../search/domain/places.js';
 import { accumulateInterest } from '../builders/trip-profile.js';
 import { round4, type Candidate, type PostMeta, type Ranker } from '../contracts.js';
 import { answerLive, type LiveAnswers, type Stage } from '../live-answers.js';
+import { primaryPlace } from '../bins.js';
 import { EXP_LABEL, type Exp } from '../topics.js';
 import { sortByFinal, TRENDING, weightMap, type Scored } from './rankers.js';
 
@@ -83,15 +84,6 @@ const mainExp = (bins: Record<string, number>) =>
   Object.entries(bins)
     .filter(([b]) => b.startsWith('exp:'))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
-/**
- * Nơi chính = nơi cụ thể nhất của bài (Nha Trang chứ không phải Khánh Hoà).
- * Không dựa vào thứ tự khoá: jsonb của Postgres tự sắp lại khoá nên 'place:khanh-hoa' có thể đứng trước.
- */
-function primaryPlace(bins: Record<string, number>): string | null {
-  const ids = Object.keys(bins).filter((b) => b.startsWith('place:')).map((b) => b.slice(6));
-  const parents = new Set(ids.map((id) => PARENT.get(id)));
-  return ids.find((id) => !parents.has(id)) ?? ids[0] ?? null;
-}
 
 export const tripRankerV1: Ranker = {
   name: 'trip_v1',

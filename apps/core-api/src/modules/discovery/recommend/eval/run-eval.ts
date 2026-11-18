@@ -2,7 +2,7 @@ import { SESSION_KINDS } from '../application/ingest.use-cases.js';
 import { profileFeaturesOf } from '../domain/builders/post-profile.js';
 import { tagAffinityV0 } from '../domain/builders/tag-affinity.js';
 import { tripProfileV1 } from '../domain/builders/trip-profile.js';
-import { assignBins } from '../domain/bins.js';
+import { assignBins, primaryPlace } from '../domain/bins.js';
 import { mergeCandidates } from '../domain/candidates.js';
 import type { Candidate, PostMeta, RankedItem } from '../domain/contracts.js';
 import { applyFeedPolicy } from '../domain/feed-policy.js';
@@ -113,7 +113,9 @@ export async function runEval(algo: EvalAlgo, personas: Persona[], posts: EvalPo
   for (const persona of personas) {
     const ranked = await algo.recommend(persona, posts, now);
     const ids = ranked.map((r) => r.postId);
-    const places = ids.map((id) => byId.get(id)?.placeId ?? null);
+    // Nơi của bài = nơi chính theo ngăn (P1), như ranker thấy; placeId cũ của job bỏ sót bài chỉ có tag nơi.
+    const placeOf = new Map(posts.map((p) => [p.postId, primaryPlace(binsOf(p))]));
+    const places = ids.map((id) => placeOf.get(id) ?? null);
     const top10 = ids.slice(0, 10).map((id) => byId.get(id));
     results.push({
       persona,
@@ -123,7 +125,7 @@ export async function runEval(algo: EvalAlgo, personas: Persona[], posts: EvalPo
       placeCoverage20: placeCoverageAt(places, 20),
       maxRun20: maxSamePlaceRun(places, 20),
       otherHotels10: persona.bookedHotelId
-        ? top10.filter((p) => p?.trip?.hotelId && persona.targetPlaces.includes(p.placeId ?? '') && p.trip.hotelId !== persona.bookedHotelId).length
+        ? top10.filter((p) => p?.trip?.hotelId && persona.targetPlaces.includes(placeOf.get(p.postId) ?? '') && p.trip.hotelId !== persona.bookedHotelId).length
         : null,
       reasons: [...new Set(ranked.slice(0, 10).map((r) => r.reason.text))].slice(0, 3),
     });

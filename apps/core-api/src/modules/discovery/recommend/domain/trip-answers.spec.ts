@@ -47,6 +47,19 @@ describe('trip_profile@v1', () => {
     expect(Object.keys(f.answers.place!)).toEqual(['place:nha-trang', 'place:khanh-hoa']);
   });
 
+  it('xem reels: ≥ 80% ngang comment (3), xem thật 1, lướt < 2 s trừ nhẹ và không tính là dấu hiệu', async () => {
+    const view = (postId: string, value: number | null, watchedMs: number, isQualified: boolean) =>
+      row({ kind: 'view_post', targetType: 'post', targetId: postId, refId: postId, value, detail: { watchedMs, isQualified } });
+    const f = await build([view('nt1', 0.95, 28_500, true), view('dl1', 0.5, 15_000, true)]);
+    expect(f.answers.exp).toEqual({ 'exp:bien': 3 * 0.5, 'exp:cafe': 1 * 0.5 }); // × độ tin thuộc ngăn (tag: 0,5)
+    expect(f.evidence.exp).toBe(4);
+    const skipped = await build([react('nt1', 0), view('nt2', 0.03, 900, false)]);
+    expect(skipped.answers.place!['place:nha-trang']).toBeCloseTo(2 * 0.9 - 0.5 * 0.9, 4);
+    expect(skipped.evidence.place).toBe(2);
+    const onlySkip = await build([view('nt2', 0.03, 900, false)]);
+    expect(onlySkip.answers.exp ?? {}).toEqual({});
+  });
+
   it('nhạt dần: 14 ngày còn một nửa; bỏ dòng đã gỡ', async () => {
     const f = await build([react('dl1', 14), react('nt1', 0, 'reaction'), { ...react('nt2', 0), isRemoved: true }]);
     expect(f.answers.exp).toEqual({ 'exp:cafe': 0.5, 'exp:bien': 1 });
@@ -92,6 +105,15 @@ describe('answerLive', () => {
     const a = live([react('nt1', 0.2), react('nt2', 0.4)]);
     expect(a.exploring['place:nha-trang']).toBeGreaterThan(1.5);
     expect(a.stage).toBe('planning');
+  });
+
+  it('bấm đặt trên reels → đang tìm hiểu nơi của bài; xem gần hết 2 reels cùng nơi trong 1 ngày cũng vậy', () => {
+    const click = row({ kind: 'booking_click', targetType: 'post', targetId: 'dl1', occurredAt: daysAgo(0.1) });
+    expect(live([click])).toMatchObject({ stage: 'planning', exploring: { 'place:da-lat': expect.any(Number) } });
+    const view = (postId: string, d: number) =>
+      row({ kind: 'view_post', targetType: 'post', targetId: postId, refId: postId, value: 0.9, occurredAt: daysAgo(d), detail: { watchedMs: 27_000, isQualified: true } });
+    expect(live([view('nt1', 0.1), view('nt2', 0.3)]).stage).toBe('planning');
+    expect(live([view('nt1', 0.1)]).stage).toBe('dreaming');
   });
 
   it('giai đoạn theo ngày của đơn: sắp đi / đang đi / vừa về / quá 14 ngày thì thôi; đơn đã huỷ bỏ qua', () => {

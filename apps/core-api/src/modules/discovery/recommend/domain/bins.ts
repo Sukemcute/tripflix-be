@@ -83,3 +83,13 @@ export function assignBins(post: PostBinInput): Record<string, number> {
   for (const [bin, w] of score) if (w >= BIN_THRESHOLD) out[bin] = round4(Math.min(1, w));
   return out;
 }
+
+/**
+ * Nơi chính = nơi cụ thể nhất của bài (Nha Trang chứ không phải Khánh Hoà).
+ * Không dựa vào thứ tự khoá: jsonb của Postgres tự sắp lại khoá nên 'place:khanh-hoa' có thể đứng trước.
+ */
+export function primaryPlace(bins: Record<string, number>): string | null {
+  const ids = Object.keys(bins).filter((b) => b.startsWith('place:')).map((b) => b.slice(6));
+  const parents = new Set(ids.map((id) => PARENT.get(id)));
+  return ids.find((id) => !parents.has(id)) ?? ids[0] ?? null;
+}

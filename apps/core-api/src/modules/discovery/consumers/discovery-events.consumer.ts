@@ -9,7 +9,8 @@ import { RecommendIngestUseCases } from '../recommend/application/ingest.use-cas
 import { ExploreUseCases } from '../search/application/explore.use-cases.js';
 
 const RETRY_START_MS = 5_000;
-const DISCOVERY_STREAMS = [STREAMS.content, STREAMS.commerce, STREAMS.access, STREAMS.discovery];
+// app-events: xem reels, bấm đặt từ reels (module feed phát; discovery chỉ đọc).
+const DISCOVERY_STREAMS = [STREAMS.content, STREAMS.commerce, STREAMS.access, STREAMS.discovery, STREAMS.appEvents];
 /**
  * Sự kiện có thể làm bài thôi hiện công khai. Không đọc action/status trong payload mà hỏi lại Content (dropHidden),
  * nên event cũ, trùng hay đến lệch thứ tự (hide rồi restore) đều không xoá nhầm bài đang hiện.

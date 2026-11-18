@@ -35,14 +35,16 @@ export interface LiveAnswers {
 /** Cửa sổ đọc dòng thô và các trọng số dấu hiệu "đang tìm hiểu". */
 export const LIVE_WINDOW_DAYS = 14;
 const HALF_LIFE_DAYS = 2;
-const SIGNAL = { search: 1, staysSearch: 3, productView: 2, postBurst: 1 };
+const SIGNAL = { search: 1, staysSearch: 3, productView: 2, postBurst: 1, bookingClick: 3 };
 /** Lên kế hoạch khi một nơi có ≥ ngưỡng này (≈ 2 lượt tìm gần đây, hoặc 1 lượt tìm phòng). */
 export const PLANNING_MIN_EVIDENCE = 1.5;
 const AFTER_TRIP_DAYS = 14;
 /** Tìm / tìm phòng / xem cùng một nơi nhiều lần trong một giờ chỉ tính một lần: bấm lại, đổi bộ lọc, tải lại trang không phải thêm quan tâm. */
 const DEDUPE_MS = 3_600_000;
-const DEDUPE_KINDS = new Set<Kind>(['search', 'stays_search', 'view']);
+const DEDUPE_KINDS = new Set<Kind>(['search', 'stays_search', 'view', 'booking_click']);
 const POST_KINDS = new Set<Kind>(['reaction', 'bookmark', 'comment', 'share']);
+/** Xem reels gần hết (≥ 80%) cũng tính vào luật "2 bài cùng nơi trong 1 ngày". */
+const FULL_VIEW_RATIO = 0.8;
 const PRODUCT_TARGETS = new Set(['hotel', 'room', 'stay', 'product']);
 
 const DAY = 86_400_000;
@@ -121,6 +123,10 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     } else if (r.kind === 'view') {
       const placeId = str(r.detail?.placeId) ?? (r.targetId ? productPlaces[r.targetId] : undefined);
       if (placeId) note(places, 'exploring', placeId, SIGNAL.productView * w);
+    } else if (r.kind === 'booking_click') {
+      // Bấm "Đặt" trên lộ trình của reels: đang tính đi nơi của bài đó.
+      const placeId = r.targetId ? posts[r.targetId]?.placeId : null;
+      if (placeId) note(places, 'exploring', placeId, SIGNAL.bookingClick * w);
     } else if (r.kind === 'order_item') {
       const nights = num(r.detail?.nights);
       if (nights) note(len, 'len', lenBin(nights + 1), w);
@@ -129,7 +135,7 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
 
   // Thích từ 2 bài cùng nơi trong 1 ngày: đang tìm hiểu nơi đó, không chỉ thích chung chung.
   const postHits = rows
-    .filter((r) => POST_KINDS.has(r.kind) && r.targetType === 'post' && r.targetId && posts[r.targetId]?.placeId)
+    .filter((r) => (POST_KINDS.has(r.kind) || (r.kind === 'view_post' && (r.value ?? 0) >= FULL_VIEW_RATIO)) && r.targetType === 'post' && r.targetId && posts[r.targetId]?.placeId)
     .map((r) => ({ r, postId: r.targetId!, placeId: posts[r.targetId!]!.placeId!, at: Date.parse(r.occurredAt) }));
   for (const hit of postHits) {
     const burst = postHits.some((o) => o.placeId === hit.placeId && o.postId !== hit.postId && Math.abs(o.at - hit.at) <= DAY);

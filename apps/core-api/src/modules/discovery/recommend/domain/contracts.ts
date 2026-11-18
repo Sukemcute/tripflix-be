@@ -16,6 +16,10 @@ export const KINDS = [
   'search',
   'stays_search',
   'view',
+  /** Xem reels (content.post.viewed), value = tỉ lệ đã xem. */
+  'view_post',
+  /** Bấm "Đặt" trên lộ trình gắn reels (content.post.booking_clicked). */
+  'booking_click',
   'flight_search',
   'registered',
   'guest_merged',
