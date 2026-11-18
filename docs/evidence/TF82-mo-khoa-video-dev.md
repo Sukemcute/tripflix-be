@@ -9,11 +9,14 @@
 - `deploy/aws/README.md`: thêm bước 7.
 - Không cấp khoá dev: key group tin mọi khoá như nhau, khoá dev ký được cookie xem cả video staging, và khoá riêng sẽ nằm trên máy cả team.
 
+- 18/11, Thành báo: Firefox trên `tripflix.io.vn` không phát Reels. Feed có 198/200 reel nằm dưới `dev/phong/`, `dev/thang/` (seed), mà `dev/*` dùng `Managed-SimpleCORS` trả `Access-Control-Allow-Origin: *`; hls.js gửi cookie (`withCredentials`) nên trình duyệt chặn. Sửa: `open` thêm `dev/*.m3u8`, `dev/*.ts` chép từ behavior video (giữ `tripflix-video-cors`), chỉ bỏ khoá; `dev/*` chỉ còn cho ảnh. `video-cors.jq` gắn policy cho cả hai behavior này, `media-domain.jq` giữ mọi behavior `dev/` ở đầu.
+
 ## Đối chiếu "Xong khi"
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
 | Local không có khoá vẫn phát được video `dev/` | Đạt (CloudFront) | 17/11 sau `./set-dev-video.sh open`: behavior `dev/* *.m3u8 *.ts`; `curl` `dev/phong/videos/.../360p/index.m3u8` không cookie ra 200 |
 | Video staging vẫn khoá | Đạt | `curl` `staging/videos/.../360p/index.m3u8` không cookie ra 403 |
+| Video `dev/` phát được trên web có cookie (Firefox, hls.js) | Chưa | Cần chạy `./set-dev-video.sh open` bản mới, rồi `curl -H 'Origin: https://tripflix.io.vn'` video `dev/` ra `access-control-allow-origin: https://tripflix.io.vn` |
 | Chạy lại hoặc chạy các script TF82 khác không phá cấu hình | Đạt | Thử jq trên cấu hình mẫu, xem dưới |
 
 ## Kết quả kiểm tra
@@ -23,6 +26,7 @@ Thử jq trên một cấu hình mẫu giống distribution hiện tại (behavi
 - `media-domain.jq` sau `open`: giữ `dev/*` ở đầu. Khi chưa `open`: không đổi so với trước.
 - `video-lock.jq` và `video-cors.jq` sau `open`: chỉ đổi `*.m3u8`, `*.ts`, không đụng `dev/*`.
 - `bash -n set-dev-video.sh`: đạt.
+- 18/11, bản 3 behavior: `open` ra `dev/*.m3u8`, `dev/*.ts` (không khoá, CORS video), `dev/*` (SimpleCORS), rồi `*.m3u8`, `*.ts` (khoá). `open` lần hai không đổi; `close` giống ban đầu; từ trạng thái chỉ có `dev/*` cũ, `open` ra đúng 3 behavior; `media-domain.jq` sau `open` không đổi; `video-lock.jq off/on` không đụng behavior dev; `video-cors.jq` gắn policy cho cả 4 behavior video.
 
 ## Cách kiểm lại
 1. CloudShell: `./set-dev-video.sh open`, rồi `aws cloudfront wait distribution-deployed --id <id>`.
