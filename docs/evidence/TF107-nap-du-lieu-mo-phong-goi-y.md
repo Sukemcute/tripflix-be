@@ -4,11 +4,17 @@
 
 ## Đã làm
 - Lý do: Duy cần chạy thuật toán gợi ý và Bảo cần test AI trên dữ liệu có quy mô. Dữ liệu là bộ mô phỏng seed 42 của Duy: 2.000 người, 41.769 bài, 123.896 sự kiện trong 120 ngày.
-- CLI mới `apps/core-api/src/cli/sim-recommend.ts` có 4 lệnh:
+- CLI mới `apps/core-api/src/cli/sim-recommend.ts` có 5 lệnh:
   - `plan`: chỉ đếm, không ghi.
   - `seed-state`: ghi người dùng, bài, theo dõi, cảm xúc, lưu, bình luận.
   - `replay`: phát thử vài sự kiện mỗi loại vào stream thật.
   - `ingest`: nạp hàng loạt bằng đúng `RecommendIngestUseCases` của discovery.
+  - `remove`: xoá đúng dữ liệu mô phỏng, là đường lui trước khi lên staging. Thiếu `--yes` thì chỉ đếm từng bảng.
+- Phạm vi của `remove`:
+  - Hai lớp chặn: ID phải là uuid v5 tính lại từ bộ dữ liệu; người dùng phải có email `@sim.tripflix.local`, bài phải do người dùng mô phỏng đăng.
+  - Xoá riêng: bảng thô, điểm bài, gu người dùng, `search_documents`, `follows`.
+  - Phần còn lại tự xoá theo khi xoá bài và người dùng: cảm xúc, lưu, bình luận (kể cả của người thật trên bài mô phỏng), bộ đếm, tóm tắt, hành động kiểm duyệt, phiên đăng nhập.
+  - Không đụng `moderation_cases` và `reports` (của Trang, không có khoá ngoại): chỉ đếm và báo.
 - Mọi lệnh ghi phải có `--yes`, in ra DB và Redis đích trước khi ghi, và không chạy khi `NODE_ENV=production`.
 - `sim-recommend/convert.ts` là hàm thuần:
   - Đổi ID mô phỏng (`usr_00001`, `post_000001`…) sang uuid v5 với namespace riêng. Chạy lại ra cùng uuid, và nhận diện được dòng mô phỏng.
@@ -64,6 +70,26 @@
 - 40.949 bài: 41.769 bài mô phỏng trừ 831 bài đã xoá hoặc bị ẩn, cộng 10 bài mẫu.
 - 1.881 người, không builder nào lỗi.
 
+**`remove`** (5,7 giây)
+- Cách thử: nạp lại toàn bộ, chạy job `recommend_build` và `explore`, cho `member@tripflix.local` (tài khoản thật) thả cảm xúc lên một bài mô phỏng. Sau đó chạy `remove` không có `--yes`, rồi chạy có `--yes`.
+- Số đếm và số xoá thật khớp ở cả 13 bảng:
+
+| Bảng | Số dòng |
+|---|---|
+| `recommend_interactions` của người mô phỏng | 104.285 |
+| `recommend_interactions` của người thật trên bài mô phỏng | 1 |
+| `recommend_post_scores` | 40.939 |
+| `recommend_posts` | 40.939 |
+| `search_documents` | 40.939 |
+| `follows` | 30.918 |
+| `reactions` | 66.814 |
+| `posts` | 41.769 |
+| `users` | 2.000 |
+
+- Lần chạy đầu, số đếm khi chưa `--yes` bị trùng ở `follows` và ở tương tác của người thật, vì một dòng khớp nhiều điều kiện. Đã sửa để mỗi dòng chỉ thuộc một nhóm.
+- So số dòng không phải mô phỏng trước và sau: người dùng, bài, cảm xúc và bình luận trên bài thật, media, tương tác, tài liệu tìm kiếm đều giữ nguyên.
+- Chạy lần hai không xoá gì thêm.
+
 **Gợi ý**
 - `usr_00001` đăng ký ngày 118/120, gần như chưa có tương tác: `for_you` trùng `trending`, đúng như người dùng mới.
 - `usr_01158` có 229 tương tác: bài về Sài Gòn (nơi ở) và Vũng Tàu, gu `anuong`. Theo đáp án, người này mơ đi Cô Tô, Đà Nẵng, Đà Lạt, gu thật là `checkin`, `camping`. Đây là dữ liệu để Duy đánh giá thuật toán, không phải lỗi của bước nạp.
@@ -76,7 +102,7 @@
 - **Tác dụng phụ của cách phát vào stream:** consumer kiểm duyệt (`ScreeningConsumer`, của Trang) cũng nhận bình luận và báo lỗi khi không có ai-service. Vì vậy chỉ phát thử vài sự kiện, còn nạp hàng loạt bằng `ingest`.
 
 ## Kết quả kiểm tra
-- `vitest run src/cli/sim-recommend`: 8/8 test đạt (uuid v5 theo vector RFC 4122, dời thời gian, payload qua `toRawRows` thật, trạng thái cuối của content).
+- `vitest run src/cli/sim-recommend`: 9/9 test đạt (uuid v5 theo vector RFC 4122, dời thời gian, payload qua `toRawRows` thật, trạng thái cuối của content, tập ID mà `remove` được xoá).
 - `pnpm turbo run lint typecheck test --affected`: 49/49 tác vụ đạt; core-api 138 file test đạt, 2 file bỏ qua có sẵn. Không có cảnh báo lint mới.
 - `node tools/check-boundaries.mjs`: không có vi phạm.
 
