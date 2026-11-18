@@ -8,6 +8,7 @@ import {
   recommendJobState,
   recommendPostScores,
   recommendPosts,
+  recommendTextVectors,
   recommendUserFeatures,
 } from '../../db/schema/index.js';
 import type { CandidateQuery, InteractionCounts, ProductFeatureStore, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
@@ -387,6 +388,23 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     const { postId, authorId, postType, tags, placeId, hasPlan } = recommendPosts;
     // hasPlan: mode has_plan lọc bài tự đăng (own) theo cờ này; thiếu thì mọi bài tự đăng bị loại.
     return this.db.select({ postId, authorId, postType, tags, placeId, hasPlan }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
+  }
+
+  async findTextVectors(model: string, textHashes: string[]): Promise<Map<string, number[]>> {
+    if (textHashes.length === 0) return new Map();
+    const rows = await this.db
+      .select({ textHash: recommendTextVectors.textHash, vector: recommendTextVectors.vector })
+      .from(recommendTextVectors)
+      .where(and(eq(recommendTextVectors.model, model), inArray(recommendTextVectors.textHash, textHashes)));
+    return new Map(rows.map((r) => [r.textHash, r.vector]));
+  }
+
+  async insertTextVectors(model: string, rows: Array<{ textHash: string; vector: number[] }>): Promise<void> {
+    if (rows.length === 0) return;
+    await this.db
+      .insert(recommendTextVectors)
+      .values(rows.map((r) => ({ model, ...r })))
+      .onConflictDoNothing();
   }
 
   async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {

@@ -2,7 +2,7 @@ import { destOf } from '../../search/domain/explore/text.js';
 import { normalizeText } from '../../search/domain/normalize-text.js';
 import { PLACES, placeIdOfName } from '../../search/domain/places.js';
 import { round4, type PostContent } from './contracts.js';
-import { COST_PER_PERSON, costBin, ITEM_CATEGORY_BINS, lenBin, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
+import { COST_PER_PERSON, costBin, EXP, EXP_DESCRIPTIONS, ITEM_CATEGORY_BINS, lenBin, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
 
 /** Những gì của bài dùng để xếp ngăn. Nhận thẳng PostMeta / PostBuildItem. Mọi trường trong content là tuỳ chọn: thiếu thì nguồn đó không góp. */
 export interface PostBinInput {
@@ -13,7 +13,14 @@ export interface PostBinInput {
 }
 
 /** Độ tin từng nguồn (recommend-topics mục 6, chốt 18/11). */
-const W = { tag: 0.5, title: 0.5, body: 0.3, itemCategory: 0.5, cost: 0.5, days: 1 };
+const W = { tag: 0.5, title: 0.5, body: 0.3, itemCategory: 0.5, cost: 0.5, days: 1, caption: 0.5 };
+/**
+ * Caption chỉ vào ngăn exp có cosine cao nhất khi hơn ngăn thứ hai ≥ biên này. Đo trên 283 caption thật (e5-small INT8):
+ * phủ 0,36, đúng 0,98, gán bừa caption không nói gì 0,02. Biên nhỏ hơn thì gán bừa tăng nhanh (0,01: 0,12).
+ */
+const CAPTION_MARGIN = 0.02;
+/** Giới hạn văn bản của /embed. Mô hình chỉ đọc 256 token đầu nên phần sau không đổi kết quả. */
+const CAPTION_MAX_CHARS = 2000;
 /** Ngăn exp/cost/with/len/season chỉ giữ khi tổng độ tin ≥ ngưỡng: một nguồn mạnh là đủ, nội dung một mình thì không. */
 export const BIN_THRESHOLD = 0.5;
 
@@ -34,6 +41,38 @@ function binsInText(text: string): Set<string> {
   for (const [bin, phrases] of Object.entries(PHRASE_BINS)) if (phrases.some((p) => padded.includes(` ${p} `))) found.add(bin);
   for (const word of norm.split(' ')) if (isCompoundWord(word)) for (const bin of TAG_BINS[word] ?? []) found.add(bin);
   return found;
+}
+
+/** Văn bản nhúng của bài: tiêu đề + nội dung. Bài không có chữ thì null. */
+function captionOf(content: PostContent | undefined): string | null {
+  const text = [content?.title, content?.body].filter(Boolean).join('\n').trim();
+  return text ? Array.from(text).slice(0, CAPTION_MAX_CHARS).join('') : null;
+}
+
+/** Mọi văn bản job phải nhúng trong chu kỳ: câu mô tả ngăn + caption từng bài (trùng thì một lần). */
+export function textsToEmbed(contents: Iterable<PostContent | undefined>): string[] {
+  const texts = new Set<string>(Object.values(EXP_DESCRIPTIONS));
+  for (const content of contents) {
+    const caption = captionOf(content);
+    if (caption) texts.add(caption);
+  }
+  return [...texts];
+}
+
+/** Ngăn exp gần caption nhất theo cosine, chỉ khi rõ (biên ≥ CAPTION_MARGIN). Thiếu vector thì null. */
+function captionExpBin(content: PostContent | undefined): string | null {
+  const caption = captionOf(content);
+  const vectors = content?.vectors;
+  const v = caption ? vectors?.get(caption) : undefined;
+  if (!v || !vectors) return null;
+  const scored: Array<[string, number]> = [];
+  for (const exp of EXP) {
+    const pool = vectors.get(EXP_DESCRIPTIONS[exp]);
+    if (!pool) return null;
+    scored.push([`exp:${exp}`, pool.reduce((sum, x, i) => sum + x * v[i]!, 0)]);
+  }
+  scored.sort((a, b) => b[1] - a[1]);
+  return scored[0]![1] - scored[1]![1] >= CAPTION_MARGIN ? scored[0]![0] : null;
 }
 
 /** Nơi chính của bài và độ tin: nguồn có thứ tự cao hơn thắng (recommend-topics mục 6.2). */
@@ -75,6 +114,8 @@ export function assignBins(post: PostBinInput): Record<string, number> {
   const { title, body, trip } = post.content ?? {};
   if (title) addSource(binsInText(title), W.title);
   if (body) addSource(binsInText(body), W.body);
+  const captionBin = captionExpBin(post.content);
+  if (captionBin) addSource([captionBin], W.caption);
   if (trip) {
     addSource(trip.items.flatMap((i) => (i.category && ITEM_CATEGORY_BINS[i.category] ? [ITEM_CATEGORY_BINS[i.category]!] : [])), W.itemCategory);
     if (trip.estimatedCostPerPerson) addSource([costBin(trip.estimatedCostPerPerson, COST_PER_PERSON)], W.cost);

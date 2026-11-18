@@ -21,6 +21,24 @@ export const EXP_LABEL: Record<Exp, string> = {
   vui_choi: 'khu vui chơi, mua sắm',
 };
 
+/**
+ * Câu mô tả ngăn để so cosine với vector caption (TF28, thí nghiệm caption thật 19/11): giữ nguyên chữ đã đo.
+ * Đổi chữ thì đo lại biên CAPTION_MARGIN (bins.ts).
+ */
+export const EXP_DESCRIPTIONS: Record<Exp, string> = {
+  an_uong: 'Bài du lịch về ăn uống: món ăn địa phương, đồ ăn đường phố, quán ngon, hải sản, ăn vặt, food tour.',
+  song_ao: 'Bài du lịch về ngắm cảnh và chụp ảnh sống ảo: góc check-in đẹp, view đẹp, hoàng hôn, bình minh.',
+  nui: 'Bài du lịch về núi và thiên nhiên: săn mây, trekking, leo núi, thác nước, ruộng bậc thang, cắm trại.',
+  cafe: 'Bài du lịch về quán cà phê: cà phê view đẹp, quán chill, ngồi uống cà phê, làm việc ở quán.',
+  bien: 'Bài du lịch về biển đảo: tắm biển, bãi cát, lặn ngắm san hô, đi cano ra đảo, nghỉ ở bãi biển.',
+  van_hoa: 'Bài du lịch về văn hoá và di tích: phố cổ, chùa, đền, bảo tàng, lịch sử, làng nghề, chợ nổi.',
+  ve_dem: 'Bài du lịch về cuộc sống về đêm: phố đêm, chợ đêm, quán bar, phố đi bộ, nightlife.',
+  nghi_duong: 'Bài du lịch về nghỉ dưỡng: resort, khách sạn cao cấp, hồ bơi, spa, thư giãn, nghỉ ngơi.',
+  vui_choi: 'Bài du lịch về khu vui chơi và mua sắm: công viên giải trí, VinWonders, Sun World, trò chơi, trung tâm thương mại.',
+};
+/** Mô hình nhúng mà biên CAPTION_MARGIN được đo trên (ai-service POST /embed). Vector của mô hình khác không dùng. */
+export const CAPTION_MODEL = 'multilingual-e5-small@614241f622f5';
+
 /** Hashtag (chữ thường, bỏ dấu, bỏ khoảng trắng) → ngăn. Chỉ `resort` vào hai ngăn. */
 export const TAG_BINS: Readonly<Record<string, readonly string[]>> = {
   // exp

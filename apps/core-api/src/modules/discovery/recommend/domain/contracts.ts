@@ -102,6 +102,11 @@ export interface PostContent {
   body?: string;
   isVerified?: boolean;
   trip?: PostTripSummary | null;
+  /**
+   * Vector đơn vị theo văn bản (caption, câu mô tả ngăn) job đã nhúng được trong chu kỳ, dùng chung cho mọi bài.
+   * Thiếu (AI tắt, lỗi, chưa kịp nhúng) thì nguồn caption không góp. Văn bản cần nhúng do bins.textsToEmbed quyết định.
+   */
+  vectors?: ReadonlyMap<string, readonly number[]>;
 }
 
 export interface UserBuildItem {

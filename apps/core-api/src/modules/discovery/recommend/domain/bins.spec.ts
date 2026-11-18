@@ -1,9 +1,9 @@
 import { PLACES } from '../../search/domain/places.js';
-import { assignBins } from './bins.js';
+import { assignBins, textsToEmbed } from './bins.js';
 import { hotV2 } from './builders/hot.js';
 import { postProfileV1 } from './builders/post-profile.js';
 import type { PostBuildItem } from './contracts.js';
-import { EXP, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
+import { EXP, EXP_DESCRIPTIONS, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
 
 type Content = NonNullable<Parameters<typeof assignBins>[0]['content']>;
 const post = ({ tags = [], placeId = null, ...content }: { tags?: string[]; placeId?: string | null } & Content) =>
@@ -109,5 +109,47 @@ describe('post_profile@v1', () => {
     expect(p1).toMatchObject({ bins: { 'place:nha-trang': 1, 'place:khanh-hoa': 1, 'exp:an_uong': 0.5, 'len:ngan': 1 }, bookable: 1 });
     expect(profile.find((o) => o.postId === 'p2')!.features).toMatchObject({ bookable: 0.4 });
     for (const o of profile) expect(postProfileV1.featuresSchema.safeParse(o.features).success).toBe(true);
+  });
+});
+
+describe('ngăn từ caption (vector nhúng)', () => {
+  // Mỗi ngăn exp một trục; caption = vector đơn vị trộn giữa hai trục.
+  const axis = (i: number) => EXP.map((_, j) => (i === j ? 1 : 0));
+  const mix = (a: number, b: number, wa: number) => {
+    const v = EXP.map((_, j) => (j === a ? wa : j === b ? 1 - wa : 0));
+    const n = Math.hypot(...v);
+    return v.map((x) => x / n);
+  };
+  const vectorsWith = (caption: string, v: number[]) =>
+    new Map<string, number[]>([...EXP.map((e, i) => [EXP_DESCRIPTIONS[e], axis(i)] as [string, number[]]), [caption, v]]);
+  const bien = EXP.indexOf('bien');
+  const nui = EXP.indexOf('nui');
+
+  it('caption gần một ngăn rõ ràng thì vào ngăn đó với độ tin 0,5 (đủ ngưỡng một mình)', () => {
+    const caption = 'Chill cả buổi chiều nghe sóng';
+    expect(post({ body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.9)) })).toEqual({ 'exp:bien': 0.5 });
+  });
+
+  it('hai ngăn sát nhau (biên < 0,02) thì không gán: không cố phân loại', () => {
+    const caption = 'Đi chơi cuối tuần';
+    expect(post({ body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.505)) })).toEqual({});
+  });
+
+  it('caption = tiêu đề + nội dung; thiếu vector caption hoặc mô tả ngăn thì nguồn caption không góp', () => {
+    const v = mix(bien, nui, 0.9);
+    expect(post({ title: 'Nha', body: 'Trang', vectors: vectorsWith('Nha\nTrang', v) })).toMatchObject({ 'exp:bien': 0.5 });
+    expect(post({ body: 'khác', vectors: vectorsWith('Nha', v) })).toEqual({});
+    expect(post({ body: 'x', vectors: new Map([['x', v]]) })).toEqual({});
+  });
+
+  it('cộng với nguồn khác như mọi nguồn: hashtag biển + caption biển = 1', () => {
+    const caption = 'Một ngày ở đảo';
+    expect(post({ tags: ['dulichbien'], body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.9)) })).toEqual({ 'exp:bien': 1 });
+  });
+
+  it('textsToEmbed: mô tả 9 ngăn + caption mỗi bài, không trùng, bỏ bài không có chữ', () => {
+    const texts = textsToEmbed([{ title: 'A', body: 'b' }, { title: 'A', body: 'b' }, { body: '  ' }, undefined]);
+    expect(texts).toEqual([...EXP.map((e) => EXP_DESCRIPTIONS[e]), 'A\nb']);
+    expect(textsToEmbed([{ body: 'x'.repeat(3000) }]).at(-1)).toHaveLength(2000);
   });
 });

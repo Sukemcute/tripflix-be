@@ -1,20 +1,27 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { textsToEmbed } from '../domain/bins.js';
 import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
 import type { PostBuilder, PostContent, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
+import { CAPTION_MODEL } from '../domain/topics.js';
 import {
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
+  TEXT_EMBEDDER,
   type RecommendCatalog,
   type RecommendPostRow,
   type RecommendSourcePost,
   type RecommendStore,
+  type TextEmbedder,
 } from './ports.js';
 
 const LOCK = 'discovery.recommend-features';
 const JOB = 'build-features';
 const USER_BATCH = 200;
+/** Văn bản mới nhúng tối đa mỗi chu kỳ (~6 giây ở ai-service 1 luồng); phần còn lại để chu kỳ sau. */
+const EMBED_PER_CYCLE = 512;
 
 export interface BuildCycleResult {
   posts: number;
@@ -70,7 +77,35 @@ export class BuildFeaturesUseCases {
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
     @Inject(RECOMMEND_CATALOG) private readonly catalog: RecommendCatalog,
+    @Optional() @Inject(TEXT_EMBEDDER) private readonly embedder?: TextEmbedder,
   ) {}
+
+  /**
+   * Vector của các văn bản (dữ liệu thô cho bins.ts): đọc cache trước, thiếu thì gọi ai-service, ghi lại cache.
+   * Vector của mô hình khác CAPTION_MODEL bị bỏ vì biên đo trên mô hình đó. Lỗi gì cũng chỉ mất nguồn caption, job chạy tiếp.
+   */
+  private async resolveVectors(texts: string[]): Promise<Map<string, number[]>> {
+    if (!this.embedder || texts.length === 0) return new Map();
+    try {
+      const hashOf = new Map(texts.map((t) => [t, createHash('sha256').update(t).digest('hex')]));
+      const byHash = await this.store.findTextVectors(CAPTION_MODEL, [...new Set(hashOf.values())]);
+      const missing = texts.filter((t) => !byHash.has(hashOf.get(t)!)).slice(0, EMBED_PER_CYCLE);
+      if (missing.length) {
+        const embedded = await this.embedder.embed(missing);
+        if (embedded?.model === CAPTION_MODEL) {
+          const rows = missing.map((t, i) => ({ textHash: hashOf.get(t)!, vector: embedded.vectors[i]! }));
+          await this.store.insertTextVectors(CAPTION_MODEL, rows);
+          for (const r of rows) byHash.set(r.textHash, r.vector);
+        } else if (embedded) {
+          this.logger.warn(`ai-service nhúng bằng ${embedded.model}, cần ${CAPTION_MODEL}: bỏ nguồn caption`);
+        }
+      }
+      return new Map(texts.flatMap((t) => (byHash.has(hashOf.get(t)!) ? [[t, byHash.get(hashOf.get(t)!)!]] : [])));
+    } catch (err) {
+      this.logger.warn(`Không lấy được vector caption, bỏ nguồn caption: ${err instanceof Error ? err.message : String(err)}`);
+      return new Map();
+    }
+  }
 
   /** null = worker khác đang chạy hoặc content tạm rỗng, bỏ lượt. */
   runCycle(now = new Date()): Promise<BuildCycleResult | null> {
@@ -109,7 +144,9 @@ export class BuildFeaturesUseCases {
     const failedBuilders: string[] = [];
 
     const needsSamples = postBuilders.some((b) => b.needsSamples);
-    const sourceById = new Map(sourcePosts.map((p) => [p.id, p]));
+    const contentById = new Map(sourcePosts.map((p) => [p.id, contentOf(p)]));
+    const vectors = await this.resolveVectors(textsToEmbed(contentById.values()));
+    if (vectors.size) for (const content of contentById.values()) if (content) content.vectors = vectors;
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),
       needsSamples ? this.store.listPostInteractionSamples(now) : Promise.resolve(null),
@@ -126,7 +163,7 @@ export class BuildFeaturesUseCases {
       interactions: counts.get(p.postId)?.d30 ?? {},
       interactions24h: counts.get(p.postId)?.h24 ?? {},
       ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
-      content: contentOf(sourceById.get(p.postId)),
+      content: contentById.get(p.postId),
     }));
     for (const builder of postBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {
@@ -144,7 +181,7 @@ export class BuildFeaturesUseCases {
     const metaById = new Map<string, PostMeta>(
       posts.map(({ postId, authorId, postType, tags, placeId }) => [
         postId,
-        { postId, authorId, postType, tags, placeId, content: contentOf(sourceById.get(postId)) },
+        { postId, authorId, postType, tags, placeId, content: contentById.get(postId) },
       ]),
     );
     const productPlaces = Object.fromEntries(hotelProvinces);

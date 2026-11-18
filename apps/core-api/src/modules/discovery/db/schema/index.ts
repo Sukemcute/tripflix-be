@@ -10,6 +10,7 @@ export {
   recommendJobState,
   recommendPostScores,
   recommendPosts,
+  recommendTextVectors,
   recommendUserFeatures,
   type RecommendInteractionRow,
 } from './recommend.js';

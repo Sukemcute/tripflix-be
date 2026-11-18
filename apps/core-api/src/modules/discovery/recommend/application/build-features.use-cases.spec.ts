@@ -1,12 +1,17 @@
+import { createHash } from 'node:crypto';
 import { hotV0 } from '../domain/builders/hot.js';
+import { postProfileV1 } from '../domain/builders/post-profile.js';
+import { CAPTION_MODEL, EXP, EXP_DESCRIPTIONS } from '../domain/topics.js';
 import { BuildFeaturesUseCases } from './build-features.use-cases.js';
-import type { RecommendCatalog, RecommendStore } from './ports.js';
+import type { RecommendCatalog, RecommendStore, TextEmbedder } from './ports.js';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
 
 describe('BuildFeaturesUseCases', () => {
-  const setup = () => {
+  const setup = (embedder?: TextEmbedder) => {
     const store = {
+      findTextVectors: vi.fn().mockResolvedValue(new Map()),
+      insertTextVectors: vi.fn().mockResolvedValue(undefined),
       withLock: (_name: string, fn: () => Promise<unknown>) => fn(),
       replacePosts: vi.fn().mockResolvedValue(true),
       listActiveAlgos: vi.fn().mockResolvedValue([
@@ -44,7 +49,7 @@ describe('BuildFeaturesUseCases', () => {
       listHotelProvinces: () => Promise.resolve({ items: [], nextCursor: null }),
       getVisiblePosts: () => Promise.resolve([]),
     };
-    return { store, useCases: new BuildFeaturesUseCases(store as unknown as RecommendStore, catalog) };
+    return { store, useCases: new BuildFeaturesUseCases(store as unknown as RecommendStore, catalog, embedder) };
   };
 
   it('builder lỗi: không ghi đè dữ liệu của nó, ghi last_error, vẫn chạy builder khác', async () => {
@@ -97,5 +102,60 @@ describe('BuildFeaturesUseCases', () => {
         features: expect.objectContaining({ orders: 1, reactions: 1, signal: 10.2 }),
       }),
     ]);
+  });
+
+  describe('vector caption', () => {
+    const sha = (t: string) => createHash('sha256').update(t).digest('hex');
+    // Mô tả ngăn = trục riêng; caption 't' của bài p1 nằm đúng trục ngăn biển.
+    const vectorOf = (text: string) => {
+      const exp = text === 't' ? 'bien' : EXP.find((e) => EXP_DESCRIPTIONS[e] === text);
+      return EXP.map((e) => (e === exp ? 1 : 0));
+    };
+    const embedderOf = (model = CAPTION_MODEL) => ({ embed: vi.fn(async (texts: string[]) => ({ model, vectors: texts.map(vectorOf) })) });
+    type Store = ReturnType<typeof setup>['store'];
+    const withProfileV1 = (store: Store) =>
+      store.listActiveAlgos.mockResolvedValue([{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }]);
+    const binsOfP1 = (store: Store) =>
+      (store.replacePostScores.mock.calls.find((c) => c[0] === postProfileV1.key)![1] as Array<{ features: { bins: Record<string, number> } }>)[0]!
+        .features.bins;
+    const allTexts = [...EXP.map((e) => EXP_DESCRIPTIONS[e]), 't'];
+
+    it('cache thiếu thì gọi ai-service, ghi cache, builder thấy ngăn từ caption', async () => {
+      const embedder = embedderOf();
+      const { store, useCases } = setup(embedder);
+      withProfileV1(store);
+      await useCases.runCycle(NOW);
+      expect(embedder.embed).toHaveBeenCalledWith(allTexts);
+      expect(store.insertTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, expect.arrayContaining([{ textHash: sha('t'), vector: vectorOf('t') }]));
+      expect(binsOfP1(store)).toMatchObject({ 'exp:bien': 0.5 });
+    });
+
+    it('cache có đủ thì không gọi ai-service', async () => {
+      const embedder = embedderOf();
+      const { store, useCases } = setup(embedder);
+      withProfileV1(store);
+      store.findTextVectors.mockResolvedValue(new Map(allTexts.map((t) => [sha(t), vectorOf(t)])));
+      await useCases.runCycle(NOW);
+      expect(store.findTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, allTexts.map(sha));
+      expect(embedder.embed).not.toHaveBeenCalled();
+      expect(binsOfP1(store)).toMatchObject({ 'exp:bien': 0.5 });
+    });
+
+    it('mô hình khác hoặc AI lỗi: không ghi cache, bỏ nguồn caption, job vẫn xong', async () => {
+      const embedders = [embedderOf('other@1'), { embed: vi.fn().mockResolvedValue(null) }, { embed: vi.fn().mockRejectedValue(new Error('down')) }];
+      for (const embedder of embedders) {
+        const { store, useCases } = setup(embedder);
+        withProfileV1(store);
+        expect(await useCases.runCycle(NOW)).toMatchObject({ failedBuilders: [] });
+        expect(store.insertTextVectors).not.toHaveBeenCalled();
+        expect(binsOfP1(store)).not.toHaveProperty('exp:bien');
+      }
+    });
+
+    it('không có embedder (AI chưa cấu hình): không đọc cache', async () => {
+      const { store, useCases } = setup();
+      await useCases.runCycle(NOW);
+      expect(store.findTextVectors).not.toHaveBeenCalled();
+    });
   });
 });
