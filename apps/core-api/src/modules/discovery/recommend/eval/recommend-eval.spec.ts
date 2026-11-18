@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { answerLive } from '../domain/live-answers.js';
 import { hitAt, maxSamePlaceRun, placeCoverageAt, placeShareAt } from './metrics.js';
 import { buildPersonas, EVAL_NOW, type EvalPost } from './personas.js';
-import { formatBinStats, formatReport, forYouV0, runEval } from './run-eval.js';
+import { formatBinStats, formatReport, forYouV0, runEval, toMeta } from './run-eval.js';
 
 /**
  * Bộ đo offline for-you (TF28, thiết kế v1 mục 4).
@@ -76,5 +77,20 @@ describe('báo cáo bộ đo', () => {
       '',
     ];
     await expect([...intro, formatBinStats(posts), ...sections].join('\n')).toMatchFileSnapshot('./report.md');
+  });
+});
+
+describe('câu trả lời tức thời trên persona', () => {
+  const metas = Object.fromEntries(posts.map((p) => [p.postId, toMeta(p)]));
+
+  it('giai đoạn suy ra khớp giai đoạn persona; lên kế hoạch thì nơi nhắm mạnh nhất nằm trong nơi mục tiêu', () => {
+    for (const persona of buildPersonas(posts).filter((p) => p.stage !== 'guest')) {
+      const live = answerLive({ rows: persona.rows, posts: metas, productPlaces: persona.productPlaces, now: EVAL_NOW });
+      expect([persona.id, live.stage]).toEqual([persona.id, persona.stage]);
+      if (persona.stage === 'planning') {
+        const top = Object.entries(live.exploring).sort((a, b) => b[1] - a[1])[0]![0];
+        expect(persona.targetPlaces.map((p) => `place:${p}`)).toContain(top);
+      }
+    }
   });
 });

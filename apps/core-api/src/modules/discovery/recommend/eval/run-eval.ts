@@ -21,7 +21,16 @@ const HOT_LIMIT = 150;
 const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
 
-const toMeta = (p: EvalPost): PostMeta => ({ postId: p.postId, authorId: p.authorId, postType: p.postType, tags: p.tags, placeId: p.placeId, hasPlan: p.hasPlan });
+/** Bài fixture → PostMeta giống job: có content để builder v1 tự xếp ngăn. */
+export const toMeta = (p: EvalPost): PostMeta => ({
+  postId: p.postId,
+  authorId: p.authorId,
+  postType: p.postType,
+  tags: p.tags,
+  placeId: p.placeId,
+  hasPlan: p.hasPlan,
+  content: { title: p.title, body: p.body, isVerified: p.isVerified, trip: p.trip },
+});
 const toCandidate = (p: EvalPost, source: Candidate['source']): Candidate => ({ ...toMeta(p), score: p.hot ?? 0, postFeatures: {}, source });
 
 const interactedPostIds = (persona: Persona) =>
@@ -121,7 +130,7 @@ const GOAL: Record<Stage, string> = {
 const fmt = (x: number | null) => (x === null ? '–' : Number.isInteger(x) ? String(x) : x.toFixed(2).replace('.', ','));
 
 /** Ngăn của từng bài fixture, đúng như post_profile@v1 tính trong job. */
-export const binsOf = (p: EvalPost) => assignBins({ tags: p.tags, placeId: p.placeId, title: p.title, body: p.body, trip: p.trip });
+export const binsOf = (p: EvalPost) => assignBins(toMeta(p));
 
 /** Độ phủ ngăn trên fixture: số bài mỗi ngăn, bài không có nơi / không có trải nghiệm nào. */
 export function formatBinStats(posts: EvalPost[]): string {

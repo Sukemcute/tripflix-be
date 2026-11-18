@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
-import type { PostBuilder, PostBuildItem, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
+import type { PostBuilder, PostContent, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
 import {
@@ -36,9 +36,9 @@ async function readAll<T>(page: (cursor: string | null) => Promise<{ items: T[];
 const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null);
 const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** Nội dung bài cho post_profile@v1 (xếp ngăn). items của lộ trình là unknown[] ở cổng: chỉ đọc location, category. */
-function contentOf(p: RecommendSourcePost | undefined): Pick<PostBuildItem, 'title' | 'body' | 'isVerified' | 'trip'> {
-  if (!p) return {};
+/** Nội dung thô của bài cho builder (không có logic thuật toán). items của lộ trình là unknown[] ở cổng: chỉ đọc location, category. */
+function contentOf(p: RecommendSourcePost | undefined): PostContent | undefined {
+  if (!p) return undefined;
   const trip = p.tripAttachment;
   return {
     title: p.title,
@@ -108,7 +108,7 @@ export class BuildFeaturesUseCases {
     const { postBuilders, userBuilders } = await this.activeBuilders();
     const failedBuilders: string[] = [];
 
-    const needsSamples = postBuilders.some((b) => ['hot@v1', 'hot@v2', 'post_profile@v1'].includes(b.key));
+    const needsSamples = postBuilders.some((b) => b.needsSamples);
     const sourceById = new Map(sourcePosts.map((p) => [p.id, p]));
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),
@@ -126,7 +126,7 @@ export class BuildFeaturesUseCases {
       interactions: counts.get(p.postId)?.d30 ?? {},
       interactions24h: counts.get(p.postId)?.h24 ?? {},
       ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
-      ...contentOf(sourceById.get(p.postId)),
+      content: contentOf(sourceById.get(p.postId)),
     }));
     for (const builder of postBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {
@@ -141,7 +141,12 @@ export class BuildFeaturesUseCases {
     }
 
     const userIds = await this.store.listActiveUserIds(now);
-    const metaById = new Map<string, PostMeta>(posts.map(({ postId, authorId, postType, tags, placeId }) => [postId, { postId, authorId, postType, tags, placeId }]));
+    const metaById = new Map<string, PostMeta>(
+      posts.map(({ postId, authorId, postType, tags, placeId }) => [
+        postId,
+        { postId, authorId, postType, tags, placeId, content: contentOf(sourceById.get(postId)) },
+      ]),
+    );
     const productPlaces = Object.fromEntries(hotelProvinces);
     for (const builder of userBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {

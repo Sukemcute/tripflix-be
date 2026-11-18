@@ -1,17 +1,15 @@
 import { destOf } from '../../search/domain/explore/text.js';
 import { normalizeText } from '../../search/domain/normalize-text.js';
 import { PLACES, placeIdOfName } from '../../search/domain/places.js';
-import { round4, type PostTripSummary } from './contracts.js';
+import { round4, type PostContent } from './contracts.js';
 import { COST_PER_PERSON, costBin, ITEM_CATEGORY_BINS, lenBin, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
 
-/** Những gì của bài dùng để xếp ngăn. Mọi trường ngoài tags/placeId là tuỳ chọn: thiếu thì nguồn đó không góp. */
+/** Những gì của bài dùng để xếp ngăn. Nhận thẳng PostMeta / PostBuildItem. Mọi trường trong content là tuỳ chọn: thiếu thì nguồn đó không góp. */
 export interface PostBinInput {
   tags: string[];
   /** Nơi job đã suy (khách sạn gắn bài → tên nơi trong destinationName/tiêu đề), xem place-of-post.ts. */
   placeId: string | null;
-  title?: string;
-  body?: string;
-  trip?: PostTripSummary | null;
+  content?: PostContent;
 }
 
 /** Độ tin từng nguồn (recommend-topics mục 6, chốt 18/11). */
@@ -40,12 +38,12 @@ function binsInText(text: string): Set<string> {
 
 /** Nơi chính của bài và độ tin: nguồn có thứ tự cao hơn thắng (recommend-topics mục 6.2). */
 function placeOf(post: PostBinInput): { placeId: string; w: number } | null {
-  if (post.placeId) return { placeId: post.placeId, w: post.trip?.hotelId ? 1 : 0.9 };
+  if (post.placeId) return { placeId: post.placeId, w: post.content?.trip?.hotelId ? 1 : 0.9 };
   for (const t of post.tags) {
     const placeId = TAG_PLACES[tagKey(t)];
     if (placeId) return { placeId, w: 0.8 };
   }
-  const texts = [post.body ?? '', ...(post.trip?.items ?? []).map((i) => i.location ?? '')];
+  const texts = [post.content?.body ?? '', ...(post.content?.trip?.items ?? []).map((i) => i.location ?? '')];
   for (const text of texts) {
     const name = text ? destOf(text) : null;
     const placeId = name ? placeIdOfName(name) : null;
@@ -74,9 +72,9 @@ export function assignBins(post: PostBinInput): Record<string, number> {
     for (const bin of new Set(bins)) score.set(bin, (score.get(bin) ?? 0) + w);
   };
   addSource(post.tags.flatMap((t) => TAG_BINS[tagKey(t)] ?? []), W.tag);
-  if (post.title) addSource(binsInText(post.title), W.title);
-  if (post.body) addSource(binsInText(post.body), W.body);
-  const trip = post.trip;
+  const { title, body, trip } = post.content ?? {};
+  if (title) addSource(binsInText(title), W.title);
+  if (body) addSource(binsInText(body), W.body);
   if (trip) {
     addSource(trip.items.flatMap((i) => (i.category && ITEM_CATEGORY_BINS[i.category] ? [ITEM_CATEGORY_BINS[i.category]!] : [])), W.itemCategory);
     if (trip.estimatedCostPerPerson) addSource([costBin(trip.estimatedCostPerPerson, COST_PER_PERSON)], W.cost);

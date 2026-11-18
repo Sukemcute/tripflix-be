@@ -45,7 +45,7 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 | `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 6 | 3 | – | Vì bạn quan tâm Ninh Bình · Vì bạn thích chủ đề #xuhuong · Vì bạn thích chủ đề #camping |
 | `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 8 | 1 | – | Vì bạn quan tâm Đà Nẵng · Vì bạn quan tâm Sài Gòn · Vì bạn quan tâm Hà Nội |
 | `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 7 | 7 | – | Vì bạn quan tâm Nha Trang · Vì bạn quan tâm Đà Nẵng · Vì bạn quan tâm Quy Nhơn |
-| `mo-ca-that-18-11` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | – | 0,60 | – | 6 | 3 | – | Vì bạn thích chủ đề #nhatrang · Vì bạn quan tâm Hà Nội · Vì bạn thích chủ đề #dalat |
+| `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 5 | 3 | – | Vì bạn thích chủ đề #nhatrang · Vì bạn thích chủ đề #dalat · Vì bạn thích chủ đề #fyp |
 | `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 6 | 4 | – | Vì bạn quan tâm Nha Trang · Vì bạn quan tâm Đà Lạt |
 | `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,20 | – | 5 | 6 | – | Vì bạn quan tâm Phú Quốc · Bài viết thịnh hành trên TripFlix |
 | `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,5, KS khác ≤ 1 | – | 0,70 | – | 8 | 6 | 0 | Vì bạn quan tâm Nha Trang · Vì bạn thích chủ đề #xuhuong · Vì bạn thích chủ đề #checkin |

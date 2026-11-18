@@ -5,7 +5,9 @@ import { postProfileV1 } from './builders/post-profile.js';
 import type { PostBuildItem } from './contracts.js';
 import { EXP, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
 
-const post = (p: Partial<Parameters<typeof assignBins>[0]>) => assignBins({ tags: [], placeId: null, ...p });
+type Content = NonNullable<Parameters<typeof assignBins>[0]['content']>;
+const post = ({ tags = [], placeId = null, ...content }: { tags?: string[]; placeId?: string | null } & Content) =>
+  assignBins({ tags, placeId, content });
 
 describe('topics', () => {
   const binCodes = new Set([
@@ -99,7 +101,7 @@ describe('post_profile@v1', () => {
   });
 
   it('giữ nguyên điểm và features của hot@v2, thêm ngăn và bookable', async () => {
-    const items = [item('p1', { isVerified: true, trip: { hotelId: 'H1', daysCount: 2, estimatedCostPerPerson: null, items: [] } }), item('p2')];
+    const items = [item('p1', { content: { isVerified: true, trip: { hotelId: 'H1', daysCount: 2, estimatedCostPerPerson: null, items: [] } } }), item('p2')];
     const [hot, profile] = await Promise.all([hotV2.build(items, now), postProfileV1.build(items, now)]);
     expect(profile.map((o) => o.score)).toEqual(hot.map((o) => o.score));
     const p1 = profile.find((o) => o.postId === 'p1')!.features;

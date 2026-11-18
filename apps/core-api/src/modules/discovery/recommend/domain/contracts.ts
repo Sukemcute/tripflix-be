@@ -48,11 +48,8 @@ export interface PostBuildItem {
   interactions24h: Partial<Record<Kind, number>>;
   /** Tương tác chi tiết kèm tuổi tài khoản trong 30 ngày (dùng cho hot@v1); nếu thiếu thì fallback về interactions. */
   interactionSamples?: PostInteractionSample[];
-  /** Nội dung bài để xếp ngăn (post_profile@v1); builder khác bỏ qua. */
-  title?: string;
-  body?: string;
-  isVerified?: boolean;
-  trip?: PostTripSummary | null;
+  /** Nội dung bài (job truyền dữ liệu thô; builder nào cần thì tự dùng). */
+  content?: PostContent;
 }
 
 /** Phần lộ trình của bài dùng để xếp ngăn (chi phí, số ngày, loại điểm, khách sạn). */
@@ -91,6 +88,16 @@ export interface PostMeta {
   tags: string[];
   placeId: string | null;
   hasPlan?: boolean;
+  /** Nội dung bài (job truyền dữ liệu thô; builder nào cần thì tự dùng). */
+  content?: PostContent;
+}
+
+/** Nội dung bài job đọc từ listPosts. Dữ liệu thô, không chứa logic thuật toán. */
+export interface PostContent {
+  title?: string;
+  body?: string;
+  isVerified?: boolean;
+  trip?: PostTripSummary | null;
 }
 
 export interface UserBuildItem {
@@ -111,6 +118,8 @@ export interface UserBuildOutput {
 export interface PostBuilder {
   /** 'hot@v0' */
   key: string;
+  /** Cần interactionSamples (tương tác kèm tuổi tài khoản): job chỉ đọc khi có builder khai báo. */
+  needsSamples?: boolean;
   featuresSchema: ZodType;
   build(items: PostBuildItem[], now: Date): Promise<PostBuildOutput[]>;
 }

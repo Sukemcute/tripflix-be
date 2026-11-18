@@ -120,13 +120,14 @@ export function buildPersonas(posts: EvalPost[]): Persona[] {
 
   // Ca thật 18/11: react bài Nha Trang + Đà Lạt, nhưng tìm Hà Nội rất nhiều từ 10 ngày trước.
   {
-    const id = 'mo-ca-that-18-11';
+    const id = 'ca-that-18-11';
     const liked = [...pick(posts.filter(atPlace('nha-trang')), id, 5), ...pick(posts.filter(atPlace('da-lat')), id, 5)];
     personas.push({
       ...base,
       id,
-      stage: 'dreaming',
-      note: 'react Nha Trang, Đà Lạt; 60 lượt tìm Hà Nội cách đây 10–12 ngày',
+      // Thích liền nhiều bài Đà Lạt trong vài ngày gần đây = đang tìm hiểu Đà Lạt (luật "2 bài cùng nơi trong 1 ngày").
+      stage: 'planning',
+      note: 'react Nha Trang rồi Đà Lạt (9–1 ngày trước); 60 lượt tìm Hà Nội cách đây 10–12 ngày',
       rows: [...engage(id, liked, 9, 1), ...searches(id, 'ha-noi', 60, 12, 10)],
       targetPlaces: ['nha-trang', 'da-lat'],
     });

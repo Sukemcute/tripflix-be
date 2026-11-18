@@ -12,7 +12,7 @@ export const PostProfileV1FeaturesSchema = HotV2FeaturesSchema.extend({
 export type PostProfileV1Features = z.infer<typeof PostProfileV1FeaturesSchema>;
 
 const bookableOf = (item: PostBuildItem) =>
-  round4(0.4 * (item.hasPlan ? 1 : 0) + 0.3 * (item.isVerified ? 1 : 0) + 0.3 * (item.trip?.hotelId ? 1 : 0));
+  round4(0.4 * (item.hasPlan ? 1 : 0) + 0.3 * (item.content?.isVerified ? 1 : 0) + 0.3 * (item.content?.trip?.hotelId ? 1 : 0));
 
 /**
  * post_profile@v1 (TF28 v1): điểm giữ nguyên hot@v2, features = hot@v2 + ngăn + bookable.
@@ -20,6 +20,7 @@ const bookableOf = (item: PostBuildItem) =>
  */
 export const postProfileV1: PostBuilder = {
   key: 'post_profile@v1',
+  needsSamples: true,
   featuresSchema: PostProfileV1FeaturesSchema,
   async build(items, now) {
     const byId = new Map(items.map((i) => [i.postId, i]));

@@ -1,6 +1,7 @@
 import { hotV0, hotV1, hotV2 } from './builders/hot.js';
 import { noneV0 } from './builders/none.js';
 import { postProfileV1 } from './builders/post-profile.js';
+import { tripProfileV1 } from './builders/trip-profile.js';
 import { tagAffinityV0 } from './builders/tag-affinity.js';
 import type { PostBuilder, Ranker, UserBuilder } from './contracts.js';
 import { popularRankerV0, tagAffinityRankerV0 } from './rankers/rankers.js';
@@ -13,6 +14,7 @@ export const BUILDERS = new Map<string, { kind: 'post'; builder: PostBuilder } |
   [postProfileV1.key, { kind: 'post', builder: postProfileV1 }],
   [tagAffinityV0.key, { kind: 'user', builder: tagAffinityV0 }],
   [noneV0.key, { kind: 'user', builder: noneV0 }],
+  [tripProfileV1.key, { kind: 'user', builder: tripProfileV1 }],
 ]);
 
 /** tên → ranker, khớp recommend_algos.ranker. */
