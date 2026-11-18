@@ -67,6 +67,15 @@ describe('answerLive', () => {
     expect(live([search('nha-trang', 6), search('nha-trang', 7)]).stage).toBe('dreaming');
   });
 
+  it('tìm lặp cùng nơi trong một giờ chỉ tính một lần: 150 lượt tìm Hà Nội không thắng vài lượt tìm phòng Nha Trang', () => {
+    const at = (h: number, m: number) => new Date(NOW.getTime() - (h * 60 + m) * 60_000).toISOString();
+    const spam = Array.from({ length: 150 }, (_, i) => row({ kind: 'search', targetType: 'place', targetId: 'ha-noi', occurredAt: at(3, i % 60) }));
+    const stays = [1, 2].map((h) => row({ kind: 'stays_search', targetType: 'place', targetId: 'nha-trang', occurredAt: at(h, 0) }));
+    const a = live([...spam, ...stays]);
+    expect(a.exploring['place:ha-noi']).toBeLessThan(3);
+    expect(a.exploring['place:nha-trang']).toBeGreaterThan(a.exploring['place:ha-noi']!);
+  });
+
   it('một lượt tìm phòng đủ để lên kế hoạch; đọc ngân sách, số người, số ngày', () => {
     const a = live([
       row({
@@ -123,5 +132,19 @@ describe('trip_v1', () => {
     expect(out.map((r) => r.postId)).toEqual(['food', 'other-hotel', 'hot-elsewhere']);
     expect(out[0]!.reason.text).toBe('Cho chuyến Nha Trang 16/11 của bạn');
     expect(out[1]!.score).toBeCloseTo(out[0]!.score / 2, 3);
+  });
+
+  it('nơi chính là nơi cụ thể nhất dù jsonb đặt tỉnh cha lên trước', () => {
+    const search = (h: number) => row({ kind: 'search', targetType: 'place', targetId: 'nha-trang', occurredAt: daysAgo(h / 24) });
+    const out = tripRankerV1.rank({
+      candidates: [cand('nt', 0.1, { 'place:khanh-hoa': 0.9, 'place:nha-trang': 0.9 }), cand('cr', 0.1, { 'place:khanh-hoa': 0.8 })],
+      userFeatures: null,
+      now: NOW,
+      viewer: { rows: [search(1), search(3)], productPlaces: {} },
+    });
+    expect(out.map((r) => [r.postId, r.reason.text, r.diversity?.place])).toEqual([
+      ['nt', 'Vì bạn đang tìm hiểu Nha Trang', 'nha-trang'],
+      ['cr', 'Gần Nha Trang mà bạn đang tìm hiểu', 'khanh-hoa'],
+    ]);
   });
 });

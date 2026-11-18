@@ -61,10 +61,10 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 | `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về núi, thiên nhiên · Vì bạn quan tâm Ninh Bình · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
 | `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 9 | 2 | – | Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
 | `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về văn hoá, di tích · Vì bạn quan tâm Nha Trang |
-| `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,90 | – | 4 | 4 | – | Vì bạn đang tìm hiểu Đà Lạt · Vì bạn đang tìm hiểu Nha Trang · Gần Đà Lạt mà bạn đang tìm hiểu |
-| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 4 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
-| `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 5 | 4 | – | Vì bạn đang tìm hiểu Phú Quốc · Bài viết thịnh hành trên TripFlix |
-| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,5, KS khác ≤ 1 | – | 0,70 | – | 6 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về biển đảo |
-| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,5 | – | 0,70 | – | 4 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về khu vui chơi, mua sắm |
+| `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,80 | – | 3 | 4 | – | Vì bạn đang tìm hiểu Đà Lạt · Vì bạn đang tìm hiểu Nha Trang · Gần Đà Lạt mà bạn đang tìm hiểu |
+| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,50 | – | 6 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
+| `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,50 | – | 6 | 4 | – | Vì bạn đang tìm hiểu Phú Quốc · Bài viết thịnh hành trên TripFlix |
+| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,5, KS khác ≤ 1 | – | 0,50 | – | 9 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về biển đảo |
+| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,5 | – | 0,50 | – | 4 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về khu vui chơi, mua sắm · Vì bạn hay xem bài về cà phê |
 | `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0 | 9 | 2 | – | Bạn vừa đi Phú Quốc, thử thêm bài về biển đảo |
 | `khach` | Khách | như trending | – | – | – | 6 | 5 | – | Bài viết thịnh hành trên TripFlix |

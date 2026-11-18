@@ -39,6 +39,9 @@ const SIGNAL = { search: 1, staysSearch: 3, productView: 2, postBurst: 1 };
 /** Lên kế hoạch khi một nơi có ≥ ngưỡng này (≈ 2 lượt tìm gần đây, hoặc 1 lượt tìm phòng). */
 export const PLANNING_MIN_EVIDENCE = 1.5;
 const AFTER_TRIP_DAYS = 14;
+/** Tìm / tìm phòng / xem cùng một nơi nhiều lần trong một giờ chỉ tính một lần: bấm lại, đổi bộ lọc, tải lại trang không phải thêm quan tâm. */
+const DEDUPE_MS = 3_600_000;
+const DEDUPE_KINDS = new Set<Kind>(['search', 'stays_search', 'view']);
 const POST_KINDS = new Set<Kind>(['reaction', 'bookmark', 'comment', 'share']);
 const PRODUCT_TARGETS = new Set(['hotel', 'room', 'stay', 'product']);
 
@@ -73,7 +76,17 @@ function stageOfTrips(trips: BookedTrip[], now: Date): { stage: Stage; trip: Boo
 export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMeta>; productPlaces: Record<string, string>; now: Date }): LiveAnswers {
   const { now, productPlaces, posts } = input;
   const since = now.getTime() - LIVE_WINDOW_DAYS * DAY;
-  const rows = input.rows.filter((r) => !r.isRemoved && Date.parse(r.occurredAt) >= since && Date.parse(r.occurredAt) <= now.getTime());
+  const seenSignal = new Set<string>();
+  const rows = input.rows
+    .filter((r) => !r.isRemoved && Date.parse(r.occurredAt) >= since && Date.parse(r.occurredAt) <= now.getTime())
+    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+    .filter((r) => {
+      if (!DEDUPE_KINDS.has(r.kind)) return true;
+      const key = `${r.kind}|${r.targetId ?? str((r.detail?.placeIds as unknown[] | undefined)?.[0]) ?? ''}|${Math.floor(Date.parse(r.occurredAt) / DEDUPE_MS)}`;
+      if (seenSignal.has(key)) return false;
+      seenSignal.add(key);
+      return true;
+    });
   const decay = (r: RawRow) => 0.5 ** ((now.getTime() - Date.parse(r.occurredAt)) / DAY / HALF_LIFE_DAYS);
 
   const places: Record<string, number> = {};

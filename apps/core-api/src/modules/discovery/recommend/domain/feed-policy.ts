@@ -32,7 +32,7 @@ export const FEED_POLICY: FeedPolicyConfig = {
   authorFactor: 0.5,
   freePostsPerAuthor: 2,
   ownBoost: 10,
-  diversity: { window: 5, maxSamePlace: 2, maxSameExp: 2, focusWindow: 10, maxFocus: 7, maxFocusRun: 4, top: 100 },
+  diversity: { window: 5, maxSamePlace: 2, maxSameExp: 2, focusWindow: 10, maxFocus: 5, maxFocusRun: 4, top: 100 },
 };
 
 /** Tín hiệu của người xem, chốt theo mốc trang đầu để phân trang ổn định. */
