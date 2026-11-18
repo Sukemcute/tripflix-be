@@ -8,7 +8,7 @@ const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
 
 /**
  * Mỗi lần ai-service gọi LLM hoặc kiểm duyệt (sự kiện `ai.usage.recorded` trên stream:ai, TF95).
- * Khoá chính là eventId: sự kiện giao lại không đếm trùng. Không lưu userId: báo cáo chi phí không cần biết ai.
+ * Khoá chính là eventId: sự kiện giao lại không đếm trùng. Từ SCRUM-179 có userId để xem token theo người (chỉ superadmin).
  */
 export const aiUsageEvents = analyticsSchema.table(
   'ai_usage_events',
@@ -22,9 +22,20 @@ export const aiUsageEvents = analyticsSchema.table(
     outputTokens: integer('output_tokens'),
     costUsd: doublePrecision('cost_usd').notNull(),
     isEstimated: boolean('is_estimated').notNull(),
+    // SCRUM-179: gắn lượt gọi với người dùng và lượt chat để xem token theo người và trace. Null với sự kiện cũ,
+    // với tóm tắt và kiểm duyệt (không có người dùng), và sau 90 ngày (job dọn dữ liệu bỏ liên kết).
+    userId: uuid('user_id'),
+    conversationId: uuid('conversation_id'),
+    turnId: uuid('turn_id'),
+    latencyMs: integer('latency_ms'),
     createdAt: at('created_at').notNull().defaultNow(),
   },
-  (t) => [index('idx_ai_usage_events_occurred_at').on(t.occurredAt)],
+  (t) => [
+    index('idx_ai_usage_events_occurred_at').on(t.occurredAt),
+    index('idx_ai_usage_events_user_occurred').on(t.userId, t.occurredAt),
+    index('idx_ai_usage_events_turn').on(t.turnId),
+    index('idx_ai_usage_events_conversation_occurred').on(t.conversationId, t.occurredAt),
+  ],
 );
 
 /**

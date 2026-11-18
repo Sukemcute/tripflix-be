@@ -45,7 +45,7 @@ class MemoryStore implements AiUsageStore {
 }
 
 describe('toAiUsageRecord', () => {
-  it('đọc sự kiện chat của ai-service, bỏ conversationId và userId', () => {
+  it('đọc sự kiện chat của ai-service, giữ conversationId; userId null thì để null (SCRUM-179)', () => {
     expect(toAiUsageRecord(chatEvent())).toEqual({
       id: '0b9c3f0e-8a63-4d0f-9d58-3c1f2b7a1e01',
       occurredAt: new Date('2026-11-17T01:02:03.123Z'),
@@ -56,6 +56,10 @@ describe('toAiUsageRecord', () => {
       outputTokens: 80,
       costUsd: 0.000092,
       isEstimated: true,
+      userId: null,
+      conversationId: '7d1e6a52-0f0b-4c8e-9a51-2f3b5c6d7e8f',
+      turnId: null,
+      latencyMs: null,
     });
   });
 

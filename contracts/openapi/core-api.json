@@ -6755,6 +6755,301 @@
           "analytics"
         ]
       }
+    },
+    "/api/analytics/ai-usage/timeseries": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày, tối đa 92 ngày. Bucket giờ chỉ cho tối đa 8 ngày.",
+        "operationId": "AiInsightsController_timeseries",
+        "parameters": [
+          {
+            "name": "model",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "feature",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "chat",
+                "summary",
+                "moderation"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTimeseriesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to, quá 92 ngày, bucket giờ quá 8 ngày hoặc tham số lạ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu lượng AI theo thời gian: lần gọi, token, chi phí theo giờ hoặc ngày",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/ai-usage/users": {
+      "get": {
+        "description": "Chỉ tính lượt gọi đã gắn với người dùng (chat của người đã đăng nhập, từ bản ai-service mới). Truyền userId để xem một người.",
+        "operationId": "AiInsightsController_users",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUserUsageResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, quá 92 ngày, phân trang lạ hoặc userId không phải UUID"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Người dùng xếp theo chi phí AI: lần gọi, cuộc trò chuyện, token, chi phí, kèm tên và email",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/ai-traces": {
+      "get": {
+        "description": "Lọc theo người dùng, kết quả (answerKind) và chi phí tối thiểu. Lượt chat cũ chưa có turnId vẫn hiện nhưng token bằng 0.",
+        "operationId": "AiInsightsController_traces",
+        "parameters": [
+          {
+            "name": "minCostUsd",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 0.001,
+              "type": "number"
+            }
+          },
+          {
+            "name": "answerKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "error",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTraceListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách lượt chat Tripi: câu hỏi đã che, kết quả, thời gian, token và chi phí",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/ai-traces/{turnId}": {
+      "get": {
+        "operationId": "AiInsightsController_trace",
+        "parameters": [
+          {
+            "name": "turnId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTraceDetailResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "turnId không phải UUID"
+          },
+          "404": {
+            "description": "Không có lượt chat nào với turnId này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết một lượt chat: các bước gọi LLM với model, token, chi phí, thời gian",
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
@@ -16421,6 +16716,372 @@
           "recentEvents",
           "from",
           "to"
+        ]
+      },
+      "AiTimeseriesPointDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "example": "2026-11-17T17:00:00.000Z",
+            "description": "Đầu bucket (theo giờ Việt Nam)"
+          },
+          "calls": {
+            "type": "number",
+            "example": 120
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 350000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 42000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0132,
+            "description": "USD, ước tính theo bảng giá ai-service"
+          }
+        },
+        "required": [
+          "at",
+          "calls",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiTimeseriesResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-11-10T17:00:00.000Z"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-17T17:00:00.000Z"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ]
+          },
+          "points": {
+            "description": "Bucket không có dữ liệu được điền 0",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiTimeseriesPointDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "bucket",
+          "points"
+        ]
+      },
+      "AiUserUsageItemDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null khi tài khoản không còn"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email đăng ký; null khi tài khoản không còn"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "calls": {
+            "type": "number",
+            "example": 30,
+            "description": "Số lần gọi LLM"
+          },
+          "conversations": {
+            "type": "number",
+            "example": 4,
+            "description": "Số cuộc trò chuyện"
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 52000
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 6000
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0042
+          },
+          "lastAt": {
+            "type": "string",
+            "example": "2026-11-18T10:20:00.000Z"
+          }
+        },
+        "required": [
+          "displayName",
+          "email",
+          "userId",
+          "calls",
+          "conversations",
+          "inputTokens",
+          "outputTokens",
+          "costUsd",
+          "lastAt"
+        ]
+      },
+      "AiUserUsageResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 12,
+            "description": "Số người dùng có lượt gọi AI trong khoảng"
+          },
+          "items": {
+            "description": "Tốn nhiều nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiUserUsageItemDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "AiTraceItemDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null khi tài khoản không còn"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email đăng ký; null khi tài khoản không còn"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "turnId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Null với lượt chat cũ chưa có turnId: không mở được chi tiết"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2026-11-18T10:20:00.000Z"
+          },
+          "question": {
+            "type": "string",
+            "nullable": true,
+            "description": "Câu hỏi đã che email, số điện thoại, cắt 120 ký tự"
+          },
+          "intent": {
+            "type": "string",
+            "nullable": true
+          },
+          "answerKind": {
+            "type": "string",
+            "nullable": true,
+            "example": "answer",
+            "description": "answer, clarify, refusal, no_result, fallback hoặc error"
+          },
+          "isAction": {
+            "type": "boolean",
+            "description": "Người dùng bấm nút trên thẻ, không gọi LLM"
+          },
+          "latencyMs": {
+            "type": "number",
+            "nullable": true,
+            "example": 1800,
+            "description": "Thời gian xử lý cả lượt (ms)"
+          },
+          "steps": {
+            "type": "number",
+            "example": 2,
+            "description": "Số bước gọi LLM đã nối được"
+          },
+          "inputTokens": {
+            "type": "number",
+            "example": 2400
+          },
+          "outputTokens": {
+            "type": "number",
+            "example": 300
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0004
+          }
+        },
+        "required": [
+          "displayName",
+          "email",
+          "eventId",
+          "turnId",
+          "userId",
+          "occurredAt",
+          "question",
+          "intent",
+          "answerKind",
+          "isAction",
+          "latencyMs",
+          "steps",
+          "inputTokens",
+          "outputTokens",
+          "costUsd"
+        ]
+      },
+      "AiTraceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 57
+          },
+          "items": {
+            "description": "Mới nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiTraceItemDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "AiTraceStepDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "step": {
+            "type": "string",
+            "nullable": true,
+            "example": "controller",
+            "description": "controller, responder; null với tóm tắt và kiểm duyệt"
+          },
+          "model": {
+            "type": "string",
+            "example": "gpt-5-mini"
+          },
+          "inputTokens": {
+            "type": "number",
+            "nullable": true
+          },
+          "outputTokens": {
+            "type": "number",
+            "nullable": true
+          },
+          "costUsd": {
+            "type": "number",
+            "example": 0.0002
+          },
+          "latencyMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Thời gian một lần gọi LLM (ms); null với sự kiện chưa có"
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2026-11-18T10:20:01.000Z"
+          },
+          "isEstimated": {
+            "type": "boolean",
+            "description": "Chi phí ước tính theo bảng giá, không phải hoá đơn"
+          }
+        },
+        "required": [
+          "id",
+          "step",
+          "model",
+          "inputTokens",
+          "outputTokens",
+          "costUsd",
+          "latencyMs",
+          "occurredAt",
+          "isEstimated"
+        ]
+      },
+      "AiTraceDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "trace": {
+            "$ref": "#/components/schemas/AiTraceItemDto"
+          },
+          "steps": {
+            "description": "Các bước gọi LLM của lượt này, theo thứ tự thời gian",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiTraceStepDto"
+            }
+          }
+        },
+        "required": [
+          "trace",
+          "steps"
         ]
       }
     }

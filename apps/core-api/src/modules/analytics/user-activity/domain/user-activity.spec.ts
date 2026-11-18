@@ -104,6 +104,22 @@ describe('toUserActivityRecord', () => {
     expect(() => toUserActivityRecord(chatEvent('😀'.repeat(121)))).toThrow();
   });
 
+  it('lượt chat mới lưu turnId và latencyMs; sự kiện cũ không có thì không thêm khoá (SCRUM-179)', () => {
+    const chatEvent = (extra: Record<string, unknown>) =>
+      envelope(
+        'ai.chat.turn.recorded',
+        { conversationId: conversation, question: 'tour Huế', intent: null, answerKind: 'answer', isAction: false, ...extra },
+        { producer: 'ai-service', userId: user },
+      );
+    const turnId = '55555555-5555-4555-8555-555555555555';
+
+    expect(toUserActivityRecord(chatEvent({ turnId, latencyMs: 1800 }))?.detail).toMatchObject({ turnId, latencyMs: 1800 });
+    const legacy = toUserActivityRecord(chatEvent({}))?.detail ?? {};
+    expect('turnId' in legacy).toBe(false);
+    expect('latencyMs' in legacy).toBe(false);
+    expect(() => toUserActivityRecord(chatEvent({ turnId: 'khong-phai-uuid' }))).toThrow();
+  });
+
   it('sự kiện khác loại thì bỏ qua', () => {
     expect(toUserActivityRecord(envelope('ai.usage.recorded', {}))).toBeNull();
   });

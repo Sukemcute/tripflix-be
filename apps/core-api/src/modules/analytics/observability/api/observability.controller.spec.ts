@@ -5,6 +5,7 @@ import { AuthModule, InvalidAccessTokenError, MemorySidBlocklist } from '@tripfl
 import request from 'supertest';
 import { AnalyticsModule } from '../../analytics.module.js';
 import { AI_USAGE_STORE } from '../../ai-usage/application/ai-usage.use-cases.js';
+import { AI_INSIGHTS_STORE } from '../../ai-insights/application/ai-insights.store.js';
 import { USER_ACTIVITY_STORE } from '../../user-activity/application/user-activity.use-cases.js';
 import { UserActivityRetentionJob } from '../../user-activity/jobs/user-activity-retention.job.js';
 import { AiUsageConsumer } from '../../ai-usage/consumers/ai-usage.consumer.js';
@@ -39,6 +40,8 @@ describe('observability HTTP authorization', () => {
       .overrideProvider(AiUsageConsumer)
       .useValue({})
       .overrideProvider(USER_ACTIVITY_STORE)
+      .useValue({})
+      .overrideProvider(AI_INSIGHTS_STORE)
       .useValue({})
       .overrideProvider(UserActivityRetentionJob)
       .useValue({})

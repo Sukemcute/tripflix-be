@@ -1,0 +1,297 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "cb2d4950-ca41-4be4-8b20-b01540a61dc9",
+  "prevIds": [
+    "9c38c097-68df-482f-afda-ad840fe887c9"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "analytics",
+        "ai_usage_events",
+        "user_id"
+      ],
+      "writes": [
+        "s|col|analytics.ai_usage_events.user_id",
+        "n|col|analytics.ai_usage_events.user_id",
+        "e|col|analytics.ai_usage_events.user_id"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "analytics",
+        "ai_usage_events",
+        "conversation_id"
+      ],
+      "writes": [
+        "s|col|analytics.ai_usage_events.conversation_id",
+        "n|col|analytics.ai_usage_events.conversation_id",
+        "e|col|analytics.ai_usage_events.conversation_id"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "analytics",
+        "ai_usage_events",
+        "turn_id"
+      ],
+      "writes": [
+        "s|col|analytics.ai_usage_events.turn_id",
+        "n|col|analytics.ai_usage_events.turn_id",
+        "e|col|analytics.ai_usage_events.turn_id"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "analytics",
+        "ai_usage_events",
+        "latency_ms"
+      ],
+      "writes": [
+        "s|col|analytics.ai_usage_events.latency_ms",
+        "n|col|analytics.ai_usage_events.latency_ms",
+        "e|col|analytics.ai_usage_events.latency_ms"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "analytics",
+        "ai_usage_events",
+        "idx_ai_usage_events_user_occurred"
+      ],
+      "writes": [
+        "s|idx|analytics.idx_ai_usage_events_user_occurred",
+        "n|idx|analytics.idx_ai_usage_events_user_occurred",
+        "e|idx|analytics.idx_ai_usage_events_user_occurred",
+        "n|rel|analytics.idx_ai_usage_events_user_occurred"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics",
+        "n|col|analytics.ai_usage_events.user_id",
+        "n|col|analytics.ai_usage_events.occurred_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "analytics",
+        "ai_usage_events",
+        "idx_ai_usage_events_turn"
+      ],
+      "writes": [
+        "s|idx|analytics.idx_ai_usage_events_turn",
+        "n|idx|analytics.idx_ai_usage_events_turn",
+        "e|idx|analytics.idx_ai_usage_events_turn",
+        "n|rel|analytics.idx_ai_usage_events_turn"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics",
+        "n|col|analytics.ai_usage_events.turn_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "analytics",
+        "ai_usage_events",
+        "idx_ai_usage_events_conversation_occurred"
+      ],
+      "writes": [
+        "s|idx|analytics.idx_ai_usage_events_conversation_occurred",
+        "n|idx|analytics.idx_ai_usage_events_conversation_occurred",
+        "e|idx|analytics.idx_ai_usage_events_conversation_occurred",
+        "n|rel|analytics.idx_ai_usage_events_conversation_occurred"
+      ],
+      "reads": [
+        "n|tbl|analytics.ai_usage_events",
+        "n|sch|analytics",
+        "n|col|analytics.ai_usage_events.conversation_id",
+        "n|col|analytics.ai_usage_events.occurred_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "conversation_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "turn_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "latency_ms",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "idx_ai_usage_events_user_occurred",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "idx_ai_usage_events_turn",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "turn_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "ai_usage_events",
+        "name": "idx_ai_usage_events_conversation_occurred",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "conversation_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}
