@@ -1,9 +1,18 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { Transactional, type Db } from '@tripflix/db';
 import { comments, posts, type PostRecord } from '../../db/schema/index.js';
 import type { ContentOutbox } from './ports/content-outbox.port.js';
 import { Post } from '../domain/post.entity.js';
+import { commentPublicationPayload, loadCommentPublicationContext } from './common/comment-publication.js';
+import { decodeCursor, encodeCursor } from './common/cursor.js';
+import { isBeforeCursor } from '../infra/keyset-cursor.js';
 
 export class CommentControlsUseCases {
   constructor(
@@ -52,30 +61,96 @@ export class CommentControlsUseCases {
   }
 
   @Transactional('content')
-  async queue(postId: string, userId: string, offset: number, limit: number) {
-    await this.ownedPost(postId, userId);
+  async queue(postId: string, userId: string, cursor: string | number | undefined, limit: number) {
+    const post = await this.ownedPost(postId, userId);
+    // Accept cursors from the first release while returning stable keyset cursors to new pages.
+    const value = cursor === undefined ? undefined : String(cursor);
+    const legacy = value !== undefined && /^\d+$/.test(value);
+    const offset = legacy ? Number(value) : 0;
+    const decoded = legacy ? undefined : decodeCursor(value);
+    if (
+      offset > 1000000 ||
+      (value &&
+        !legacy &&
+        (!decoded ||
+          !Number.isFinite(decoded.createdAt.getTime()) ||
+          !z.uuid().safeParse(decoded.id).success))
+    )
+      throw new BadRequestException('Cursor hàng chờ không hợp lệ');
     const rows = await this.db
       .select()
       .from(comments)
       .where(
-        and(eq(comments.postId, postId), eq(comments.creatorReview, 'pending'), isNull(comments.deletedAt)),
+        and(
+          eq(comments.postId, postId),
+          eq(comments.creatorReview, 'pending'),
+          isNull(comments.deletedAt),
+          decoded
+            ? isBeforeCursor(comments, comments.createdAt, comments.id, {
+                time: decoded.createdAt,
+                id: decoded.id,
+              })
+            : undefined,
+        ),
       )
       .orderBy(desc(comments.createdAt), desc(comments.id))
       .limit(limit + 1)
       .offset(offset);
+    const page = rows.slice(0, limit);
+    const contextIds = [
+      ...new Set(
+        page.flatMap((row) => [row.parentCommentId, row.replyToCommentId]).filter((id): id is string => !!id),
+      ),
+    ];
+    const contexts = contextIds.length
+      ? await this.db
+          .select()
+          .from(comments)
+          .where(and(eq(comments.postId, postId), inArray(comments.id, contextIds)))
+      : [];
+    const byId = new Map(contexts.map((row) => [row.id, row]));
+    const last = page.at(-1);
     return {
-      items: rows
-        .slice(0, limit)
-        .map((row) => ({
+      items: page.map((row) => {
+        const parent = row.parentCommentId ? byId.get(row.parentCommentId) : undefined;
+        const approvalBlockReason =
+          post.status !== 'published'
+            ? ('post_unavailable' as const)
+            : row.parentCommentId && (!parent || parent.deletedAt || parent.status !== 'visible')
+              ? ('parent_unavailable' as const)
+              : null;
+        const contextId = row.replyToCommentId ?? row.parentCommentId;
+        const context = contextId ? byId.get(contextId) : undefined;
+        const contextVisible =
+          context &&
+          !context.deletedAt &&
+          context.status === 'visible' &&
+          context.creatorReview === 'approved';
+        const platformBlocked = row.platformHeld || ['hidden', 'removed'].includes(row.status);
+        return {
           id: row.id,
           postId,
           authorId: row.authorId,
+          authorName: row.authorDisplayName,
           parentCommentId: row.parentCommentId,
           body: ['hidden', 'removed'].includes(row.status) ? '' : row.body,
-          platformBlocked: row.platformHeld || ['hidden', 'removed'].includes(row.status),
+          platformBlocked,
+          canApprove: approvalBlockReason === null,
+          approvalBlockReason,
+          willPublish: approvalBlockReason === null && !platformBlocked && row.status === 'held',
+          parentContext: contextId
+            ? {
+                id: contextId,
+                kind: row.replyToCommentId ? ('reply' as const) : ('thread' as const),
+                authorName: contextVisible ? context.authorDisplayName : null,
+                body: contextVisible ? context.body : null,
+                unavailable: !contextVisible,
+              }
+            : null,
           createdAt: row.createdAt.toISOString(),
-        })),
-      nextCursor: rows.length > limit ? String(offset + limit) : null,
+        };
+      }),
+      nextCursor: rows.length > limit && last ? encodeCursor(last.createdAt, last.id) : null,
     };
   }
 
@@ -94,7 +169,9 @@ export class CommentControlsUseCases {
       record.status === 'held' &&
       !record.platformHeld &&
       post.status === 'published';
-    if (publish && record.parentCommentId) {
+    if (decision === 'approve' && post.status !== 'published')
+      throw new ConflictException('Bài viết chưa hiển thị, chưa thể duyệt bình luận');
+    if (decision === 'approve' && record.parentCommentId) {
       const [parent] = await this.db.select().from(comments).where(eq(comments.id, record.parentCommentId));
       if (!parent || parent.deletedAt || parent.status !== 'visible')
         throw new ConflictException('Bình luận gốc chưa hiển thị');
@@ -149,29 +226,14 @@ export class CommentControlsUseCases {
       .update(posts)
       .set({ commentCount: sql`${posts.commentCount} + 1`, updatedAt: new Date() })
       .where(eq(posts.id, post.id));
-    let parentAuthorId: string | null = null;
-    if (record.parentCommentId)
-      parentAuthorId =
-        (
-          await this.db
-            .select({ authorId: comments.authorId })
-            .from(comments)
-            .where(eq(comments.id, record.parentCommentId))
-        )[0]?.authorId ?? null;
     await this.outbox.add({
       type: restored ? 'content.comment.restored' : 'content.comment.created',
       userId: post.authorId,
-      payload: {
-        postId: post.id,
-        postAuthorId: post.authorId,
-        postVisibility: post.visibility,
-        commentId: record.id,
-        authorId: record.authorId,
-        parentCommentId: record.parentCommentId,
-        parentCommentAuthorId: parentAuthorId,
-        body: record.body,
-        createdAt: new Date().toISOString(),
-      },
+      payload: commentPublicationPayload(
+        record,
+        post,
+        await loadCommentPublicationContext(this.db, post.id, record),
+      ),
     });
   }
 }

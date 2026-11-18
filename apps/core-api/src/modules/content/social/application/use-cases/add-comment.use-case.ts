@@ -9,6 +9,7 @@ import type { PostCounterDeltaRepository } from '../../infra/post-counter-delta.
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostRecord } from '../../../db/schema/index.js';
+import { commentPublicationPayload } from '../common/comment-publication.js';
 
 export interface AddCommentCommand {
   postId: string;
@@ -67,7 +68,10 @@ export class AddCommentUseCase {
   }
 
   @Transactional('content')
-  protected async createInTransaction(command: AddCommentCommand, prepared: PreparedComment): Promise<CommentRecord> {
+  protected async createInTransaction(
+    command: AddCommentCommand,
+    prepared: PreparedComment,
+  ): Promise<CommentRecord> {
     // Bài vắng: lấy được khoá dòng bài ngay thì cộng đếm luôn (câu đầu vừa khoá vừa cộng), giữ thứ tự "khoá bài
     // trước" như xoá bình luận và kiểm duyệt. Kiểm không đạt thì ném lỗi, rollback huỷ cả phần cộng đếm.
     const lock = await this.lockPostForComment(command.postId, prepared.shouldHold);
@@ -79,9 +83,11 @@ export class AddCommentUseCase {
     const { authorDisplayName, replyToName } = prepared;
     let shouldHold = prepared.shouldHold;
     const body = command.body;
-    const settingsPost = lockedPost ?? await this.postRepository.findById(command.postId);
+    const settingsPost = lockedPost ?? (await this.postRepository.findById(command.postId));
     this.assertCanComment(settingsPost, command);
-    const creatorHeld = command.authorId !== settingsPost.authorId && matchesCommentKeywords(body, settingsPost.commentKeywords ?? []);
+    const creatorHeld =
+      command.authorId !== settingsPost.authorId &&
+      matchesCommentKeywords(body, settingsPost.commentKeywords ?? []);
     shouldHold ||= creatorHeld;
     if (creatorHeld && !prepared.shouldHold && lockedPost) {
       await this.postRepository.incrementCounter(command.postId, 'commentCount', -1);
@@ -91,6 +97,8 @@ export class AddCommentUseCase {
       postId: command.postId,
       authorId: command.authorId,
       parentCommentId: threadRootId,
+      replyToCommentId: command.parentCommentId ?? null,
+      authorDisplayName: authorDisplayName ?? null,
       ...(replyToName ? { replyToName } : {}),
       body,
       isEdited: false,
@@ -111,9 +119,17 @@ export class AddCommentUseCase {
         prepared.thread,
       );
       // The FK now holds the post stable; settings may have changed while INSERT waited.
-      if (!creatorHeld && command.authorId !== post.authorId && matchesCommentKeywords(body, post.commentKeywords ?? [])) {
+      if (
+        !creatorHeld &&
+        command.authorId !== post.authorId &&
+        matchesCommentKeywords(body, post.commentKeywords ?? [])
+      ) {
         shouldHold = true;
-        comment = await this.commentRepository.update(comment.id, { status: 'held', creatorReview: 'pending', publishedAt: null });
+        comment = await this.commentRepository.update(comment.id, {
+          status: 'held',
+          creatorReview: 'pending',
+          publishedAt: null,
+        });
       }
       if (!shouldHold) await this.counterDeltas!.addCommentDelta(command.postId, 1);
     }
@@ -122,20 +138,12 @@ export class AddCommentUseCase {
     await this.outbox.add({
       type: shouldHold ? 'content.comment.held' : 'content.comment.created',
       userId: command.authorId,
-      payload: {
-        commentId: comment.id,
-        postId: command.postId,
-        postAuthorId: post.authorId,
-        // notification chỉ phát realtime vào phòng của bài khi biết bài public (TF99, TF101).
-        postVisibility: post.visibility,
-        authorId: command.authorId,
-        ...(authorDisplayName ? { authorDisplayName } : {}),
-        parentCommentId: threadRootId,
-        parentCommentAuthorId,
-        ...(command.parentCommentId ? { replyToCommentId: command.parentCommentId, replyToAuthorId } : {}),
-        body: comment.body,
-        createdAt: comment.createdAt.toISOString(),
-      },
+      payload: commentPublicationPayload(
+        { ...comment, replyToCommentId: command.parentCommentId ?? null, authorDisplayName },
+        post,
+        { parentCommentAuthorId, replyToAuthorId },
+        comment.createdAt.toISOString(),
+      ),
     });
 
     return comment;
@@ -145,7 +153,10 @@ export class AddCommentUseCase {
     // Bình luận bị giữ chờ duyệt không cộng đếm: chỉ khoá như cũ.
     if (shouldHold) return { kind: 'locked', post: await this.postRepository.findByIdForUpdate(postId) };
     if (!this.counterDeltas) {
-      return { kind: 'locked', post: await this.postRepository.lockAndIncrementCounter(postId, 'commentCount', 1) };
+      return {
+        kind: 'locked',
+        post: await this.postRepository.lockAndIncrementCounter(postId, 'commentCount', 1),
+      };
     }
     const result = await this.postRepository.tryLockAndIncrementCounter(postId, 'commentCount', 1);
     if (result.status === 'busy') return { kind: 'busy' };
@@ -174,7 +185,8 @@ export class AddCommentUseCase {
     if (post.status === 'held' || !domainPost.canBeViewedBy(command.authorId)) {
       throw new PostNotFoundException(command.postId);
     }
-    if (post.commentsEnabled === false) throw new ForbiddenException({ code: 'comments_disabled', message: 'Chủ bài đã tắt bình luận.' });
+    if (post.commentsEnabled === false)
+      throw new ForbiddenException({ code: 'comments_disabled', message: 'Chủ bài đã tắt bình luận.' });
   }
 
   private assertReplyTarget(
@@ -191,7 +203,9 @@ export class AddCommentUseCase {
   private async findThread(postId: string, parentCommentId: string): Promise<CommentThread> {
     const parent = await this.commentRepository.findById(parentCommentId);
     this.assertReplyTarget(parent, postId, parentCommentId);
-    const root = parent.parentCommentId ? await this.commentRepository.findById(parent.parentCommentId) : parent;
+    const root = parent.parentCommentId
+      ? await this.commentRepository.findById(parent.parentCommentId)
+      : parent;
     this.assertReplyTarget(root, postId, parentCommentId);
     Comment.validateParentForReply(root);
     return { root, parent };

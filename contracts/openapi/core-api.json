@@ -7680,6 +7680,39 @@
           "keywords"
         ]
       },
+      "CreatorCommentContextDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "thread"
+            ]
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "unavailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "authorName",
+          "body",
+          "unavailable"
+        ]
+      },
       "CreatorReviewCommentDto": {
         "type": "object",
         "properties": {
@@ -7692,6 +7725,10 @@
           "authorId": {
             "type": "string"
           },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
           "parentCommentId": {
             "type": "string",
             "nullable": true
@@ -7702,6 +7739,29 @@
           "platformBlocked": {
             "type": "boolean"
           },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "willPublish": {
+            "type": "boolean"
+          },
+          "approvalBlockReason": {
+            "type": "string",
+            "enum": [
+              "post_unavailable",
+              "parent_unavailable"
+            ],
+            "nullable": true
+          },
+          "parentContext": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CreatorCommentContextDto"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string"
           }
@@ -7710,9 +7770,14 @@
           "id",
           "postId",
           "authorId",
+          "authorName",
           "parentCommentId",
           "body",
           "platformBlocked",
+          "canApprove",
+          "willPublish",
+          "approvalBlockReason",
+          "parentContext",
           "createdAt"
         ]
       },
