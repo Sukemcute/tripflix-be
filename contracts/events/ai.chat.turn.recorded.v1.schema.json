@@ -39,7 +39,7 @@
         },
         "question": {
           "type": "string",
-          "maxLength": 120
+          "maxLength": 240
         },
         "intent": {
           "type": [

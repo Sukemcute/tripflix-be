@@ -93,6 +93,17 @@ describe('toUserActivityRecord', () => {
     });
   });
 
+  it('câu hỏi 120 ký tự có emoji vẫn nhận (đếm theo ký tự, không theo UTF-16)', () => {
+    const chatEvent = (question: string) =>
+      envelope(
+        'ai.chat.turn.recorded',
+        { conversationId: conversation, question, intent: null, answerKind: 'answer', isAction: true },
+        { producer: 'ai-service', userId: user },
+      );
+    expect(toUserActivityRecord(chatEvent('😀'.repeat(120)))).toMatchObject({ kind: 'chat' });
+    expect(() => toUserActivityRecord(chatEvent('😀'.repeat(121)))).toThrow();
+  });
+
   it('sự kiện khác loại thì bỏ qua', () => {
     expect(toUserActivityRecord(envelope('ai.usage.recorded', {}))).toBeNull();
   });

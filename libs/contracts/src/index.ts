@@ -482,7 +482,8 @@ export const AiChatTurnRecordedV1Schema = z.object({
   userId: z.uuid(),
   payload: z.strictObject({
     conversationId: z.uuid(),
-    question: z.string().max(120),
+    // Đếm theo ký tự (code point) như tripflix-ai cắt; .max(240) chặn chuỗi quá dài trước khi đếm (emoji tính 2 đơn vị UTF-16).
+    question: z.string().max(240).refine((text) => [...text].length <= 120, 'question tối đa 120 ký tự'),
     intent: z.string().nullable(),
     answerKind: z.string(),
     isAction: z.boolean(),
