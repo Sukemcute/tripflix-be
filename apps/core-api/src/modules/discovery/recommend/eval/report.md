@@ -57,14 +57,14 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 
 | Persona | Giai đoạn | Mục tiêu | hit@20 | đúng nơi@10 | nơi vừa đi@10 | số nơi@20 | chuỗi cùng nơi@20 | KS khác@10 | Lý do top 10 |
 |---|---|---|---|---|---|---|---|---|---|
-| `mo-bien-capdoi` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 3 | – | Vì bạn hay xem bài về biển đảo · Vì bạn quan tâm Vũng Tàu · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
-| `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 7 | 2 | – | Vì bạn hay xem bài về núi, thiên nhiên · Vì bạn quan tâm Ninh Bình · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
-| `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 6 | 2 | – | Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
-| `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 3 | – | Vì bạn hay xem bài về văn hoá, di tích · Vì bạn quan tâm Nha Trang |
-| `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 1 | – | 3 | 10 | – | Vì bạn đang tìm hiểu Đà Lạt |
-| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 1 | – | 3 | 16 | – | Vì bạn đang tìm hiểu Nha Trang |
-| `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 1 | – | 4 | 15 | – | Vì bạn đang tìm hiểu Phú Quốc |
-| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,5, KS khác ≤ 1 | – | 1 | – | 4 | 15 | 0 | Cho chuyến Nha Trang 16/11 của bạn |
-| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,5 | – | 1 | – | 4 | 10 | 0 | Cho chuyến Đà Lạt 12/11 của bạn |
-| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0 | 9 | 3 | – | Bạn vừa đi Phú Quốc, thử thêm bài về biển đảo |
+| `mo-bien-capdoi` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về biển đảo · Vì bạn quan tâm Vũng Tàu · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
+| `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về núi, thiên nhiên · Vì bạn quan tâm Ninh Bình · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
+| `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 9 | 2 | – | Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
+| `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về văn hoá, di tích · Vì bạn quan tâm Nha Trang |
+| `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,90 | – | 4 | 4 | – | Vì bạn đang tìm hiểu Đà Lạt · Vì bạn đang tìm hiểu Nha Trang · Gần Đà Lạt mà bạn đang tìm hiểu |
+| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 4 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
+| `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,5 | – | 0,70 | – | 5 | 4 | – | Vì bạn đang tìm hiểu Phú Quốc · Bài viết thịnh hành trên TripFlix |
+| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,5, KS khác ≤ 1 | – | 0,70 | – | 6 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về biển đảo |
+| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,5 | – | 0,70 | – | 4 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về khu vui chơi, mua sắm |
+| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0 | 9 | 2 | – | Bạn vừa đi Phú Quốc, thử thêm bài về biển đảo |
 | `khach` | Khách | như trending | – | – | – | 6 | 5 | – | Bài viết thịnh hành trên TripFlix |

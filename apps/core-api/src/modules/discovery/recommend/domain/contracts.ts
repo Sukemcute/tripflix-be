@@ -223,6 +223,11 @@ export interface RankedItem {
   /** vd tagMatch, placeMatch, hot, final */
   breakdown: Record<string, number>;
   reason: { code: string; text: string };
+  /**
+   * Nội bộ, không ra API: ranker có thì feed-policy áp luật đa dạng nơi / trải nghiệm (ranker v0 không có → giữ nguyên).
+   * isFocus: bài ở nơi người xem đang nhắm hoặc đã đặt, được phép chiếm nhiều chỗ hơn.
+   */
+  diversity?: { place: string | null; exp: string | null; isFocus: boolean };
 }
 
 export interface RankInput {

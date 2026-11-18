@@ -64,6 +64,25 @@ function bestSharedExp(u: Record<string, number>, p: Record<string, number>): st
   return shared.find((b) => b !== 'exp:song_ao') ?? shared[0] ?? null;
 }
 const expLabel = (bin: string) => EXP_LABEL[bin.slice(4) as Exp] ?? bin.slice(4);
+const PARENT = new Map(PLACES.map((p) => [p.id, p.parentId]));
+
+/**
+ * "Vì bạn đang tìm hiểu Nha Trang" khi bài ở đúng nơi đó. Bài chỉ khớp qua tỉnh cha (Cam Ranh khi người xem tìm Nha Trang)
+ * thì nói "Gần Nha Trang mà bạn đang tìm hiểu", không nói tên tỉnh mà người xem chưa từng gõ.
+ */
+function exploringText(exploring: Record<string, number>, bins: Record<string, number>, place: string): string {
+  // answerLive cộng cả tỉnh cha: bài ở cấp tỉnh khớp qua nơi con người xem đã tìm thì gọi tên nơi con đó.
+  const child = Object.entries(exploring)
+    .filter(([b]) => PARENT.get(b.slice(6)) === place && (bins[`place:${place}`] ?? 0) > 0)
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  return child ? `Gần ${placeName(child.slice(6))} mà bạn đang tìm hiểu` : `Vì bạn đang tìm hiểu ${placeName(place)}`;
+}
+
+/** Trải nghiệm chính của bài: ngăn exp có độ tin cao nhất (hoà thì theo tên, cố định). */
+const mainExp = (bins: Record<string, number>) =>
+  Object.entries(bins)
+    .filter(([b]) => b.startsWith('exp:'))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
 const primaryPlace = (bins: Record<string, number>) => Object.keys(bins).find((b) => b.startsWith('place:'))?.slice(6) ?? null;
 
 export const tripRankerV1: Ranker = {
@@ -110,6 +129,13 @@ export const tripRankerV1: Ranker = {
       ['len', { ...ofQuestion(answers.len ?? {}, 'len'), ...live?.len }, (evidence.len ?? 0) / FULL_EVIDENCE.interest + (live?.evidence.len ?? 0) / FULL_EVIDENCE.live],
     ];
     const tripBin = live?.trip ? `place:${live.trip.placeId}` : null;
+    // Nơi được phép chiếm nhiều chỗ trong trang (feed-policy): nơi đang nhắm khi lên kế hoạch, nơi đã đặt khi sắp đi / đang đi.
+    const focusBin =
+      stage === 'planning'
+        ? (Object.entries(live?.exploring ?? {}).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null)
+        : stage === 'upcoming' || stage === 'on_trip'
+          ? tripBin
+          : null;
 
     const scored: Scored[] = candidates.map((c: Candidate) => {
       const bins = postBins.get(c.postId)!;
@@ -144,7 +170,7 @@ export const tripRankerV1: Ranker = {
       let reason = TRENDING;
       const place = primaryPlace(bins);
       const exp = bestSharedExp(answers.exp ?? {}, bins);
-      if (top?.k === 'exploring' && place) reason = { code: 'matches_place', text: `Vì bạn đang tìm hiểu ${placeName(place)}` };
+      if (top?.k === 'exploring' && place) reason = { code: 'matches_place', text: exploringText(live!.exploring, bins, place) };
       else if (top?.k === 'trip' && live?.trip) {
         const [, m, d] = live.trip.checkIn.split('-');
         reason = { code: 'matches_place', text: `Cho chuyến ${placeName(live.trip.placeId)} ${d}/${m} của bạn` };
@@ -155,7 +181,8 @@ export const tripRankerV1: Ranker = {
       } else if (top?.k === 'interestPlace' && place) reason = { code: 'matches_place', text: `Vì bạn quan tâm ${placeName(place)}` };
 
       const breakdown = Object.fromEntries([...Object.entries(parts).map(([k, v]) => [k, round4(v)]), ['final', round4(final)]]);
-      return { candidate: c, final, item: { postId: c.postId, score: round4(final), source: c.source, breakdown, reason } };
+      const diversity = { place, exp: mainExp(bins), isFocus: focusBin !== null && (bins[focusBin] ?? 0) > 0 };
+      return { candidate: c, final, item: { postId: c.postId, score: round4(final), source: c.source, breakdown, reason, diversity } };
     });
     return sortByFinal(scored);
   },
