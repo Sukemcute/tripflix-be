@@ -32,6 +32,9 @@
     },
     "reasonCode": {
       "type": "string"
+    },
+    "previouslyAutoHidden": {
+      "type": "boolean"
     }
   },
   "required": [

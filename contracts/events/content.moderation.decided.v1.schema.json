@@ -43,6 +43,9 @@
     },
     "isAutomatic": {
       "type": "boolean"
+    },
+    "previouslyAutoHidden": {
+      "type": "boolean"
     }
   },
   "required": [
