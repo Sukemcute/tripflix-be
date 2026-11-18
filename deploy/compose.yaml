@@ -143,6 +143,20 @@ services:
       REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Trợ lý Tripi (/chat), cùng biến như compose.server.yaml. Mặc định false: máy không có key
+      # vẫn chạy, Tripi chỉ tìm theo từ khoá. Bật thì cần OPENAI_API_KEY và DEEPSEEK_API_KEY.
+      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
+      CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
+      CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
+      CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
+      CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
+      # Trống thì dùng mặc định của code (minimal); model không nhận minimal (gpt-5.6-luna) đặt none.
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
+      CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
+      CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
+      CHAT_SYSTEM_DAILY_USD: ${CHAT_SYSTEM_DAILY_USD:-3}
     ports: ['8000:8000']
     develop:
       watch:
