@@ -17,3 +17,39 @@ describe('AccessFacade.getDisplayNames', () => {
     expect(findByIds).not.toHaveBeenCalled();
   });
 });
+
+describe('AccessFacade.getUserContacts', () => {
+  it('trả tên, email, ngày đăng ký; bỏ id trùng, sai dạng và không tồn tại; không đọc hash mật khẩu', async () => {
+    const store = new MemoryAccessStore();
+    const user = await store.users.insert({ email: 'b@example.com', passwordHash: 'secret-hash', displayName: 'Tên B', role: 'member' });
+    const findByIds = vi.spyOn(store.users, 'findByIds');
+    const findContacts = vi.spyOn(store.users, 'findContactsByIds');
+
+    const contacts = await new AccessFacade(store).getUserContacts([
+      user!.id,
+      user!.id,
+      'not-a-uuid',
+      '00000000-0000-4000-8000-000000000000',
+    ]);
+
+    expect([...contacts.keys()]).toEqual([user!.id]);
+    expect(contacts.get(user!.id)).toEqual({ displayName: 'Tên B', email: 'b@example.com', createdAt: user!.createdAt });
+    expect(findContacts).toHaveBeenCalledWith([user!.id, '00000000-0000-4000-8000-000000000000']);
+    expect(findByIds).not.toHaveBeenCalled();
+  });
+
+  it('danh sách rỗng thì không gọi store', async () => {
+    const store = new MemoryAccessStore();
+    const findContacts = vi.spyOn(store.users, 'findContactsByIds');
+
+    expect((await new AccessFacade(store).getUserContacts([])).size).toBe(0);
+    expect(findContacts).not.toHaveBeenCalled();
+  });
+
+  it('quá 100 id thì từ chối', async () => {
+    const store = new MemoryAccessStore();
+    const ids = Array.from({ length: 101 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+
+    await expect(new AccessFacade(store).getUserContacts(ids)).rejects.toThrow(RangeError);
+  });
+});

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ACCESS_STORE, type AccessStore } from './auth/application/ports.js';
 
+const MAX_CONTACT_IDS = 100;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -18,4 +19,22 @@ export class AccessFacade {
     const users = await this.store.users.findDisplayNamesByIds(ids);
     return new Map(users.map((u) => [u.id, u.displayName]));
   }
+
+  /** Tên, email đăng ký và ngày đăng ký theo id, cho trang admin theo dõi hành vi (TF177). Id không tồn tại thì không có trong Map. */
+  async getUserContacts(userIds: string[]): Promise<Map<string, UserContact>> {
+    // Email là dữ liệu cá nhân: mỗi lần tối đa 100 id để không kéo cả bảng (Dũng duyệt, #272).
+    if (userIds.length > MAX_CONTACT_IDS) throw new RangeError(`getUserContacts nhận tối đa ${MAX_CONTACT_IDS} id`);
+    const ids = [...new Set(userIds)].filter((id) => UUID.test(id));
+    if (ids.length === 0) return new Map();
+    const users = await this.store.users.findContactsByIds(ids);
+    return new Map(
+      users.map((u) => [u.id, { displayName: u.displayName, email: u.email, createdAt: u.createdAt }]),
+    );
+  }
+}
+
+export interface UserContact {
+  displayName: string;
+  email: string;
+  createdAt: Date;
 }
