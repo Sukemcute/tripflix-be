@@ -262,7 +262,7 @@ dc --profile ai up -d --wait ai-service ai-summary-worker ai-label-worker
 dc --profile gateway up -d --wait traefik
 ```
 
-2. Gọi thử từ laptop không kèm token: `401` là đạt (gateway tới được ai-service, ai-service chặn người chưa đăng nhập). `404` là gateway chưa có router mới.
+2. Gọi thử từ laptop không kèm token, không kèm body: `422` là đạt (gateway tới được ai-service; khách chat được không cần đăng nhập nên ai-service đi tiếp và chỉ báo thiếu `conversationId`, `message`). Lệnh này không gọi LLM, không tốn lượt. `404` là gateway chưa có router mới. Bản ai-service trước Tripi v3 (chưa cho khách chat) trả `401`.
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.tripflix.io.vn/ai/chat
@@ -304,7 +304,7 @@ dc --profile gateway restart traefik
 dc --profile ai exec -T ai-service printenv FORWARDED_ALLOW_IPS   # phải là dải mạng, không phải 127.0.0.1
 ```
 
-3. Gọi thử từ app khi chưa đăng nhập (khách được chat, 5 lượt/ngày). Log `ai-service` ghi mã người dùng hoặc IP đã băm, token, chi phí, không ghi nội dung tin nhắn.
+3. Gọi thử từ app khi chưa đăng nhập: khách chat được, hạn mức tính theo IP (`chat_guest_daily_turns`, `chat_guest_turns_per_minute` trong `app/core/config.py` của tripflix-ai; compose không đặt nên lấy mặc định của image). `sha-336e170`: 5 lượt/ngày, 3 lượt/phút; từ commit `2ff99eb` (nới để test): 300 lượt/ngày, 15 lượt/phút. Hết lượt thì trả `429 GUEST_LIMIT_REACHED` và app mời đăng nhập. Log `ai-service` ghi mã người dùng hoặc IP đã băm, token, chi phí, không ghi nội dung tin nhắn.
 4. Đo tải trên staging trước khi mở cho người dùng: 10 rồi 30 lượt chat cùng lúc, trong lúc gửi bình luận để core gọi `/moderate` (hai việc chung một tiến trình, nửa nhân). Đạt khi p95 của `/moderate` vẫn dưới timeout của core-api và `ai-service` không bị khởi động lại vì hết RAM. Khi đo, hạ `CHAT_SYSTEM_DAILY_USD` (ví dụ `0.5`) trong `.env.server` rồi chạy lại `ai-service`.
 
 ### Giữ log
