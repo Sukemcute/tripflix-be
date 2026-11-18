@@ -2,12 +2,14 @@ import {
   Body,
   Controller,
   Get,
-  NotFoundException,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Put,
+  Res,
   UseFilters,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ServiceOnly, type AuthUser } from '@tripflix/auth';
 import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
@@ -104,10 +106,12 @@ export class PostSummaryController {
       'Trả về bản tóm tắt và các điểm nổi bật đã lưu trong cơ sở dữ liệu (phục vụ Web/Mobile hiển thị).',
   })
   @ApiResponse({ status: 200, description: 'Thông tin tóm tắt bài viết', type: PostSummaryResponseDto })
+  @ApiResponse({ status: 204, description: 'Bài viết chưa có bản tóm tắt' })
   @ApiResponse({ status: 400, description: 'postId sai định dạng UUID' })
-  @ApiResponse({ status: 404, description: 'Bài viết chưa có bản tóm tắt hoặc không có quyền xem' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy bài viết hoặc không có quyền xem' })
   async getSummary(
     @Param('postId', new ParseUUIDPipe()) postId: string,
+    @Res({ passthrough: true }) response: Response,
     @OptionalCurrentUser() user?: AuthUser,
   ) {
     const isStaff = user?.role === 'superadmin' || user?.role === 'moderator';
@@ -117,7 +121,8 @@ export class PostSummaryController {
       isStaff,
     });
     if (!summary) {
-      throw new NotFoundException(`Bài viết ${postId} chưa có bản tóm tắt nào`);
+      response.status(HttpStatus.NO_CONTENT);
+      return;
     }
     return summary;
   }

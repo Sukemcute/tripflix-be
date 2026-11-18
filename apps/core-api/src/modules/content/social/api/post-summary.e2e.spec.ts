@@ -61,7 +61,7 @@ class FakePlatformModule {}
       provide: PostRepository,
       useValue: {
         findById: async (id: string): Promise<PostRecord | null> => {
-          if (id === '018d9f20-0000-7000-8000-000000000001') {
+          if (['018d9f20-0000-7000-8000-000000000001', '018d9f20-0000-7000-8000-000000000002'].includes(id)) {
             return {
               id,
               authorId: '018d9f00-0000-7000-8000-000000000001',
@@ -361,16 +361,29 @@ describe('E2E: PUT & GET /api/v1/posts/:postId/ai-summary với Service Token', 
       .expect(401);
   });
 
-  it('GET /api/v1/posts/:postId/ai-summary công khai: 200 khi có tóm tắt, 404 khi chưa có', async () => {
-    // Đã lưu ở test đầu tiên -> trả về 200 kèm inputHash và keyTakeaways
+  it('GET returns 200 with a summary and preserves ETag/304 caching', async () => {
     const res = await http().get(`/api/v1/posts/${validPostId}/ai-summary`).expect(200);
     expect(res.body).toMatchObject({
       postId: validPostId,
       status: 'ready',
       inputHash: 'hash-abc-123',
     });
+    expect(res.headers.etag).toBeTruthy();
+    const cached = await http()
+      .get(`/api/v1/posts/${validPostId}/ai-summary`)
+      .set('If-None-Match', String(res.headers.etag))
+      .expect(304);
+    expect(cached.text).toBe('');
+  });
 
-    // UUID hợp lệ nhưng chưa có tóm tắt -> 404
+  it('GET returns 204 with an empty body when the post has no summary', async () => {
+    const res = await http()
+      .get('/api/v1/posts/018d9f20-0000-7000-8000-000000000002/ai-summary')
+      .expect(204);
+    expect(res.text).toBe('');
+  });
+
+  it('GET returns 404 when the post does not exist', async () => {
     await http().get('/api/v1/posts/018d9f20-0000-7000-8000-000000000099/ai-summary').expect(404);
   });
 

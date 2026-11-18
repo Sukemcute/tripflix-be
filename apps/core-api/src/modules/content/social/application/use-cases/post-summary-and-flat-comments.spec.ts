@@ -550,19 +550,17 @@ describe('Post Summary and Flat Comments Use Cases', () => {
       } as any);
       expect(saved).toEqual(mockSummaryRecord);
 
-      const fetched = await controller.getSummary(postId);
+      const fetched = await controller.getSummary(postId, { status: vi.fn() } as any);
       expect(fetched).toEqual(mockSummaryRecord);
     });
 
-    it('ném NotFoundException khi bài viết chưa có tóm tắt trong getSummary', async () => {
-      const saveUseCase = {} as any;
+    it('returns no content when the post has no summary', async () => {
       const getUseCase = { execute: vi.fn().mockResolvedValue(null) } as any;
+      const controller = new PostSummaryController({} as any, getUseCase, {} as any);
+      const response = { status: vi.fn() };
 
-      const controller = new PostSummaryController(saveUseCase, getUseCase, {} as any);
-
-      await expect(controller.getSummary(postId)).rejects.toThrow(
-        `Bài viết ${postId} chưa có bản tóm tắt nào`,
-      );
+      expect(await controller.getSummary(postId, response as any)).toBeUndefined();
+      expect(response.status).toHaveBeenCalledWith(204);
     });
   });
 });

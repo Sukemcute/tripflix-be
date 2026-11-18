@@ -2441,11 +2441,14 @@
               }
             }
           },
+          "204": {
+            "description": "Bài viết chưa có bản tóm tắt"
+          },
           "400": {
             "description": "postId sai định dạng UUID"
           },
           "404": {
-            "description": "Bài viết chưa có bản tóm tắt hoặc không có quyền xem"
+            "description": "Không tìm thấy bài viết hoặc không có quyền xem"
           }
         },
         "summary": "Lấy kết quả tóm tắt cộng đồng của bài viết",
