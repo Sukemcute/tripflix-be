@@ -37,7 +37,8 @@ describe('Phát sự kiện tìm kiếm', () => {
     expect(stream).toBe(STREAMS.discovery);
     expect(envelope).toMatchObject({ type: 'discovery.search.performed', version: 1, userId: U, producer: 'core-api' });
     expect(envelope.payload).toEqual({ userId: U, surface: 'explore', placeIds: ['da-lat'], intent: 'food', budgetMax: 1_500_000, postType: null, resultCount: 5 });
-    expect(JSON.stringify(envelope)).not.toMatch(/ăn gì|"lat"|106/);
+    // Chỉ kiểm payload: eventId (UUID ngẫu nhiên) và thời điểm có thể tình cờ chứa "106" làm test đỏ ngẫu nhiên.
+    expect(JSON.stringify(envelope.payload)).not.toMatch(/ăn gì|"lat"|106/);
   });
 
   it('POST /search/posts: chỉ trang đầu; postType all → null', async () => {
