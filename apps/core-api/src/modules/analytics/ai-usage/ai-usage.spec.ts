@@ -95,7 +95,12 @@ describe('AiUsageUseCases', () => {
 
 describe('AiUsageConsumer.handle', () => {
   const consumerWith = (store: AiUsageStore) =>
-    new AiUsageConsumer({ APP_ROLE: 'api' } as never, {} as never, new AiUsageUseCases(store));
+    new AiUsageConsumer(
+      { APP_ROLE: 'api' } as never,
+      {} as never,
+      new AiUsageUseCases(store),
+      { record: async () => false } as never,
+    );
 
   it('payload sai hợp đồng thì bỏ qua (không ném, không thử lại)', async () => {
     const store = new MemoryStore();

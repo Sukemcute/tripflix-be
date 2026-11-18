@@ -7,6 +7,7 @@ import { ZodError } from 'zod';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV, REDIS } from '../../../../platform/tokens.js';
 import { AiUsageUseCases } from '../application/ai-usage.use-cases.js';
+import { UserActivityUseCases } from '../../user-activity/application/user-activity.use-cases.js';
 
 const RETRY_START_MS = 5_000;
 
@@ -29,6 +30,7 @@ export class AiUsageConsumer implements OnApplicationBootstrap, OnApplicationShu
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(AiUsageUseCases) private readonly usage: AiUsageUseCases,
+    @Inject(UserActivityUseCases) private readonly activity: UserActivityUseCases,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -39,7 +41,8 @@ export class AiUsageConsumer implements OnApplicationBootstrap, OnApplicationShu
       redis: this.connection,
       group: 'core-analytics',
       consumer: hostname(),
-      streams: [STREAMS.ai],
+      // TF177: cùng group, thêm stream content và app-events để gom hành vi; đừng tạo consumer thứ hai.
+      streams: [STREAMS.ai, STREAMS.content, STREAMS.appEvents],
       handler: (event) => this.handle(event),
       onError: (err, delivery) => this.logger.error({ err, ...delivery }, 'Ghi chi phí AI lỗi, sẽ thử lại'),
     });
@@ -55,9 +58,10 @@ export class AiUsageConsumer implements OnApplicationBootstrap, OnApplicationShu
   async handle(event: EventEnvelope): Promise<void> {
     try {
       await this.usage.record(event);
+      await this.activity.record(event);
     } catch (err) {
       if (!(err instanceof ZodError)) throw err;
-      this.logger.warn({ eventId: event.eventId, issues: err.issues.length }, 'Sự kiện chi phí AI sai hợp đồng, bỏ qua');
+      this.logger.warn({ eventId: event.eventId, issues: err.issues.length }, 'Sự kiện sai hợp đồng, bỏ qua');
     }
   }
 

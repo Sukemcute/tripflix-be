@@ -6420,6 +6420,117 @@
           "analytics"
         ]
       }
+    },
+    "/api/analytics/user-activity": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày tới hôm nay, tối đa 90 ngày. Sắp theo hoạt động gần nhất.",
+        "operationId": "UserActivityController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "items gồm userId, displayName, email, số lượt từng loại, lastActiveAt; kèm total"
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to, quá 90 ngày hoặc phân trang lạ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số lượt thích, bình luận, chia sẻ, xem, chat",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/analytics/user-activity/{userId}": {
+      "get": {
+        "operationId": "UserActivityController_detail",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hồ sơ hành vi của người dùng"
+          },
+          "404": {
+            "description": "Không có tài khoản với userId này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết hành vi một người dùng: tên, email đăng ký, số lượt trong khoảng và 50 sự kiện gần nhất",
+        "tags": [
+          "analytics"
+        ]
+      }
     }
   },
   "info": {
