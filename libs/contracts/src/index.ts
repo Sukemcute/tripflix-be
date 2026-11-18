@@ -461,6 +461,34 @@ export const ContentCommentHeldV1Schema = z.object({ commentId: z.uuid(), postId
 export type ContentPostHeldV1 = z.infer<typeof ContentPostHeldV1Schema>;
 export type ContentCommentHeldV1 = z.infer<typeof ContentCommentHeldV1Schema>;
 
+/** content.post.shared v1: người dùng chia sẻ bài (đếm theo người cho trang hành vi, TF177). userId null khi khách. */
+export const ContentPostSharedV1Schema = z.object({
+  postId: z.uuid(),
+  userId: z.uuid().nullable(),
+  shareUrl: z.string(),
+});
+
+/**
+ * ai.chat.turn.recorded v1 (stream:ai, TF177): một lượt chat của người đã đăng nhập; khách không có sự kiện.
+ * Khớp contracts/events/ai.chat.turn.recorded.v1.schema.json bên tripflix-ai. intent và answerKind là chuỗi để dễ thêm giá trị mới.
+ */
+export const AiChatTurnRecordedV1Schema = z.object({
+  eventId: z.uuid(),
+  type: z.literal('ai.chat.turn.recorded'),
+  version: z.literal(1),
+  occurredAt: z.iso.datetime(),
+  producer: z.literal('ai-service'),
+  userId: z.uuid(),
+  payload: z.strictObject({
+    conversationId: z.uuid(),
+    question: z.string().max(120),
+    intent: z.string().nullable(),
+    answerKind: z.string(),
+    isAction: z.boolean(),
+  }),
+});
+export type AiChatTurnRecordedV1 = z.infer<typeof AiChatTurnRecordedV1Schema>;
+
 export const exportedSchemas: Record<string, z.ZodType> = {
   'content.post.held.v1': ContentPostHeldV1Schema,
   'content.comment.held.v1': ContentCommentHeldV1Schema,
@@ -504,4 +532,6 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.session_reuse_detected.v1': AccessSessionReuseDetectedV1Schema,
   'discovery.search.performed.v1': DiscoverySearchPerformedV1Schema,
   'discovery.stays.searched.v1': DiscoveryStaysSearchedV1Schema,
+  'content.post.shared.v1': ContentPostSharedV1Schema,
+  'ai.chat.turn.recorded.v1': AiChatTurnRecordedV1Schema,
 };
