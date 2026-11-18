@@ -47,7 +47,15 @@ export interface ExplorePost {
   title: string;
   body: string;
   hashtags: string[];
-  tripAttachment: { destinationName?: string; daysCount?: number; estimatedCostPerPerson?: number } | null;
+  mediaIds?: string[];
+  coverMediaId?: string | null;
+  tripAttachment: {
+    destinationName?: string;
+    destinationPlaceId?: string;
+    daysCount?: number;
+    estimatedCostPerPerson?: number;
+    items?: unknown[];
+  } | null;
   reactionTotal: number;
   commentCount: number;
   authorId: string;

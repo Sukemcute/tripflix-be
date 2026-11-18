@@ -1,4 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { calculateCompleteness } from '../../recommend/domain/completeness.js';
+import { RECOMMEND_STORE, type RecommendStore } from '../../recommend/application/ports.js';
 import { buildIndex } from '../domain/explore/build.js';
 import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
@@ -43,9 +45,13 @@ export interface ExploreQuery {
   loc?: { lat: number; lng: number } | null;
 }
 
+export const POST_SORTS = ['relevance', 'trending', 'recent'] as const;
+export type PostSort = (typeof POST_SORTS)[number];
+
 export interface PostSearchQuery {
   q: string;
   postType: PostType;
+  sort?: PostSort;
   cursor?: string;
   limit: number;
 }
@@ -210,6 +216,13 @@ export function postToObject(p: ExplorePost): ExploreObject {
     topics: isVideo && days ? ['plan'] : [],
     authorId: p.authorId,
     createdAt: new Date(p.createdAt).toISOString(),
+    completeness: calculateCompleteness({
+      mediaIds: p.mediaIds ?? [],
+      coverMediaId: p.coverMediaId ?? null,
+      body: p.body,
+      hashtags: p.hashtags,
+      tripAttachment: p.tripAttachment,
+    }),
   };
 }
 
@@ -267,6 +280,7 @@ export class ExploreUseCases {
     @Inject(EXPLORE_STORE) private readonly store: ExploreStore,
     @Inject(EXPLORE_CATALOG) private readonly catalog: ExploreCatalog,
     @Inject(PLACES_STORE) private readonly places: Pick<PlacesStore, 'listPlaces' | 'listPoints'>,
+    @Optional() @Inject(RECOMMEND_STORE) private readonly recommendStore?: Pick<RecommendStore, 'findPostScores'>,
   ) {}
 
   async search(query: ExploreQuery): Promise<ExploreResultPage> {
@@ -321,17 +335,52 @@ export class ExploreUseCases {
       : found;
     const visible = candidates.length ? await this.catalog.findVisiblePostIds(candidates.map((i) => i.obj.refId ?? '')) : new Set<string>();
     const shown = candidates.filter((i) => visible.has(i.obj.refId ?? ''));
-    const page = paginate(shown, query.cursor, query.limit);
+    const sorted = await this.sortPostItems(shown, query.sort ?? 'relevance');
+    const page = paginate(sorted, query.cursor, query.limit);
     const names = await this.authorNames(page.items);
     return {
       understood: understoodOf(r.understood),
       items: page.items.map((i) => toResultItem({ ...i, reason: postReason(i) }, names)),
-      total: shown.length,
+      total: sorted.length,
       nextCursor: page.nextCursor,
-      dropped: isFallback && shown.length > 0 ? fallback!.dropped : [],
-      isFallback: isFallback && shown.length > 0,
-      fallbackRelaxed: isFallback && shown.length > 0 ? fallback!.relaxed : [],
+      dropped: isFallback && sorted.length > 0 ? fallback!.dropped : [],
+      isFallback: isFallback && sorted.length > 0,
+      fallbackRelaxed: isFallback && sorted.length > 0 ? fallback!.relaxed : [],
     };
+  }
+
+  private async sortPostItems(shown: ExploreItem[], sort: PostSort): Promise<ExploreItem[]> {
+    if (sort === 'relevance' || shown.length <= 1) return shown;
+
+    if (sort === 'recent') {
+      return shown
+        .map((item, idx) => {
+          const ms = item.obj.createdAt ? Date.parse(item.obj.createdAt) : Number.NaN;
+          return { item, idx, time: Number.isFinite(ms) ? ms : null };
+        })
+        .sort((a, b) => {
+          if (a.time !== null && b.time !== null && b.time !== a.time) return b.time - a.time;
+          if (a.time !== null && b.time === null) return -1;
+          if (a.time === null && b.time !== null) return 1;
+          return a.idx - b.idx;
+        })
+        .map((x) => x.item);
+    }
+
+    // sort === 'trending': đọc điểm hot@v2; lỗi đọc điểm thì log warn và giữ relevance.
+    if (!this.recommendStore) return shown;
+    let scores: Map<string, number>;
+    try {
+      const postIds = shown.map((i) => i.obj.refId ?? '').filter(Boolean);
+      scores = await this.recommendStore.findPostScores('hot@v2', postIds);
+    } catch (error) {
+      this.logger.warn(`Đọc điểm hot@v2 khi sort trending lỗi, giữ relevance: ${(error as Error).message}`);
+      return shown;
+    }
+    return shown
+      .map((item, idx) => ({ item, idx, score: scores.get(item.obj.refId ?? '') ?? 0 }))
+      .sort((a, b) => b.score - a.score || a.idx - b.idx)
+      .map((x) => x.item);
   }
 
   /** Tìm một loại chỗ, điểm (tab riêng của trang tìm), có phân trang. Cùng engine với search(). */

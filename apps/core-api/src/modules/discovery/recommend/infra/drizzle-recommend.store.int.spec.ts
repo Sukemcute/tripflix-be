@@ -137,7 +137,16 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     const author = randomUUID();
     const ids = [randomUUID(), randomUUID(), randomUUID()].sort();
     await store.replacePosts(
-      ids.map((postId, i) => ({ postId, authorId: author, postType: 'video', tags: ['dalat'], placeId: 'da-lat', isVerified: false, publishedAt: hoursAgo(i === 2 ? 1 : 100) })),
+      ids.map((postId, i) => ({
+        postId,
+        authorId: author,
+        postType: 'video',
+        tags: ['dalat'],
+        placeId: 'da-lat',
+        isVerified: false,
+        hasPlan: i === 0,
+        publishedAt: hoursAgo(i === 2 ? 1 : 100),
+      })),
     );
     // Hai bài đầu cùng điểm 1, cùng giờ đăng → phá hoà bằng post_id desc. Bài 3 chưa có điểm.
     await store.replacePostScores('hot@v0', ids.slice(0, 2).map((postId) => ({ postId, postType: 'video', score: 1, features: {} })));
@@ -195,14 +204,14 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
 
   it('số liệu admin: dòng nạp 10 phút/24 giờ, bài, người có gu, mốc builder; tra tag/nơi bài', async () => {
     const p = randomUUID();
-    await store.replacePosts([{ postId: p, authorId: randomUUID(), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', isVerified: false, publishedAt: hoursAgo(2) }]);
+    await store.replacePosts([{ postId: p, authorId: randomUUID(), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', isVerified: false, hasPlan: false, publishedAt: hoursAgo(2) }]);
     await store.upsertInteractions([row({ refId: 'a', targetId: p }), row({ refId: 'b', targetId: randomUUID() })], meta());
     await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { dalat: 1 } } }]);
     await store.setJobState('hot@v0', { lastRunAt: NOW, lastError: 'boom' });
     const stats = await store.getAdminStats(new Date());
     expect(stats).toMatchObject({ interactionsLast10m: 2, interactionsLast24h: 2, posts: 1, usersWithFeatures: 1 });
     expect(stats.jobStates).toContainEqual({ name: 'hot@v0', lastRunAt: NOW, lastError: 'boom' });
-    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat' }]);
+    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', hasPlan: false }]);
   });
 
   it('khoá advisory: lượt thứ hai cùng lúc bỏ lượt', async () => {

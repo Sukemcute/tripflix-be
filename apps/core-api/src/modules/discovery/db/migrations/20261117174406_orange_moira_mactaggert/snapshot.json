@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "eb4c3c29-ddcd-4695-834f-7959732c77b3",
+  "prevIds": [
+    "5ffeb6ec-b8dc-41bd-8b0f-1636740074b3"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "discovery",
+        "recommend_posts",
+        "has_plan"
+      ],
+      "writes": [
+        "s|col|discovery.recommend_posts.has_plan",
+        "n|col|discovery.recommend_posts.has_plan",
+        "e|col|discovery.recommend_posts.has_plan"
+      ],
+      "reads": [
+        "n|tbl|discovery.recommend_posts",
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "has_plan",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

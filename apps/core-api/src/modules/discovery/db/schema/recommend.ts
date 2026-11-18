@@ -43,6 +43,7 @@ export const recommendPosts = discoverySchema.table(
     tags: text('tags').array().notNull(),
     placeId: text('place_id'),
     isVerified: boolean('is_verified').notNull(),
+    hasPlan: boolean('has_plan').notNull().default(false),
     publishedAt: at('published_at').notNull(),
     syncedAt: at('synced_at').notNull().defaultNow(),
   },

@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { STAY_SORTS, type StaySort } from '../domain/stays.js';
-import { PLACE_KINDS, POST_TYPES, type PlaceKind, type PostType } from '../application/explore.use-cases.js';
+import { PLACE_KINDS, POST_SORTS, POST_TYPES, type PlaceKind, type PostSort, type PostType } from '../application/explore.use-cases.js';
 import { SUGGEST_TYPES, type SuggestType } from '../domain/suggest-entity.js';
 import { POI_KINDS, type PoiKind } from '../domain/points-of-interest.js';
 
@@ -275,6 +275,7 @@ export class ExploreResponseDto {
 export const SearchPostsRequestSchema = z.object({
   q: z.string().trim().min(1, 'Nhập điều muốn tìm').max(200),
   postType: z.enum(POST_TYPES as [PostType, ...PostType[]]).default('all'),
+  sort: z.enum(POST_SORTS).default('relevance'),
   cursor: z.string().regex(/^\d+$/, 'cursor lấy từ nextCursor của trang trước').nullish().transform((c) => c ?? undefined),
   limit: z.number().int().min(1).max(50).default(20),
 });
@@ -289,6 +290,13 @@ export class SearchPostsRequestDto {
       'all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)',
   })
   postType?: PostType;
+  @ApiProperty({
+    enum: POST_SORTS,
+    required: false,
+    default: 'relevance',
+    description: 'Kiểu sắp xếp kết quả khớp: relevance (liên quan nhất, mặc định), trending (thịnh hành theo hot@v2), recent (mới nhất trước)',
+  })
+  sort?: PostSort;
   @ApiProperty({ type: String, required: false, nullable: true, description: '`nextCursor` của trang trước' }) cursor?: string | null;
   @ApiProperty({ required: false, default: 20, description: '1–50' }) limit?: number;
 }

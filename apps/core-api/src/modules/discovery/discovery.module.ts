@@ -5,7 +5,7 @@ import type { Redis } from 'ioredis';
 import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { CommerceFacade, CommerceModule, type CatalogFlight, type CatalogHotel } from '../commerce/index.js';
-import { ContentFacade, ContentModule } from '../content/index.js';
+import { ContentFacade, ContentModule, FeedFacade } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { PostRecommendationsController } from './recommend/api/post-recommendations.controller.js';
@@ -23,6 +23,7 @@ import {
   SERVED_STORE,
   type ProductProfileCatalog,
   type RecommendCatalog,
+  type RecommendReelCard,
 } from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { TripAddonUseCases } from './recommend/application/trip-addons.use-cases.js';
@@ -86,7 +87,7 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade, access
 });
 
 /** Bài + khách sạn → tỉnh cho bộ điều phối gợi ý. days: 1 vì chỉ cần tỉnh, không cần giá. */
-const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): RecommendCatalog => ({
+const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade, feed: FeedFacade): RecommendCatalog => ({
   listPosts: (cursor) => content.listPosts({ cursor, limit: 100 }),
   listHotelProvinces: async (cursor) => {
     const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 1 });
@@ -94,6 +95,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade): Rec
     return { items, nextCursor: page.nextCursor };
   },
   getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
+  getReelCardsByIds: async (postIds, viewerId) => (await feed.getByIds(postIds, viewerId)).items as unknown as RecommendReelCard[],
 });
 
 /** Khách sạn, chuyến bay cho hồ sơ gợi ý phần còn thiếu (TF39). days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
@@ -172,7 +174,7 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     RebuildSuggestIndexJob,
     RebuildExploreIndexJob,
     { provide: RECOMMEND_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleRecommendStore(createDb(pools.discovery)) },
-    { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade], useFactory: recommendCatalog },
+    { provide: RECOMMEND_CATALOG, inject: [CommerceFacade, ContentFacade, FeedFacade], useFactory: recommendCatalog },
     RecommendIngestUseCases,
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
     { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },

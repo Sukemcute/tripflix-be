@@ -30,7 +30,8 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
   hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang' }));
   const fresh = [cand('f1', { score: 0, source: 'fresh' })];
   const explore = Array.from({ length: 10 }, (_, i) => cand(`e0${i}`, { score: 0, source: 'explore' }));
-  const without = (xs: Candidate[], q: CandidateQuery) => xs.filter((c) => !q.excludePostIds.includes(c.postId)).slice(0, q.limit);
+  const without = (xs: Candidate[], q: CandidateQuery) =>
+    xs.filter((c) => !q.excludePostIds.includes(c.postId) && (!q.hasPlan || c.hasPlan)).slice(0, q.limit);
 
   const store = {
     listActiveAlgos: vi.fn(async () => opts.algos ?? ALGOS),
@@ -41,7 +42,7 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
     findPostMetas: vi.fn(async (postIds: string[]) =>
-      postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang' })),
+      postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang', hasPlan: false })),
     ),
   };
   /** Bài vừa tương tác: id → lúc (ms), như ZSET 2 giờ trong Redis. */
@@ -294,5 +295,77 @@ describe('PostRecommendationUseCases', () => {
     await expect(setup().useCases.recommendReels({ mode: 'trending', limit: 5, cursor: null, userId: null, now: NOW })).rejects.toBeInstanceOf(
       ReelsFeedNotWiredError,
     );
+  });
+
+  it('mode has_plan: chỉ trả bài có lịch trình (kể cả slot explore), khách dùng trending + lọc', async () => {
+    const { useCases, store } = setup();
+    // Gắn hasPlan cho một số bài hot, fresh và explore
+    const hotPlan = Array.from({ length: 6 }, (_, i) => cand(`hp0${i}`, { score: 0.9 - i / 100, hasPlan: true }));
+    const freshPlan = [cand('fp1', { score: 0, source: 'fresh', hasPlan: true })];
+    const explorePlan = [cand('ep1', { score: 0, source: 'explore', hasPlan: true })];
+    const exploreNoPlan = [cand('e_no_plan', { score: 0, source: 'explore', hasPlan: false })];
+    store.listHotCandidates.mockImplementation(async (q: CandidateQuery) => (q.hasPlan ? hotPlan : []));
+    store.listFreshCandidates.mockImplementation(async (q: CandidateQuery) => (q.hasPlan ? freshPlan : []));
+    store.listExplorePool.mockImplementation(async (q: CandidateQuery) =>
+      [...exploreNoPlan, ...explorePlan].filter((c) => !q.excludePostIds.includes(c.postId) && (!q.hasPlan || c.hasPlan)),
+    );
+
+    const userPage = await useCases.recommend(query({ mode: 'has_plan', limit: 5, userId: U }));
+    expect(userPage.algo).toBe('for_you');
+    expect(userPage.items).toHaveLength(5);
+    expect(userPage.items.every((i) => i.post.id !== 'e_no_plan')).toBe(true);
+    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ hasPlan: true }));
+    expect(store.listFreshCandidates).toHaveBeenCalledWith(expect.objectContaining({ hasPlan: true }));
+    expect(store.listExplorePool).toHaveBeenCalledWith(expect.objectContaining({ hasPlan: true }));
+
+    // Khách gọi has_plan vẫn chạy: dùng trending + lọc hasPlan
+    const guestPage = await useCases.recommend(query({ mode: 'has_plan', limit: 5, userId: null }));
+    expect(guestPage.algo).toBe('trending');
+    expect(guestPage.items).toHaveLength(5);
+
+    // Trang sau qua cursor giữ nguyên mode has_plan dù request không truyền hoặc truyền khác
+    const page2 = await useCases.recommend(query({ mode: 'has_plan', limit: 5, cursor: userPage.nextCursor, userId: U }));
+    expect(page2.items.every((i) => !userPage.items.map((x) => x.post.id).includes(i.post.id))).toBe(true);
+  });
+
+  it('mode has_plan: bài tự đăng có lịch trình vẫn hiện, bài tự đăng không lịch trình bị lọc (findPostMetas trả hasPlan)', async () => {
+    const { useCases, store } = setup();
+    const hotPlan = Array.from({ length: 6 }, (_, i) => cand(`hp0${i}`, { score: 0.9 - i / 100, hasPlan: true }));
+    store.listHotCandidates.mockImplementation(async (q: CandidateQuery) => (q.hasPlan ? hotPlan : []));
+    store.listFreshCandidates.mockResolvedValue([]);
+    store.listExplorePool.mockResolvedValue([]);
+    store.listOwnRecentPostIds.mockResolvedValue(['own-plan', 'own-no-plan']);
+    store.findPostMetas.mockImplementation(async (postIds: string[]) =>
+      postIds.map((postId) => ({ postId, authorId: U, postType: 'video', tags: ['dalat'], placeId: 'da-lat', hasPlan: postId === 'own-plan' })),
+    );
+
+    const page = await useCases.recommend(query({ mode: 'has_plan', limit: 5, userId: U }));
+    const ids = page.items.map((i) => i.post.id);
+    expect(ids).toContain('own-plan');
+    expect(ids).not.toContain('own-no-plan');
+    expect(page.items.find((i) => i.post.id === 'own-plan')!.reason.code).toBe('own_post');
+  });
+
+  it('mode recent: đúng thứ tự mới nhất, không explore/ranker, phân trang không lặp không sót', async () => {
+    const { useCases, store } = setup();
+    const recentPool = Array.from({ length: 7 }, (_, i) => cand(`r0${i}`, { score: 0, source: 'explore' }));
+    store.listExplorePool.mockResolvedValue(recentPool);
+    store.listOwnRecentPostIds.mockResolvedValue(['own1']);
+
+    const p1 = await useCases.recommend(query({ mode: 'recent', limit: 4, userId: U }));
+    expect(p1.algo).toBe('recent');
+    expect(p1.items.map((i) => i.post.id)).toEqual(['own1', 'r00', 'r01', 'r02']);
+    expect(p1.items[0]!.reason.code).toBe('own_post');
+    expect(p1.items[1]!.reason).toEqual({ code: 'recent', text: 'Mới đăng' });
+    expect(p1.items[1]!.source).toBe('fresh');
+
+    const p2 = await useCases.recommend(query({ mode: 'recent', limit: 4, cursor: p1.nextCursor, userId: U }));
+    expect(p2.algo).toBe('recent');
+    expect(p2.items.map((i) => i.post.id)).toEqual(['r03', 'r04', 'r05', 'r06']);
+    expect(p2.nextCursor).toBeNull();
+
+    // Gọi lại cùng cursor ra cùng trang
+    const p2Again = await useCases.recommend(query({ mode: 'recent', limit: 4, cursor: p1.nextCursor, userId: U }));
+    expect(p2Again.items.map((i) => i.post.id)).toEqual(['r03', 'r04', 'r05', 'r06']);
   });
 });

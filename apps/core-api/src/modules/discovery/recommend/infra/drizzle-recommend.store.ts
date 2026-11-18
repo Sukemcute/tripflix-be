@@ -100,6 +100,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
               tags: excluded('tags'),
               placeId: excluded('place_id'),
               isVerified: excluded('is_verified'),
+              hasPlan: excluded('has_plan'),
               publishedAt: excluded('published_at'),
               syncedAt: excluded('synced_at'),
             },
@@ -373,8 +374,19 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
 
   async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
     if (!postIds.length) return [];
-    const { postId, authorId, postType, tags, placeId } = recommendPosts;
-    return this.db.select({ postId, authorId, postType, tags, placeId }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
+    const { postId, authorId, postType, tags, placeId, hasPlan } = recommendPosts;
+    // hasPlan: mode has_plan lọc bài tự đăng (own) theo cờ này; thiếu thì mọi bài tự đăng bị loại.
+    return this.db.select({ postId, authorId, postType, tags, placeId, hasPlan }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
+  }
+
+  async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {
+    if (!postIds.length) return new Map();
+    const { builder, version } = splitKey(builderKey);
+    const rows = await this.db
+      .select({ postId: recommendPostScores.postId, score: recommendPostScores.score })
+      .from(recommendPostScores)
+      .where(and(eq(recommendPostScores.builder, builder), eq(recommendPostScores.version, version), inArray(recommendPostScores.postId, postIds)));
+    return new Map(rows.map((r) => [r.postId, Number(r.score)]));
   }
 
   listHotCandidates(q: CandidateQuery) {
@@ -402,6 +414,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     const postTypeColumn = source === 'hot' ? recommendPostScores.postType : recommendPosts.postType;
     const where = and(
       q.postType ? eq(postTypeColumn, q.postType) : undefined,
+      q.hasPlan ? eq(recommendPosts.hasPlan, true) : undefined,
       q.excludePostIds.length ? notInArray(recommendPosts.postId, q.excludePostIds) : undefined,
       lte(recommendPosts.publishedAt, q.now),
       publishedAfter ? gt(recommendPosts.publishedAt, publishedAfter) : undefined,

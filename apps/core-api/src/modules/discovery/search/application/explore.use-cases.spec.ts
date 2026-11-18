@@ -97,7 +97,7 @@ function setup(hotels: ExploreHotel[], posts: ExplorePost[], hidden: string[] = 
     getAuthorNames: async (ids) => new Map(ids.filter((id) => id === 'U1').map((id) => [id, 'Minh Anh'])),
   };
   const places = { listPlaces: async () => [...PLACE_SEEDS], listPoints: async () => points };
-  return { store, catalog, explore: new ExploreUseCases(store, catalog, places) };
+  return { store, catalog, places, explore: new ExploreUseCases(store, catalog, places) };
 }
 
 describe('ExploreUseCases', () => {
@@ -381,6 +381,45 @@ describe('ExploreUseCases', () => {
       expect(relaxed.isFallback).toBe(true);
       expect(relaxed.dropped).toContain('yên tĩnh');
       expect((await explore.searchPlaces({ q: 'cafe đà lạt', kind: 'stay', limit: 10 })).attribution).toBeNull();
+    });
+  });
+
+  describe('TF108: sort cho searchPosts', () => {
+    it('relevance / recent / trending: giữ total, phân trang đúng, fallback relevance khi đọc điểm lỗi', async () => {
+      const posts = [
+        post('P1', 'Kinh nghiệm Đà Lạt cũ', { createdAt: new Date('2026-10-01T00:00:00Z'), reactionTotal: 100 }),
+        post('P2', 'Kinh nghiệm Đà Lạt mới nhất', { createdAt: new Date('2026-11-15T00:00:00Z'), reactionTotal: 5 }),
+        post('P3', 'Kinh nghiệm Đà Lạt giữa', { createdAt: new Date('2026-11-01T00:00:00Z'), reactionTotal: 20 }),
+      ];
+      const { store, catalog, places } = setup([], posts);
+      const findPostScores = vi.fn(async (_builder: string, ids: string[]) => {
+        expect(ids).toHaveLength(3);
+        return new Map([
+          ['P3', 0.95],
+          ['P1', 0.4],
+          // P2 chưa có điểm -> 0
+        ]);
+      });
+      const explore = new ExploreUseCases(store, catalog, places, { findPostScores });
+      await explore.rebuildIndex();
+
+      const rel = await explore.searchPosts({ q: 'kinh nghiệm đà lạt', postType: 'all', sort: 'relevance', limit: 10 });
+      expect(rel.total).toBe(3);
+
+      const rec = await explore.searchPosts({ q: 'kinh nghiệm đà lạt', postType: 'all', sort: 'recent', limit: 2 });
+      expect(rec.total).toBe(3);
+      expect(rec.items.map((i) => i.refId)).toEqual(['P2', 'P3']);
+      const rec2 = await explore.searchPosts({ q: 'kinh nghiệm đà lạt', postType: 'all', sort: 'recent', cursor: rec.nextCursor!, limit: 2 });
+      expect(rec2.items.map((i) => i.refId)).toEqual(['P1']);
+
+      const tr = await explore.searchPosts({ q: 'kinh nghiệm đà lạt', postType: 'all', sort: 'trending', limit: 10 });
+      expect(tr.total).toBe(3);
+      expect(tr.items.map((i) => i.refId)).toEqual(['P3', 'P1', 'P2']);
+
+      // Đọc điểm lỗi -> log warn và giữ thứ tự relevance, không làm hỏng lượt tìm
+      findPostScores.mockRejectedValueOnce(new Error('pg timeout'));
+      const errFallback = await explore.searchPosts({ q: 'kinh nghiệm đà lạt', postType: 'all', sort: 'trending', limit: 10 });
+      expect(errFallback.items.map((i) => i.refId)).toEqual(rel.items.map((i) => i.refId));
     });
   });
 });

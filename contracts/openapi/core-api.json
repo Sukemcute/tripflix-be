@@ -4366,7 +4366,7 @@
     },
     "/api/search/posts": {
       "post": {
-        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`, `article`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần. `article` = `plan` + `post` nhưng bỏ mọi video, lọc ở server nên trang luôn đủ `limit`.\n- Mỗi bài có `likes`, `comments`, `createdAt`, `author` để hiện thẻ. Không có trạng thái đã thích/đã lưu của người xem.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
+        "description": "Cho tab tìm bài trên app và web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `postType`: `all` (mặc định), `plan`, `video`, `post`, `article`. Video kèm lộ trình thuộc cả `plan` và `video`; với `all` chỉ trả một lần. `article` = `plan` + `post` nhưng bỏ mọi video, lọc ở server nên trang luôn đủ `limit`.\n- `sort`: `relevance` (mặc định, liên quan nhất), `trending` (điểm `hot@v2`), `recent` (mới nhất trước). Chỉ đổi thứ tự trong tập kết quả khớp, không đổi `total` hay `isFallback`.\n- Mỗi bài có `likes`, `comments`, `createdAt`, `author` để hiện thẻ. Không có trạng thái đã thích/đã lưu của người xem.\n- Kết quả chính không bao giờ vượt ngân sách trong câu (chi phí mỗi người của lộ trình). Bài bị ẩn hoặc xoá không trả về.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`. Không có kết quả thì `items: []`, `total: 0`.\n- Không bài nào khớp đủ câu (vd \"mùa thu hà nội\", lộ trình vượt ngân sách): `isFallback: true`, `items` là kết quả thay thế, `fallbackRelaxed` là điều kiện đã nới, `dropped` là các từ bị bỏ.",
         "operationId": "ExploreController_searchPosts",
         "parameters": [],
         "requestBody": {
@@ -4493,7 +4493,7 @@
     },
     "/api/recommendations/posts": {
       "get": {
-        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- `trending`: bài thịnh hành chung.\n- `has_plan`: giống `for_you` (khách nhận `trending`) nhưng chỉ lấy bài có lịch trình.\n- `recent`: bài mới đăng gần đây (mới nhất trước, không xếp hạng cá nhân hoá).\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
         "operationId": "PostRecommendationsController_recommendPosts",
         "parameters": [
           {
@@ -4527,10 +4527,13 @@
             "name": "mode",
             "required": false,
             "in": "query",
+            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)",
             "schema": {
               "enum": [
                 "for_you",
-                "trending"
+                "trending",
+                "has_plan",
+                "recent"
               ],
               "type": "string"
             }
@@ -4564,7 +4567,7 @@
     },
     "/api/recommendations/reels": {
       "get": {
-        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
+        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng, lọc có lịch trình, mới đăng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
         "operationId": "PostRecommendationsController_recommendReels",
         "parameters": [
           {
@@ -4586,10 +4589,13 @@
             "name": "mode",
             "required": false,
             "in": "query",
+            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)",
             "schema": {
               "enum": [
                 "for_you",
-                "trending"
+                "trending",
+                "has_plan",
+                "recent"
               ],
               "type": "string"
             }
@@ -4615,7 +4621,7 @@
             "bearer": []
           }
         ],
-        "summary": "Gợi ý Reels phát được (trending hoặc for_you)",
+        "summary": "Gợi ý Reels phát được (trending, for_you, has_plan hoặc recent)",
         "tags": [
           "discovery"
         ]
@@ -11369,6 +11375,16 @@
             "default": "all",
             "description": "all: cả lộ trình, video, bài viết · plan: bài có lộ trình (gồm video kèm lộ trình) · video · post: bài viết thường · article: plan + post, bỏ mọi video (kể cả video kèm lộ trình)"
           },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "trending",
+              "recent"
+            ],
+            "default": "relevance",
+            "description": "Kiểu sắp xếp kết quả khớp: relevance (liên quan nhất, mặc định), trending (thịnh hành theo hot@v2), recent (mới nhất trước)"
+          },
           "cursor": {
             "type": "string",
             "nullable": true,
@@ -11747,7 +11763,8 @@
               "matches_interest",
               "trending",
               "explore",
-              "own_post"
+              "own_post",
+              "recent"
             ]
           },
           "text": {

@@ -24,7 +24,21 @@ describe('BuildFeaturesUseCases', () => {
     const catalog: RecommendCatalog = {
       listPosts: () =>
         Promise.resolve({
-          items: [{ id: 'p1', authorId: 'a', postType: 'video', title: 't', hashtags: [], isVerified: false, tripAttachment: null, createdAt: NOW }],
+          items: [
+            {
+              id: 'p1',
+              authorId: 'a',
+              postType: 'video',
+              title: 't',
+              body: '',
+              hashtags: [],
+              isVerified: false,
+              mediaIds: [],
+              coverMediaId: null,
+              tripAttachment: null,
+              createdAt: NOW,
+            },
+          ],
           nextCursor: null,
         }),
       listHotelProvinces: () => Promise.resolve({ items: [], nextCursor: null }),
