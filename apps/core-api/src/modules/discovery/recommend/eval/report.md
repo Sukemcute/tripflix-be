@@ -13,6 +13,30 @@ Dump lại fixture (DB local, xem `fixtures/dump-posts.sql`):
 docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dump-posts.sql
 ```
 
+### Ngăn của bài (post_profile@v1)
+
+243 bài: 239 có nơi, 4 không có nơi; 30 không có ngăn trải nghiệm nào.
+
+| Ngăn | Số bài |
+|---|---|
+| `cost:binh_dan` | 66 |
+| `cost:cao_cap` | 42 |
+| `cost:trung` | 13 |
+| `exp:an_uong` | 88 |
+| `exp:bien` | 24 |
+| `exp:cafe` | 45 |
+| `exp:nghi_duong` | 18 |
+| `exp:nui` | 38 |
+| `exp:song_ao` | 49 |
+| `exp:van_hoa` | 25 |
+| `exp:ve_dem` | 18 |
+| `exp:vui_choi` | 16 |
+| `len:ngan` | 52 |
+| `len:vua` | 17 |
+| `with:cap_doi` | 13 |
+| `with:gia_dinh` | 13 |
+| `with:mot_minh` | 10 |
+
 ### v0 (tag_affinity_v0, 150 hot + 50 mới)
 
 | Persona | Giai đoạn | Mục tiêu | hit@20 | đúng nơi@10 | nơi vừa đi@10 | số nơi@20 | chuỗi cùng nơi@20 | KS khác@10 | Lý do top 10 |

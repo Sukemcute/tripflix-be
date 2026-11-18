@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { hitAt, maxSamePlaceRun, placeCoverageAt, placeShareAt } from './metrics.js';
 import { buildPersonas, EVAL_NOW, type EvalPost } from './personas.js';
-import { formatReport, forYouV0, runEval } from './run-eval.js';
+import { formatBinStats, formatReport, forYouV0, runEval } from './run-eval.js';
 
 /**
  * Bộ đo offline for-you (TF28, thiết kế v1 mục 4).
@@ -75,6 +75,6 @@ describe('báo cáo bộ đo', () => {
       '```',
       '',
     ];
-    await expect([...intro, ...sections].join('\n')).toMatchFileSnapshot('./report.md');
+    await expect([...intro, formatBinStats(posts), ...sections].join('\n')).toMatchFileSnapshot('./report.md');
   });
 });

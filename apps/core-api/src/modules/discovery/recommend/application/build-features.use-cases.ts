@@ -1,9 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
-import type { PostBuilder, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
+import type { PostBuilder, PostBuildItem, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
-import { RECOMMEND_CATALOG, RECOMMEND_STORE, type RecommendCatalog, type RecommendPostRow, type RecommendStore } from './ports.js';
+import {
+  RECOMMEND_CATALOG,
+  RECOMMEND_STORE,
+  type RecommendCatalog,
+  type RecommendPostRow,
+  type RecommendSourcePost,
+  type RecommendStore,
+} from './ports.js';
 
 const LOCK = 'discovery.recommend-features';
 const JOB = 'build-features';
@@ -24,6 +31,31 @@ async function readAll<T>(page: (cursor: string | null) => Promise<{ items: T[];
     cursor = next.nextCursor;
   } while (cursor);
   return all;
+}
+
+const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null);
+const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** Nội dung bài cho post_profile@v1 (xếp ngăn). items của lộ trình là unknown[] ở cổng: chỉ đọc location, category. */
+function contentOf(p: RecommendSourcePost | undefined): Pick<PostBuildItem, 'title' | 'body' | 'isVerified' | 'trip'> {
+  if (!p) return {};
+  const trip = p.tripAttachment;
+  return {
+    title: p.title,
+    body: p.body,
+    isVerified: p.isVerified,
+    trip: trip
+      ? {
+          hotelId: strOrNull(trip.hotelId),
+          daysCount: numOrNull(trip.daysCount),
+          estimatedCostPerPerson: numOrNull(trip.estimatedCostPerPerson),
+          items: (trip.items ?? []).map((i) => {
+            const item = (i && typeof i === 'object' ? i : {}) as Record<string, unknown>;
+            return { location: strOrNull(item.location), category: strOrNull(item.category) };
+          }),
+        }
+      : null,
+  };
 }
 
 /**
@@ -76,7 +108,8 @@ export class BuildFeaturesUseCases {
     const { postBuilders, userBuilders } = await this.activeBuilders();
     const failedBuilders: string[] = [];
 
-    const needsSamples = postBuilders.some((b) => b.key === 'hot@v1' || b.key === 'hot@v2');
+    const needsSamples = postBuilders.some((b) => ['hot@v1', 'hot@v2', 'post_profile@v1'].includes(b.key));
+    const sourceById = new Map(sourcePosts.map((p) => [p.id, p]));
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),
       needsSamples ? this.store.listPostInteractionSamples(now) : Promise.resolve(null),
@@ -93,6 +126,7 @@ export class BuildFeaturesUseCases {
       interactions: counts.get(p.postId)?.d30 ?? {},
       interactions24h: counts.get(p.postId)?.h24 ?? {},
       ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
+      ...contentOf(sourceById.get(p.postId)),
     }));
     for (const builder of postBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {

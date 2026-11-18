@@ -183,7 +183,7 @@ describe('tag_affinity_v0', () => {
 
 describe('registry', () => {
   it('đủ builder và ranker v0', () => {
-    expect([...BUILDERS.keys()].sort()).toEqual(['hot@v0', 'hot@v1', 'hot@v2', 'none@v0', 'tag_affinity@v0']);
+    expect([...BUILDERS.keys()].sort()).toEqual(['hot@v0', 'hot@v1', 'hot@v2', 'none@v0', 'post_profile@v1', 'tag_affinity@v0']);
     expect([...RANKERS.keys()].sort()).toEqual(['popular_v0', 'tag_affinity_v0']);
   });
 

@@ -48,6 +48,19 @@ export interface PostBuildItem {
   interactions24h: Partial<Record<Kind, number>>;
   /** Tương tác chi tiết kèm tuổi tài khoản trong 30 ngày (dùng cho hot@v1); nếu thiếu thì fallback về interactions. */
   interactionSamples?: PostInteractionSample[];
+  /** Nội dung bài để xếp ngăn (post_profile@v1); builder khác bỏ qua. */
+  title?: string;
+  body?: string;
+  isVerified?: boolean;
+  trip?: PostTripSummary | null;
+}
+
+/** Phần lộ trình của bài dùng để xếp ngăn (chi phí, số ngày, loại điểm, khách sạn). */
+export interface PostTripSummary {
+  hotelId: string | null;
+  daysCount: number | null;
+  estimatedCostPerPerson: number | null;
+  items: Array<{ location: string | null; category: string | null }>;
 }
 
 /** score 0..1, chuẩn hoá trên cả lô. */

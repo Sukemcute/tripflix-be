@@ -1,5 +1,6 @@
 import { SESSION_KINDS } from '../application/ingest.use-cases.js';
 import { tagAffinityV0 } from '../domain/builders/tag-affinity.js';
+import { assignBins } from '../domain/bins.js';
 import { mergeCandidates } from '../domain/candidates.js';
 import type { Candidate, PostMeta, RankedItem } from '../domain/contracts.js';
 import { applyFeedPolicy } from '../domain/feed-policy.js';
@@ -118,6 +119,33 @@ const GOAL: Record<Stage, string> = {
 };
 
 const fmt = (x: number | null) => (x === null ? '–' : Number.isInteger(x) ? String(x) : x.toFixed(2).replace('.', ','));
+
+/** Ngăn của từng bài fixture, đúng như post_profile@v1 tính trong job. */
+export const binsOf = (p: EvalPost) => assignBins({ tags: p.tags, placeId: p.placeId, title: p.title, body: p.body, trip: p.trip });
+
+/** Độ phủ ngăn trên fixture: số bài mỗi ngăn, bài không có nơi / không có trải nghiệm nào. */
+export function formatBinStats(posts: EvalPost[]): string {
+  const counts = new Map<string, number>();
+  let noPlace = 0;
+  let noExp = 0;
+  for (const p of posts) {
+    const bins = Object.keys(binsOf(p));
+    if (!bins.some((b) => b.startsWith('place:'))) noPlace++;
+    if (!bins.some((b) => b.startsWith('exp:'))) noExp++;
+    for (const b of bins) if (!b.startsWith('place:')) counts.set(b, (counts.get(b) ?? 0) + 1);
+  }
+  const rows = [...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([bin, n]) => `| \`${bin}\` | ${n} |`);
+  return [
+    '### Ngăn của bài (post_profile@v1)',
+    '',
+    `${posts.length} bài: ${posts.length - noPlace} có nơi, ${noPlace} không có nơi; ${noExp} không có ngăn trải nghiệm nào.`,
+    '',
+    '| Ngăn | Số bài |',
+    '|---|---|',
+    ...rows,
+    '',
+  ].join('\n');
+}
 
 /** Bảng markdown một thuật toán: mỗi persona một dòng. */
 export function formatReport(algo: EvalAlgo, results: PersonaResult[]): string {
