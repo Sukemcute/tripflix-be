@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Mở video của máy dev (`dev/*`) khỏi khoá cookie ký (TF82), để core-api chạy local không có khoá CloudFront vẫn phát
-# được video. Video staging (`staging/*`) vẫn khoá. Chạy lại an toàn. Chạy trong CloudShell.
+# được video. Video staging (`staging/*`) vẫn khoá. Chạy lại an toàn, kể cả trên distribution đang có `dev/*` bản cũ.
+# Chạy trong CloudShell.
 # Không cấp khoá riêng cho dev: key group tin mọi khoá như nhau, cầm khoá dev là ký được cookie xem cả video staging.
 # Dùng: ./set-dev-video.sh open | ./set-dev-video.sh close
 set -euo pipefail
