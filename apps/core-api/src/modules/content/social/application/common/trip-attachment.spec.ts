@@ -46,6 +46,23 @@ describe('prepareTripAttachment (TF105)', () => {
     ]);
   });
 
+  it('giữ loại điểm gợi ý hợp lệ, bỏ loại lạ', async () => {
+    const prepared = await prepareTripAttachment(createPostMedia({}), authorId, {
+      items: [
+        { day: 1, title: 'Cà phê Cộng', category: 'cafe' },
+        { day: 1, title: 'Ăn bún chả', category: 'food' },
+        { day: 2, title: 'Lạ', category: 'shopping' as never },
+        { day: 2, title: 'Không loại' },
+      ],
+    });
+    expect(prepared?.items).toEqual([
+      { day: 1, title: 'Cà phê Cộng', category: 'cafe' },
+      { day: 1, title: 'Ăn bún chả', category: 'food' },
+      { day: 2, title: 'Lạ' },
+      { day: 2, title: 'Không loại' },
+    ]);
+  });
+
   it('nhận poster là ảnh đã tải xong của chính tác giả', async () => {
     const media = createPostMedia({ [posterId]: { kind: 'image', ownerId: authorId, status: 'ready' } });
     await expect(prepareTripAttachment(media, authorId, { posterMediaId: posterId })).resolves.toEqual({ posterMediaId: posterId });

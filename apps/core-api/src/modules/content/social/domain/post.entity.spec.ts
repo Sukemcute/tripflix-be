@@ -250,6 +250,21 @@ describe('Post Entity Domain Rules', () => {
     expect(masked?.items?.[0]?.transport).toEqual({ mode: 'flight', fromAirport: 'SGN', toAirport: 'PQC' });
     expect(masked?.items?.[1]?.transport).toBeUndefined();
   });
+
+  it('lộ trình trả về giữ loại điểm gợi ý để app chọn icon (TF105)', () => {
+    const post = createTestPost({
+      tripAttachment: {
+        items: [
+          { day: 1, title: 'Cà phê Cộng', category: 'cafe' },
+          { day: 1, title: 'Ghé chợ đêm' },
+        ],
+      },
+    });
+
+    const items = post.getMaskedTripAttachment()?.items;
+    expect(items?.[0]?.category).toBe('cafe');
+    expect(items?.[1]).not.toHaveProperty('category');
+  });
 });
 
 describe('Comment Entity Domain Rules', () => {

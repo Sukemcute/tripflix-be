@@ -47,6 +47,9 @@ export class TripItineraryItemDto implements TripItineraryItem {
   @ApiPropertyOptional({ example: '16:30', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: 'Giờ trong ngày (HH:mm)' })
   time?: string;
 
+  @ApiPropertyOptional({ enum: ['cafe', 'food', 'fun', 'other'], example: 'food', description: 'Loại điểm gợi ý để app chọn icon: cà phê, ăn uống, vui chơi, khác' })
+  category?: TripItineraryItem['category'];
+
   @ApiPropertyOptional({ type: TripItemHotelDto, description: 'Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)' })
   hotel?: TripItemHotelDto;
 

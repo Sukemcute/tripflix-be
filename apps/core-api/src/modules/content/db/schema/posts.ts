@@ -22,6 +22,8 @@ export interface TripItineraryItem {
   notes?: string;
   /** Giờ trong ngày (HH:mm), tuỳ chọn (TF105). */
   time?: string;
+  /** Loại điểm gợi ý để app chọn icon (cà phê, ăn uống, vui chơi, khác), tuỳ chọn (TF105). */
+  category?: 'cafe' | 'food' | 'fun' | 'other';
   /** Khách sạn và loại phòng của điểm khách sạn này; một chuyến có thể ở nhiều khách sạn (TF105). */
   hotel?: {
     hotelId: string;
