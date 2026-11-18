@@ -22,7 +22,7 @@ Chạy lại an toàn. Sau đó tạo access key cho `tripflix-dev-<tên>` trong
 |---|---|---|
 | `cors.json` | Cho `PUT`, `GET`, `HEAD`, trả header `ETag` | Web phải đọc được `ETag` của từng phần để hoàn tất upload |
 | `lifecycle.json` | Xoá upload dở sau 1 ngày, file gốc trong `dev/<tên>/uploads/` sau 7 ngày | Theo docs Feed. Có thành viên mới thì thêm một luật |
-| `bucket-policy.template.json` | CloudFront chỉ đọc `dev/*/videos/*` và `dev/*/images/*` | File gốc không phát công khai. `images/` chứa ảnh công khai như ảnh khách sạn, không để giấy tờ hay chứng từ ở đây |
+| `bucket-policy.template.json` | CloudFront chỉ đọc `videos/` và `images/` của `dev/<tên>/` và `staging/` | File gốc không phát công khai. `images/` chứa ảnh công khai như ảnh khách sạn, không để giấy tờ hay chứng từ ở đây |
 | `cloudfront-distribution.template.json` | Chỉ HTTPS, cache theo `Cache-Control` của file, CORS cho web | `master.m3u8` cache 60 giây, còn đoạn video cache 1 năm |
 | `media-domain.jq` | Gắn `media.tripflix.io.vn`, tách behavior `*.m3u8` và `*.ts` từ behavior mặc định | Trình duyệt chỉ gửi cookie ký cho tên miền con của `tripflix.io.vn`, không gửi cho `*.cloudfront.net` |
 | `video-cors.jq` | Gắn policy CORS có credentials `tripflix-video-cors` cho hai behavior video | hls.js gửi cookie bằng XHR, cần origin cụ thể thay vì `*` |

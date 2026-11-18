@@ -8,7 +8,9 @@
       "Action": "s3:GetObject",
       "Resource": [
         "arn:aws:s3:::@BUCKET@/dev/*/videos/*",
-        "arn:aws:s3:::@BUCKET@/dev/*/images/*"
+        "arn:aws:s3:::@BUCKET@/dev/*/images/*",
+        "arn:aws:s3:::@BUCKET@/staging/videos/*",
+        "arn:aws:s3:::@BUCKET@/staging/images/*"
       ],
       "Condition": { "StringEquals": { "AWS:SourceArn": "@DISTRIBUTION_ARN@" } }
     }
