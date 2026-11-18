@@ -77,7 +77,7 @@ describe('BuildFeaturesUseCases trên Postgres thật', () => {
       [fresh.id]: null,
     });
 
-    const scores = await pool.query(`select post_id, post_type, score from discovery.recommend_post_scores where builder = 'hot' and version = 'v1'`);
+    const scores = await pool.query(`select post_id, post_type, score from discovery.recommend_post_scores where builder = 'hot' and version = 'v2'`);
     expect(scores.rows).toHaveLength(3);
     expect(scores.rows.find((r: { post_id: string }) => r.post_id === dalat.id)).toMatchObject({ score: 1, post_type: 'video' });
 
@@ -88,7 +88,7 @@ describe('BuildFeaturesUseCases trên Postgres thật', () => {
     const state = await pool.query(`select name, last_error from discovery.recommend_job_state order by name`);
     expect(state.rows).toEqual([
       { name: 'build-features', last_error: null },
-      { name: 'hot@v1', last_error: null },
+      { name: 'hot@v2', last_error: null },
       { name: 'none@v0', last_error: null },
       { name: 'tag_affinity@v0', last_error: null },
     ]);
