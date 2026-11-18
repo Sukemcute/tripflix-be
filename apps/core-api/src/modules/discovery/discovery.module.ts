@@ -39,8 +39,6 @@ import { JobRuns } from './jobs/job-runs.js';
 import { ExploreController } from './search/api/explore.controller.js';
 import { StaysController } from './search/api/stays.controller.js';
 import { SuggestController } from './search/api/suggest.controller.js';
-import { TripBuilderController } from './trip-builder/api/trip-builder.controller.js';
-import { TripBuilderUseCases } from './trip-builder/application/trip-builder.use-cases.js';
 import { PlacesController } from './search/api/places.controller.js';
 import { PlacesUseCases } from './search/application/places.use-cases.js';
 import { DrizzlePlacesStore } from './search/infra/drizzle-places.store.js';
@@ -152,7 +150,6 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     AdminIndexHealthController,
     AdminVocabGapsController,
     AdminDiscoveryJobsController,
-    TripBuilderController,
   ],
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
@@ -166,7 +163,6 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     SearchEventsPublisher,
     SuggestUseCases,
     StaysUseCases,
-    TripBuilderUseCases,
     HomeRecommendationUseCases,
     ExploreUseCases,
     IndexHealth,
