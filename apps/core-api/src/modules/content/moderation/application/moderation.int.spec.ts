@@ -49,6 +49,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   let moduleRef: TestingModule;
   let postId: string;
   let failOutbox = false;
+  const displayNames = new Map<string, string>();
   function bundle(tx: ModuleTransactionHost) {
     const repository = new ModerationRepository(() => tx.tx);
     const posts = new PostRepository(() => tx.tx);
@@ -76,7 +77,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       decideAppeal: new DecideAppealUseCase(repository, visibility, outbox),
       decide: new DecideCaseUseCase(repository, visibility),
       screen: new RecordScreeningUseCase(repository, visibility, CONFIG, outbox),
-      add: new AddCommentUseCase(posts, comments, outbox),
+      add: new AddCommentUseCase(posts, comments, outbox, { getDisplayNames: async () => displayNames }),
       delete: new DeleteCommentUseCase(comments, posts, outbox),
       edit: new EditCommentUseCase(comments, outbox, posts),
       saveSummary: new SavePostSummaryUseCase(posts, summaries),
@@ -111,6 +112,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     cases = moduleRef.get('cases');
   });
   beforeEach(async () => {
+    displayNames.clear();
     failOutbox = false;
     await pool.query(
       'truncate content.posts, content.moderation_cases, content.reports, content.outbox_events, content.moderation_processed_events, content.moderation_scans cascade',
@@ -143,10 +145,14 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   }
   it('chủ bài bật/tắt bình luận và người khác không được đổi cài đặt hoặc xem hàng chờ', async () => {
     const member = randomUUID();
-    await expect(cases.controls.updateSettings(postId, member, { enabled: false, keywords: [] })).rejects.toThrow('Chỉ chủ bài');
+    await expect(
+      cases.controls.updateSettings(postId, member, { enabled: false, keywords: [] }),
+    ).rejects.toThrow('Chỉ chủ bài');
     await expect(cases.controls.queue(postId, member, 0, 20)).rejects.toThrow('Chỉ chủ bài');
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: false, keywords: ['đặt cọc'] });
-    await expect(cases.add.execute({ postId, authorId: member, body: 'Bình thường' })).rejects.toThrow('Chủ bài đã tắt');
+    await expect(cases.add.execute({ postId, authorId: member, body: 'Bình thường' })).rejects.toThrow(
+      'Chủ bài đã tắt',
+    );
     expect((await cases.controls.permissions(postId)).enabled).toBe(false);
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: [] });
     expect((await cases.controls.permissions(postId)).enabled).toBe(true);
@@ -156,12 +162,28 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['đặt cọc'] });
     const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Xin ĐẶT CỌC trước nhé' });
     expect(held).toMatchObject({ status: 'held', creatorReview: 'pending', platformHeld: false });
-    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(0);
+    expect(
+      (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
+        .comment_count,
+    ).toBe(0);
     expect((await cases.controls.queue(postId, AUTHOR, 0, 1)).items[0]?.id).toBe(held.id);
-    await Promise.all([cases.controls.decide(held.id, AUTHOR, 'approve'), cases.controls.decide(held.id, AUTHOR, 'approve')]);
+    await Promise.all([
+      cases.controls.decide(held.id, AUTHOR, 'approve'),
+      cases.controls.decide(held.id, AUTHOR, 'approve'),
+    ]);
     expect((await cases.comments.findById(held.id))?.status).toBe('visible');
-    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(1);
-    expect((await pool.query("select id from content.outbox_events where type='content.comment.created' and payload->>'commentId'=$1", [held.id])).rowCount).toBe(1);
+    expect(
+      (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
+        .comment_count,
+    ).toBe(1);
+    expect(
+      (
+        await pool.query(
+          "select id from content.outbox_events where type='content.comment.created' and payload->>'commentId'=$1",
+          [held.id],
+        )
+      ).rowCount,
+    ).toBe(1);
   });
 
   it('creator approve không vượt platform hold; platform restore không vượt creator reject', async () => {
@@ -176,8 +198,55 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     await cases.controls.decide(rejected.id, AUTHOR, 'reject');
     await hide(rejected.id);
     await hide(rejected.id, 'restore');
-    expect((await cases.comments.findById(rejected.id))).toMatchObject({ status: 'held', creatorReview: 'rejected' });
+    expect(await cases.comments.findById(rejected.id)).toMatchObject({
+      status: 'held',
+      creatorReview: 'rejected',
+    });
   });
+
+  it.each(['creator', 'platform'] as const)(
+    'nhả held qua %s giữ đúng người được trả lời cấp 2 và tên tác giả',
+    async (release) => {
+      const rootAuthor = randomUUID();
+      const replyAuthor = randomUUID();
+      const writer = randomUUID();
+      displayNames.set(writer, 'Người trả lời C');
+      const root = await cases.add.execute({ postId, authorId: rootAuthor, body: 'Gốc A' });
+      const reply = await cases.add.execute({
+        postId,
+        authorId: replyAuthor,
+        parentCommentId: root.id,
+        body: 'Phản hồi B',
+      });
+      await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+      const held = await cases.add.execute({
+        postId,
+        authorId: writer,
+        parentCommentId: reply.id,
+        body: 'Cần lọc C',
+      });
+      if (release === 'creator') await cases.controls.decide(held.id, AUTHOR, 'approve');
+      else {
+        await pool.query(
+          "update content.comments set creator_review='approved', platform_held=true where id=$1",
+          [held.id],
+        );
+        await hide(held.id, 'restore');
+      }
+      const events = await pool.query(
+        "select payload from content.outbox_events where type='content.comment.created' and payload->>'commentId'=$1",
+        [held.id],
+      );
+      expect(events.rows).toHaveLength(1);
+      expect(events.rows[0].payload).toMatchObject({
+        parentCommentId: root.id,
+        parentCommentAuthorId: rootAuthor,
+        replyToCommentId: reply.id,
+        replyToAuthorId: replyAuthor,
+        authorDisplayName: 'Người trả lời C',
+      });
+    },
+  );
 
   it('đổi settings không tự nhả bình luận đã giữ; quyết định creator rollback nếu outbox lỗi', async () => {
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
@@ -186,7 +255,10 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect((await cases.comments.findById(held.id))?.status).toBe('held');
     failOutbox = true;
     await expect(cases.controls.decide(held.id, AUTHOR, 'approve')).rejects.toThrow('outbox unavailable');
-    expect((await cases.comments.findById(held.id))).toMatchObject({ status: 'held', creatorReview: 'pending' });
+    expect(await cases.comments.findById(held.id)).toMatchObject({
+      status: 'held',
+      creatorReview: 'pending',
+    });
   });
 
   it('từ chối lặp không đổi đếm; người khác không được duyệt; tác giả xóa thì rời hàng chờ', async () => {
@@ -212,30 +284,120 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(own.status).toBe('visible');
     const held = await cases.add.execute({ postId, authorId: member, body: 'Cần lọc' });
     await cases.edit.execute({ commentId: held.id, userId: member, body: 'Đã sửa sạch' });
-    expect(await cases.comments.findById(held.id)).toMatchObject({ status: 'held', creatorReview: 'pending' });
+    expect(await cases.comments.findById(held.id)).toMatchObject({
+      status: 'held',
+      creatorReview: 'pending',
+    });
     await cases.controls.decide(held.id, AUTHOR, 'approve');
     expect(await count()).toBe(2);
   });
 
   it('hàng chờ phân trang và không lộ cài đặt bài riêng tư khi tắt bình luận', async () => {
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
-    for (let i = 0; i < 3; i++) await cases.add.execute({ postId, authorId: randomUUID(), body: `Cần lọc ${i}` });
+    for (let i = 0; i < 3; i++)
+      await cases.add.execute({ postId, authorId: randomUUID(), body: `Cần lọc ${i}` });
     const first = await cases.controls.queue(postId, AUTHOR, 0, 2);
-    const next = await cases.controls.queue(postId, AUTHOR, Number(first.nextCursor), 2);
-    expect(new Set([...first.items, ...next.items].map(item => item.id)).size).toBe(3);
+    const next = await cases.controls.queue(postId, AUTHOR, first.nextCursor ?? undefined, 2);
+    expect(new Set([...first.items, ...next.items].map((item) => item.id)).size).toBe(3);
     expect(next.nextCursor).toBeNull();
-    await pool.query("update content.posts set visibility='private', comments_enabled=false where id=$1", [postId]);
+    await pool.query("update content.posts set visibility='private', comments_enabled=false where id=$1", [
+      postId,
+    ]);
     await expect(cases.controls.permissions(postId)).rejects.toThrow('Không tìm thấy');
-    await expect(cases.add.execute({ postId, authorId: randomUUID(), body: 'Bình thường' })).rejects.toThrow('Không tìm thấy');
+    await expect(cases.add.execute({ postId, authorId: randomUUID(), body: 'Bình thường' })).rejects.toThrow(
+      'Không tìm thấy',
+    );
+  });
+
+  it('hàng chờ không bỏ sót khi trang trước đã duyệt và có bình luận mới chen vào', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const original = [];
+    for (let i = 0; i < 5; i++)
+      original.push(await cases.add.execute({ postId, authorId: randomUUID(), body: `lọc ${i}` }));
+    const first = await cases.controls.queue(postId, AUTHOR, undefined, 2);
+    for (const row of first.items) await cases.controls.decide(row.id, AUTHOR, 'approve');
+    await cases.add.execute({ postId, authorId: randomUUID(), body: 'lọc mới' });
+    const second = await cases.controls.queue(postId, AUTHOR, first.nextCursor!, 2);
+    const third = await cases.controls.queue(postId, AUTHOR, second.nextCursor!, 2);
+    expect(new Set([...first.items, ...second.items, ...third.items].map((row) => row.id))).toEqual(
+      new Set(original.map((row) => row.id)),
+    );
+    expect(third.nextCursor).toBeNull();
+    await expect(cases.controls.queue(postId, AUTHOR, 'khong-hop-le', 2)).rejects.toThrow('Cursor');
+  });
+
+  it('hàng chờ trả đúng ngữ cảnh reply, che nội dung bị ẩn và chặn approve khi gốc chưa hiển thị', async () => {
+    const root = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Gốc A' });
+    const reply = await cases.add.execute({
+      postId,
+      authorId: randomUUID(),
+      parentCommentId: root.id,
+      body: 'Nội dung B',
+    });
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({
+      postId,
+      authorId: randomUUID(),
+      parentCommentId: reply.id,
+      body: 'lọc C',
+    });
+    let row = (await cases.controls.queue(postId, AUTHOR, 0, 20)).items[0]!;
+    expect(row).toMatchObject({
+      canApprove: true,
+      willPublish: true,
+      parentContext: { id: reply.id, kind: 'reply', body: 'Nội dung B', unavailable: false },
+    });
+    await hide(reply.id);
+    row = (await cases.controls.queue(postId, AUTHOR, 0, 20)).items[0]!;
+    expect(row.parentContext).toMatchObject({ body: null, unavailable: true });
+    await hide(root.id);
+    row = (await cases.controls.queue(postId, AUTHOR, 0, 20)).items[0]!;
+    expect(row).toMatchObject({
+      canApprove: false,
+      willPublish: false,
+      approvalBlockReason: 'parent_unavailable',
+    });
+    await expect(cases.controls.decide(held.id, AUTHOR, 'approve')).rejects.toThrow('gốc chưa hiển thị');
+    expect((await cases.comments.findById(held.id))?.creatorReview).toBe('pending');
+  });
+
+  it('capability phân biệt chấp nhận bộ lọc với công khai và không duyệt vào trạng thái mắc kẹt khi bài bị giữ', async () => {
+    await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
+    const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'lọc' });
+    await pool.query('update content.comments set platform_held=true where id=$1', [held.id]);
+    expect((await cases.controls.queue(postId, AUTHOR, 0, 20)).items[0]).toMatchObject({
+      platformBlocked: true,
+      canApprove: true,
+      willPublish: false,
+    });
+    await pool.query("update content.posts set status='held' where id=$1", [postId]);
+    expect((await cases.controls.queue(postId, AUTHOR, 0, 20)).items[0]).toMatchObject({
+      canApprove: false,
+      approvalBlockReason: 'post_unavailable',
+    });
+    await expect(cases.controls.decide(held.id, AUTHOR, 'approve')).rejects.toThrow('Bài viết chưa hiển thị');
+    expect((await cases.comments.findById(held.id))?.creatorReview).toBe('pending');
   });
 
   it('AI gắn cờ khi creator đang giữ phải thêm platform hold trước khi chủ bài duyệt', async () => {
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
     const held = await cases.add.execute({ postId, authorId: randomUUID(), body: 'Cần lọc tiếp' });
     const target = (await cases.repository.loadTarget('comment', held.id))!;
-    await cases.screen.execute(randomUUID(), target, { id: `comment:${held.id}`, flagged: false, scores: {}, categories: {}, model: 'clean' });
+    await cases.screen.execute(randomUUID(), target, {
+      id: `comment:${held.id}`,
+      flagged: false,
+      scores: {},
+      categories: {},
+      model: 'clean',
+    });
     expect((await cases.repository.queue({ view: 'pending', limit: 20, offset: 0 })).total).toBe(0);
-    await cases.screen.execute(randomUUID(), target, { id: `comment:${held.id}`, flagged: true, scores: { harassment: 0.99 }, categories: { harassment: true }, model: 'test' });
+    await cases.screen.execute(randomUUID(), target, {
+      id: `comment:${held.id}`,
+      flagged: true,
+      scores: { harassment: 0.99 },
+      categories: { harassment: true },
+      model: 'test',
+    });
     expect((await cases.comments.findById(held.id))?.platformHeld).toBe(true);
     await cases.controls.decide(held.id, AUTHOR, 'approve');
     expect((await cases.comments.findById(held.id))?.status).toBe('held');
@@ -244,7 +406,12 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   it('sửa gốc bị keyword giữ phải giữ reply; staff restore không nhả reply khi chủ bài chưa duyệt', async () => {
     const member = randomUUID();
     const root = await cases.add.execute({ postId, authorId: member, body: 'Bình thường' });
-    const child = await cases.add.execute({ postId, authorId: randomUUID(), parentCommentId: root.id, body: 'Phản hồi sạch' });
+    const child = await cases.add.execute({
+      postId,
+      authorId: randomUUID(),
+      parentCommentId: root.id,
+      body: 'Phản hồi sạch',
+    });
     await cases.controls.updateSettings(postId, AUTHOR, { enabled: true, keywords: ['lọc'] });
     await cases.edit.execute({ commentId: root.id, userId: member, body: 'Cần lọc' });
     expect((await cases.comments.findById(child.id))?.status).toBe('held');
@@ -253,7 +420,10 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     await cases.controls.decide(root.id, AUTHOR, 'approve');
     expect((await cases.comments.findById(root.id))?.status).toBe('visible');
     expect((await cases.comments.findById(child.id))?.status).toBe('visible');
-    expect((await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0].comment_count).toBe(2);
+    expect(
+      (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
+        .comment_count,
+    ).toBe(2);
   });
 
   it('scan ghi tín hiệu staff trong transaction và rollback khi outbox lỗi', async () => {
@@ -264,20 +434,26 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     expect(await cases.repository.scan(eventId)).toBeUndefined();
     failOutbox = false;
     await cases.screen.execute(eventId, target, null);
-    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
-    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'scan', id: eventId });
+    const signals = await pool.query(
+      "select payload from content.outbox_events where type='content.moderation.changed'",
+    );
+    expect(signals.rows.map((row) => row.payload)).toContainEqual({ scope: 'scan', id: eventId });
   });
 
   it('khiếu nại mới có tín hiệu staff và không lưu nếu outbox lỗi', async () => {
     const root = await add();
     const decision = await hide(root.id);
     failOutbox = true;
-    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow('outbox unavailable');
+    await expect(cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại')).rejects.toThrow(
+      'outbox unavailable',
+    );
     expect(await cases.repository.appealsByUser(AUTHOR, 20, 0)).toHaveLength(0);
     failOutbox = false;
     const appeal = await cases.appeal.execute(decision.actionId, AUTHOR, 'Xem lại');
-    const signals = await pool.query("select payload from content.outbox_events where type='content.moderation.changed'");
-    expect(signals.rows.map(row => row.payload)).toContainEqual({ scope: 'appeal', id: appeal.id });
+    const signals = await pool.query(
+      "select payload from content.outbox_events where type='content.moderation.changed'",
+    );
+    expect(signals.rows.map((row) => row.payload)).toContainEqual({ scope: 'appeal', id: appeal.id });
   });
 
   it('recovery có lease, giới hạn retry và staff có thể lên lịch lại', async () => {
@@ -996,7 +1172,8 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   });
   it('thống kê đếm ở server đúng khi hàng chờ vượt 100 dòng, khớp total của queue (TF89)', async () => {
     // 120 bài có hồ sơ chờ duyệt, 30 hồ sơ khẩn cấp (severity 90); vượt giới hạn 100 dòng FE từng tải.
-    await pool.query(`
+    await pool.query(
+      `
       with created as (
         insert into content.posts (id, author_id, post_type, title, status, published_at)
         select gen_random_uuid(), $1, 'video', 'Bài ' || n, 'published', now() from generate_series(1, 120) n

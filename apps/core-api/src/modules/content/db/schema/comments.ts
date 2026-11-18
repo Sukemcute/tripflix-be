@@ -16,6 +16,8 @@ export const comments = contentSchema.table(
       .references(() => posts.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull(),
     parentCommentId: uuid('parent_comment_id'),
+    replyToCommentId: uuid('reply_to_comment_id'),
+    authorDisplayName: text('author_display_name'),
     replyToName: text('reply_to_name'),
     body: text('body').notNull(),
     // held: luật nhanh giữ lại lúc đăng, chờ kiểm duyệt (TF90).
@@ -24,7 +26,10 @@ export const comments = contentSchema.table(
       .notNull()
       .default('visible'),
     hiddenByActionId: uuid('hidden_by_action_id'),
-    creatorReview: varchar('creator_review', { length: 12 }).$type<'approved' | 'pending' | 'rejected'>().notNull().default('approved'),
+    creatorReview: varchar('creator_review', { length: 12 })
+      .$type<'approved' | 'pending' | 'rejected'>()
+      .notNull()
+      .default('approved'),
     platformHeld: boolean('platform_held').notNull().default(false),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     cascadeRootCommentId: uuid('cascade_root_comment_id'),
@@ -35,6 +40,9 @@ export const comments = contentSchema.table(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
+    index('idx_comments_creator_pending')
+      .on(t.postId, t.createdAt.desc(), t.id.desc())
+      .where(sql`${t.creatorReview} = 'pending' AND ${t.deletedAt} IS NULL`),
     check('ck_comments_status', sql`${t.status} IN ('visible', 'held', 'hidden', 'removed')`),
     check('ck_comments_creator_review', sql`${t.creatorReview} IN ('approved', 'pending', 'rejected')`),
     index('idx_comments_post_created').on(t.postId, t.createdAt),
@@ -53,5 +61,19 @@ export const comments = contentSchema.table(
 );
 
 type StoredComment = typeof comments.$inferSelect;
-export type CommentRecord = Omit<StoredComment, 'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt'> & Partial<Pick<StoredComment, 'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt'>>;
+export type CommentRecord = Omit<
+  StoredComment,
+  'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt' | 'replyToCommentId' | 'authorDisplayName'
+> &
+  Partial<
+    Pick<
+      StoredComment,
+      | 'replyToName'
+      | 'creatorReview'
+      | 'platformHeld'
+      | 'publishedAt'
+      | 'replyToCommentId'
+      | 'authorDisplayName'
+    >
+  >;
 export type NewCommentRecord = typeof comments.$inferInsert;

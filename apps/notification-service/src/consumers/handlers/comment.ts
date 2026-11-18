@@ -10,7 +10,8 @@ import type { RealtimeService } from '../../realtime/realtime.service.js';
 import type { EventHandler } from './event-handler.js';
 
 export function createCommentHandlers(options: {
-  comments: Pick<CommentNotificationRepository, 'create' | 'hide'> & Partial<Pick<CommentNotificationRepository, 'notifyThread'>>;
+  comments: Pick<CommentNotificationRepository, 'create' | 'hide'> &
+    Partial<Pick<CommentNotificationRepository, 'notifyThread'>>;
   inbox: Pick<InboxRepository, 'countUnread'> | undefined;
   realtime: Pick<RealtimeService, 'emitToUser'> | undefined;
   log: (message: string, event: EventEnvelope) => void;
@@ -41,32 +42,38 @@ export function createCommentHandlers(options: {
     'content.comment.created.v1': async (event) => {
       const comment = ContentCommentCreatedV1Schema.parse(event.payload);
       const recipients = new Map([[comment.postAuthorId, false]]);
-      const replyRecipient = comment.replyToAuthorId ?? comment.parentCommentAuthorId;
-      if (comment.parentCommentId && replyRecipient) {
+      const replyRecipient =
+        comment.replyToAuthorId ??
+        (comment.replyRecipientKnown === false ? undefined : comment.parentCommentAuthorId);
+      if (comment.parentCommentId && replyRecipient && comment.postVisibility !== 'private') {
         recipients.set(replyRecipient, true);
       }
       recipients.delete(comment.authorId);
       // N2 chỉ chạy cho bài public: bài private chỉ tác giả xem được, báo người khác vừa lộ hoạt động vừa dẫn tới 404.
       // Thiếu postVisibility (core chưa ghi) cũng bỏ qua cho chắc.
       const isPublicPost = comment.postVisibility === 'public';
-      const threadRows = isPublicPost ? await options.comments.notifyThread?.({
-        commentId: comment.commentId,
-        postId: comment.postId,
-        authorId: comment.authorId,
-        authorDisplayName: comment.authorDisplayName,
-        commentBody: comment.body,
-        parentCommentId: comment.parentCommentId,
-        parentCommentAuthorId: comment.parentCommentAuthorId,
-        postAuthorId: comment.postAuthorId,
-        excludedUserIds: [...recipients.keys()],
-        eventId: event.eventId,
-        occurredAt: event.occurredAt,
-      }) : undefined;
+      const threadRows = isPublicPost
+        ? await options.comments.notifyThread?.({
+            commentId: comment.commentId,
+            postId: comment.postId,
+            authorId: comment.authorId,
+            authorDisplayName: comment.authorDisplayName,
+            commentBody: comment.body,
+            parentCommentId: comment.parentCommentId,
+            parentCommentAuthorId: comment.parentCommentAuthorId,
+            postAuthorId: comment.postAuthorId,
+            excludedUserIds: [...recipients.keys()],
+            eventId: event.eventId,
+            occurredAt: event.occurredAt,
+          })
+        : undefined;
       await Promise.all(
-        (threadRows ?? []).map(({ row, isNew }) => isNew
-          ? emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })
-          // Dòng gom được cập nhật: web tải lại inbox và badge như với cảm xúc.
-          : emit(event, row.user_id, 'notification.read', {})),
+        (threadRows ?? []).map(({ row, isNew }) =>
+          isNew
+            ? emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })
+            : // Dòng gom được cập nhật: web tải lại inbox và badge như với cảm xúc.
+              emit(event, row.user_id, 'notification.read', {}),
+        ),
       );
       if (!recipients.size) return true;
       const rows = await options.comments.create({

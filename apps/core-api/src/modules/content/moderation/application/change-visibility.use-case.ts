@@ -8,6 +8,10 @@ import type { ContentOutbox } from '../../social/application/ports/content-outbo
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
 import { MODERATION_POLICY_VERSION } from '../domain/content-version.js';
+import {
+  commentPublicationPayload,
+  loadCommentPublicationContext,
+} from '../../social/application/common/comment-publication.js';
 
 export interface ChangeVisibilityCommand {
   actorIsSuperAdmin?: boolean;
@@ -59,6 +63,8 @@ export class ChangeVisibilityUseCase {
       authorId: string;
       body: string;
       parentCommentId: string | null;
+      replyToCommentId: string | null;
+      authorDisplayName: string | null;
       previousStatus: string;
       wasPublic: boolean;
       status: string;
@@ -136,8 +142,12 @@ export class ChangeVisibilityUseCase {
                 record.cascadeRootCommentId !== root.id)))
         )
           continue;
-        if (isChild && record.status === 'held' &&
-          (record.cascadeRootCommentId !== root.id || record.hiddenByActionId !== root.hiddenByActionId)) continue;
+        if (
+          isChild &&
+          record.status === 'held' &&
+          (record.cascadeRootCommentId !== root.id || record.hiddenByActionId !== root.hiddenByActionId)
+        )
+          continue;
         if (command.action === 'hide' && !['visible', 'held'].includes(record.status)) {
           // Một quyết định ẩn riêng sau cascade phải ngăn lần restore gốc hiện lại phản hồi đó.
           if (!isChild && record.status === 'hidden' && record.cascadeRootCommentId) {
@@ -150,10 +160,14 @@ export class ChangeVisibilityUseCase {
           }
           continue;
         }
-        const creatorRestricted = (record.creatorReview && record.creatorReview !== 'approved') ||
+        const creatorRestricted =
+          (record.creatorReview && record.creatorReview !== 'approved') ||
           (isChild && root.creatorReview && root.creatorReview !== 'approved');
         const recordStatus = command.action === 'restore' && creatorRestricted ? 'held' : newStatus;
-        if ((record.status === 'removed' && command.action !== 'restore') || (record.status === recordStatus && command.action !== 'restore'))
+        if (
+          (record.status === 'removed' && command.action !== 'restore') ||
+          (record.status === recordStatus && command.action !== 'restore')
+        )
           continue;
         const [updated] = await db
           .update(comments)
@@ -163,8 +177,17 @@ export class ChangeVisibilityUseCase {
             ...(recordStatus === 'visible' ? { publishedAt: record.publishedAt ?? new Date() } : {}),
             updatedAt: new Date(),
             deletedAt: null,
-            hiddenByActionId: ['hide', 'remove'].includes(command.action) ? actionId : recordStatus === 'held' ? record.hiddenByActionId : null,
-            cascadeRootCommentId: ['hide', 'remove'].includes(command.action) && isChild ? root.id : recordStatus === 'held' ? record.cascadeRootCommentId : null,
+            hiddenByActionId: ['hide', 'remove'].includes(command.action)
+              ? actionId
+              : recordStatus === 'held'
+                ? record.hiddenByActionId
+                : null,
+            cascadeRootCommentId:
+              ['hide', 'remove'].includes(command.action) && isChild
+                ? root.id
+                : recordStatus === 'held'
+                  ? record.cascadeRootCommentId
+                  : null,
           })
           .where(
             and(eq(comments.id, record.id), eq(comments.status, record.status), isNull(comments.deletedAt)),
@@ -176,8 +199,13 @@ export class ChangeVisibilityUseCase {
             authorId: updated.authorId,
             body: updated.body,
             parentCommentId: updated.parentCommentId,
+            replyToCommentId: updated.replyToCommentId,
+            authorDisplayName: updated.authorDisplayName,
             previousStatus: record.status,
-            wasPublic: record.publishedAt === undefined ? Boolean(record.hiddenByActionId) : Boolean(record.publishedAt),
+            wasPublic:
+              record.publishedAt === undefined
+                ? Boolean(record.hiddenByActionId)
+                : Boolean(record.publishedAt),
             status: updated.status,
           });
       }
@@ -186,7 +214,8 @@ export class ChangeVisibilityUseCase {
         0,
       );
       if (delta) await this.postRepository.incrementCounter(target.postId, 'commentCount', delta);
-      newStatus = (await this.repository.loadTarget(command.targetType, command.targetId))?.status ?? newStatus;
+      newStatus =
+        (await this.repository.loadTarget(command.targetType, command.targetId))?.status ?? newStatus;
     }
     if (target.targetType === 'comment' || command.action === 'dismiss')
       await this.repository.db.insert(moderationActions).values({
@@ -231,10 +260,10 @@ export class ChangeVisibilityUseCase {
           row.previousStatus === 'held' && !row.wasPublic && row.status === 'visible'
             ? 'content.comment.created'
             : row.status === 'visible'
-            ? 'content.comment.restored'
-            : row.status === 'removed'
-              ? 'content.comment.deleted'
-              : 'content.comment.hidden',
+              ? 'content.comment.restored'
+              : row.status === 'removed'
+                ? 'content.comment.deleted'
+                : 'content.comment.hidden',
         userId: command.actorId,
         payload:
           row.status === 'visible'
@@ -243,12 +272,13 @@ export class ChangeVisibilityUseCase {
                 body: row.body,
                 parentCommentId: row.parentCommentId,
                 postAuthorId: parentPost?.authorId,
-                ...(row.previousStatus === 'held' && !row.wasPublic ? {
-                  createdAt: new Date().toISOString(),
-                  parentCommentAuthorId: row.parentCommentId
-                    ? (await this.repository.db.select({ authorId: comments.authorId }).from(comments)
-                        .where(eq(comments.id, row.parentCommentId)))[0]?.authorId ?? null : null,
-                } : {}),
+                ...(row.previousStatus === 'held' && !row.wasPublic && parentPost
+                  ? commentPublicationPayload(
+                      row,
+                      parentPost,
+                      await loadCommentPublicationContext(this.repository.db, target.postId, row),
+                    )
+                  : {}),
               }
             : row.status === 'removed'
               ? {
