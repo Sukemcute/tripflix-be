@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { MediaFramesRequestedV1Schema, MediaFramesCompletedV1Schema, MediaFramesFailedV1Schema } from './moderation-frames.js';
+export * from './moderation-frames.js';
 
 /** Ba vai trò cố định của hệ thống (docs/architecture/10 §3.10). */
 export const ROLES = ['member', 'moderator', 'superadmin'] as const;
@@ -560,6 +562,10 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'content.media.failed.v1': ContentMediaFailedV1Schema,
   'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
   'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,
+  'content.media.frames.requested.v1': MediaFramesRequestedV1Schema,
+  'media.frames.completed.v1': MediaFramesCompletedV1Schema,
+  'media.frames.failed.v1': MediaFramesFailedV1Schema,
+  'content.media.frames.changed.v1': z.object({ assetId: z.uuid() }),
   'content.reaction.updated.v1': ContentReactionUpdatedV1Schema,
   'content.comment_reaction.updated.v1': ContentCommentReactionUpdatedV1Schema,
   'content.comment.created.v1': ContentCommentCreatedV1Schema,

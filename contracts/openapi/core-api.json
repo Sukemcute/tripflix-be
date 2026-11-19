@@ -11662,6 +11662,32 @@
       "ModerationPartDto": {
         "type": "object",
         "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "caption",
+              "image",
+              "video_poster",
+              "video_frame",
+              "video_sampling"
+            ]
+          },
+          "timestampMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "sampleDurationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "sampleCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "playbackUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "id": {
             "type": "string",
             "nullable": true

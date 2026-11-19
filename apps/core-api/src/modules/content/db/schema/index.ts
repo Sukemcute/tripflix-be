@@ -1,5 +1,6 @@
 export { contentSchema } from './content-schema.js';
 export * from './media.js';
+export * from './media-frames.js';
 export * from './posts.js';
 export * from './comments.js';
 export * from './post-counter-deltas.js';

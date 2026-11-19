@@ -1,6 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ModerationPartDto {
+  @ApiPropertyOptional({ enum: ['caption', 'image', 'video_poster', 'video_frame', 'video_sampling'] })
+  modality?: string;
+  @ApiPropertyOptional({ type: Number, nullable: true }) timestampMs?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true }) sampleDurationMs?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true }) sampleCount?: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) playbackUrl?: string | null;
   @ApiProperty({ type: String, nullable: true }) id!: string | null;
   @ApiProperty({ enum: ['caption', 'image'] }) kind!: 'caption' | 'image';
   @ApiProperty({ type: String, nullable: true }) assetId!: string | null;

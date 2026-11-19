@@ -67,10 +67,13 @@ func newHarness(t *testing.T, transcoder *faketranscoder.Fake, claimIdle, heartb
 		ConsumerName: "worker-1",
 		Storage:      objectStorage,
 		Transcoder:   transcoder,
-		ClaimIdle:    claimIdle,
-		Heartbeat:    heartbeat,
-		Block:        50 * time.Millisecond,
-		TempDir:      t.TempDir(),
+		ExtractFrame: func(_ context.Context, _, output string, _ int) error {
+			return os.WriteFile(output, []byte("frame"), 0600)
+		},
+		ClaimIdle: claimIdle,
+		Heartbeat: heartbeat,
+		Block:     50 * time.Millisecond,
+		TempDir:   t.TempDir(),
 	})
 	t.Cleanup(h.stop)
 	return h

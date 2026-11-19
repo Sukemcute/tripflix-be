@@ -23,11 +23,14 @@ import { DrizzleMediaAssetStore } from './infra/drizzle-media-asset.store.js';
 import { MediaResultConsumer } from './infra/media-result-consumer.js';
 import { DEFAULT_PLAYBACK_TTL_SEC } from './domain/playback-policy.js';
 import { MediaFacade } from './media.facade.js';
+import { MediaFramesUseCases } from './application/media-frames.use-cases.js';
 
 /** Phần con media của content. Test thay database và S3 bằng overrideProvider. */
 @Module({
   controllers: [MediaUploadController, MediaPlaybackController],
   providers: [
+    { provide: MediaFramesUseCases, inject: [buildTransactionHostToken('content')],
+      useFactory: (tx: ModuleTransactionHost) => new MediaFramesUseCases(() => tx.tx) },
     MediaUploadUseCases,
     MediaResultUseCases,
     MediaResultConsumer,

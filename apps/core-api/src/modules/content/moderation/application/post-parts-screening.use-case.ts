@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { Transactional } from '@tripflix/db';
+import { FRAME_POLICY } from '@tripflix/contracts';
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { moderationParts, moderationScans, posts, type PartVerdict } from '../../db/schema/index.js';
 import { MediaFacade } from '../../media/media.facade.js';
@@ -11,6 +12,7 @@ import type { ModerationAiPort, ModerationPartInput } from './ports.js';
 import type { RecordScreeningUseCase } from './moderation.use-cases.js';
 
 const POLICY = `${MODERATION_POLICY_VERSION}:parts-v1-review-images`;
+const FRAME_PART_POLICY = `${POLICY}:${FRAME_POLICY}`;
 type Part = typeof moderationParts.$inferSelect;
 type Input = {
   key: string;
@@ -20,9 +22,16 @@ type Input = {
   text?: string;
   url?: string;
   mediaKind?: 'video' | 'image';
+  modality?: 'video_frame' | 'video_sampling' | 'video_poster';
+  timestampMs?: number;
+  sampleDurationMs?: number | null;
+  sampleCount?: number;
+  errorCode?: string | null;
   state: 'pending' | 'waiting' | 'failed' | 'not_applicable';
 };
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+const inputPolicy = (input: Input) =>
+  input.modality === 'video_frame' || input.modality === 'video_sampling' ? FRAME_PART_POLICY : POLICY;
 
 /** Only claim/complete hold DB locks. All provider calls happen between these transactions. */
 export class PostPartsScreeningUseCase {
@@ -44,6 +53,7 @@ export class PostPartsScreeningUseCase {
       ]),
     ];
     const assets = await this.media.getModerationInputs(ids, lock);
+    const samples = await this.media.getModerationFrames(ids);
     return [
       {
         key: 'caption',
@@ -62,9 +72,45 @@ export class PostPartsScreeningUseCase {
           hash: asset?.revision ?? 'missing',
           ...(asset?.url ? { url: asset.url } : {}),
           ...(asset ? { mediaKind: asset.kind } : {}),
+          ...(asset?.kind === 'video' ? { modality: 'video_poster' as const } : {}),
           state: asset?.status === 'failed' ? 'failed' : asset?.url ? 'pending' : 'waiting',
         };
       }),
+      ...assets
+        .filter((a) => a.kind === 'video')
+        .flatMap((asset): Input[] => {
+          const sample = samples.find((s) => s.assetId === asset.id);
+          const common = {
+            kind: 'image' as const,
+            assetId: asset.id,
+            mediaKind: 'video' as const,
+            sampleDurationMs: sample?.durationMs ?? null,
+            sampleCount: sample?.frames.length ?? 0,
+          };
+          if (!sample || sample.status !== 'ready')
+            return [
+              {
+                ...common,
+                key: `frames:${asset.id}`,
+                modality: 'video_sampling',
+                hash: hash(
+                  `${asset.revision}:${sample?.requestId ?? 'waiting'}:${sample?.status ?? 'waiting'}`,
+                ),
+                state: sample?.status === 'failed' || asset.status === 'failed' ? 'failed' : 'waiting',
+                errorCode:
+                  asset.status === 'failed' ? 'media_failed' : (sample?.errorCode ?? 'frames_not_ready'),
+              },
+            ];
+          return sample.frames.map((frame): Input => ({
+            ...common,
+            key: `frame:${asset.id}:${frame.timestampMs}`,
+            modality: 'video_frame',
+            timestampMs: frame.timestampMs,
+            url: frame.url,
+            hash: hash(`${asset.revision}:${sample.requestId}:${frame.timestampMs}`),
+            state: 'pending',
+          }));
+        }),
     ];
   }
 
@@ -111,8 +157,9 @@ export class PostPartsScreeningUseCase {
     for (const old of existing) {
       if (
         old.contentVersion !== target.version ||
-        old.policyVersion !== POLICY ||
-        !inputs.some((i) => i.key === old.partKey && i.hash === old.inputHash)
+        !inputs.some(
+          (i) => i.key === old.partKey && i.hash === old.inputHash && inputPolicy(i) === old.policyVersion,
+        )
       ) {
         if (old.status !== 'superseded')
           await this.repository.db
@@ -132,10 +179,15 @@ export class PostPartsScreeningUseCase {
           kind: input.kind,
           assetId: input.assetId,
           inputHash: input.hash,
-          policyVersion: POLICY,
+          policyVersion: inputPolicy(input),
           status: input.state,
           errorCode:
-            input.state === 'failed' ? 'media_failed' : input.state === 'waiting' ? 'media_not_ready' : null,
+            input.errorCode ??
+            (input.state === 'failed'
+              ? 'media_failed'
+              : input.state === 'waiting'
+                ? 'media_not_ready'
+                : null),
           nextAttemptAt: new Date(Date.now() + (input.state === 'waiting' ? 30_000 : 0)),
         })
         .onConflictDoNothing();
@@ -159,7 +211,7 @@ export class PostPartsScreeningUseCase {
           and(
             eq(moderationParts.postId, postId),
             eq(moderationParts.contentVersion, target.version),
-            eq(moderationParts.policyVersion, POLICY),
+            inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY]),
             ne(moderationParts.status, 'superseded'),
           ),
         )
@@ -320,6 +372,7 @@ export class PostPartsScreeningUseCase {
               categories: verdict.categories,
               scores: verdict.scores,
               model: verdict.model,
+              ...(claim.input.timestampMs === undefined ? {} : { timestampMs: claim.input.timestampMs }),
             },
           },
         },
@@ -330,6 +383,12 @@ export class PostPartsScreeningUseCase {
   }
 
   async execute(postId: string, occurredAt?: string) {
+    const initial = await this.eligible(postId, occurredAt);
+    if (initial)
+      await this.media.ensureModerationFrames([
+        ...initial.mediaIds,
+        ...(initial.coverMediaId ? [initial.coverMediaId] : []),
+      ]);
     const prepared = await this.prepare(postId, occurredAt);
     if (!prepared) return;
     // Sequential claims bound provider load and preserve caption policy before image review.
@@ -398,6 +457,10 @@ export class PostPartsScreeningUseCase {
     const target = await this.repository.loadTarget('post', postId);
     if (!target) throw new NotFoundException('Không tìm thấy bài viết');
     const inputs = await this.inputs(target);
+    const playback = await this.media.getPlayback([
+      ...target.mediaIds,
+      ...(target.coverMediaId ? [target.coverMediaId] : []),
+    ]);
     const rows = await this.repository.db
       .select()
       .from(moderationParts)
@@ -405,7 +468,7 @@ export class PostPartsScreeningUseCase {
         and(
           eq(moderationParts.postId, postId),
           eq(moderationParts.contentVersion, target.version),
-          eq(moderationParts.policyVersion, POLICY),
+          inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY]),
         ),
       );
     return {
@@ -425,7 +488,12 @@ export class PostPartsScreeningUseCase {
           model: row?.verdict?.model ?? null,
           categories: row?.verdict?.categories ?? {},
           scores: row?.verdict?.scores ?? {},
-          errorCode: row?.errorCode ?? null,
+          errorCode: row?.errorCode ?? input.errorCode ?? null,
+          playbackUrl: input.assetId ? (playback[input.assetId]?.hlsUrl ?? null) : null,
+          modality: input.modality ?? input.kind,
+          timestampMs: input.timestampMs ?? null,
+          sampleDurationMs: input.sampleDurationMs ?? null,
+          sampleCount: input.sampleCount ?? null,
           updatedAt: row?.updatedAt?.toISOString() ?? null,
         };
       }),
@@ -437,6 +505,31 @@ export class PostPartsScreeningUseCase {
     const [part] = await this.repository.db.select().from(moderationParts).where(eq(moderationParts.id, id));
     if (!part) throw new NotFoundException('Không tìm thấy lượt quét');
     await this.repository.lockPost(part.postId);
+    if (part.partKey.startsWith('frames:') && part.assetId && part.status === 'failed') {
+      if (part.errorCode === 'media_failed')
+        throw new ConflictException('Video chưa sẵn sàng để trích khung hình');
+      const current = await this.repository.loadTarget('post', part.postId);
+      if (
+        !current ||
+        current.deleted ||
+        current.version !== part.contentVersion ||
+        !(await this.inputs(current)).some((i) => i.key === part.partKey && i.hash === part.inputHash)
+      )
+        throw new ConflictException('Nội dung đã thay đổi');
+      await this.media.ensureModerationFrames([part.assetId], actorId);
+      await this.repository.db
+        .update(moderationParts)
+        .set({
+          status: 'waiting',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+          retriedBy: actorId,
+          retriedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(moderationParts.id, id));
+      return { id, status: 'pending' };
+    }
     const target = await this.repository.loadTarget('post', part.postId);
     const input = target
       ? (await this.inputs(target, true)).find((i) => i.key === part.partKey && i.hash === part.inputHash)
@@ -447,7 +540,7 @@ export class PostPartsScreeningUseCase {
       target.version !== part.contentVersion ||
       !input ||
       input.state !== 'pending' ||
-      part.policyVersion !== POLICY
+      part.policyVersion !== inputPolicy(input)
     )
       throw new ConflictException('Đầu vào đã thay đổi hoặc media chưa sẵn sàng');
     const updated = await this.repository.db
