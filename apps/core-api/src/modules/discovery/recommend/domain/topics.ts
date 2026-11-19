@@ -62,23 +62,6 @@ export const TAG_BINS: Readonly<Record<string, readonly string[]>> = {
   weekend: ['len:ngan'],
 };
 
-/** Tag nơi, địa danh → id trong PLACES (search/domain/places.ts). Dùng khi bài chưa có nơi từ khách sạn hay tiêu đề. */
-export const TAG_PLACES: Readonly<Record<string, string>> = {
-  saigon: 'sai-gon', landmark81: 'sai-gon', dongkhoi: 'sai-gon',
-  hanoi: 'ha-noi', hoguom: 'ha-noi', royalcity: 'ha-noi',
-  danang: 'da-nang', mykhe: 'da-nang', caurong: 'da-nang',
-  hoian: 'hoi-an', hue: 'hue', songhuong: 'hue',
-  nhatrang: 'nha-trang', binhba: 'khanh-hoa', camranh: 'khanh-hoa',
-  dalat: 'da-lat', lamdong: 'lam-dong', phanthiet: 'lam-dong', muine: 'lam-dong', doicat: 'lam-dong',
-  phuquoc: 'phu-quoc', condao: 'con-dao', vungtau: 'vung-tau', quynhon: 'quy-nhon',
-  eogio: 'gia-lai', kyco: 'gia-lai', pleiku: 'gia-lai',
-  halong: 'ha-long', vinhhalong: 'ha-long', coto: 'co-to', catba: 'hai-phong', lanha: 'hai-phong',
-  ninhbinh: 'ninh-binh', trangan: 'ninh-binh', hangmua: 'ninh-binh',
-  sapa: 'sa-pa', laocai: 'lao-cai', mucangchai: 'lao-cai', hagiang: 'ha-giang', mocchau: 'son-la',
-  vinh: 'nghe-an', cualo: 'nghe-an', nghean: 'nghe-an', bienhoa: 'dong-nai',
-  buonmathuot: 'dak-lak', dray: 'dak-lak', kontum: 'quang-ngai', cantho: 'can-tho', vinhlong: 'vinh-long',
-};
-
 /**
  * Cụm từ (đã chuẩn hoá bằng normalizeText) trong tiêu đề / nội dung → ngăn. So theo ranh giới từ.
  * Tránh từ một âm tiết dễ trùng tên riêng ("dao" trong "Sapa Dao Homestay", "bien" trong "Biên Hoà").

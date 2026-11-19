@@ -1,6 +1,7 @@
 import type { EventEnvelope } from '@tripflix/contracts';
 import { STREAMS, type EventBus } from '@tripflix/event-bus';
 import { ExploreController } from '../api/explore.controller.js';
+import { parse } from '../domain/explore/query.js';
 import type { ExploreResultPage, ExploreUseCases, PostSearchPage } from './explore.use-cases.js';
 import { SearchEventsPublisher } from './search-events.publisher.js';
 
@@ -88,9 +89,19 @@ describe('Phát sự kiện tìm kiếm', () => {
     const { publish } = setup();
     const publisher = new SearchEventsPublisher({ publish } as EventBus);
     publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: null, intents: [], budget: null }), postType: null, resultCount: 0 });
-    publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Hòn Sơn' }), postType: null, resultCount: 0 });
+    publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Bangkok' }), postType: null, resultCount: 0 });
     publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Hà Giang' }), postType: null, resultCount: 0 });
     expect(published(publish).map(([, e]) => e.payload.placeIds)).toEqual([[], [], ['ha-giang']]);
+  });
+
+  it('tìm "cần thơ", "mũi né", "cát bà", "hà giang" qua parse đều phát đúng placeIds', () => {
+    const { publish } = setup();
+    const publisher = new SearchEventsPublisher({ publish } as EventBus);
+    for (const q of ['cần thơ', 'mũi né', 'cát bà', 'hà giang']) {
+      const u = parse(q);
+      publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: u.place, intents: u.intents, budget: u.budget }), postType: null, resultCount: 1 });
+    }
+    expect(published(publish).map(([, e]) => e.payload.placeIds)).toEqual([['can-tho'], ['mui-ne'], ['cat-ba'], ['ha-giang']]);
   });
 
   it('stays: discovery.stays.searched đủ trường', () => {

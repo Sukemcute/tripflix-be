@@ -8,7 +8,7 @@ export function isCandidate(doc: IndexedDoc, f: CandidateFilter): boolean {
   const o = doc.obj;
   // Chưa rõ nơi: là ứng viên khi nhắc tới nơi, hoặc khi câu có từ (làm kết quả thay thế lúc dữ liệu ít).
   const isUnknownOk = o.place == null && (!f.isAll || f.placeTerms.some((t) => Object.hasOwn(doc.tf, t)));
-  if (f.place && o.place !== f.place && !isUnknownOk) {
+  if (f.place && !(o.place && f.places.includes(o.place)) && !isUnknownOk) {
     if (!f.center || o.lat == null || Math.abs(o.lat - f.center.lat) > f.latSpan) return false;
   }
   if (f.isAll) return true;

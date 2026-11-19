@@ -1,5 +1,6 @@
 // Tìm khám phá: HIỂU CÂU một lần -> mỗi NHÁNH lấy ứng viên rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần -> GỘP theo vùng.
 // Port từ experiments/natural-search/search/engine.py + verticals/*.py; giữ nguyên công thức để so được với bộ câu thử.
+import { bucketsWithin } from '../places.js';
 import { LEX } from './lexicon.js';
 import { branchTerms, understand, type Interpretation, type QueryTerm, type Understood } from './query.js';
 import { NS, Stats } from './stats.js';
@@ -215,6 +216,7 @@ async function searchVertical(
     return w.length === 1 ? w : w.slice(1).map((b, i) => `${w[i]}_${b}`);
   });
   const placeTerms = [...new Set(placeGroups.flat())];
+  const places = u.place ? bucketsWithin(u.place) : [];
   const docs = await st.source.candidates({
     vertical: vt.name,
     isAll: isBroad || !qterms.length,
@@ -223,6 +225,7 @@ async function searchVertical(
     tiers: [...qtier],
     days: u.days,
     place: u.place,
+    places,
     placeTerms,
     center,
     latSpan: FAR_KM / 111,
@@ -235,7 +238,7 @@ async function searchVertical(
     // Chưa rõ nơi (caption không gắn lộ trình) mà có nhắc nơi trong câu: coi như đúng nơi, không loại.
     const isMention = Boolean(u.place) && o.place == null && placeGroups.some((g) => g.every((t) => Object.hasOwn(doc.tf, t)));
     let isUnknownPlace = false;
-    if (u.place && o.place !== u.place && !isMention) {
+    if (u.place && !(o.place && places.includes(o.place)) && !isMention) {
       const d = center ? km(o, center) : null;
       if (d === null && o.place == null) {
         // Không biết ở đâu: chỉ cho tầng thay thế, xếp sau bài gần nơi, phạt bằng bài xa nhất còn được nhận.
@@ -352,7 +355,7 @@ function reasonOf(r: Row): string {
   const ws = [...new Set(r.hit.filter((h) => h[0] !== '~').map((h) => h.replace(/_/g, ' ')))].sort((a, b) => b.length - a.length).slice(0, 3);
   if (ws.length) why.push(`Khớp: ${ws.join(', ')}`);
   if (r.hit[0]?.[0] === '~') why.push(`Cùng tầm ${r.hit[0].slice(1)}`);
-  if (u.place) why.push(r.isMention ? `Nhắc tới ${u.place}` : r.isUnknownPlace ? 'Chưa rõ nơi' : r.near ? `Gần ${u.place} · ${r.near.toFixed(0)} km` : `Ở ${u.place}`);
+  if (u.place) why.push(r.isMention ? `Nhắc tới ${u.place}` : r.isUnknownPlace ? 'Chưa rõ nơi' : r.near ? `Gần ${u.place} · ${r.near.toFixed(0)} km` : `Ở ${r.doc.obj.place ?? u.place}`);
   if (r.dist !== null) why.push(`Cách bạn ${r.dist.toFixed(1).replace('.', ',')} km`);
   return [...why, ...r.vertical.reason(u, r.doc.obj, r.relaxed.includes('budget'))].join(' · ');
 }

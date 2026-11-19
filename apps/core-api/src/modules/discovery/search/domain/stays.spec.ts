@@ -15,7 +15,7 @@ const stay = (hotelId: string, unitPrice: number, stars: number | null): StayRes
 
 describe('resolvePlaceSlugs', () => {
   it('tỉnh gồm cả điểm đến con', () => {
-    expect(resolvePlaceSlugs('lam-dong')).toEqual(['lam-dong', 'da-lat']);
+    expect(resolvePlaceSlugs('lam-dong')).toEqual(expect.arrayContaining(['lam-dong', 'da-lat', 'mui-ne']));
     expect(resolvePlaceSlugs('ho-chi-minh')).toEqual(expect.arrayContaining(['ho-chi-minh', 'sai-gon', 'con-dao', 'vung-tau']));
   });
 

@@ -293,6 +293,22 @@ describe('tìm', () => {
     expect(secs.plan).toEqual(expect.arrayContaining(['t1', 'p1']));
   });
 
+  it('tìm theo tỉnh gồm cả điểm đến thuộc tỉnh; thành phố trực thuộc trung ương thì chỉ chính nó', async () => {
+    const stays = [
+      o({ id: 'pq', kind: 'stay', title: 'Resort biển', place: 'Phú Quốc' }),
+      o({ id: 'ag', kind: 'stay', title: 'Resort ven sông', place: 'An Giang' }),
+      o({ id: 'dl', kind: 'stay', title: 'Resort đồi thông', place: 'Đà Lạt' }),
+      o({ id: 'ha', kind: 'stay', title: 'Resort phố cổ', place: 'Hội An' }),
+      o({ id: 'dn', kind: 'stay', title: 'Resort ven biển', place: 'Đà Nẵng' }),
+    ];
+    const ids = async (q: string) => (await searchExplore(src(stays), q)).sections[0]!.items.map((i) => i.obj.id).sort();
+    expect(await ids('resort an giang')).toEqual(['ag', 'pq']);
+    expect(await ids('resort lâm đồng')).toEqual(['dl']);
+    expect(await ids('resort đà nẵng')).toEqual(['dn']);
+    const pq = (await searchExplore(src(stays), 'resort an giang')).sections[0]!.items.find((i) => i.obj.id === 'pq')!;
+    expect(pq.reason).toContain('Ở Phú Quốc');
+  });
+
   it('bài chưa rõ nơi mà nhắc tới nơi trong câu thì vẫn ra; "hà lội" là Hà Nội', async () => {
     const videos = [
       o({ id: 'v1', kind: 'video', title: '', text: 'Hôm nay bay ra hà lội học AI nhe ae' }),

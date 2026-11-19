@@ -7,6 +7,7 @@ import type { Understood } from '../domain/explore/query.js';
 import { paginate } from '../domain/stays.js';
 import { NS } from '../domain/explore/stats.js';
 import { destOf } from '../domain/explore/text.js';
+import { placeBucketOfId, placeParentOf, placesIn } from '../domain/places.js';
 import { QUERY_TOTAL_KEYS, queryGrams, rankVocabGaps, type QueryGramRow, type VocabGap } from '../domain/explore/vocab-gaps.js';
 import type { ExploreObject } from '../domain/explore/types.js';
 import { POI_ATTRIBUTION, type PointOfInterestSeed } from '../domain/points-of-interest.js';
@@ -150,6 +151,14 @@ export interface ExploreFallbackPage {
   items: Array<ExploreResultItem & { section: string; relaxed: Relax[] }>;
 }
 
+function hotelPlace(h: Pick<ExploreHotel, 'province' | 'city'>): string {
+  const provinceId = placesIn(h.province.name)[0] ?? null;
+  const cityId = h.city ? (placesIn(h.city)[0] ?? null) : null;
+  // Chỉ dùng city khi cùng nhánh với tỉnh của khách sạn (tránh city nhiễu như 'Hà Nội' kéo khách sạn Bắc Ninh sang Hà Nội).
+  const chosen = cityId && (!provinceId || placeParentOf(cityId) === provinceId) ? cityId : provinceId;
+  return chosen ? (placeBucketOfId(chosen) ?? h.province.name) : h.province.name;
+}
+
 export function hotelToObject(h: ExploreHotel): ExploreObject {
   return {
     id: `hotel:${h.id}`,
@@ -160,7 +169,7 @@ export function hotelToObject(h: ExploreHotel): ExploreObject {
     title: h.name,
     text: [h.brand, h.style, h.city, h.province.name].filter(Boolean).join(' · '),
     addr: h.address,
-    place: destOf(`${h.province.name} ${h.city ?? ''}`) ?? h.province.name,
+    place: hotelPlace(h),
     lat: h.location?.lat ?? null,
     lon: h.location?.lng ?? null,
     priceNight: h.priceFrom,

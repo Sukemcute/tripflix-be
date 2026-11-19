@@ -59,6 +59,7 @@ export interface PostBuildItem {
 /** Phần lộ trình của bài dùng để xếp ngăn (chi phí, số ngày, loại điểm, khách sạn). */
 export interface PostTripSummary {
   hotelId: string | null;
+  destinationName?: string | null;
   daysCount: number | null;
   estimatedCostPerPerson: number | null;
   items: Array<{ location: string | null; category: string | null }>;
