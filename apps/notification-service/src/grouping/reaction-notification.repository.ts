@@ -112,13 +112,15 @@ export class ReactionNotificationRepository {
          FROM inbox WHERE id = $1
        ), latest AS (
          -- Hiện tên người thả gần nhất để bảng thông báo có tên và avatar thay vì chỉ có số.
-         SELECT COALESCE(NULLIF(btrim(u.display_name), ''), 'Một người dùng') AS name
+         SELECT COALESCE(NULLIF(btrim(u.display_name), ''), 'Một người dùng') AS name, a.actor_id
          FROM reaction_notification_actors a LEFT JOIN user_directory u ON u.user_id = a.actor_id
          WHERE a.inbox_id = $1 AND a.is_active
          ORDER BY a.occurred_at DESC LIMIT 1
        )
        UPDATE inbox SET
-         data = jsonb_set(data, '{actorCount}', to_jsonb(totals.actor_count)),
+         -- actorIds như thông báo bình luận để web hiện avatar người thả gần nhất.
+         data = jsonb_set(data, '{actorCount}', to_jsonb(totals.actor_count))
+           || jsonb_build_object('actorIds', COALESCE((SELECT jsonb_build_array(actor_id) FROM latest), '[]'::jsonb)),
          body = COALESCE((SELECT name FROM latest), 'Một người dùng')
            || CASE WHEN totals.actor_count > 1 THEN ' và ' || (totals.actor_count - 1) || ' người khác' ELSE '' END
            || $3::text,
