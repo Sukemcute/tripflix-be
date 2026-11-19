@@ -3969,6 +3969,77 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/posts/{id}/parts": {
+      "get": {
+        "operationId": "AdminModerationController_postParts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationPartsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bằng chứng quét riêng caption và từng ảnh của phiên bản bài hiện tại",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/parts/{id}/retry": {
+      "post": {
+        "operationId": "AdminModerationController_retryPart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationPartRetryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/stats": {
       "get": {
         "operationId": "AdminModerationController_stats",
@@ -11576,6 +11647,141 @@
           "createdAt"
         ]
       },
+      "ModerationPartDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "caption",
+              "image"
+            ]
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "mediaKind": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "previewUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "checking",
+              "waiting",
+              "deferred",
+              "passed",
+              "flagged",
+              "failed",
+              "not_applicable",
+              "superseded"
+            ]
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "categories": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "assetId",
+          "mediaKind",
+          "text",
+          "previewUrl",
+          "status",
+          "attempts",
+          "model",
+          "categories",
+          "scores",
+          "errorCode",
+          "updatedAt"
+        ]
+      },
+      "ModerationPartsDto": {
+        "type": "object",
+        "properties": {
+          "contentVersion": {
+            "type": "string"
+          },
+          "imagePolicy": {
+            "type": "string",
+            "enum": [
+              "review_only"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationPartDto"
+            }
+          }
+        },
+        "required": [
+          "contentVersion",
+          "imagePolicy",
+          "items"
+        ]
+      },
+      "ModerationPartRetryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "ModerationStatsDto": {
         "type": "object",
         "properties": {
@@ -11659,6 +11865,14 @@
       "FailedScanDto": {
         "type": "object",
         "properties": {
+          "partKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
           "eventId": {
             "type": "string"
           },

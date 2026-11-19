@@ -51,6 +51,12 @@ export interface MediaKindInfo {
   status: MediaAssetStatus;
 }
 
+export interface ModerationAsset extends MediaKindInfo {
+  sourceKey: string;
+  hlsPrefix: string | null;
+  updatedAt: Date;
+}
+
 export interface ReadyRendition {
   assetId: string;
   hlsPrefix: string;
@@ -101,6 +107,7 @@ export interface MediaAssetStore {
   findReadyImages(assetIds: string[]): Promise<ReadyImageAsset[]>;
   /** Loại, chủ và trạng thái của từng id có tồn tại, để module khác kiểm media gắn vào bài. */
   findKinds(assetIds: string[]): Promise<MediaKindInfo[]>;
+  findModerationAssets(assetIds: string[], lock?: boolean): Promise<ModerationAsset[]>;
 }
 
 export const PLAYBACK_COOKIE_SIGNER = Symbol('PLAYBACK_COOKIE_SIGNER');

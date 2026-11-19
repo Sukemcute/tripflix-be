@@ -1,4 +1,8 @@
 import { InMemoryObjectStorage } from '@tripflix/storage';
+import 'reflect-metadata';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
+import { ClsModule } from 'nestjs-cls';
 import { MediaError } from '../domain/errors.js';
 import { MAX_IMAGE_FILE_SIZE_BYTES, detectImageMimeType } from '../domain/upload-rules.js';
 import { MemoryMediaAssetStore } from '../infra/memory/memory-media-asset.store.js';
@@ -6,12 +10,18 @@ import { MediaFacade } from '../media.facade.js';
 import { MediaUploadUseCases } from './media-upload.use-cases.js';
 
 const NOW = new Date('2026-11-13T08:00:00.000Z');
-const OWNER_ID = 'owner-1';
+const OWNER_ID = '11111111-1111-4111-8111-111111111111';
 
 /** Đủ chữ ký định dạng ở đầu file; phần sau chỉ để file có kích thước. */
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00]);
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
 const WEBP_BYTES = Buffer.from('RIFF\u0010\u0000\u0000\u0000WEBPVP8 ', 'latin1');
+let moduleRef: TestingModule;
+beforeAll(async () => {
+  moduleRef = await Test.createTestingModule({ imports: [ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() })] }).compile();
+  await moduleRef.init();
+});
+afterAll(async () => { await moduleRef?.close(); });
 
 function createUseCases() {
   const store = new MemoryMediaAssetStore();
@@ -59,9 +69,11 @@ describe('Upload ảnh bài viết', () => {
 
     await expect(complete()).resolves.toEqual({ assetId: created.assetId, status: 'ready' });
     expect(context.store.assets.get(created.assetId)?.status).toBe('ready');
-    expect(context.store.outboxRows).toHaveLength(0);
+    expect(context.store.outboxRows).toHaveLength(1);
+    expect(context.store.outboxRows[0]).toMatchObject({ type: 'content.image.ready', payload: { assetId: created.assetId, ownerId: OWNER_ID } });
     // Gọi lại vẫn cùng kết quả.
     await expect(complete()).resolves.toEqual({ assetId: created.assetId, status: 'ready' });
+    expect(context.store.outboxRows).toHaveLength(1);
   });
 
   it('file không đúng định dạng đã khai thì bị từ chối và đánh dấu failed', async () => {

@@ -63,6 +63,8 @@ import { URGENT_SEVERITY } from '../domain/severity.js';
 import { ReviewQueueUseCase } from '../application/review-queue.use-case.js';
 import { ReviewLeaseDto, ReviewLeaseSchema, ModerationCaseDto } from './dto.js';
 import { AdminQueueQueryDto, AdminQueueQuerySchema } from './dto.js';
+import { PostPartsScreeningUseCase } from '../application/post-parts-screening.use-case.js';
+import { ModerationPartsDto, ModerationPartRetryDto } from './parts.dto.js';
 
 @ApiTags('Moderation - Reports')
 @ApiBearerAuth()
@@ -155,7 +157,20 @@ export class AdminModerationController {
     @Inject(ClaimDeferredScansUseCase) private readonly recovery: ClaimDeferredScansUseCase,
     @Inject(ReviewQueueUseCase) private readonly review: ReviewQueueUseCase,
     @Inject(AccessFacade) private readonly access: AccessFacade,
+    @Inject(PostPartsScreeningUseCase) private readonly parts: PostPartsScreeningUseCase,
   ) {}
+  @Get('posts/:id/parts')
+  @ApiOkResponse({ type: ModerationPartsDto })
+  @ApiOperation({ summary: 'Bằng chứng quét riêng caption và từng ảnh của phiên bản bài hiện tại' })
+  postParts(@Param('id', ParseUUIDPipe) id: string) {
+    return this.parts.detail(id);
+  }
+  @Post('parts/:id/retry')
+  @Idempotent()
+  @ApiCreatedResponse({ type: ModerationPartRetryDto })
+  retryPart(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
+    return this.parts.retry(id, user.userId);
+  }
   @Get('stats')
   @ApiOkResponse({ type: ModerationStatsDto })
   @ApiOperation({ summary: 'Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server' })
@@ -172,7 +187,11 @@ export class AdminModerationController {
   @Post('scans/:id/retry')
   @ApiCreatedResponse({ type: ScanRetryDto })
   @Idempotent()
-  retryScan(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
+  async retryScan(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
+    if (await this.parts.exists(id)) {
+      await this.parts.retry(id, user.userId);
+      return { eventId: id, status: 'deferred' };
+    }
     return this.recovery.retry(id, user.userId);
   }
   @Get('appeals')

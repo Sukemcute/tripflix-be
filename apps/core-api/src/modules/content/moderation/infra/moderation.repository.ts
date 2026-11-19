@@ -16,6 +16,7 @@ import {
   moderationAppeals,
   moderationProcessedEvents,
   moderationScans,
+  moderationParts,
   posts,
   reports,
   moderationReviewAudit,
@@ -24,6 +25,7 @@ import {
 } from '../../db/schema/index.js';
 
 export interface TargetSnapshot {
+  posterMediaId?: string;
   creatorReview?: string;
   platformHeld?: boolean;
   targetType: ModerationTarget;
@@ -48,20 +50,19 @@ export class ModerationRepository {
     return scan;
   }
   async failedScans(limit: number, offset: number) {
-    return this.db
-      .select({
-        eventId: moderationScans.eventId,
-        targetType: moderationScans.targetType,
-        targetId: moderationScans.targetId,
-        status: moderationScans.status,
-        attempts: moderationScans.attempts,
-        updatedAt: moderationScans.updatedAt,
-      })
-      .from(moderationScans)
-      .where(eq(moderationScans.status, 'failed'))
-      .orderBy(asc(moderationScans.updatedAt), asc(moderationScans.eventId))
-      .limit(limit + 1)
-      .offset(offset);
+    const result = await this.db.execute<{
+      eventId: string; targetType: string; targetId: string; status: string;
+      attempts: number; updatedAt: Date; partKind: string | null; assetId: string | null;
+    }>(sql`SELECT * FROM (
+      SELECT event_id AS "eventId", target_type AS "targetType", target_id AS "targetId", status,
+        attempts, updated_at AS "updatedAt", NULL::text AS "partKind", NULL::uuid AS "assetId"
+      FROM ${moderationScans} s WHERE status = 'failed'
+        AND NOT EXISTS (SELECT 1 FROM ${moderationParts} p WHERE p.id = s.event_id)
+      UNION ALL
+      SELECT id, 'post', post_id, status, attempts, updated_at, kind, asset_id
+      FROM ${moderationParts} WHERE status = 'failed'
+    ) scans ORDER BY "updatedAt", "eventId" LIMIT ${limit + 1} OFFSET ${offset}`);
+    return result.rows;
   }
 
   async claimDeferredScans() {
@@ -153,8 +154,12 @@ export class ModerationRepository {
         (SELECT count(*)::int FROM ${reports}
           WHERE created_at >= now() - interval '24 hours') AS reports_24h,
         (SELECT count(*)::int FROM ${moderationAppeals} WHERE status = 'pending') AS pending_appeals,
-        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'failed') AS failed_scans,
-        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'deferred') AS deferred_scans,
+        ((SELECT count(*)::int FROM ${moderationScans} s WHERE status = 'failed' AND NOT EXISTS
+          (SELECT 1 FROM ${moderationParts} p WHERE p.id = s.event_id)) +
+          (SELECT count(*)::int FROM ${moderationParts} WHERE status = 'failed')) AS failed_scans,
+        ((SELECT count(*)::int FROM ${moderationScans} s WHERE status = 'deferred' AND NOT EXISTS
+          (SELECT 1 FROM ${moderationParts} p WHERE p.id = s.event_id)) +
+          (SELECT count(*)::int FROM ${moderationParts} WHERE status IN ('deferred','waiting'))) AS deferred_scans,
         (SELECT count(*)::int FROM pending WHERE assignee_id IS NULL OR lease_expires_at <= now()) AS unassigned,
         (SELECT count(*)::int FROM pending WHERE assignee_id = ${actorId ?? null}::uuid AND lease_expires_at > now()) AS assigned_to_me,
         (SELECT count(*)::int FROM pending WHERE due_at <= now()) AS overdue,
@@ -325,6 +330,7 @@ export class ModerationRepository {
             version: contentVersion(postEvidence(post).text, post.coverMediaId, post.mediaIds),
             coverMediaId: post.coverMediaId,
             mediaIds: post.mediaIds,
+            ...(post.tripAttachment?.posterMediaId ? { posterMediaId: post.tripAttachment.posterMediaId } : {}),
             deleted: Boolean(post.deletedAt),
           }
         : null;

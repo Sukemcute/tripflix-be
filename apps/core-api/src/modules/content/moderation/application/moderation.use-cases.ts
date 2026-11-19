@@ -19,6 +19,7 @@ import { ChangeVisibilityUseCase, type ChangeVisibilityCommand } from './change-
 import type { ModerationAiPort } from './ports.js';
 import { MODERATION_POLICY_VERSION, APPEAL_WINDOW_DAYS } from '../domain/content-version.js';
 import { assertReviewLease } from '../infra/review-lease.js';
+import type { PostPartsScreeningUseCase } from './post-parts-screening.use-case.js';
 
 export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 export interface ScreeningConfig extends SeverityConfig {
@@ -288,8 +289,15 @@ export class ScreenContentUseCase {
     private readonly ai: ModerationAiPort,
     private readonly record: RecordScreeningUseCase,
     private readonly media: MediaFacade,
+    private readonly parts?: PostPartsScreeningUseCase,
   ) {}
   async execute(eventId: string, targetType: ModerationTarget, targetId: string, occurredAt?: string) {
+    if (targetType === 'post' && this.parts) {
+      await this.parts.execute(targetId, occurredAt);
+      // Retry ownership moves from legacy whole-post scans to the independent parts.
+      if (!(await this.parts.exists(eventId))) await this.repository.supersedeScan(eventId);
+      return;
+    }
     const target = await this.repository.loadTarget(targetType, targetId);
     const scan = await this.repository.scan(eventId);
     if (scan && scan.status !== 'deferred') return;
