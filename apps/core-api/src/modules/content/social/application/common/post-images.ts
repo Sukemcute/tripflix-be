@@ -1,6 +1,9 @@
-import type { PostImage, PostMediaPort } from '../ports/post-media.port.js';
+import type { PostImage, PostMediaPort, PostVideoPlayback } from '../ports/post-media.port.js';
 
-export type WithPostImages<T> = T & { images: PostImage[] };
+export type WithPostImages<T> = T & {
+  images: PostImage[];
+  video?: PostVideoPlayback | null;
+};
 
 export interface PostLike {
   postType: string;
@@ -9,8 +12,8 @@ export interface PostLike {
 }
 
 /**
- * Gắn link ảnh của bài viết (vlog) vào bài trả về API, đúng thứ tự mediaIds. Một lần hỏi module media cho cả
- * trang. Reels không có ảnh nên luôn là mảng rỗng.
+ * Gắn link ảnh của bài viết (vlog) hoặc video HLS/poster (video) vào bài trả về API, đúng thứ tự mediaIds.
+ * Một lần hỏi module media cho cả trang.
  */
 export class PostImagesResolver {
   constructor(private readonly postMedia: PostMediaPort) {}
@@ -20,17 +23,29 @@ export class PostImagesResolver {
     const posterIds = posts.flatMap((post) => (post.tripAttachment?.posterMediaId ? [post.tripAttachment.posterMediaId] : []));
     const allIds = [...imageIds, ...posterIds];
     const images = allIds.length > 0 ? await this.postMedia.getImages(allIds) : new Map<string, PostImage>();
-    return posts.map((post) => ({
-      ...post,
-      ...withTripPoster(post, images),
-      images:
-        post.postType === 'vlog'
-          ? post.mediaIds.flatMap((mediaId) => {
-              const image = images.get(mediaId);
-              return image ? [image] : [];
-            })
-          : [],
-    }));
+
+    const videoPosts = posts.filter((post) => post.postType === 'video' && post.mediaIds.length > 0);
+    const videoIds = videoPosts.map((post) => post.mediaIds[0]!).filter(Boolean);
+    const playback =
+      videoIds.length > 0 && this.postMedia.getPlayback
+        ? await this.postMedia.getPlayback(videoIds)
+        : new Map<string, PostVideoPlayback>();
+
+    return posts.map((post) => {
+      const videoInfo = post.postType === 'video' && post.mediaIds[0] ? (playback.get(post.mediaIds[0]) ?? null) : null;
+      return {
+        ...post,
+        ...withTripPoster(post, images),
+        images:
+          post.postType === 'vlog'
+            ? post.mediaIds.flatMap((mediaId) => {
+                const image = images.get(mediaId);
+                return image ? [image] : [];
+              })
+            : [],
+        video: videoInfo,
+      };
+    });
   }
 
   async attachOne<T extends PostLike>(post: T): Promise<WithPostImages<T>> {

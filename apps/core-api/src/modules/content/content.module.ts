@@ -236,6 +236,8 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
           new Map((await media.getKinds(mediaIds)).map(({ id, ...info }) => [id, info])),
         getImages: async (mediaIds) =>
           new Map(Object.entries(await media.getImages(mediaIds)).map(([id, image]) => [id, { id, ...image }])),
+        getPlayback: async (mediaIds) =>
+          new Map(Object.entries(await media.getPlayback(mediaIds))),
       }),
     },
     {

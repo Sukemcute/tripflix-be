@@ -15,6 +15,20 @@ export class PostImageDto {
   @ApiProperty({ type: Number, nullable: true }) heightPx!: number | null;
 }
 
+export class PostVideoPostersDto {
+  @ApiProperty() w360!: string;
+  @ApiProperty() w540!: string;
+  @ApiProperty() w720!: string;
+}
+
+export class PostVideoDto {
+  @ApiProperty({ description: 'master.m3u8 trên CloudFront' }) hlsUrl!: string;
+  @ApiProperty({ type: PostVideoPostersDto }) posters!: PostVideoPostersDto;
+  @ApiProperty() durationSec!: number;
+  @ApiProperty({ enum: ['9:16', '16:9', '1:1'] }) aspect!: string;
+  @ApiProperty({ isArray: true, type: Number }) levels!: number[];
+}
+
 // Document the existing wire format so generated clients do not treat JSON responses as void.
 export class SocialPostDto {
   @ApiProperty() id!: string;
@@ -29,13 +43,25 @@ export class SocialPostDto {
   @ApiProperty({ enum: ['public', 'private'] }) visibility!: string;
   @ApiProperty() isVerified!: boolean;
   @ApiProperty({ type: [String] }) mediaIds!: string[];
-  @ApiProperty({ type: String, nullable: true }) coverMediaId!: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    deprecated: true,
+    description: 'ID media làm ảnh bìa (DEPRECATED: UI dùng post.images[0].url hoặc video.posters)',
+  })
+  coverMediaId!: string | null;
   @ApiProperty({
     type: [PostImageDto],
     required: false,
     description: 'Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng',
   })
   images?: PostImageDto[];
+  @ApiPropertyOptional({
+    type: PostVideoDto,
+    nullable: true,
+    description: 'Thông tin phát video và posters của Reels',
+  })
+  video?: PostVideoDto | null;
   @ApiProperty({ type: TripAttachmentDto, nullable: true }) tripAttachment!: TripAttachmentDto | null;
   @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reactionCounts!: Record<
     string,
