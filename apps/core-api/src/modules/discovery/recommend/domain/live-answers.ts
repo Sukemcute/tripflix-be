@@ -77,7 +77,8 @@ function stageOfTrips(trips: BookedTrip[], now: Date): { stage: Stage; trip: Boo
   const today = Date.parse(now.toISOString().slice(0, 10));
   const span = (t: BookedTrip) => ({ t, from: Date.parse(t.checkIn), to: Date.parse(t.checkIn) + t.nights * DAY });
   const spans = trips.map(span);
-  const onTrip = spans.find((s) => s.from <= today && today <= s.to);
+  // Nhiều chuyến cùng lúc (đặt Đà Lạt 18–20 rồi Nha Trang 19–22): lấy chuyến vừa bắt đầu gần nhất, là nơi người dùng đang tới.
+  const onTrip = spans.filter((s) => s.from <= today && today <= s.to).sort((a, b) => b.from - a.from)[0];
   if (onTrip) return { stage: 'on_trip', trip: onTrip.t };
   const upcoming = spans.filter((s) => s.from > today).sort((a, b) => a.from - b.from)[0];
   if (upcoming) return { stage: 'upcoming', trip: upcoming.t };

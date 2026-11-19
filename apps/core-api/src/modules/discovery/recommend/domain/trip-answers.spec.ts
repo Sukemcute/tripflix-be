@@ -148,6 +148,16 @@ describe('answerLive', () => {
     expect(live([order], { 'P-osm-nha-trang-013': 'nha-trang' })).toMatchObject({ stage: 'on_trip', trip: { placeId: 'nha-trang', hotelId: 'P-osm-nha-trang-013' } });
   });
 
+  it('hai chuyến trùng thời gian (Đà Lạt 10–13, Nha Trang 12–15): đang đi chuyến vừa bắt đầu, dù đặt trước hay sau', () => {
+    const order = (hotel: string, date: string, nights: number, d: number) =>
+      row({ kind: 'order_item', targetType: 'room', targetId: `${hotel}--DLX`, occurredAt: daysAgo(d), detail: { date, nights } });
+    const places = { 'H-dl': 'da-lat', 'H-nt': 'nha-trang' };
+    const dl = order('H-dl', '2026-11-10', 3, 4);
+    const nt = order('H-nt', '2026-11-12', 3, 3);
+    expect(live([nt, dl], places).trip).toMatchObject({ placeId: 'nha-trang' });
+    expect(live([dl, nt], places).trip).toMatchObject({ placeId: 'nha-trang' });
+  });
+
   it('một lượt tìm phòng đủ để lên kế hoạch; đọc ngân sách, số người, số ngày', () => {
     const a = live([
       row({
