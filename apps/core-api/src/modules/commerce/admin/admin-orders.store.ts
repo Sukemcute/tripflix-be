@@ -22,6 +22,15 @@ export interface AdminOrderRow {
   cancelledAt: Date | null;
 }
 
+export interface AdminProductRow {
+  id: string;
+  name: string;
+  /** Phòng: tên khách sạn. Chuyến bay: hãng. */
+  parentName: string;
+  /** Phòng: tỉnh. Chuyến bay: sân bay đi → đến. */
+  place: string;
+}
+
 export interface AnomalyRow {
   kind: AnomalyKind;
   orderId: string;
@@ -72,6 +81,28 @@ export class AdminOrdersStore {
     const filter = where.length ? sql`where ${sql.join(where, sql` and `)}` : sql``;
     const result = await this.db.execute<AdminOrderRow>(sql`select ${ORDER_COLUMNS} from commerce.orders o ${filter} order by o.created_at desc limit ${input.limit}`);
     return result.rows.map(normalizeOrder);
+  }
+
+  /**
+   * Danh sách loại phòng / chuyến bay để màn Lịch trống chọn mã thay vì gõ tay. Tìm theo mã, tên, khách sạn, tỉnh,
+   * sân bay hoặc số hiệu chuyến.
+   */
+  async searchProducts(input: { kind: 'room' | 'flight'; q?: string; limit: number }): Promise<AdminProductRow[]> {
+    const like = input.q ? `%${input.q.trim().toLowerCase()}%` : null;
+    const result =
+      input.kind === 'room'
+        ? await this.db.execute<AdminProductRow>(sql`
+            select r.id, r.name, p.name as "parentName", p.province_name as "place"
+            from commerce.room_types r join commerce.properties p on p.id = r.property_id
+            where ${like}::text is null or lower(r.id) like ${like} or lower(r.name) like ${like} or lower(p.name) like ${like} or lower(p.province_name) like ${like}
+            order by p.name, r.name limit ${input.limit}`)
+        : await this.db.execute<AdminProductRow>(sql`
+            select f.id, f.name, coalesce(f.airline, '') as "parentName", f.from_airport || ' → ' || f.to_airport as "place"
+            from commerce.flights f
+            where ${like}::text is null or lower(f.id) like ${like} or lower(f.name) like ${like} or lower(coalesce(f.airline, '')) like ${like}
+               or lower(f.from_airport || '-' || f.to_airport) like ${like} or lower(coalesce(f.flight_number, '')) like ${like}
+            order by f.from_airport, f.to_airport, f.id limit ${input.limit}`);
+    return result.rows;
   }
 
   /** Toàn bộ hồ sơ một đơn: mục, khách, các lần trừ tiền, hoàn tiền, lịch sử trạng thái. */

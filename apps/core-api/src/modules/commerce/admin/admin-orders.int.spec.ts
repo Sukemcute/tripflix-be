@@ -154,4 +154,18 @@ describe('TF43 đơn bất thường cho quản trị', () => {
     expect(detail!.history.length).toBeGreaterThan(0);
     expect(await store.detail(randomUUID())).toBeNull();
   });
+
+  it('danh sách phòng và chuyến bay cho màn Lịch trống, tìm theo tên hoặc sân bay', async () => {
+    const rooms = await store.searchProducts({ kind: 'room', limit: 5 });
+    expect(rooms).toHaveLength(5);
+    expect(rooms[0]).toEqual({ id: expect.any(String), name: expect.any(String), parentName: expect.any(String), place: expect.any(String) });
+    const hotel = rooms[0]!.parentName;
+    expect((await store.searchProducts({ kind: 'room', q: hotel.toUpperCase(), limit: 50 })).every((r) => r.parentName === hotel)).toBe(true);
+
+    const [flight] = await store.searchProducts({ kind: 'flight', limit: 1 });
+    const [from, to] = flight!.place.split(' → ');
+    const found = await store.searchProducts({ kind: 'flight', q: `${from}-${to}`, limit: 100 });
+    expect(found.map((f) => f.id)).toContain(flight!.id);
+    expect(await store.searchProducts({ kind: 'room', q: 'khong-co-ten-nay', limit: 5 })).toEqual([]);
+  });
 });

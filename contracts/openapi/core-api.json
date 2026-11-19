@@ -6446,6 +6446,51 @@
         ]
       }
     },
+    "/api/admin/commerce/products": {
+      "get": {
+        "operationId": "AdminOrdersController_products",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Mã, tên, khách sạn, tỉnh, sân bay hoặc số hiệu chuyến",
+            "schema": {}
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "room",
+                "flight"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loại phòng hoặc chuyến bay để chọn khi sửa lịch"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
     "/api/admin/commerce/orders/{id}": {
       "get": {
         "operationId": "AdminOrdersController_detail",

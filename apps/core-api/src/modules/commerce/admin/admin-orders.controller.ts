@@ -27,6 +27,12 @@ export const ListAnomaliesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
+export const SearchAdminProductsQuerySchema = z.object({
+  kind: z.enum(['room', 'flight']),
+  q: z.string().trim().min(1).max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
 /** TF43: tra đơn và đơn bất thường cho quản trị. Chỉ đọc; dữ liệu có thông tin liên hệ của khách nên chỉ superadmin. */
 @ApiTags('admin-commerce')
 @ApiBearerAuth()
@@ -45,6 +51,16 @@ export class AdminOrdersController {
   async search(@Query(new ZodQuery(SearchAdminOrdersQuerySchema)) query: z.infer<typeof SearchAdminOrdersQuerySchema>) {
     const items = await this.store.search({ q: query.q, statuses: query.status, before: query.before, limit: query.limit });
     return { items, nextBefore: items.length === query.limit ? items[items.length - 1]!.createdAt : null };
+  }
+
+  @Get('products')
+  @Header('Cache-Control', 'no-store')
+  @ApiQuery({ name: 'kind', enum: ['room', 'flight'] })
+  @ApiQuery({ name: 'q', required: false, description: 'Mã, tên, khách sạn, tỉnh, sân bay hoặc số hiệu chuyến' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiOkResponse({ description: 'Loại phòng hoặc chuyến bay để chọn khi sửa lịch' })
+  async products(@Query(new ZodQuery(SearchAdminProductsQuerySchema)) query: z.infer<typeof SearchAdminProductsQuerySchema>) {
+    return { items: await this.store.searchProducts(query) };
   }
 
   @Get('orders/:id')
