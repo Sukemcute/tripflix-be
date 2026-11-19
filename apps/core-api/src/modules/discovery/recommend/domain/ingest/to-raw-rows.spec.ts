@@ -73,6 +73,26 @@ describe('toRawRows', () => {
     expect(toRawRows(event('access.user.locked', { userId: U, lockedBy: C }))![0]).toMatchObject({ kind: 'locked', refId: U });
   });
 
+  it('xem reels: một dòng mỗi người × bài (ref postId), value = tỉ lệ đã xem; khách bỏ qua', () => {
+    const view = (over: object) => ({ postId: P, viewerId: U, anonId: null, watchedMs: 27_000, durationSec: 30, isQualified: true, surface: 'reels', ...over });
+    expect(toRawRows(event('content.post.viewed', view({})))).toEqual([
+      {
+        actorType: 'user', actorId: U, kind: 'view_post', refId: P, targetType: 'post', targetId: P, value: 0.9, isRemoved: false,
+        detail: { watchedMs: 27_000, durationSec: 30, isQualified: true, surface: 'reels' }, occurredAt: AT,
+      },
+    ]);
+    expect(toRawRows(event('content.post.viewed', view({ durationSec: null })))![0]).toMatchObject({ value: null });
+    expect(toRawRows(event('content.post.viewed', view({ viewerId: null, anonId: C })))).toEqual([]);
+  });
+
+  it('bấm đặt từ reels: mỗi lần một dòng (ref eventId); khách bỏ qua', () => {
+    const click = { postId: P, viewerId: U, anonId: null, hotelId: 'H1', surface: 'reels_trip_plan' };
+    expect(toRawRows(event('content.post.booking_clicked', click))).toEqual([
+      expect.objectContaining({ kind: 'booking_click', refId: E, targetType: 'post', targetId: P, detail: { hotelId: 'H1', surface: 'reels_trip_plan' } }),
+    ]);
+    expect(toRawRows(event('content.post.booking_clicked', { ...click, viewerId: null }))).toEqual([]);
+  });
+
   it('payload hỏng → null; loại lạ hoặc version khác → []', () => {
     expect(toRawRows(event('content.reaction.updated', { postId: 'không-phải-uuid', userId: U, type: 'like' }))).toBeNull();
     expect(toRawRows(event('content.post.moderated', { postId: P }))).toEqual([]);

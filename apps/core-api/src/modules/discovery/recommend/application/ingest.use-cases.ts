@@ -5,7 +5,7 @@ import { toOrderCancellation, toRawRows } from '../domain/ingest/to-raw-rows.js'
 import { RECENT_POSTS_STORE, RECOMMEND_STORE, type RecentPostsStore, type RecommendStore } from './ports.js';
 
 /** Tương tác rõ ý với bài thì vào gu trong phiên. */
-const SESSION_KINDS = new Set<Kind>(['reaction', 'bookmark', 'comment', 'share']);
+export const SESSION_KINDS = new Set<Kind>(['reaction', 'bookmark', 'comment', 'share']);
 
 /** Nạp sự kiện vào bảng thô của gợi ý. Lỗi DB thì ném để consumer không XACK; payload hỏng thì log rồi bỏ. */
 @Injectable()

@@ -6,6 +6,8 @@ import {
   CommerceOrderPaidV1Schema,
   ContentCommentCreatedV1Schema,
   ContentCommentDeletedV1Schema,
+  ContentPostBookingClickedV1Schema,
+  ContentPostViewedV1Schema,
   DiscoverySearchPerformedV1Schema,
   DiscoveryStaysSearchedV1Schema,
   type EventEnvelope,
@@ -72,6 +74,23 @@ on('access.user.guest_merged', AccessUserGuestMergedV1Schema, (p) => [
   user(p.userId, 'guest_merged', p.anonId, { targetType: 'anon', targetId: p.anonId }),
 ]);
 on('access.user.locked', AccessUserLockedV1Schema, (p) => [user(p.userId, 'locked', p.userId)]);
+// Xem reels (stream:app-events). Một dòng mỗi người × bài (ref = postId): giữ lần xem mới nhất, xem lại không cộng dồn.
+// value = tỉ lệ đã xem (null khi chưa biết thời lượng). Khách (chỉ có anonId) bỏ qua như các nguồn khác.
+on('content.post.viewed', ContentPostViewedV1Schema, (p) =>
+  p.viewerId
+    ? [
+        user(p.viewerId, 'view_post', p.postId, {
+          targetType: 'post',
+          targetId: p.postId,
+          value: p.durationSec ? Math.min(1, p.watchedMs / (p.durationSec * 1000)) : null,
+          detail: { watchedMs: p.watchedMs, durationSec: p.durationSec, isQualified: p.isQualified, surface: p.surface },
+        }),
+      ]
+    : [],
+);
+on('content.post.booking_clicked', ContentPostBookingClickedV1Schema, (p, e) =>
+  p.viewerId ? [user(p.viewerId, 'booking_click', e.eventId, { targetType: 'post', targetId: p.postId, detail: { hotelId: p.hotelId, surface: p.surface } })] : [],
+);
 on('discovery.search.performed', DiscoverySearchPerformedV1Schema, (p, e) => {
   const placeId = p.placeIds[0] ?? null;
   return [
