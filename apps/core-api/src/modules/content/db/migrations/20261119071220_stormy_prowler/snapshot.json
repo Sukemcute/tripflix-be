@@ -1,0 +1,89 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d2ac4cee-9585-403e-bc93-57fb8eedceeb",
+  "prevIds": [
+    "a6199b04-ae39-452a-a965-626641e8be13"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "comments",
+        "idx_comments_parent_created_asc"
+      ],
+      "writes": [
+        "s|idx|content.idx_comments_parent_created_asc",
+        "n|idx|content.idx_comments_parent_created_asc",
+        "e|idx|content.idx_comments_parent_created_asc",
+        "n|rel|content.idx_comments_parent_created_asc"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comments.parent_comment_id",
+        "n|col|content.comments.created_at",
+        "n|col|content.comments.id",
+        "n|col|content.comments.status",
+        "n|col|content.comments.author_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "idx_comments_parent_created_asc",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "parent_comment_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "status",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "author_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"deleted_at\" IS NULL",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

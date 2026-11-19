@@ -1,4 +1,5 @@
 import { decodeCursor, encodeCursor } from '../common/cursor.js';
+import { formatReplyExcerpt, isPublicReplyTarget } from '../common/reply-excerpt.js';
 import { z } from 'zod';
 import { Post, PostNotFoundException } from '../../domain/index.js';
 import { CommentRepository } from '../../infra/comment.repository.js';
@@ -24,6 +25,8 @@ export type EnrichedCommentItem = Omit<CommentRecord, 'hiddenByActionId' | 'casc
   likeCount: number;
   replyCount: number;
   authorName: string | null;
+  replyToCommentId: string | null;
+  replyToExcerpt: string | null;
 };
 
 export interface ListCommentsResult {
@@ -91,8 +94,11 @@ export class ListCommentsUseCase {
     const lastItem = pageItems[pageItems.length - 1];
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id, total) : null;
 
-    const authorNames = await this.findAuthorNames(pageItems);
-    const items = pageItems.map((comment) => this.toEnrichedItem(comment, authorNames, {
+    const [authorNames, replyTargets] = await Promise.all([
+      this.findAuthorNames(pageItems),
+      this.findReplyTargets(query.postId, pageItems),
+    ]);
+    const items = pageItems.map((comment) => this.toEnrichedItem(comment, authorNames, replyTargets, {
       replyCount: comment.replyCount,
       isLiked: comment.isLiked,
     }));
@@ -118,6 +124,21 @@ export class ListCommentsUseCase {
     }
   }
 
+  /** Đọc lô câu được trả lời trên cùng trang (1 truy vấn WHERE id IN (...), tránh N+1). */
+  private async findReplyTargets(
+    postId: string,
+    records: readonly CommentRecord[],
+  ): Promise<Map<string, CommentRecord>> {
+    const targetIds = [
+      ...new Set(records.map((comment) => comment.replyToCommentId).filter((id): id is string => Boolean(id))),
+    ];
+    if (!targetIds.length || typeof this.commentRepository.findByIds !== 'function') {
+      return new Map();
+    }
+    const targets = await this.commentRepository.findByIds(postId, targetIds);
+    return new Map(targets.map((target) => [target.id, target]));
+  }
+
   private async findFocusThread(postId: string, commentId: string, viewerId?: string, isStaff = false): Promise<CommentRecord[]> {
     if (!z.uuid().safeParse(commentId).success) return [];
     const comment = await this.commentRepository.findById(commentId);
@@ -137,10 +158,18 @@ export class ListCommentsUseCase {
   private toEnrichedItem(
     comment: CommentRecord,
     authorNames: Map<string, string>,
+    replyTargets: Map<string, CommentRecord>,
     extras: { isLiked?: boolean; replyCount?: number } = {},
   ): EnrichedCommentItem {
     const moderated = comment.status === 'hidden' || comment.status === 'removed';
     const { hiddenByActionId: _hiddenByActionId, cascadeRootCommentId: _cascadeRootCommentId, ...publicComment } = comment;
+    const replyToCommentId = comment.replyToCommentId ?? null;
+    const replyTarget = replyToCommentId ? replyTargets.get(replyToCommentId) : undefined;
+    const replyToExcerpt =
+      !moderated && replyToCommentId && isPublicReplyTarget(replyTarget, comment.postId)
+        ? formatReplyExcerpt(replyTarget.body)
+        : null;
+
     return {
       ...publicComment,
       status: moderated ? 'hidden' : comment.status,
@@ -148,6 +177,9 @@ export class ListCommentsUseCase {
       mentions: moderated ? [] : (comment.mentions ?? []),
       moderationState: moderated ? 'hidden' : null,
       authorName: authorNames.get(comment.authorId) ?? null,
+      replyToCommentId,
+      replyToName: comment.replyToName ?? null,
+      replyToExcerpt,
       likeCount: comment.likeCount ?? 0,
       replyCount: extras.replyCount ?? 0,
       isLiked: extras.isLiked ?? false,
@@ -166,11 +198,15 @@ export class ListCommentsUseCase {
       );
     }
 
+    const postId = rawItems[0]!.postId;
     // App chỉ hiện "Xem N trả lời" khi có trả lời, nên cần số này cho cả trang.
-    const replyCounts = await this.commentRepository.countRepliesByParentIds(rawItems.map((c) => c.id));
-    const authorNames = await this.findAuthorNames(rawItems);
+    const [replyCounts, authorNames, replyTargets] = await Promise.all([
+      this.commentRepository.countRepliesByParentIds(rawItems.map((c) => c.id)),
+      this.findAuthorNames(rawItems),
+      this.findReplyTargets(postId, rawItems),
+    ]);
 
-    return rawItems.map((comment) => this.toEnrichedItem(comment, authorNames, {
+    return rawItems.map((comment) => this.toEnrichedItem(comment, authorNames, replyTargets, {
       replyCount: replyCounts.get(comment.id) ?? 0,
       isLiked: likedIds.has(comment.id),
     }));

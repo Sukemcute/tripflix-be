@@ -58,6 +58,10 @@ export const comments = contentSchema.table(
     index('idx_comments_parent_created')
       .on(t.parentCommentId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst(), t.status, t.authorId)
       .where(sql`${t.deletedAt} IS NULL`),
+    // Trả lời trong một luồng đọc theo thứ tự cũ -> mới (ASC) nên cần index một phần tăng dần.
+    index('idx_comments_parent_created_asc')
+      .on(t.parentCommentId, t.createdAt.asc(), t.id.asc(), t.status, t.authorId)
+      .where(sql`${t.deletedAt} IS NULL`),
   ],
 );
 

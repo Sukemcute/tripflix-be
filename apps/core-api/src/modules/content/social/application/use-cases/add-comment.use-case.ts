@@ -10,6 +10,7 @@ import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostRecord } from '../../../db/schema/index.js';
 import { commentPublicationPayload } from '../common/comment-publication.js';
+import { formatReplyExcerpt, isPublicReplyTarget } from '../common/reply-excerpt.js';
 import { validateMentionedUsers } from '../common/validate-mentioned-users.js';
 import type { CommentMention } from '../../domain/index.js';
 
@@ -46,7 +47,9 @@ export class AddCommentUseCase {
     private readonly counterDeltas?: PostCounterDeltaRepository,
   ) {}
 
-  async execute(command: AddCommentCommand): Promise<CommentRecord> {
+  async execute(
+    command: AddCommentCommand,
+  ): Promise<CommentRecord & { replyToCommentId: string | null; replyToExcerpt: string | null }> {
     const { body, mentions } = Comment.prepareContent(command.body, command.mentions);
     const shouldHold = this.gate?.precheck(body).shouldHold ?? false;
 
@@ -60,7 +63,7 @@ export class AddCommentUseCase {
     const displayIds = thread ? [command.authorId, thread.parent.authorId] : [command.authorId];
     const names = await this.userDirectory?.getDisplayNames(displayIds).catch(() => undefined);
 
-    return this.createInTransaction(
+    const comment = await this.createInTransaction(
       { ...command, body, mentions },
       {
         shouldHold,
@@ -69,6 +72,14 @@ export class AddCommentUseCase {
         replyToName: thread ? names?.get(thread.parent.authorId)?.trim() : undefined,
       },
     );
+    return {
+      ...comment,
+      replyToCommentId: comment.replyToCommentId ?? command.parentCommentId ?? null,
+      replyToExcerpt:
+        thread && isPublicReplyTarget(thread.parent, command.postId)
+          ? formatReplyExcerpt(thread.parent.body)
+          : null,
+    };
   }
 
   @Transactional('content')
