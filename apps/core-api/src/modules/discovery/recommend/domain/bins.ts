@@ -44,6 +44,28 @@ function binsInText(text: string): Set<string> {
   return found;
 }
 
+/**
+ * Ngăn chủ đề của câu tìm theo từ khoá. Khác caption: câu tìm chỉ là "biển", "núi" thì một âm tiết cũng tính
+ * (cả câu trùng hashtag), vì không có ngữ cảnh khác để nhầm với "Biên Hoà".
+ */
+export function expsOfQuery(query: string): string[] {
+  const whole = TAG_BINS[tagKey(query)] ?? [];
+  return [...new Set([...binsInText(query), ...whole])].filter((b) => b.startsWith('exp:'));
+}
+
+/**
+ * Câu tìm ngắn hơn caption nên điểm cosine sát nhau hơn: chỉ nhận ngăn gần nhất khi hơn ngăn thứ hai ≥ biên này.
+ * Đo 19/11 trên 46 câu mẫu (eval/query-topics.samples.json) với CAPTION_MODEL: từ khoá bắt 23 câu, đúng cả 23; 23 câu còn lại
+ * qua embed ở biên 0,01 gán 12 (đúng 11, sai 1), không gán câu mơ hồ nào; biên 0,005 gán thêm nhưng sai 2 và gán 1 câu mơ hồ.
+ */
+export const QUERY_MARGIN = 0.01;
+
+/** Ngăn exp gần câu tìm nhất theo cosine, chỉ khi rõ (biên ≥ QUERY_MARGIN). */
+export function queryExpOf(query: readonly number[], descriptions: readonly (readonly number[])[], margin = QUERY_MARGIN): string | null {
+  const sorted = EXP.map((exp, i) => [`exp:${exp}`, (descriptions[i] ?? []).reduce((sum, x, j) => sum + x * (query[j] ?? 0), 0)] as const).sort((a, b) => b[1] - a[1]);
+  return sorted.length > 1 && sorted[0]![1] - sorted[1]![1] >= margin ? sorted[0]![0] : null;
+}
+
 /** Văn bản nhúng của bài: tiêu đề + nội dung. Bài không có chữ thì null. */
 export function captionOf(content: PostContent | undefined): string | null {
   const text = [content?.title, content?.body].filter(Boolean).join('\n').trim();

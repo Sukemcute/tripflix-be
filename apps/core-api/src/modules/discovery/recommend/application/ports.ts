@@ -86,6 +86,8 @@ export interface HotelProfileSource {
   location: { lat: number; lng: number } | null;
   /** Mã loại phòng của khách sạn: mục order_item ghi mã loại phòng, không ghi mã khách sạn. */
   roomProductIds: string[];
+  /** Kiểu khách sạn của commerce (biển, núi, resort, thành phố, homestay, boutique); nói lên nơi đó thiên về gì. */
+  style: string | null;
 }
 
 /** Chuyến bay cho flight builder (TF39). Thật: CommerceFacade.listCatalog (type flight), days 30. */
@@ -203,6 +205,8 @@ export interface RecommendStore {
   findProductPlaces(productIds: string[]): Promise<Record<string, string>>;
   /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
   findPostMetas(postIds: string[]): Promise<PostMeta[]>;
+  /** Số khách sạn theo (nơi, kiểu) từ hồ sơ khách sạn đã dựng: nguồn chính của hồ sơ chủ đề từng nơi. */
+  listPlaceStyleCounts(): Promise<Array<{ placeId: string; style: string; hotels: number }>>;
   /** Vector đã nhúng theo sha256 văn bản, chỉ của đúng mô hình đó. Chưa có thì không có trong Map. */
   findTextVectors(model: string, textHashes: string[]): Promise<Map<string, number[]>>;
   /** Ghi vector mới; trùng khoá thì giữ dòng cũ. */

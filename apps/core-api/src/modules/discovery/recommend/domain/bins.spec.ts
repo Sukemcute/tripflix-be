@@ -1,5 +1,5 @@
 import { PLACES } from '../../search/domain/places.js';
-import { assignBins, captionExpOf, EXP_DESCRIPTION_TEXTS } from './bins.js';
+import { assignBins, captionExpOf, EXP_DESCRIPTION_TEXTS, expsOfQuery, queryExpOf } from './bins.js';
 import { hotV2 } from './builders/hot.js';
 import { postProfileV1 } from './builders/post-profile.js';
 import type { PostBuildItem } from './contracts.js';
@@ -140,5 +140,21 @@ describe('ngăn từ caption (vector nhúng)', () => {
 
   it('cộng với nguồn khác như mọi nguồn: hashtag biển + caption biển = 1', () => {
     expect(post({ tags: ['dulichbien'], body: 'Một ngày ở đảo', captionExp: 'exp:bien' })).toEqual({ 'exp:bien': 1 });
+  });
+});
+
+describe('chủ đề của câu tìm', () => {
+  it('từ khoá: một chữ "biển", "núi" cũng tính; câu có cụm từ rõ cũng tính; câu không nhắc chủ đề thì rỗng', () => {
+    expect(expsOfQuery('biển')).toEqual(['exp:bien']);
+    expect(expsOfQuery('Núi')).toEqual(['exp:nui']);
+    expect(expsOfQuery('quán cà phê view đẹp đà lạt')).toEqual(expect.arrayContaining(['exp:cafe']));
+    expect(expsOfQuery('đi đâu cho đỡ buồn')).toEqual([]);
+  });
+
+  it('nhúng: nhận ngăn gần nhất chỉ khi hơn ngăn thứ hai đủ biên', () => {
+    const descriptions = EXP_DESCRIPTION_TEXTS.map((_, i) => Array.from({ length: 9 }, (_, j) => (i === j ? 1 : 0)));
+    const near = (i: number, second: number, gap: number) => Array.from({ length: 9 }, (_, j) => (j === i ? 0.5 + gap : j === second ? 0.5 : 0));
+    expect(queryExpOf(near(4, 0, 0.05), descriptions)).toBe('exp:bien');
+    expect(queryExpOf(near(4, 0, 0.001), descriptions)).toBeNull();
   });
 });

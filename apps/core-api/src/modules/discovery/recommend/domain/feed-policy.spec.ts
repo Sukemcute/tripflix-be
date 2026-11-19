@@ -82,12 +82,21 @@ describe('diversify', () => {
     expect(out.find((x) => x.postId === 'd1')).toMatchObject({ score: 1, breakdown: { diversityMoved: 1 } });
   });
 
-  it('nơi đang nhắm: được nhiều chỗ hơn nhưng không quá 4 bài liền nhau, không quá 5 trong 10', () => {
+  it('nơi đang nhắm: được nhiều chỗ hơn nhưng không quá 4 bài liền nhau, không quá 4 trong 10', () => {
     const focus = Array.from({ length: 12 }, (_, i) => at(`f${i}`, 10 - i / 100, 'nt', null, true));
     const others = Array.from({ length: 6 }, (_, i) => at(`o${i}`, 1 - i / 100, `p${i}`));
     const out = order([...focus, ...others]);
     expect(out.slice(0, 5)).toEqual(['f0', 'f1', 'f2', 'f3', 'o0']);
-    expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(5);
+    expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(4);
+  });
+
+  it('nơi vừa được chú ý: đẩy 4 bài lên đầu dù điểm thấp hơn, các trang sau giảm dần 3, 2, 1', () => {
+    const focus = Array.from({ length: 20 }, (_, i) => at(`f${i}`, 1 - i / 100, 'nt', null, true));
+    const others = Array.from({ length: 40 }, (_, i) => at(`o${i}`, 5 - i / 100, `p${i % 10}`));
+    const out = order([...others, ...focus]);
+    expect(out.slice(0, 4)).toEqual(['f0', 'f1', 'f2', 'f3']);
+    const perPage = [0, 1, 2, 3, 4].map((p) => out.slice(p * 10, (p + 1) * 10).filter((id) => id.startsWith('f')).length);
+    expect(perPage).toEqual([4, 3, 2, 1, 1]);
   });
 
   it('không còn bài nào hợp luật thì vẫn xếp theo điểm (chỉ đổi chỗ khi có lựa chọn)', () => {

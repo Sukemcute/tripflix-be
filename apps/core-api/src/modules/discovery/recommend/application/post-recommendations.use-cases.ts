@@ -3,6 +3,8 @@ import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domai
 import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts.js';
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
+import { hotelIdOfProduct } from '../domain/place-of-post.js';
+import { placeStyleProfiles } from '../domain/place-topics.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import {
   RECENT_POSTS_STORE,
@@ -22,11 +24,14 @@ export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent';
 const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 
 const ALGO_CACHE_MS = 60_000;
+const PLACE_PROFILE_CACHE_MS = 10 * 60_000;
 const HOT_LIMIT = 150;
 const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
 const EXPLORE_POOL_LIMIT = 500;
 const EXPLORE_DAYS = 30;
+/** Số bài khám phá giữ trước cho cả phiên (đủ cho ~50 trang). */
+const EXPLORE_RESERVE = 50;
 const FULL_READ_EXPLORE_SKIP = 100;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
@@ -114,6 +119,7 @@ function decodeCursor(raw: string): Cursor {
 export class PostRecommendationUseCases {
   private readonly logger = new Logger(PostRecommendationUseCases.name);
   private algoCache: { at: number; rows: Map<string, AlgoRow> } | null = null;
+  private placeProfileCache: { at: number; profiles: Map<string, Record<string, number>> } | null = null;
 
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
@@ -222,26 +228,31 @@ export class PostRecommendationUseCases {
     const ownExtra: RankedItem[] = ownRecent
       .filter((postId) => !inCandidates.has(postId))
       .map((postId) => ({ postId, authorId: q.userId!, score: 0, source: 'own', breakdown: {}, reason: OWN_POST_REASON }));
-    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now, viewer }), ...ownExtra], {
+    // Xếp theo mốc trang đầu (sessionAt), không theo giờ gọi: điểm "vừa xảy ra" đổi theo phút, trang sau mà xếp lại thì offset lệch, bài lặp.
+    const placeProfiles = algo.ranker.needsViewerRows ? await this.placeProfiles() : undefined;
+    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now: new Date(sessionAt), viewer, placeProfiles }), ...ownExtra], {
       userId: q.userId,
       seen,
       interacted: new Set(interacted),
       ownRecent: new Set(ownRecent),
     });
     // Ranker đọc toàn bộ bài thì mọi bài đều là ứng viên: ô khám phá lấy bài xếp ngoài top, không lấy bài ngoài ứng viên.
-    // ponytail: người cuộn sâu quá top có thể gặp lại bài khám phá ở vị trí xếp hạng của nó.
     const topIds = new Set(ranked.slice(0, FULL_READ_EXPLORE_SKIP).map((r) => r.postId));
     const explorePool = rawExplorePool.filter(
       (c) => !seen.has(c.postId) && (algo.ranker.candidateLimit ? !topIds.has(c.postId) : !inCandidates.has(c.postId)),
     );
-    const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, page * slots);
+    // Giữ trước một tập bài khám phá cố định cho cả phiên và bỏ chúng khỏi danh sách xếp hạng: bài khám phá không gặp lại ở trang sau.
+    const reserved = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: new Date(sessionAt).toISOString().slice(0, 10) }, EXPLORE_RESERVE, 0);
+    const reservedIds = new Set(reserved.map((r) => r.postId));
+    const rankedOnly = ranked.filter((r) => !reservedIds.has(r.postId));
+    const explore = reserved.slice(page * slots, (page + 1) * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
-    const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
+    const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
     const pageItems = interleave(rankedTake, explore, q.limit);
 
     // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
     const nextOffset = offset + rankedTake.length;
-    const hasMore = ranked.length > nextOffset || explorePool.length > (page + 1) * slots;
+    const hasMore = rankedOnly.length > nextOffset || reserved.length > (page + 1) * slots;
     return {
       pageItems,
       algo,
@@ -350,6 +361,19 @@ export class PostRecommendationUseCases {
     return fallback.algo;
   }
 
+  /** Hồ sơ chủ đề của từng nơi từ kiểu khách sạn, cache 10 phút như chu kỳ job; lỗi thì bỏ qua (ranker suy từ bài). */
+  private async placeProfiles(): Promise<Map<string, Record<string, number>> | undefined> {
+    if (this.placeProfileCache && Date.now() - this.placeProfileCache.at < PLACE_PROFILE_CACHE_MS) return this.placeProfileCache.profiles;
+    try {
+      const profiles = placeStyleProfiles(await this.store.listPlaceStyleCounts());
+      this.placeProfileCache = { at: Date.now(), profiles };
+      return profiles;
+    } catch (err) {
+      this.logger.warn({ err }, 'Đọc kiểu khách sạn theo nơi lỗi, bỏ hồ sơ nơi lượt này');
+      return undefined;
+    }
+  }
+
   private async algoRows(): Promise<Map<string, AlgoRow>> {
     if (this.algoCache && Date.now() - this.algoCache.at < ALGO_CACHE_MS) return this.algoCache.rows;
     const rows = new Map((await this.store.listActiveAlgos()).map((r) => [r.name, r]));
@@ -372,7 +396,18 @@ export class PostRecommendationUseCases {
   private async loadViewer(userId: string, until: Date): Promise<ViewerRaw> {
     const rows = await this.store.listUserRows([userId], until);
     const productIds = [...new Set(rows.flatMap((r) => (r.kind === 'order_item' && r.targetId ? [r.targetId] : [])))];
-    return { rows, productPlaces: await this.store.findProductPlaces(productIds) };
+    const postIds = [
+      ...new Set(
+        rows.flatMap((r) => {
+          const source = r.detail?.sourcePostId;
+          return [r.targetType === 'post' && r.targetId ? r.targetId : null, typeof source === 'string' ? source : null].filter((id): id is string => id !== null);
+        }),
+      ),
+    ];
+    // Đơn ghi mã loại phòng (`<khách sạn>--<phòng>`), bảng đặc trưng lưu nơi theo khách sạn: tra cả hai.
+    const lookupIds = [...new Set([...productIds, ...productIds.map(hotelIdOfProduct)])];
+    const [productPlaces, metas] = await Promise.all([this.store.findProductPlaces(lookupIds), this.store.findPostMetas(postIds)]);
+    return { rows, productPlaces, posts: Object.fromEntries(metas.map((m) => [m.postId, m])) };
   }
 
   private async listRecent(userId: string, until: Date): Promise<Array<{ postId: string; at: number }>> {

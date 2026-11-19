@@ -59,7 +59,7 @@ export class ExploreController {
     const page = await this.explore.search(parsed.data);
     if (user) {
       const resultCount = page.sections.reduce((sum, s) => sum + s.total, 0);
-      this.searchEvents.searchPerformed(user.userId, { surface: 'explore', understood: page.understood, postType: null, resultCount });
+      this.searchEvents.searchPerformed(user.userId, { surface: 'explore', understood: page.understood, postType: null, resultCount, query: parsed.data.q });
     }
     return page;
   }
@@ -89,7 +89,7 @@ export class ExploreController {
     // Chỉ trang đầu: lật trang không phải một lượt tìm mới.
     if (user && !parsed.data.cursor) {
       const postType = parsed.data.postType === 'all' ? null : parsed.data.postType;
-      this.searchEvents.searchPerformed(user.userId, { surface: 'posts', understood: page.understood, postType, resultCount: page.total });
+      this.searchEvents.searchPerformed(user.userId, { surface: 'posts', understood: page.understood, postType, resultCount: page.total, query: parsed.data.q });
     }
     return page;
   }
