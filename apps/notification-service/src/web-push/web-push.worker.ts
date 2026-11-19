@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { type AuthUser, type SidBlocklist } from '@tripflix/auth';
 import type pg from 'pg';
-import webPush from 'web-push';
+// web-push 4 là ESM chỉ có named export; Node thật không có default (Vitest thì có).
+import * as webPush from 'web-push';
 import { DB, ENV, SID_BLOCKLIST_PROVIDER } from '../tokens.js';
 import type { Env } from '../env.js';
 import { toInboxItemDto, type InboxRow } from '../inbox/inbox.repository.js';
