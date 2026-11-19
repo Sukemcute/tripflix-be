@@ -7186,7 +7186,7 @@
             "bearer": []
           }
         ],
-        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số lượt thích, bình luận, chia sẻ, xem, chat",
+        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số liệu hồ sơ (theo dõi, lượt thích, bài đăng) và số lượt trong khoảng",
         "tags": [
           "analytics"
         ]
@@ -17709,6 +17709,37 @@
           "spans"
         ]
       },
+      "UserProfileStatsDto": {
+        "type": "object",
+        "properties": {
+          "followerCount": {
+            "type": "number",
+            "example": 120,
+            "description": "Số người theo dõi"
+          },
+          "followingCount": {
+            "type": "number",
+            "example": 35,
+            "description": "Số người đang theo dõi"
+          },
+          "likeCount": {
+            "type": "number",
+            "example": 2400,
+            "description": "Tổng cảm xúc nhận được trên các bài công khai"
+          },
+          "postCount": {
+            "type": "number",
+            "example": 8,
+            "description": "Số bài công khai đã đăng (không gồm bài đã xoá)"
+          }
+        },
+        "required": [
+          "followerCount",
+          "followingCount",
+          "likeCount",
+          "postCount"
+        ]
+      },
       "UserActivityListItemDto": {
         "type": "object",
         "properties": {
@@ -17758,6 +17789,14 @@
             "type": "string",
             "nullable": true,
             "description": "Email đăng ký; null khi tài khoản không còn"
+          },
+          "profile": {
+            "description": "Số liệu hồ sơ từ trước tới nay, không theo khoảng thời gian",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileStatsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -17770,7 +17809,8 @@
           "lastActiveAt",
           "userId",
           "displayName",
-          "email"
+          "email",
+          "profile"
         ]
       },
       "UserActivityListResponseDto": {
@@ -17867,6 +17907,11 @@
             "example": "2026-11-18",
             "description": "Ngày theo giờ Việt Nam"
           },
+          "activeUsers": {
+            "type": "number",
+            "example": 9,
+            "description": "Số người khác nhau có hoạt động trong ngày"
+          },
           "reactions": {
             "type": "number"
           },
@@ -17888,6 +17933,7 @@
         },
         "required": [
           "date",
+          "activeUsers",
           "reactions",
           "comments",
           "shares",
@@ -18035,6 +18081,14 @@
             "example": "2026-10-01T03:00:00.000Z",
             "description": "Ngày đăng ký"
           },
+          "profile": {
+            "description": "Số liệu hồ sơ từ trước tới nay",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileStatsDto"
+              }
+            ]
+          },
           "counts": {
             "$ref": "#/components/schemas/UserActivityCountsDto"
           },
@@ -18059,6 +18113,7 @@
           "displayName",
           "email",
           "createdAt",
+          "profile",
           "counts",
           "recentEvents",
           "from",
