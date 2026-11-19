@@ -35,6 +35,13 @@ export interface LiveAnswers {
 /** Cửa sổ đọc dòng thô và các trọng số dấu hiệu "đang tìm hiểu". */
 export const LIVE_WINDOW_DAYS = 14;
 const HALF_LIFE_DAYS = 2;
+/**
+ * Nơi vừa tìm dẫn đầu: dấu hiệu mới được nhân thêm tới (1 + RECENT_BOOST), phần thêm giảm một nửa sau mỗi RECENT_HALF_LIFE_MS.
+ * Nhảy Nha Trang → Hà Nội → Hội An thì nơi mới nhất lên trước, nơi tìm vài giờ trước nhạt dần; tìm xen kẽ nhiều nơi
+ * trong cùng khoảng thì các nơi ngang nhau. Chỉ đổi thứ tự nơi đang nhắm, không đổi ngưỡng lên kế hoạch.
+ */
+const RECENT_BOOST = 3;
+const RECENT_HALF_LIFE_MS = 3_600_000;
 const SIGNAL = { search: 1, staysSearch: 3, productView: 2, postBurst: 1, bookingClick: 3 };
 /** Lên kế hoạch khi một nơi có ≥ ngưỡng này (≈ 2 lượt tìm gần đây, hoặc 1 lượt tìm phòng). */
 export const PLANNING_MIN_EVIDENCE = 1.5;
@@ -90,6 +97,7 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
       return true;
     });
   const decay = (r: RawRow) => 0.5 ** ((now.getTime() - Date.parse(r.occurredAt)) / DAY / HALF_LIFE_DAYS);
+  const recency = (r: RawRow) => 1 + RECENT_BOOST * 0.5 ** (Math.max(0, now.getTime() - Date.parse(r.occurredAt)) / RECENT_HALF_LIFE_MS);
 
   const places: Record<string, number> = {};
   const budget: Record<string, number> = {};
@@ -100,16 +108,22 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     add(m, bin, w);
     evidence[key] += w;
   };
+  // places: độ tin (quyết định lên kế hoạch). ranked: thêm hệ số "vừa tìm", quyết định nơi nào dẫn đầu.
+  const ranked: Record<string, number> = {};
+  const notePlace = (placeId: string, signal: number, r: RawRow) => {
+    note(places, 'exploring', placeId, signal * decay(r));
+    add(ranked, placeId, signal * decay(r) * recency(r));
+  };
 
   for (const r of rows) {
     const w = decay(r);
     if (r.kind === 'search') {
       const placeId = r.targetId ?? str((r.detail?.placeIds as unknown[] | undefined)?.[0]);
-      if (placeId) note(places, 'exploring', placeId, SIGNAL.search * w);
+      if (placeId) notePlace(placeId, SIGNAL.search, r);
       const budgetMax = num(r.detail?.budgetMax);
       if (budgetMax) note(budget, 'budget', costBin(budgetMax, COST_PER_PERSON), w);
     } else if (r.kind === 'stays_search') {
-      if (r.targetId) note(places, 'exploring', r.targetId, SIGNAL.staysSearch * w);
+      if (r.targetId) notePlace(r.targetId, SIGNAL.staysSearch, r);
       const priceMax = num(r.detail?.priceMax);
       if (priceMax) note(budget, 'budget', costBin(priceMax, PRICE_PER_NIGHT), w);
       if ((num(r.detail?.minStars) ?? 0) >= 4) note(budget, 'budget', 'cost:cao_cap', w);
@@ -122,11 +136,11 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
       if (checkIn && checkOut) note(len, 'len', lenBin(Math.max(1, (Date.parse(checkOut) - Date.parse(checkIn)) / DAY) + 1), w);
     } else if (r.kind === 'view') {
       const placeId = str(r.detail?.placeId) ?? (r.targetId ? productPlaces[r.targetId] : undefined);
-      if (placeId) note(places, 'exploring', placeId, SIGNAL.productView * w);
+      if (placeId) notePlace(placeId, SIGNAL.productView, r);
     } else if (r.kind === 'booking_click') {
       // Bấm "Đặt" trên lộ trình của reels: đang tính đi nơi của bài đó.
       const placeId = r.targetId ? posts[r.targetId]?.placeId : null;
-      if (placeId) note(places, 'exploring', placeId, SIGNAL.bookingClick * w);
+      if (placeId) notePlace(placeId, SIGNAL.bookingClick, r);
     } else if (r.kind === 'order_item') {
       const nights = num(r.detail?.nights);
       if (nights) note(len, 'len', lenBin(nights + 1), w);
@@ -139,11 +153,11 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     .map((r) => ({ r, postId: r.targetId!, placeId: posts[r.targetId!]!.placeId!, at: Date.parse(r.occurredAt) }));
   for (const hit of postHits) {
     const burst = postHits.some((o) => o.placeId === hit.placeId && o.postId !== hit.postId && Math.abs(o.at - hit.at) <= DAY);
-    if (burst) note(places, 'exploring', hit.placeId, SIGNAL.postBurst * decay(hit.r));
+    if (burst) notePlace(hit.placeId, SIGNAL.postBurst, hit.r);
   }
 
   const exploring: Record<string, number> = {};
-  for (const [placeId, w] of Object.entries(places)) {
+  for (const [placeId, w] of Object.entries(ranked)) {
     add(exploring, `place:${placeId}`, w);
     const parent = PARENT.get(placeId);
     if (parent) add(exploring, `place:${parent}`, w);

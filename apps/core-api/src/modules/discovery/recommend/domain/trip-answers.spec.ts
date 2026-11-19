@@ -89,6 +89,29 @@ describe('answerLive', () => {
     expect(a.exploring['place:nha-trang']).toBeGreaterThan(a.exploring['place:ha-noi']!);
   });
 
+  describe('nhảy nơi khi đang tìm chỗ đi', () => {
+    const minsAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+    const searchAt = (placeId: string, m: number) => row({ kind: 'search', targetType: 'place', targetId: placeId, occurredAt: minsAgo(m) });
+    const top = (a: ReturnType<typeof live>) => Object.entries(a.exploring).sort((x, y) => y[1] - x[1])[0]![0];
+
+    it('nơi vừa tìm dẫn đầu, nơi tìm vài giờ trước nhạt đi', () => {
+      // Nha Trang: 2 lượt tìm 3–4 giờ trước. Hà Nội: 1 lượt vừa tìm.
+      const a = live([searchAt('nha-trang', 240), searchAt('nha-trang', 180), searchAt('ha-noi', 5)]);
+      expect(top(a)).toBe('place:ha-noi');
+      expect(a.exploring['place:nha-trang']).toBeGreaterThan(0);
+    });
+
+    it('tìm xen kẽ nhiều nơi trong cùng khoảng thì các nơi gần ngang nhau', () => {
+      const a = live([searchAt('nha-trang', 30), searchAt('ha-noi', 20), searchAt('hoi-an', 10)]);
+      const w = ['nha-trang', 'ha-noi', 'hoi-an'].map((p) => a.exploring[`place:${p}`]!);
+      expect(Math.max(...w) / Math.min(...w)).toBeLessThan(1.5);
+    });
+
+    it('một lượt tìm vẫn chưa đủ để lên kế hoạch (hệ số vừa tìm chỉ đổi thứ tự nơi)', () => {
+      expect(live([searchAt('ha-noi', 1)]).stage).toBe('dreaming');
+    });
+  });
+
   it('một lượt tìm phòng đủ để lên kế hoạch; đọc ngân sách, số người, số ngày', () => {
     const a = live([
       row({
