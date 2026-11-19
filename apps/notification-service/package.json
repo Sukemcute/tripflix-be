@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch --preserveWatchOutput",
@@ -12,7 +14,8 @@
     "lint": "oxlint --type-aware src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:int": "vitest run --config vitest.int.config.ts"
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "export:web-push-openapi": "node dist/cli/export-web-push-openapi.js"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",
@@ -35,6 +38,7 @@
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "socket.io": "catalog:",
+    "web-push": "^4.0.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -47,6 +51,7 @@
     "@types/nodemailer": "catalog:",
     "@types/pg": "catalog:",
     "@types/supertest": "catalog:",
+    "@types/web-push": "^3.6.4",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "socket.io-client": "catalog:",

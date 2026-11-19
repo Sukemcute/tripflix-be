@@ -32,6 +32,8 @@ import { InboxController } from './inbox/inbox.controller.js';
 import { PostWatchController } from './inbox/post-watch.controller.js';
 import { PostWatchWorker } from './inbox/post-watch.worker.js';
 import { PushTokenController } from './push/push-token.controller.js';
+import { WebPushController } from './web-push/web-push.controller.js';
+import { WebPushWorker } from './web-push/web-push.worker.js';
 import { PushWorker } from './push/push.worker.js';
 import { CommentNotificationRepository } from './inbox/comment-notification.repository.js';
 import { PostNotificationRepository } from './inbox/post-notification.repository.js';
@@ -155,7 +157,7 @@ export class InfraModule {}
       }),
     }),
   ],
-  controllers: [HealthController, MeController, InboxController, PostWatchController, PushTokenController],
+  controllers: [HealthController, MeController, InboxController, PostWatchController, PushTokenController, WebPushController],
   providers: [
     TelemetryLifecycle,
     NotificationConsumer,
@@ -166,6 +168,7 @@ export class InfraModule {}
     FollowerPostWorker,
     PostWatchWorker,
     PushWorker,
+    WebPushWorker,
     CommentNotificationRepository,
     PostNotificationRepository,
     ReactionNotificationRepository,
