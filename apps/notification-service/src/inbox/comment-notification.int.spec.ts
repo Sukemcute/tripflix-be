@@ -336,4 +336,98 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
       ).toBe(0);
     });
   });
+
+  describe('TF25: thông báo khi được tag trong bình luận', () => {
+    async function mentionRows(userId: string) {
+      return (await inbox.listForUser(userId, { limit: 20, tab: 'interactions' })).items.filter(
+        (item) => item.type === 'comment.mentioned',
+      );
+    }
+
+    function mention(overrides: Partial<ContentCommentCreatedV1> = {}) {
+      return comment({
+        parentCommentId: null,
+        parentCommentAuthorId: null,
+        authorDisplayName: 'Thành',
+        postVisibility: 'public',
+        ...overrides,
+      });
+    }
+
+    it('đăng ngay: người được tag nhận "X đã nhắc đến bạn trong một bình luận"', async () => {
+      const tagged = randomUUID();
+      const payload = mention({ mentionedUserIds: [tagged] });
+      await router.route(event('content.comment.created', payload));
+      expect(await mentionRows(tagged)).toEqual([
+        expect.objectContaining({
+          title: 'Thành đã nhắc đến bạn',
+          body: 'Thành đã nhắc đến bạn trong một bình luận.',
+          link: `/trips/${payload.postId}?comment=${payload.commentId}`,
+        }),
+      ]);
+      expect(emitToUser).toHaveBeenCalledWith(tagged, 'notification.created', expect.anything());
+    });
+
+    it('chủ bài duyệt: lúc giữ không báo, lúc duyệt mới báo', async () => {
+      const tagged = randomUUID();
+      const payload = mention({ mentionedUserIds: [tagged] });
+      await router.route(event('content.comment.held', payload));
+      expect(await mentionRows(tagged)).toEqual([]);
+      await router.route(event('content.comment.created', payload));
+      expect(await mentionRows(tagged)).toHaveLength(1);
+    });
+
+    it('nền tảng gỡ giữ sau hai lớp giữ: chỉ báo một lần khi bình luận công khai', async () => {
+      const tagged = randomUUID();
+      const payload = mention({ mentionedUserIds: [tagged] });
+      // Bị giữ ở cả chủ bài và nền tảng; chủ bài duyệt xong vẫn còn giữ nên core chưa phát created.
+      await router.route(event('content.comment.held', payload));
+      await router.route(event('content.comment.held', payload));
+      expect(await mentionRows(tagged)).toEqual([]);
+      await router.route(event('content.comment.created', payload));
+      expect(await mentionRows(tagged)).toHaveLength(1);
+    });
+
+    it('event lặp (cùng hoặc khác eventId) không tạo thông báo trùng', async () => {
+      const tagged = randomUUID();
+      const payload = mention({ mentionedUserIds: [tagged] });
+      const created = event('content.comment.created', payload);
+      await Promise.all([router.route(created), router.route(created)]);
+      await router.route(event('content.comment.created', payload));
+      expect(await mentionRows(tagged)).toHaveLength(1);
+    });
+
+    it('người đã nhận thông báo chủ bài hoặc trả lời cho cùng bình luận thì không nhận thêm thông báo tag', async () => {
+      const postAuthorId = randomUUID();
+      const parentCommentAuthorId = randomUUID();
+      const payload = mention({
+        postAuthorId,
+        parentCommentId: randomUUID(),
+        parentCommentAuthorId,
+        mentionedUserIds: [postAuthorId, parentCommentAuthorId],
+      });
+      await router.route(event('content.comment.created', payload));
+      await router.route(event('content.comment.created', payload));
+      expect((await inbox.listForUser(postAuthorId, { limit: 20 })).items.map((item) => item.type)).toEqual([
+        'comment.created',
+      ]);
+      expect((await inbox.listForUser(parentCommentAuthorId, { limit: 20 })).items.map((item) => item.type)).toEqual([
+        'comment.replied',
+      ]);
+    });
+
+    it('tự tag mình thì không báo', async () => {
+      const authorId = randomUUID();
+      await router.route(event('content.comment.created', mention({ authorId, mentionedUserIds: [authorId] })));
+      expect(await inbox.countUnread(authorId)).toBe(0);
+    });
+
+    it('bài private hoặc thiếu postVisibility thì không báo người được tag', async () => {
+      const tagged = randomUUID();
+      for (const postVisibility of ['private', undefined] as const) {
+        await router.route(event('content.comment.created', mention({ postVisibility, mentionedUserIds: [tagged] })));
+      }
+      expect(await inbox.countUnread(tagged)).toBe(0);
+    });
+  });
 });

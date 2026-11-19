@@ -4,7 +4,10 @@ import {
   ContentCommentHiddenV1Schema,
   type EventEnvelope,
 } from '@tripflix/contracts';
-import type { CommentNotificationRepository } from '../../inbox/comment-notification.repository.js';
+import type {
+  CommentNotificationRepository,
+  CommentNotificationType,
+} from '../../inbox/comment-notification.repository.js';
 import { toInboxItemDto, type InboxRepository } from '../../inbox/inbox.repository.js';
 import type { RealtimeService } from '../../realtime/realtime.service.js';
 import type { EventHandler } from './event-handler.js';
@@ -41,12 +44,18 @@ export function createCommentHandlers(options: {
     },
     'content.comment.created.v1': async (event) => {
       const comment = ContentCommentCreatedV1Schema.parse(event.payload);
-      const recipients = new Map([[comment.postAuthorId, false]]);
+      const recipients = new Map<string, CommentNotificationType>([[comment.postAuthorId, 'comment.created']]);
       const replyRecipient =
         comment.replyToAuthorId ??
         (comment.replyRecipientKnown === false ? undefined : comment.parentCommentAuthorId);
       if (comment.parentCommentId && replyRecipient && comment.postVisibility !== 'private') {
-        recipients.set(replyRecipient, true);
+        recipients.set(replyRecipient, 'comment.replied');
+      }
+      // TF25: người được tag chỉ xem được bài public; đã nhận thông báo chủ bài/trả lời thì không báo thêm.
+      if (comment.postVisibility === 'public') {
+        for (const userId of comment.mentionedUserIds ?? []) {
+          if (!recipients.has(userId)) recipients.set(userId, 'comment.mentioned');
+        }
       }
       recipients.delete(comment.authorId);
       // N2 chỉ chạy cho bài public: bài private chỉ tác giả xem được, báo người khác vừa lộ hoạt động vừa dẫn tới 404.
@@ -85,7 +94,7 @@ export function createCommentHandlers(options: {
         parentCommentId: comment.parentCommentId,
         eventId: event.eventId,
         occurredAt: event.occurredAt,
-        recipients: Array.from(recipients, ([userId, isReplyRecipient]) => ({ userId, isReplyRecipient })),
+        recipients: Array.from(recipients, ([userId, type]) => ({ userId, type })),
       });
       await Promise.all(
         rows.map((row) => emit(event, row.user_id, 'notification.created', { item: toInboxItemDto(row) })),

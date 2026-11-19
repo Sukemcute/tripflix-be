@@ -5,9 +5,11 @@ import { DB } from '../tokens.js';
 import { canCreatePostInteraction, lockPostNotifications } from './post-notification.repository.js';
 import { enqueuePostWatchJob, recordPostWatcher } from './post-watch.worker.js';
 
+export type CommentNotificationType = 'comment.created' | 'comment.replied' | 'comment.mentioned';
+
 interface CommentRecipient {
   userId: string;
-  isReplyRecipient: boolean;
+  type: CommentNotificationType;
 }
 
 export const THREAD_REPLY_TYPE = 'comment.thread_replied';
@@ -51,20 +53,29 @@ export class CommentNotificationRepository {
       if (!(await canCreatePostInteraction(client, input.postId, input.occurredAt))) return [];
       const { rows } = await client.query<InboxRow>(
         `INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id, comment_id, interaction_occurred_at)
-         SELECT recipient.user_id,
-           CASE WHEN recipient.is_reply THEN 'comment.replied' ELSE 'comment.created' END,
-           CASE WHEN recipient.is_reply THEN COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') || ' đã trả lời bình luận' ELSE 'Có bình luận mới' END,
-           COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') ||
-             CASE WHEN recipient.is_reply THEN ' đã trả lời bình luận của bạn.' ELSE ' đã bình luận bài của bạn.' END,
+         SELECT recipient.user_id, recipient.type,
+           CASE recipient.type
+             WHEN 'comment.replied' THEN COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') || ' đã trả lời bình luận'
+             WHEN 'comment.mentioned' THEN COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') || ' đã nhắc đến bạn'
+             ELSE 'Có bình luận mới' END,
+           COALESCE($9::text, NULLIF(btrim(actor.display_name), ''), 'Một người dùng') || CASE recipient.type
+             WHEN 'comment.replied' THEN ' đã trả lời bình luận của bạn.'
+             WHEN 'comment.mentioned' THEN ' đã nhắc đến bạn trong một bình luận.'
+             ELSE ' đã bình luận bài của bạn.' END,
            $4, $5::jsonb, $6, $7::uuid, $8
-         FROM unnest($1::uuid[], $2::boolean[]) AS recipient(user_id, is_reply)
+         FROM unnest($1::uuid[], $2::text[]) AS recipient(user_id, type)
          LEFT JOIN user_directory AS actor ON actor.user_id = $3
          WHERE NOT EXISTS (SELECT 1 FROM deleted_notification_comments WHERE comment_id = $7)
+           -- TF25: mỗi (bình luận, người nhận) tối đa một thông báo, kể cả sự kiện phát lại với eventId khác.
+           AND NOT EXISTS (
+             SELECT 1 FROM inbox AS existing
+             WHERE existing.comment_id = $7 AND existing.user_id = recipient.user_id
+               AND existing.type IN ('comment.created', 'comment.replied', 'comment.mentioned'))
          ON CONFLICT DO NOTHING
          RETURNING *`,
         [
           input.recipients.map((recipient) => recipient.userId),
-          input.recipients.map((recipient) => recipient.isReplyRecipient),
+          input.recipients.map((recipient) => recipient.type),
           input.authorId,
           `/trips/${input.postId}?comment=${input.commentId}`,
           JSON.stringify({
