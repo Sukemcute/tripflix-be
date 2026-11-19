@@ -5,7 +5,7 @@ import { UserActivityController } from './user-activity.controller.js';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const at = new Date('2026-11-18T10:20:00.000Z');
-const counts = { reactions: 1, comments: 2, shares: 0, views: 3, chats: 4 };
+const counts = { reactions: 1, comments: 2, shares: 0, views: 3, chats: 4, posts: 5 };
 
 function controllerWith(queries: Partial<UserActivityQueries>) {
   return new UserActivityController(queries as UserActivityQueries);
@@ -54,6 +54,22 @@ describe('UserActivityController', () => {
 
     await expect(controller.detail(userId, {})).rejects.toBeInstanceOf(NotFoundException);
     await expect(controller.detail('khong-phai-uuid', {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('tổng quan trả tổng, số lượt theo ngày và khoảng ISO', async () => {
+    const totals = { activeUsers: 3, reactions: 1, comments: 2, shares: 4, views: 5, chats: 6, posts: 7 };
+    const daily = [{ date: '2026-11-18', reactions: 1, comments: 0, shares: 4, views: 0, chats: 0, posts: 7 }];
+    const controller = controllerWith({ overview: async () => ({ totals, daily }) });
+
+    const response = await controller.overview({ from: '2026-11-12', to: '2026-11-18' });
+
+    expect(response).toEqual({ from: '2026-11-11T17:00:00.000Z', to: '2026-11-18T17:00:00.000Z', totals, daily });
+  });
+
+  it('tổng quan khoảng quá 90 ngày thì 400', async () => {
+    const controller = controllerWith({ overview: async () => ({ totals: {} as never, daily: [] }) });
+
+    await expect(controller.overview({ from: '2026-01-01', to: '2026-11-18' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('khoảng quá 90 ngày thì 400', async () => {
