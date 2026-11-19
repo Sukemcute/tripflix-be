@@ -13,6 +13,7 @@ import { createBookingHandlers } from './handlers/booking.js';
 import { createCommentHandlers } from './handlers/comment.js';
 import { createContentStatusHandlers } from './handlers/content-status.js';
 import { createDirectoryHandlers } from './handlers/directory.js';
+import { createFollowHandlers } from './handlers/follow.js';
 import { createReactionHandlers } from './handlers/reaction-updated.js';
 import type { EventHandler } from './handlers/event-handler.js';
 
@@ -80,6 +81,7 @@ export class EventRouter {
       ...(comments ? createCommentHandlers({ comments, inbox, realtime, log }) : {}),
       ...(inbox ? createContentStatusHandlers({ inbox, posts, followerPosts, realtime, log }) : {}),
       ...(reactions ? createReactionHandlers({ reactions, inbox, realtime, log }) : {}),
+      ...(followerPosts ? createFollowHandlers({ followerPosts, inbox, realtime, log }) : {}),
     };
   }
 

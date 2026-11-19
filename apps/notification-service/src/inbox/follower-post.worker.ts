@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleD
 import type pg from 'pg';
 import { z } from 'zod';
 import type { Env } from '../env.js';
+import type { InboxRow } from './inbox.repository.js';
 import { DB, ENV } from '../tokens.js';
 
 const PAGE_SIZE = 200;
@@ -43,15 +44,29 @@ export class FollowerPostWorker implements OnApplicationBootstrap, OnModuleDestr
     await this.pending;
   }
 
-  async applyFollow(input: { followerId: string; authorId: string; followedAt: string | null; changedAt: string }) {
-    await this.pool.query(
-      `INSERT INTO notification_follows (follower_id, author_id, followed_at, changed_at)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (follower_id, author_id) DO UPDATE SET followed_at = EXCLUDED.followed_at, changed_at = EXCLUDED.changed_at
-       WHERE notification_follows.changed_at < EXCLUDED.changed_at
-          OR (notification_follows.changed_at = EXCLUDED.changed_at AND EXCLUDED.followed_at IS NULL)`,
+  /** Lưu quan hệ theo dõi; lần đầu theo dõi thì báo cho người được theo dõi (bỏ rồi theo dõi lại không báo nữa). */
+  async applyFollow(input: {
+    followerId: string; authorId: string; followedAt: string | null; changedAt: string;
+  }): Promise<InboxRow | null> {
+    const { rows } = await this.pool.query<InboxRow>(
+      `WITH changed AS (
+         INSERT INTO notification_follows (follower_id, author_id, followed_at, changed_at)
+         VALUES ($1::uuid, $2::uuid, $3::timestamptz, $4::timestamptz)
+         ON CONFLICT (follower_id, author_id) DO UPDATE SET followed_at = EXCLUDED.followed_at, changed_at = EXCLUDED.changed_at
+         WHERE notification_follows.changed_at < EXCLUDED.changed_at
+            OR (notification_follows.changed_at = EXCLUDED.changed_at AND EXCLUDED.followed_at IS NULL)
+         RETURNING followed_at
+       )
+       INSERT INTO inbox (user_id, type, title, body, link, data, source_event_id)
+       SELECT $2::uuid, 'follow.user', 'Có người theo dõi mới',
+         COALESCE(NULLIF(btrim(u.display_name), ''), 'Một người dùng') || ' đã theo dõi bạn.',
+         '/u/' || $1::text, jsonb_build_object('actorIds', jsonb_build_array($1::text)), 'follow:' || $1::text
+       FROM changed LEFT JOIN user_directory u ON u.user_id = $1::uuid
+       WHERE changed.followed_at IS NOT NULL AND $1::uuid <> $2::uuid
+       ON CONFLICT DO NOTHING RETURNING *`,
       [input.followerId, input.authorId, input.followedAt, input.changedAt],
     );
+    return rows[0] ?? null;
   }
 
   async enqueue(postId: string, authorId: string): Promise<void> {
