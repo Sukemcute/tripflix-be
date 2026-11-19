@@ -43,6 +43,7 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
     listUserRows: vi.fn(async (_ids: string[], _now: Date) => opts.viewerRows ?? []),
     findProductPlaces: vi.fn(async (_ids: string[]): Promise<Record<string, string>> => ({})),
+    listPlaceStyleCounts: vi.fn(async () => [{ placeId: 'nha-trang', style: 'biển', hotels: 10 }, { placeId: 'ha-noi', style: 'thành phố', hotels: 10 }]),
     findPostMetas: vi.fn(async (postIds: string[]) =>
       postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang', hasPlan: false })),
     ),

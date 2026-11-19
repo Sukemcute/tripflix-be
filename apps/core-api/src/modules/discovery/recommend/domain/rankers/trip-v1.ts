@@ -109,6 +109,20 @@ function placeTopicProfiles(postBins: Iterable<Record<string, number>>): Map<str
   return profiles;
 }
 
+/** Hồ sơ nơi: kiểu khách sạn (nguồn chính, place-topics.ts) cộng hồ sơ từ bài; nơi chỉ có một nguồn thì dùng nguồn đó. */
+function mergeProfiles(
+  primary: ReadonlyMap<string, Record<string, number>> | undefined,
+  fromPosts: Map<string, Record<string, number>>,
+): Map<string, Record<string, number>> {
+  const out = new Map(fromPosts);
+  for (const [place, exps] of primary ?? []) {
+    const merged = { ...out.get(place) };
+    for (const [e, w] of Object.entries(exps)) merged[e] = (merged[e] ?? 0) + w;
+    out.set(place, merged);
+  }
+  return out;
+}
+
 /** Chủ đề suy từ các nơi đang tìm hiểu (đã có hệ số vừa xảy ra); bỏ tỉnh cha khi đã có nơi con để không đếm hai lần. */
 function topicsFromPlaces(exploring: Record<string, number>, profiles: Map<string, Record<string, number>>): Record<string, number> {
   const parents = new Set(Object.keys(exploring).map((b) => PARENT.get(b.slice(6))).filter(Boolean).map((p) => `place:${p}`));
@@ -144,7 +158,7 @@ export const tripRankerV1: Ranker = {
   // ponytail: đọc toàn bộ bài mỗi lượt gọi, ổn tới vài nghìn bài; lớn hơn thì lấy theo ngăn có index (thiết kế v1 mục 3.2).
   candidateLimit: 5000,
   needsViewerRows: true,
-  rank({ candidates, userFeatures, now, viewer }) {
+  rank({ candidates, userFeatures, now, viewer, placeProfiles }) {
     const postBins = new Map(candidates.map((c) => [c.postId, weightMap(c.postFeatures.bins)]));
     // Nơi của tương tác tra cả bài ngoài ứng viên: Reels chỉ xếp video, nhưng thích bài viết Hà Nội vẫn là đang tìm hiểu Hà Nội.
     const metas: Record<string, PostMeta> = { ...viewer?.posts, ...Object.fromEntries(candidates.map((c) => [c.postId, c])) };
@@ -166,14 +180,11 @@ export const tripRankerV1: Ranker = {
       for (const [q, w] of Object.entries(fresh.evidence)) evidence[q] = (evidence[q] ?? 0) + w;
     }
     const live: LiveAnswers | null = viewer ? answerLive({ rows: viewer.rows, posts: metas, productPlaces: viewer.productPlaces, now }) : null;
-    // Chủ đề: gõ thẳng (biển, núi) + suy từ các nơi đang tìm hiểu (Nha Trang, Phú Quốc → biển), nặng bằng nửa.
+    // Chủ đề: gõ thẳng (biển, núi) và suy từ các nơi đang tìm hiểu (Nha Trang, Phú Quốc → biển). Hai điểm riêng rồi cộng:
+    // cosine chuẩn hoá theo độ dài nên gộp chung một vector thì hệ số của phần suy từ nơi mất tác dụng.
+    const placeTopics = live ? topicsFromPlaces(live.exploring, mergeProfiles(placeProfiles, placeTopicProfiles(postBins.values()))) : {};
     const topicVector: Record<string, number> = { ...live?.topics };
-    if (live) {
-      for (const [e, w] of Object.entries(topicsFromPlaces(live.exploring, placeTopicProfiles(postBins.values())))) {
-        topicVector[e] = (topicVector[e] ?? 0) + PLACE_TOPIC_FACTOR * w;
-      }
-    }
-    const topicEvidence = (live?.evidence.topics ?? 0) + PLACE_TOPIC_FACTOR * (live?.evidence.exploring ?? 0);
+    for (const [e, w] of Object.entries(placeTopics)) topicVector[e] = (topicVector[e] ?? 0) + w;
 
     const hasSignal =
       Object.keys(evidence).length > 0 || (live !== null && (live.stage !== 'dreaming' || live.evidence.exploring > 0 || live.evidence.topics > 0));
@@ -206,7 +217,9 @@ export const tripRankerV1: Ranker = {
       const parts: Record<Part, number> = {
         exploring: conf(live?.evidence.exploring, FULL_EVIDENCE.exploring) * cosine(live?.exploring ?? {}, places, idf),
         trip: tripBin ? (bins[tripBin] ?? 0) * (stage === 'after_trip' || Object.keys(bins).some((b) => ON_SITE_EXP.has(b)) ? 1 : NO_LOCAL_EXP_FACTOR) : 0,
-        topic: conf(topicEvidence, FULL_EVIDENCE.live) * cosine(topicVector, ofQuestion(bins, 'exp'), idf),
+        topic:
+          conf(live?.evidence.topics, FULL_EVIDENCE.live) * cosine(live?.topics ?? {}, ofQuestion(bins, 'exp'), idf) +
+          PLACE_TOPIC_FACTOR * conf(live?.evidence.exploring, FULL_EVIDENCE.exploring) * cosine(placeTopics, ofQuestion(bins, 'exp'), idf),
         interestExp: conf(evidence.exp, FULL_EVIDENCE.interest) * cosine(answers.exp ?? {}, ofQuestion(bins, 'exp'), idf),
         interestPlace: conf(evidence.place, FULL_EVIDENCE.interest) * cosine(answers.place ?? {}, places, idf),
         fit: 0,

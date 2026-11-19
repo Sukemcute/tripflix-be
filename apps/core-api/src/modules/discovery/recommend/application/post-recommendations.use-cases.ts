@@ -4,6 +4,7 @@ import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
 import { hotelIdOfProduct } from '../domain/place-of-post.js';
+import { placeStyleProfiles } from '../domain/place-topics.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import {
   RECENT_POSTS_STORE,
@@ -23,6 +24,7 @@ export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent';
 const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 
 const ALGO_CACHE_MS = 60_000;
+const PLACE_PROFILE_CACHE_MS = 10 * 60_000;
 const HOT_LIMIT = 150;
 const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
@@ -117,6 +119,7 @@ function decodeCursor(raw: string): Cursor {
 export class PostRecommendationUseCases {
   private readonly logger = new Logger(PostRecommendationUseCases.name);
   private algoCache: { at: number; rows: Map<string, AlgoRow> } | null = null;
+  private placeProfileCache: { at: number; profiles: Map<string, Record<string, number>> } | null = null;
 
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
@@ -226,7 +229,8 @@ export class PostRecommendationUseCases {
       .filter((postId) => !inCandidates.has(postId))
       .map((postId) => ({ postId, authorId: q.userId!, score: 0, source: 'own', breakdown: {}, reason: OWN_POST_REASON }));
     // Xếp theo mốc trang đầu (sessionAt), không theo giờ gọi: điểm "vừa xảy ra" đổi theo phút, trang sau mà xếp lại thì offset lệch, bài lặp.
-    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now: new Date(sessionAt), viewer }), ...ownExtra], {
+    const placeProfiles = algo.ranker.needsViewerRows ? await this.placeProfiles() : undefined;
+    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now: new Date(sessionAt), viewer, placeProfiles }), ...ownExtra], {
       userId: q.userId,
       seen,
       interacted: new Set(interacted),
@@ -355,6 +359,19 @@ export class PostRecommendationUseCases {
     const fallback = resolveAlgo(FALLBACK);
     if (!fallback.ok) throw new Error(fallback.error);
     return fallback.algo;
+  }
+
+  /** Hồ sơ chủ đề của từng nơi từ kiểu khách sạn, cache 10 phút như chu kỳ job; lỗi thì bỏ qua (ranker suy từ bài). */
+  private async placeProfiles(): Promise<Map<string, Record<string, number>> | undefined> {
+    if (this.placeProfileCache && Date.now() - this.placeProfileCache.at < PLACE_PROFILE_CACHE_MS) return this.placeProfileCache.profiles;
+    try {
+      const profiles = placeStyleProfiles(await this.store.listPlaceStyleCounts());
+      this.placeProfileCache = { at: Date.now(), profiles };
+      return profiles;
+    } catch (err) {
+      this.logger.warn({ err }, 'Đọc kiểu khách sạn theo nơi lỗi, bỏ hồ sơ nơi lượt này');
+      return undefined;
+    }
   }
 
   private async algoRows(): Promise<Map<string, AlgoRow>> {

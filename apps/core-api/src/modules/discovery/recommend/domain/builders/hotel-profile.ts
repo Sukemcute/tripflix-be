@@ -21,6 +21,8 @@ export const HotelProfileV0FeaturesSchema = z.object({
   bookings30d: z.number(),
   /** bookings30d chia cho số lượt đặt lớn nhất trong lô: 0..1. */
   popularity: z.number(),
+  /** Kiểu khách sạn của commerce (biển, núi, resort…): gộp theo nơi thành hồ sơ chủ đề của nơi. Hồ sơ cũ không có. */
+  style: z.string().nullable().optional(),
 });
 export type HotelProfileFeatures = z.infer<typeof HotelProfileV0FeaturesSchema>;
 
@@ -111,6 +113,7 @@ export const hotelProfileV0: HotelBuilder = {
           ...geo(h, input),
           bookings30d: h.bookings30d,
           popularity,
+          style: h.style ?? null,
         };
         // Chất lượng chung để sắp khi không có tiêu chí nào khác: đánh giá là chính, được đặt nhiều cộng thêm.
         const score = round4(0.7 * (ratingScore === null ? 0 : (ratingScore - 1) / 4) + 0.3 * popularity);

@@ -263,6 +263,17 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     });
   }
 
+  async listPlaceStyleCounts(): Promise<Array<{ placeId: string; style: string; hotels: number }>> {
+    const t = recommendProductFeatures;
+    const style = sql<string>`${t.features}->>'style'`;
+    const rows = await this.db
+      .select({ placeId: t.groupKey, style, hotels: sql<number>`count(*)::int` })
+      .from(t)
+      .where(and(eq(t.builder, 'hotel_profile'), eq(t.productType, 'hotel'), sql`${t.features}->>'style' is not null`))
+      .groupBy(t.groupKey, style);
+    return rows.map((r) => ({ placeId: r.placeId, style: r.style, hotels: Number(r.hotels) }));
+  }
+
   async findProductFeatures(builderKey: string, productIds: string[]) {
     if (!productIds.length) return new Map<string, { score: number; features: Record<string, unknown> }>();
     const { builder, version } = splitKey(builderKey);

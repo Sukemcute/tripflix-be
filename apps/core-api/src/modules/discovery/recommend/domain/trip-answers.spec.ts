@@ -160,6 +160,25 @@ describe('answerLive', () => {
       expect(out[at('qn-beach')]!.reason.text).toBe('Vì bạn đang tìm hiểu các nơi có biển đảo');
     });
 
+    it('hồ sơ nơi từ kiểu khách sạn: bài ở nơi tìm gắn chủ đề lộn xộn vẫn suy ra biển, bài biển nơi khác lên', () => {
+      const cand = (postId: string, score: number, bins: Record<string, number>) => ({
+        postId, authorId: postId, postType: 'video', tags: [], placeId: null, score, source: 'hot' as const, postFeatures: { bins, bookable: 0, hotelId: null },
+      });
+      // Bài Nha Trang toàn núi/ăn uống (như dữ liệu mẫu), nhưng khách sạn Nha Trang thiên về biển.
+      const noisy = Array.from({ length: 6 }, (_, i) => cand(`nt-${i}`, 0.3, { 'place:nha-trang': 1, [i % 2 ? 'exp:nui' : 'exp:an_uong']: 1 }));
+      const search = (placeId: string, m: number) => row({ kind: 'search', targetType: 'place', targetId: placeId, occurredAt: minsAgo(m) });
+      const out = tripRankerV1.rank({
+        candidates: [...noisy, cand('qn-beach', 0.3, { 'place:quy-nhon': 1, 'exp:bien': 1 }), cand('sg-food', 0.3, { 'place:sai-gon': 1, 'exp:an_uong': 1 })],
+        userFeatures: null,
+        now: NOW,
+        viewer: { rows: [search('nha-trang', 5), search('nha-trang', 80)], productPlaces: {} },
+        placeProfiles: new Map([['place:nha-trang', { 'exp:bien': 0.3 }]]),
+      });
+      const at = (id: string) => out.findIndex((r) => r.postId === id);
+      expect(at('qn-beach')).toBeLessThan(at('sg-food'));
+      expect(out[at('qn-beach')]!.reason.text).toBe('Vì bạn đang tìm hiểu các nơi có biển đảo');
+    });
+
     it('một lượt tìm vẫn chưa đủ để lên kế hoạch (hệ số vừa tìm chỉ đổi thứ tự nơi)', () => {
       expect(live([searchAt('ha-noi', 1)]).stage).toBe('dreaming');
     });

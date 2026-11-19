@@ -115,6 +115,7 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
         rating: h.rating ?? null,
         location: h.location,
         roomProductIds: h.options.map((o) => o.productId),
+        style: h.style,
       }));
     return { items, nextCursor: page.nextCursor };
   },

@@ -78,6 +78,7 @@ export class BuildProductFeaturesUseCases {
             rating: h.rating,
             location: h.location,
             bookings30d: booked(h.roomProductIds),
+            style: h.style,
           })),
           points: points.flatMap((p): HotelPoint[] => (p.kind === 'lodging' ? [] : [{ name: p.name, kind: p.kind, lat: p.lat, lng: p.lng }])),
         },

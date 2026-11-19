@@ -157,6 +157,8 @@ export interface HotelBuildItem {
   location: { lat: number; lng: number } | null;
   /** Mục phòng trong đơn đã trả 30 ngày qua (không tính đơn đã huỷ). */
   bookings30d: number;
+  /** Kiểu khách sạn của commerce; thiếu thì null. */
+  style?: string | null;
 }
 
 /** Điểm tham quan, quán ăn, quán cà phê (bảng discovery.points_of_interest). */
@@ -250,6 +252,8 @@ export interface RankInput {
   now: Date;
   /** Dữ liệu thô của người xem, chỉ có khi ranker khai báo needsViewerRows và người xem đã đăng nhập. */
   viewer?: ViewerRaw | null;
+  /** 'place:nha-trang' → ngăn chủ đề nơi đó thiên về (từ kiểu khách sạn, place-topics.ts). Thiếu thì ranker chỉ suy từ bài. */
+  placeProfiles?: ReadonlyMap<string, Record<string, number>>;
 }
 
 /** Dòng thô 30 ngày của người xem + nơi (tỉnh) của sản phẩm trong đơn. Use case chỉ đọc và đưa vào, không xử lý. */

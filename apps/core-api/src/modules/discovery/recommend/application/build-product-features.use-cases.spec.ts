@@ -7,6 +7,7 @@ import type { FlightProfileSource, HotelProfileSource, ProductFeatureStore, Prod
 const hotel = (id: string, roomProductIds: string[]): HotelProfileSource => ({
   id,
   provinceSlug: 'nha-trang',
+  style: 'biển',
   city: 'Nha Trang',
   stars: 4,
   priceFrom: 800_000,
