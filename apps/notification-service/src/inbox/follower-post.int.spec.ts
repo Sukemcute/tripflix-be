@@ -24,6 +24,26 @@ describe('Gửi inbox bài mới theo từng lô', () => {
     await fixture?.stop();
   });
 
+  it('báo "đã theo dõi bạn" một lần cho mỗi người theo dõi, không báo tự theo dõi', async () => {
+    const authorId = randomUUID();
+    const followerId = randomUUID();
+    const worker = new FollowerPostWorker(pool, envSchema.parse({ DATABASE_URL_NOTIFICATION: fixture.buildModuleUrl('notification') }));
+    await pool.query("INSERT INTO user_directory (user_id, display_name) VALUES ($1, 'Lan')", [followerId]);
+    const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
+    const follow = (minute: number, isFollowing = true, follower = followerId) =>
+      worker.applyFollow({ followerId: follower, authorId, followedAt: isFollowing ? at(minute) : null, changedAt: at(minute) });
+
+    expect(await follow(1)).toEqual(expect.objectContaining({
+      user_id: authorId, type: 'follow.user', body: 'Lan đã theo dõi bạn.', link: `/u/${followerId}`,
+      data: { actorIds: [followerId] },
+    }));
+    expect(await follow(2, false)).toBeNull();
+    expect(await follow(3)).toBeNull();
+    expect(await follow(4, true, authorId)).toBeNull();
+    const { items } = await inbox.listForUser(authorId, { limit: 20, tab: 'interactions' });
+    expect(items.map((item) => item.type)).toEqual(['follow.user']);
+  });
+
   it('chia 1.000 người thành lô và nhường lượt cho bài nhỏ giữa hai lô', async () => {
     const authorId = randomUUID();
     const largePost = randomUUID();

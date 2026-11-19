@@ -137,7 +137,7 @@ export class InboxRepository implements OnModuleInit {
       SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
       FROM visible WHERE ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
         AND ($5 = 'all' OR ($5 = 'orders' AND type LIKE 'booking.%')
-          OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%' OR type = 'follow.post.published')))
+          OR ($5 = 'interactions' AND (type LIKE 'comment.%' OR type LIKE 'reaction.%' OR type LIKE 'follow.%')))
       ORDER BY created_at DESC, id DESC LIMIT $4
     `,
       [userId, cursor?.[0] ?? null, cursor?.[1] ?? null, options.limit + 1, options.tab ?? 'all'],
