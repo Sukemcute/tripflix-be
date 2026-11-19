@@ -1,0 +1,356 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a6199b04-ae39-452a-a965-626641e8be13",
+  "prevIds": [
+    "67dcab0a-013c-40be-9afe-dafc4ca88783",
+    "ffa62f2d-30a7-4623-aa93-90532c9f7ceb",
+    "5edece55-c69c-4db2-ad38-7cc917c32ee7"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "saved_itineraries"
+      ],
+      "writes": [
+        "s|tbl|content.saved_itineraries",
+        "n|tbl|content.saved_itineraries",
+        "e|tbl|content.saved_itineraries",
+        "n|rel|content.saved_itineraries",
+        "n|type|content.saved_itineraries",
+        "n|rel|content.saved_itineraries_pkey"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "saved_itineraries",
+        "idx_saved_itineraries_user_updated"
+      ],
+      "writes": [
+        "s|idx|content.idx_saved_itineraries_user_updated",
+        "n|idx|content.idx_saved_itineraries_user_updated",
+        "e|idx|content.idx_saved_itineraries_user_updated",
+        "n|rel|content.idx_saved_itineraries_user_updated"
+      ],
+      "reads": [
+        "n|tbl|content.saved_itineraries",
+        "n|sch|content",
+        "n|col|content.saved_itineraries.user_id",
+        "n|col|content.saved_itineraries.updated_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "saved_itineraries",
+        "uq_saved_itineraries_user_post"
+      ],
+      "writes": [
+        "s|idx|content.uq_saved_itineraries_user_post",
+        "n|idx|content.uq_saved_itineraries_user_post",
+        "e|idx|content.uq_saved_itineraries_user_post",
+        "n|rel|content.uq_saved_itineraries_user_post"
+      ],
+      "reads": [
+        "n|tbl|content.saved_itineraries",
+        "n|sch|content",
+        "n|col|content.saved_itineraries.user_id",
+        "n|col|content.saved_itineraries.source_post_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "name": "saved_itineraries",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "gen_random_uuid()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "title",
+        "type": "varchar(120)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "destination_name",
+        "type": "varchar(120)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "destination_place_id",
+        "type": "varchar(100)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "days_count",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "items",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "source",
+        "type": "varchar(10)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "source_post_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "idx_saved_itineraries_user_updated",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "updated_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "uq_saved_itineraries_user_post",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "source_post_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"source_post_id\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "saved_itineraries_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "ck_saved_itineraries_source",
+        "value": "\"source\" in ('reel', 'tripi', 'builder')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "saved_itineraries",
+        "name": "ck_saved_itineraries_days",
+        "value": "\"days_count\" between 1 and 14",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

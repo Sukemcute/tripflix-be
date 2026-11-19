@@ -2954,6 +2954,178 @@
         ]
       }
     },
+    "/api/v1/me/itineraries": {
+      "get": {
+        "operationId": "SavedItinerariesController_list",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy lộ trình đã lưu từ reel này",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "?postId= để biết reel này đã lưu chưa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedItineraryListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Content - Saved itineraries"
+        ]
+      },
+      "post": {
+        "operationId": "SavedItinerariesController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveItineraryRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reel đã lưu rồi thì trả lại bản cũ, không tạo trùng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedItineraryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Content - Saved itineraries"
+        ]
+      }
+    },
+    "/api/v1/me/itineraries/{id}": {
+      "get": {
+        "operationId": "SavedItinerariesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedItineraryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Content - Saved itineraries"
+        ]
+      },
+      "patch": {
+        "operationId": "SavedItinerariesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItineraryRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedItineraryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Content - Saved itineraries"
+        ]
+      },
+      "delete": {
+        "operationId": "SavedItinerariesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Content - Saved itineraries"
+        ]
+      }
+    },
     "/api/media/uploads": {
       "post": {
         "operationId": "MediaUploadController_createUpload",
@@ -10368,6 +10540,226 @@
           "nextCursor",
           "total"
         ]
+      },
+      "SavedItineraryItemDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "number",
+            "example": 1,
+            "description": "Số ngày trong lộ trình"
+          },
+          "title": {
+            "type": "string",
+            "example": "Check-in khách sạn & ngắm hoàng hôn",
+            "description": "Tiêu đề hoạt động"
+          },
+          "location": {
+            "type": "string",
+            "example": "Bãi Dài, Phú Quốc",
+            "description": "Địa điểm"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất",
+            "description": "Ghi chú"
+          },
+          "time": {
+            "type": "string",
+            "example": "16:30",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Giờ trong ngày (HH:mm)"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "cafe",
+              "food",
+              "fun",
+              "other"
+            ],
+            "example": "food",
+            "description": "Loại điểm gợi ý để app chọn icon: cà phê, ăn uống, vui chơi, khác"
+          },
+          "hotel": {
+            "description": "Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripItemHotelDto"
+              }
+            ]
+          },
+          "transport": {
+            "description": "Phương tiện được chọn khi soạn lộ trình",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripTransportDto"
+              }
+            ]
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "sáng",
+              "trưa",
+              "chiều",
+              "tối"
+            ],
+            "description": "Buổi trong ngày khi không có giờ cụ thể (Tripi)"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          },
+          "placeId": {
+            "type": "string",
+            "description": "Mã địa điểm của discovery (Tripi)"
+          },
+          "nights": {
+            "type": "number",
+            "description": "Điểm khách sạn: số đêm ở"
+          }
+        },
+        "required": [
+          "day",
+          "title"
+        ]
+      },
+      "SavedItineraryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "destinationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "destinationPlaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "daysCount": {
+            "type": "number",
+            "description": "Số ngày (Ngày 1..N); ngày đi khách chọn lúc đặt"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedItineraryItemDto"
+            }
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "reel",
+              "tripi",
+              "builder"
+            ]
+          },
+          "sourcePostId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Reel gốc khi lưu từ reel"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "destinationName",
+          "destinationPlaceId",
+          "daysCount",
+          "items",
+          "source",
+          "sourcePostId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SavedItineraryListDto": {
+        "type": "object",
+        "properties": {
+          "itineraries": {
+            "description": "Mới sửa trước, tối đa 100",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedItineraryDto"
+            }
+          }
+        },
+        "required": [
+          "itineraries"
+        ]
+      },
+      "SaveItineraryRequestDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "reel",
+              "tripi",
+              "builder"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "source = reel"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "trip": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "source = tripi: sự kiện trip của ai-service (place, days, stay, transport, returnTransport)"
+          },
+          "builder": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "source = builder: lộ trình đang soạn (destinationName, startDate, dayCount, items hotel/flight/activity)"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "UpdateItineraryRequestDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "daysCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 14
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedItineraryItemDto"
+            }
+          }
+        }
       },
       "CreateUploadDto": {
         "type": "object",

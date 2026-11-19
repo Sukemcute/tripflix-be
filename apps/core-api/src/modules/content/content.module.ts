@@ -9,6 +9,9 @@ import { Redis } from 'ioredis';
 import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { PostShareLinks } from './social/application/post-share-links.js';
+import { SavedItinerariesController } from './itinerary/api/saved-itineraries.controller.js';
+import { SavedItineraryUseCases } from './itinerary/application/saved-itinerary.use-cases.js';
+import { DrizzleSavedItineraryStore } from './itinerary/infra/saved-itinerary.repository.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { createCommerceServicePort } from './social/infra/commerce-service.adapter.js';
 import { FollowsController } from './social/api/follows.controller.js';
@@ -108,6 +111,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     AdminPostsController,
     PostSummaryController,
     AiSummaryInternalController,
+    SavedItinerariesController,
   ],
   providers: [
     {
@@ -126,6 +130,12 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
       provide: CONTENT_DB,
       inject: [DB_POOLS],
       useFactory: (pools: DbPools): Db => createDb(pools.content),
+    },
+    // Lộ trình đã lưu (TF105): mỗi lệnh một câu SQL, không cần transaction.
+    {
+      provide: SavedItineraryUseCases,
+      inject: [CONTENT_DB],
+      useFactory: (db: Db) => new SavedItineraryUseCases(new DrizzleSavedItineraryStore(db)),
     },
 
     {
