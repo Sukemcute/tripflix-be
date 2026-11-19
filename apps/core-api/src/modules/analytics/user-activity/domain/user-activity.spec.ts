@@ -120,6 +120,19 @@ describe('toUserActivityRecord', () => {
     expect(() => toUserActivityRecord(chatEvent({ turnId: 'khong-phai-uuid' }))).toThrow();
   });
 
+  it('lượt chat có turnId, latencyMs là null (lượt không gọi LLM) vẫn nhận và không lưu khoá rỗng', () => {
+    const record = toUserActivityRecord(
+      envelope(
+        'ai.chat.turn.recorded',
+        { conversationId: conversation, question: 'bấm nút', intent: null, answerKind: 'answer', isAction: true, turnId: null, latencyMs: null },
+        { producer: 'ai-service', userId: user },
+      ),
+    );
+    expect(record).toMatchObject({ kind: 'chat' });
+    expect('turnId' in (record?.detail ?? {})).toBe(false);
+    expect('latencyMs' in (record?.detail ?? {})).toBe(false);
+  });
+
   it('sự kiện khác loại thì bỏ qua', () => {
     expect(toUserActivityRecord(envelope('ai.usage.recorded', {}))).toBeNull();
   });
