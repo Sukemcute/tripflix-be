@@ -4,6 +4,12 @@ import type { AlgoRow } from '../domain/registry.js';
 
 export const RECOMMEND_STORE = Symbol('RECOMMEND_STORE');
 export const RECOMMEND_CATALOG = Symbol('RECOMMEND_CATALOG');
+export const TEXT_EMBEDDER = Symbol('TEXT_EMBEDDER');
+
+/** Nhúng văn bản thành vector đơn vị. Thật: ai-service POST /embed. null = AI tắt hoặc lỗi (job bỏ nguồn caption). */
+export interface TextEmbedder {
+  embed(texts: string[]): Promise<{ model: string; vectors: number[][] } | null>;
+}
 
 /** Bài đang hiện công khai cho gợi ý. Thật: ContentFacade.listPosts (VisiblePostSummary). */
 export interface RecommendSourcePost {
@@ -193,8 +199,14 @@ export interface RecommendStore {
   listInteractedPostIds(userId: string, now: Date): Promise<string[]>;
   /** Bài người dùng tự đăng trong (since, until], mới nhất trước, đọc dòng `publish` của bảng thô (có ngay, không chờ job). */
   listOwnRecentPostIds(q: { userId: string; since: Date; until: Date; postType: string | null }): Promise<string[]>;
+  /** Tỉnh (group_key) của khách sạn theo hồ sơ hotel_profile@v0; khách sạn chưa có hồ sơ thì không có trong kết quả. */
+  findProductPlaces(productIds: string[]): Promise<Record<string, string>>;
   /** Tag, nơi của các bài trong recommend_posts (bảng đọc, không phải bảng thô). */
   findPostMetas(postIds: string[]): Promise<PostMeta[]>;
+  /** Vector đã nhúng theo sha256 văn bản, chỉ của đúng mô hình đó. Chưa có thì không có trong Map. */
+  findTextVectors(model: string, textHashes: string[]): Promise<Map<string, number[]>>;
+  /** Ghi vector mới; trùng khoá thì giữ dòng cũ. */
+  insertTextVectors(model: string, rows: Array<{ textHash: string; vector: number[] }>): Promise<void>;
   /** Điểm của một post builder (vd 'hot@v2') theo danh sách postId. Bài chưa có điểm không có trong Map. */
   findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */

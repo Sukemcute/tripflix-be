@@ -16,6 +16,10 @@ export const KINDS = [
   'search',
   'stays_search',
   'view',
+  /** Xem reels (content.post.viewed), value = tỉ lệ đã xem. */
+  'view_post',
+  /** Bấm "Đặt" trên lộ trình gắn reels (content.post.booking_clicked). */
+  'booking_click',
   'flight_search',
   'registered',
   'guest_merged',
@@ -48,6 +52,16 @@ export interface PostBuildItem {
   interactions24h: Partial<Record<Kind, number>>;
   /** Tương tác chi tiết kèm tuổi tài khoản trong 30 ngày (dùng cho hot@v1); nếu thiếu thì fallback về interactions. */
   interactionSamples?: PostInteractionSample[];
+  /** Nội dung bài (job truyền dữ liệu thô; builder nào cần thì tự dùng). */
+  content?: PostContent;
+}
+
+/** Phần lộ trình của bài dùng để xếp ngăn (chi phí, số ngày, loại điểm, khách sạn). */
+export interface PostTripSummary {
+  hotelId: string | null;
+  daysCount: number | null;
+  estimatedCostPerPerson: number | null;
+  items: Array<{ location: string | null; category: string | null }>;
 }
 
 /** score 0..1, chuẩn hoá trên cả lô. */
@@ -78,6 +92,21 @@ export interface PostMeta {
   tags: string[];
   placeId: string | null;
   hasPlan?: boolean;
+  /** Nội dung bài (job truyền dữ liệu thô; builder nào cần thì tự dùng). */
+  content?: PostContent;
+}
+
+/** Nội dung bài job đọc từ listPosts. Dữ liệu thô, không chứa logic thuật toán. */
+export interface PostContent {
+  title?: string;
+  body?: string;
+  isVerified?: boolean;
+  trip?: PostTripSummary | null;
+  /**
+   * Vector đơn vị theo văn bản (caption, câu mô tả ngăn) job đã nhúng được trong chu kỳ, dùng chung cho mọi bài.
+   * Thiếu (AI tắt, lỗi, chưa kịp nhúng) thì nguồn caption không góp. Văn bản cần nhúng do bins.textsToEmbed quyết định.
+   */
+  vectors?: ReadonlyMap<string, readonly number[]>;
 }
 
 export interface UserBuildItem {
@@ -98,6 +127,10 @@ export interface UserBuildOutput {
 export interface PostBuilder {
   /** 'hot@v0' */
   key: string;
+  /** Cần interactionSamples (tương tác kèm tuổi tài khoản): job chỉ đọc khi có builder khai báo. */
+  needsSamples?: boolean;
+  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: PostBuildItem[], now: Date): Promise<PostBuildOutput[]>;
 }
@@ -105,6 +138,8 @@ export interface PostBuilder {
 export interface UserBuilder {
   /** 'tag_affinity@v0' */
   key: string;
+  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: UserBuildItem[], now: Date): Promise<UserBuildOutput[]>;
 }
@@ -201,6 +236,11 @@ export interface RankedItem {
   /** vd tagMatch, placeMatch, hot, final */
   breakdown: Record<string, number>;
   reason: { code: string; text: string };
+  /**
+   * Nội bộ, không ra API: ranker có thì feed-policy áp luật đa dạng nơi / trải nghiệm (ranker v0 không có → giữ nguyên).
+   * isFocus: bài ở nơi người xem đang nhắm hoặc đã đặt, được phép chiếm nhiều chỗ hơn.
+   */
+  diversity?: { place: string | null; exp: string | null; isFocus: boolean };
 }
 
 export interface RankInput {
@@ -208,6 +248,14 @@ export interface RankInput {
   candidates: Candidate[];
   userFeatures: Record<string, unknown> | null;
   now: Date;
+  /** Dữ liệu thô của người xem, chỉ có khi ranker khai báo needsViewerRows và người xem đã đăng nhập. */
+  viewer?: ViewerRaw | null;
+}
+
+/** Dòng thô 30 ngày của người xem + nơi (tỉnh) của sản phẩm trong đơn. Use case chỉ đọc và đưa vào, không xử lý. */
+export interface ViewerRaw {
+  rows: RawRow[];
+  productPlaces: Record<string, string>;
 }
 
 /** Tất định: không Math.random. Trả đúng các ứng viên được đưa vào (lọc hết thì rỗng). */
@@ -215,6 +263,10 @@ export interface Ranker {
   /** Khớp recommend_algos.ranker */
   name: string;
   accepts: { postBuilders: string[]; userBuilders: string[] };
+  /** Số ứng viên hot tối đa use case đọc (mặc định 150). Ranker v1 đọc toàn bộ bài. */
+  candidateLimit?: number;
+  /** Cần dòng thô của người xem lúc gọi (RankInput.viewer). */
+  needsViewerRows?: boolean;
   rank(input: RankInput, params?: Record<string, unknown>): RankedItem[];
 }
 

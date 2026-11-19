@@ -491,8 +491,9 @@ export const AiChatTurnRecordedV1Schema = z.object({
     answerKind: z.string(),
     isAction: z.boolean(),
     // SCRUM-179: tuỳ chọn để nhận cả sự kiện cũ. turnId nối lượt chat với các bước gọi LLM trong ai.usage.recorded.
-    turnId: z.uuid().optional(),
-    latencyMs: z.int().nonnegative().optional(),
+    // ai-service gửi null khi không có (sự kiện cũ, lượt không gọi LLM): chấp nhận cả thiếu lẫn null.
+    turnId: z.uuid().nullish(),
+    latencyMs: z.int().nonnegative().nullish(),
   }),
 });
 export type AiChatTurnRecordedV1 = z.infer<typeof AiChatTurnRecordedV1Schema>;

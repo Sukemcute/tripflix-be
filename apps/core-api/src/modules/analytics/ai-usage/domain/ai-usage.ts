@@ -18,9 +18,10 @@ const AiUsagePayloadSchema = z.object({
   costUsd: z.number().nonnegative().finite(),
   estimated: z.boolean(),
   // SCRUM-179: tuỳ chọn, chỉ có từ ai-service bản mới; chat có conversationId, tóm tắt và kiểm duyệt thì không.
-  conversationId: z.uuid().optional(),
-  turnId: z.uuid().optional(),
-  latencyMs: z.number().int().nonnegative().optional(),
+  // ai-service serialize trường rỗng thành null (không exclude_none): nhận cả thiếu lẫn null, không thì mất cả sự kiện chi phí.
+  conversationId: z.uuid().nullish(),
+  turnId: z.uuid().nullish(),
+  latencyMs: z.number().int().nonnegative().nullish(),
 });
 
 export interface AiUsageRecord {

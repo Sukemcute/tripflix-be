@@ -530,6 +530,66 @@
         ]
       }
     },
+    "/api/auth/me/avatar-decor": {
+      "put": {
+        "operationId": "AccountController_setAvatarDecor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvatarDecorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      },
+      "delete": {
+        "operationId": "AccountController_removeAvatarDecor",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/password/change": {
       "post": {
         "operationId": "AccountController_changePassword",
@@ -1138,6 +1198,36 @@
           },
           "404": {
             "description": "Chưa có ảnh"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/avatar-decor": {
+      "get": {
+        "operationId": "UserSearchController_avatarDecor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarDecorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -6399,6 +6489,160 @@
         ]
       }
     },
+    "/api/admin/commerce/orders": {
+      "get": {
+        "operationId": "AdminOrdersController_search",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "createdAt của đơn cuối trang trước",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc trạng thái, nhiều giá trị cách bằng dấu phẩy",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Mã xác nhận, mã đơn, mã người dùng, số điện thoại hoặc email",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn mới nhất trước; nextBefore=null khi hết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/products": {
+      "get": {
+        "operationId": "AdminOrdersController_products",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Mã, tên, khách sạn, tỉnh, sân bay hoặc số hiệu chuyến",
+            "schema": {}
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "room",
+                "flight"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loại phòng hoặc chuyến bay để chọn khi sửa lịch"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/orders/{id}": {
+      "get": {
+        "operationId": "AdminOrdersController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn, mục, khách, khoản trừ, khoản hoàn, lịch sử trạng thái và bất thường của đơn"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/anomalies": {
+      "get": {
+        "operationId": "AdminOrdersController_anomalies",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Tối đa mỗi loại",
+            "schema": {}
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "Loại, cách bằng dấu phẩy: double_charge, charged_without_seat, paid_without_seat, paid_amount_mismatch, stuck_payment, refund_needs_review",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn bất thường, cũ nhất trước trong từng loại, kèm số đếm theo loại"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
     "/api/analytics/ai-usage": {
       "get": {
         "description": "Ngày theo giờ Việt Nam, gồm cả `from` và `to`. Mặc định 7 ngày tới hôm nay, tối đa 92 ngày. Chi phí là ước tính.",
@@ -7467,6 +7711,77 @@
           "updatedAt"
         ]
       },
+      "AvatarStickerDto": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "maxLength": 64,
+            "example": "sticker-1"
+          },
+          "presetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,40}$",
+            "example": "headphones",
+            "description": "Mã sticker do app định nghĩa"
+          },
+          "x": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2,
+            "description": "Tâm theo vòng tròn avatar: 0..1 là trong vòng"
+          },
+          "y": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2
+          },
+          "scale": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2.4
+          },
+          "rotationDeg": {
+            "type": "number",
+            "minimum": -3600,
+            "maximum": 3600
+          },
+          "isFlipped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instanceId",
+          "presetId",
+          "x",
+          "y",
+          "scale",
+          "rotationDeg",
+          "isFlipped"
+        ]
+      },
+      "AvatarDecorDto": {
+        "type": "object",
+        "properties": {
+          "frameId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,40}$",
+            "example": "fox-hat",
+            "description": "Mã khung do app định nghĩa; 'none': không khung"
+          },
+          "stickers": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvatarStickerDto"
+            }
+          }
+        },
+        "required": [
+          "frameId",
+          "stickers"
+        ]
+      },
       "MyProfileDto": {
         "type": "object",
         "properties": {
@@ -7535,6 +7850,16 @@
             "type": "string",
             "nullable": true,
             "description": "Ảnh đại diện (TF109). null: chưa có, app hiện chữ cái đầu của tên"
+          },
+          "avatarDecor": {
+            "nullable": true,
+            "description": "Khung và phụ kiện quanh ảnh đại diện (TF109). null: chưa trang trí",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AvatarDecorDto"
+              }
+            ]
           }
         },
         "required": [
@@ -7549,7 +7874,8 @@
           "gender",
           "nationality",
           "travelPreferences",
-          "avatarUrl"
+          "avatarUrl",
+          "avatarDecor"
         ]
       },
       "UpdateProfileDto": {
@@ -7956,6 +8282,24 @@
           "items",
           "page",
           "hasMore"
+        ]
+      },
+      "AvatarDecorResponseDto": {
+        "type": "object",
+        "properties": {
+          "avatarDecor": {
+            "nullable": true,
+            "description": "null: chưa trang trí hoặc tài khoản bị khoá",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AvatarDecorDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "avatarDecor"
         ]
       },
       "CommentPermissionsDto": {

@@ -175,6 +175,7 @@ function normalizeByP99<F extends Record<string, unknown>>(rows: Array<{ postId:
  */
 export const hotV1: PostBuilder = {
   key: 'hot@v1',
+  needsSamples: true,
   featuresSchema: HotV1FeaturesSchema,
   build(items, now) {
     const rows = buildHotBase(items, now).map((r) => ({
@@ -193,6 +194,7 @@ export const hotV1: PostBuilder = {
  */
 export const hotV2: PostBuilder = {
   key: 'hot@v2',
+  needsSamples: true,
   featuresSchema: HotV2FeaturesSchema,
   build(items, now) {
     const rows = buildHotBase(items, now).map((r) => ({

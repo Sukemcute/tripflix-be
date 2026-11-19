@@ -8,6 +8,7 @@ import {
   type Clock,
 } from '../../auth/application/ports.js';
 import { AccessError } from '../../auth/domain/errors.js';
+import type { AvatarDecor } from '../domain/avatar-decor.js';
 import {
   PUBLIC_SEARCH_LIMITS,
   PUBLIC_SEARCH_MAX_PAGE,
@@ -38,6 +39,12 @@ export class UserSearchUseCases {
   async findAvatarUrl(userId: string): Promise<string | null> {
     const user = await this.store.users.findById(userId);
     return user?.status === 'active' ? user.avatarUrl : null;
+  }
+
+  /** Khung và phụ kiện quanh ảnh đại diện công khai (TF109); không tồn tại, bị khoá hay chưa trang trí thì null. */
+  async findAvatarDecor(userId: string): Promise<AvatarDecor | null> {
+    const user = await this.store.users.findById(userId);
+    return user?.status === 'active' ? user.avatarDecor : null;
   }
 
   /** `q` đã chuẩn hoá ở API (normalizeSearchQuery); `ip` là IP người gọi (đã qua trust proxy). */

@@ -10,6 +10,19 @@ export interface FeedPolicyConfig {
   freePostsPerAuthor: number;
   /** Cộng cho bài tự đăng gần đây; điểm ranker nằm trong [0, 1] nên bài này lên đầu. */
   ownBoost: number;
+  /** Đa dạng trang (chỉ bài có RankedItem.diversity, tức ranker v1): xem diversify(). */
+  diversity: {
+    /** Trong mỗi `window` bài liền nhau: tối đa `maxSamePlace` bài cùng một nơi, `maxSameExp` bài cùng trải nghiệm chính. */
+    window: number;
+    maxSamePlace: number;
+    maxSameExp: number;
+    /** Nơi đang nhắm / đã đặt: tối đa `maxFocus` trong mỗi `focusWindow` bài, không quá `maxFocusRun` bài liền nhau. */
+    focusWindow: number;
+    maxFocus: number;
+    maxFocusRun: number;
+    /** Chỉ sắp lại chừng này vị trí đầu (người xem hiếm khi cuộn sâu hơn); phần sau giữ thứ tự điểm. */
+    top: number;
+  };
 }
 
 /** Giá trị giữ chỗ (đề xuất mục 6.3), chỉnh bằng bộ đánh giá offline. */
@@ -19,6 +32,7 @@ export const FEED_POLICY: FeedPolicyConfig = {
   authorFactor: 0.5,
   freePostsPerAuthor: 2,
   ownBoost: 10,
+  diversity: { window: 5, maxSamePlace: 2, maxSameExp: 2, focusWindow: 10, maxFocus: 5, maxFocusRun: 4, top: 100 },
 };
 
 /** Tín hiệu của người xem, chốt theo mốc trang đầu để phân trang ổn định. */
@@ -62,10 +76,44 @@ export function applyFeedPolicy(ranked: RankedItem[], viewer: ViewerSignals, cfg
     a.final *= a.applied.authorFactor;
   }
 
-  return personal.sort(byFinal).map(({ item, final, applied }) => ({
+  const sorted = personal.sort(byFinal).map(({ item, final, applied }) => ({
     ...item,
     score: round4(final),
     breakdown: { ...item.breakdown, ...applied, final: round4(final) },
     reason: applied.ownBoost ? OWN_POST_REASON : item.reason,
   }));
+  return diversify(sorted, cfg.diversity);
+}
+
+/**
+ * Đa dạng nơi / trải nghiệm trong trang (thiết kế v1 mục 3.6): chỉ đổi vị trí, không bỏ bài, không đổi điểm.
+ * Tham lam: mỗi vị trí lấy bài điểm cao nhất không phạm luật với các bài vừa xếp; nới luật trải nghiệm trước, rồi mới bỏ luật.
+ * Bài không có `diversity` (ranker v0, bài tự đăng) không bao giờ phạm luật nên giữ chỗ như cũ.
+ */
+export function diversify(items: RankedItem[], cfg: FeedPolicyConfig['diversity'] = FEED_POLICY.diversity): RankedItem[] {
+  if (!items.some((i) => i.diversity)) return items;
+  const pool = [...items];
+  const out: RankedItem[] = [];
+  const violates = (c: RankedItem, checkExp: boolean): boolean => {
+    const d = c.diversity;
+    if (!d) return false;
+    const recent = out.slice(-(cfg.window - 1)).map((i) => i.diversity);
+    if (d.isFocus) {
+      const focusInWindow = out.slice(-(cfg.focusWindow - 1)).filter((i) => i.diversity?.isFocus).length;
+      let run = 0;
+      for (let k = out.length - 1; k >= 0 && out[k]!.diversity?.isFocus; k--) run++;
+      if (focusInWindow >= cfg.maxFocus || run >= cfg.maxFocusRun) return true;
+    } else if (d.place && recent.filter((r) => r && !r.isFocus && r.place === d.place).length >= cfg.maxSamePlace) {
+      return true;
+    }
+    return checkExp && d.exp !== null && recent.filter((r) => r?.exp === d.exp).length >= cfg.maxSameExp;
+  };
+  while (out.length < cfg.top && pool.length) {
+    let at = pool.findIndex((c) => !violates(c, true));
+    if (at < 0) at = pool.findIndex((c) => !violates(c, false));
+    if (at < 0) at = 0;
+    const [picked] = pool.splice(at, 1);
+    out.push(at > 0 ? { ...picked!, breakdown: { ...picked!.breakdown, diversityMoved: 1 } } : picked!);
+  }
+  return [...out, ...pool];
 }

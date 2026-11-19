@@ -1,5 +1,5 @@
 import type { RankedItem } from './contracts.js';
-import { applyFeedPolicy, type ViewerSignals } from './feed-policy.js';
+import { applyFeedPolicy, diversify, type ViewerSignals } from './feed-policy.js';
 
 const item = (postId: string, score: number, authorId = `a-${postId}`): RankedItem => ({
   postId,
@@ -60,5 +60,47 @@ describe('applyFeedPolicy', () => {
     const out = applyFeedPolicy(same, viewer({ seen: new Set(['a']) }));
     expect(ids(out)).toEqual(['b', 'c', 'a']);
     expect(out[1]!.breakdown.authorFactor).toBeUndefined();
+  });
+});
+
+describe('diversify', () => {
+  const at = (postId: string, score: number, place: string | null, exp: string | null = null, isFocus = false): RankedItem => ({
+    ...item(postId, score),
+    diversity: { place, exp, isFocus },
+  });
+  const order = (xs: RankedItem[]) => diversify(xs).map((x) => x.postId);
+
+  it('không có diversity (ranker v0) thì giữ nguyên thứ tự', () => {
+    const xs = [item('a', 3), item('b', 2), item('c', 1)];
+    expect(diversify(xs)).toBe(xs);
+  });
+
+  it('tối đa 2 bài cùng nơi trong 5 bài liền nhau; không bỏ bài, không đổi điểm', () => {
+    const xs = [at('n1', 9, 'nt'), at('n2', 8, 'nt'), at('n3', 7, 'nt'), at('d1', 1, 'dl'), at('h1', 0.5, 'hn')];
+    const out = diversify(xs);
+    expect(out.map((x) => x.postId)).toEqual(['n1', 'n2', 'd1', 'h1', 'n3']);
+    expect(out.find((x) => x.postId === 'd1')).toMatchObject({ score: 1, breakdown: { diversityMoved: 1 } });
+  });
+
+  it('nơi đang nhắm: được nhiều chỗ hơn nhưng không quá 4 bài liền nhau, không quá 5 trong 10', () => {
+    const focus = Array.from({ length: 12 }, (_, i) => at(`f${i}`, 10 - i / 100, 'nt', null, true));
+    const others = Array.from({ length: 6 }, (_, i) => at(`o${i}`, 1 - i / 100, `p${i}`));
+    const out = order([...focus, ...others]);
+    expect(out.slice(0, 5)).toEqual(['f0', 'f1', 'f2', 'f3', 'o0']);
+    expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(5);
+  });
+
+  it('không còn bài nào hợp luật thì vẫn xếp theo điểm (chỉ đổi chỗ khi có lựa chọn)', () => {
+    expect(order([at('n1', 3, 'nt'), at('n2', 2, 'nt'), at('n3', 1, 'nt')])).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  it('nới luật trải nghiệm trước luật nơi', () => {
+    const xs = [at('a', 5, 'p1', 'exp:an_uong'), at('b', 4, 'p2', 'exp:an_uong'), at('c', 3, 'p3', 'exp:an_uong'), at('d', 2, 'p4', 'exp:bien')];
+    expect(order(xs)).toEqual(['a', 'b', 'd', 'c']);
+  });
+
+  it('applyFeedPolicy chạy diversify sau các luật theo người xem', () => {
+    const xs = [at('n1', 0.9, 'nt'), at('n2', 0.8, 'nt'), at('n3', 0.7, 'nt'), at('d1', 0.1, 'dl')];
+    expect(applyFeedPolicy(xs, viewer()).map((x) => x.postId)).toEqual(['n1', 'n2', 'd1', 'n3']);
   });
 });

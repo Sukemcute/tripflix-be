@@ -1,4 +1,4 @@
-import type { Candidate } from '../domain/contracts.js';
+import type { Candidate, RawRow } from '../domain/contracts.js';
 import type { AlgoRow } from '../domain/registry.js';
 import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
 import { InvalidRecommendCursorError, PostRecommendationUseCases, ReelsFeedNotWiredError } from './post-recommendations.use-cases.js';
@@ -24,10 +24,10 @@ const ALGOS: AlgoRow[] = [
 ];
 
 /** 30 bài hot (h00 điểm cao nhất), bài Đà Lạt d1 điểm thấp, bài mới f1, pool explore e00..e09. */
-function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[] } = {}) {
+function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[]; viewerRows?: RawRow[] } = {}) {
   const hot = Array.from({ length: 30 }, (_, i) => cand(`h${String(i).padStart(2, '0')}`, { score: 1 - i / 100 }));
   hot.push(cand('d1', { score: 0.1, tags: ['dalat'], placeId: 'da-lat' }));
-  hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang' }));
+  hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang', postFeatures: { bins: { 'place:nha-trang': 1 } } }));
   const fresh = [cand('f1', { score: 0, source: 'fresh' })];
   const explore = Array.from({ length: 10 }, (_, i) => cand(`e0${i}`, { score: 0, source: 'explore' }));
   const without = (xs: Candidate[], q: CandidateQuery) =>
@@ -41,6 +41,8 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     listHotCandidates: vi.fn(async (q: CandidateQuery) => without(hot, q)),
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
+    listUserRows: vi.fn(async (_ids: string[], _now: Date) => opts.viewerRows ?? []),
+    findProductPlaces: vi.fn(async (_ids: string[]): Promise<Record<string, string>> => ({})),
     findPostMetas: vi.fn(async (postIds: string[]) =>
       postIds.map((postId) => ({ postId, authorId: 'a', postType: 'video', tags: ['Beach', 'bien', 'nhatrang'], placeId: 'nha-trang', hasPlan: false })),
     ),
@@ -79,6 +81,30 @@ const query = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>
 const ids = (page: { items: Array<{ post: { id: string } }> }) => page.items.map((i) => i.post.id);
 
 describe('PostRecommendationUseCases', () => {
+  it('ranker v1 (trip_v1): đọc toàn bộ bài, đưa dòng thô người xem vào ranker; vừa tìm Nha Trang thì bài Nha Trang lên đầu', async () => {
+    const search = (i: number): RawRow => ({
+      actorType: 'user', actorId: U, kind: 'search', refId: `s${i}`, targetType: 'place', targetId: 'nha-trang',
+      value: null, isRemoved: false, detail: null, occurredAt: new Date(NOW.getTime() - (i + 1) * 3_600_000).toISOString(),
+    });
+    const { useCases, store } = setup({
+      algos: [{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }, ALGOS[1]!],
+      viewerRows: [search(0), search(1)],
+    });
+    const page = await useCases.recommend(query());
+    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'post_profile@v1', limit: 5000 }));
+    expect(store.listUserRows).toHaveBeenCalledWith([U], expect.any(Date));
+    expect(page.items[0]).toMatchObject({ post: { id: 'b1' }, reason: { code: 'matches_place', text: 'Vì bạn đang tìm hiểu Nha Trang' } });
+    // Mọi bài là ứng viên: ô khám phá vẫn có bài (lấy ngoài top), không rỗng.
+    expect(page.items.some((i) => i.source === 'explore')).toBe(true);
+  });
+
+  it('ranker cũ không đọc dòng thô người xem và giữ giới hạn 150 bài hot', async () => {
+    const { useCases, store } = setup();
+    await useCases.recommend(query());
+    expect(store.listUserRows).not.toHaveBeenCalled();
+    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 150 }));
+  });
+
   it('có user: for_you đưa bài hợp gu lên đầu, đẩy bài đã tương tác xuống, chèn ~5% explore, ghi đã phục vụ', async () => {
     const { useCases, servedAdd, store } = setup();
     const page = await useCases.recommend(query());

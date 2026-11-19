@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { createDb } from '@tripflix/db';
 import { RedisStreamsEventBus } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
-import { DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
+import type { CoreEnv } from '../../platform/env.js';
+import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { CommerceFacade, CommerceModule, type CatalogFlight, type CatalogHotel } from '../commerce/index.js';
 import { ContentFacade, ContentModule, FeedFacade } from '../content/index.js';
@@ -21,12 +22,14 @@ import {
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   SERVED_STORE,
+  TEXT_EMBEDDER,
   type ProductProfileCatalog,
   type RecommendCatalog,
   type RecommendReelCard,
 } from './recommend/application/ports.js';
 import { PostRecommendationUseCases } from './recommend/application/post-recommendations.use-cases.js';
 import { TripAddonUseCases } from './recommend/application/trip-addons.use-cases.js';
+import { AiEmbeddingClient } from './recommend/infra/ai-embedding.client.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
@@ -174,6 +177,12 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     RecommendIngestUseCases,
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
     { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
+    {
+      provide: TEXT_EMBEDDER,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv) =>
+        new AiEmbeddingClient({ aiUrl: env.AI_SERVICE_URL, coreUrl: env.CORE_API_INTERNAL_URL, secret: env.MODERATION_SERVICE_CLIENT_SECRET }),
+    },
     BuildFeaturesUseCases,
     { provide: PRODUCT_PROFILE_CATALOG, inject: [CommerceFacade], useFactory: productProfileCatalog },
     { provide: PRODUCT_FEATURE_STORE, useExisting: RECOMMEND_STORE },
