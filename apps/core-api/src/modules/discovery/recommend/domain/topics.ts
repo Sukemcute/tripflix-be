@@ -72,9 +72,9 @@ export const TAG_PLACES: Readonly<Record<string, string>> = {
   dalat: 'da-lat', lamdong: 'lam-dong', phanthiet: 'lam-dong', muine: 'lam-dong', doicat: 'lam-dong',
   phuquoc: 'phu-quoc', condao: 'con-dao', vungtau: 'vung-tau', quynhon: 'quy-nhon',
   eogio: 'gia-lai', kyco: 'gia-lai', pleiku: 'gia-lai',
-  halong: 'ha-long', vinhhalong: 'ha-long', coto: 'quang-ninh', catba: 'hai-phong', lanha: 'hai-phong',
+  halong: 'ha-long', vinhhalong: 'ha-long', coto: 'co-to', catba: 'hai-phong', lanha: 'hai-phong',
   ninhbinh: 'ninh-binh', trangan: 'ninh-binh', hangmua: 'ninh-binh',
-  sapa: 'lao-cai', laocai: 'lao-cai', mucangchai: 'lao-cai', hagiang: 'tuyen-quang', mocchau: 'son-la',
+  sapa: 'sa-pa', laocai: 'lao-cai', mucangchai: 'lao-cai', hagiang: 'ha-giang', mocchau: 'son-la',
   vinh: 'nghe-an', cualo: 'nghe-an', nghean: 'nghe-an', bienhoa: 'dong-nai',
   buonmathuot: 'dak-lak', dray: 'dak-lak', kontum: 'quang-ngai', cantho: 'can-tho', vinhlong: 'vinh-long',
 };

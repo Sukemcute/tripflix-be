@@ -75,6 +75,10 @@ export const PLACES: readonly PlaceSeed[] = [
   destination('phu-quoc', 'Phú Quốc', 'an-giang', ['pq', 'phuquoc']),
   destination('ha-long', 'Hạ Long', 'quang-ninh', ['halong']),
   destination('quy-nhon', 'Quy Nhơn', 'gia-lai', ['quynhon']),
+  // Có trong lexicon tìm khám phá: thiếu ở đây thì lượt tìm và bài ở các nơi này mất nơi, gợi ý không nhận ra (19/11).
+  destination('ha-giang', 'Hà Giang', 'tuyen-quang', ['hagiang']),
+  destination('sa-pa', 'Sa Pa', 'lao-cai', ['sapa']),
+  destination('co-to', 'Cô Tô', 'quang-ninh', ['coto']),
 ];
 
 const PLACE_ID_BY_NAME = new Map(PLACES.flatMap((p) => [p.name, ...p.aliases].map((n) => [normalizeText(n), p.id] as const)));

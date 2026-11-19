@@ -36,9 +36,9 @@ describe('assignBins', () => {
   });
 
   it('nơi: chưa có placeId thì lấy tag nơi (0,8), rồi tới tên nơi trong nội dung (0,6)', () => {
-    expect(post({ tags: ['fyp', 'SaPa'] })).toEqual({ 'place:lao-cai': 0.8 });
+    expect(post({ tags: ['fyp', 'SaPa'] })).toEqual({ 'place:sa-pa': 0.8, 'place:lao-cai': 0.8 });
     expect(post({ body: 'Ba ngày lang thang Đà Lạt' })).toMatchObject({ 'place:da-lat': 0.6, 'place:lam-dong': 0.6 });
-    expect(post({ placeId: 'hue', tags: ['sapa'] })['place:lao-cai']).toBeUndefined();
+    expect(post({ placeId: 'hue', tags: ['sapa'] })['place:sa-pa']).toBeUndefined();
   });
 
   it('một nguồn mạnh là đủ vào ngăn; nội dung một mình thì không; hai nguồn cộng lại', () => {
