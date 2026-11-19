@@ -1,2 +1,0 @@
-SET LOCAL lock_timeout = '5s';--> statement-breakpoint
-CREATE INDEX "idx_comments_parent_created_asc" ON "content"."comments" ("parent_comment_id","created_at","id","status","author_id") WHERE "deleted_at" IS NULL;

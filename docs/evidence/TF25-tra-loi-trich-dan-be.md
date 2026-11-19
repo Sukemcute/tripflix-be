@@ -13,9 +13,10 @@
    - Thêm `CommentRepository.findByIds(postId, ids)` đọc một truy vấn `WHERE post_id = $1 AND id IN (...)`.
    - `ListCommentsUseCase` (`execute` cho cả list gốc/replies/flat và `enrich` cho `focusCommentId`) gom các `replyToCommentId` trên trang và gọi `findByIds` tối đa 1 lần.
    - `AddCommentUseCase` và `EditCommentUseCase` trả kèm `replyToCommentId` và `replyToExcerpt` ngay trong response tạo/sửa.
-4. **Thứ tự replies ASC + index một phần + migration (`comment.repository.ts`, `db/schema/comments.ts`, `db/migrations/20261119071220_stormy_prowler/migration.sql`):**
+4. **Thứ tự replies ASC & tận dụng index `idx_comments_parent_created` sẵn có (`comment.repository.ts`):**
    - Khi `!options.flat && options.parentCommentId`: `findPage` và `findByPostId` sắp `created_at ASC, id ASC` và phân trang keyset bằng `isAfterCursor` (bình luận gốc giữ nguyên `DESC` + `isBeforeCursor`).
-   - Thêm partial index `idx_comments_parent_created_asc` (`parent_comment_id, created_at ASC, id ASC, status, author_id WHERE deleted_at IS NULL`) trong `schema/comments.ts` và sinh migration bằng `pnpm --filter @tripflix/core-api db:generate content`, đầu file có `SET LOCAL lock_timeout = '5s';`. Không chạy `db:migrate`.
+   - Không tạo thêm migration/index mới: `develop` đã có sẵn partial index `idx_comments_parent_created` trên `(parent_comment_id, created_at DESC NULLS FIRST, id DESC NULLS FIRST, status, author_id) WHERE deleted_at IS NULL`. Vì mặc định của PostgreSQL cho `ASC` là `NULLS LAST` (đối xứng ngược chính xác của `DESC NULLS FIRST`), truy vấn `WHERE parent_comment_id = $1 AND deleted_at IS NULL AND (created_at, id) > ($2, $3) ORDER BY created_at ASC, id ASC LIMIT 21` dùng **`Index Scan Backward using idx_comments_parent_created`** (hoặc `Index Only Scan Backward` khi visibility map cho phép), đọc đúng 21 mục theo thứ tự tăng dần mà không tốn `Sort` hay chi phí ghi thêm index trùng.
+   - Đã kiểm `drizzle-kit check --config src/modules/content/db/drizzle.config.ts` (`Everything's fine`) và `pnpm --filter @tripflix/core-api db:generate content` (`No schema changes, nothing to migrate`).
 5. **Unit tests (`apps/core-api/src/modules/content/social/application/use-cases/reply-quote.spec.ts`, 8 tests):**
    - Kiểm cắt 120 ký tự Unicode an toàn với emoji/surrogate pair, `isPublicReplyTarget` trả `null` khi xoá/ẩn/giữ/creator pending, `findByIds` chỉ gọi 1 lần cho cả trang và focus thread (không N+1), reply cũ không có `replyToCommentId` trả `null`, thứ tự `ASC` + cursor trang 2 nối đúng, và `AddCommentUseCase` trả ngay `replyToCommentId` + `replyToExcerpt`.
 
@@ -32,4 +33,4 @@
 - Không áp dụng (thay đổi backend).
 
 ## Ảnh hưởng tới phần của người khác
-- Chỉ sửa trong `apps/core-api/src/modules/content/social/*`, `apps/core-api/src/modules/content/db/*` (thêm partial index), và `contracts/openapi/core-api.json` (chỉ thêm field tương thích ngược trên `SocialCommentDto`). Không sửa `libs/contracts/` hay module của thành viên khác.
+- Chỉ sửa trong `apps/core-api/src/modules/content/social/*` và `contracts/openapi/core-api.json` (chỉ thêm field tương thích ngược trên `SocialCommentDto`). Không đổi schema/migration DB, không sửa `libs/contracts/` hay module của thành viên khác.
