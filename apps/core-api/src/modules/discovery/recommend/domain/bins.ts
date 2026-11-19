@@ -15,11 +15,11 @@ export interface PostBinInput {
 /** Độ tin từng nguồn (recommend-topics mục 6, chốt 18/11). */
 const W = { tag: 0.5, title: 0.5, body: 0.3, itemCategory: 0.5, cost: 0.5, days: 1, caption: 0.5 };
 /**
- * Caption chỉ vào ngăn exp có cosine cao nhất khi hơn ngăn thứ hai ≥ biên này. Chọn theo F1 cao nhất trên 283 caption thật
- * (e5-small INT8, bỏ hashtag; FP gồm cả caption không nói gì mà bị gán): F1 0,75, precision 0,74, recall 0,76,
- * nhưng gán bừa 59% caption không nói gì. Muốn ít gán bừa hơn: 0,0075 (F1 0,71, gán bừa 14%), 0,02 (F1 0,52, gán bừa 2%).
+ * Caption chỉ vào ngăn exp có cosine cao nhất khi hơn ngăn thứ hai ≥ biên này. Quét trên 283 caption thật (e5-small INT8,
+ * bỏ hashtag; FP gồm cả caption không nói gì mà bị gán): 0,0075 cho F1 0,71 (precision 0,86, recall 0,61), gán bừa 14%.
+ * F1 cao nhất là 0,0025 (0,75) nhưng gán bừa 59%; 0,02 gán bừa 2% nhưng F1 chỉ 0,52 (Duy chọn 0,0075, 19/11).
  */
-const CAPTION_MARGIN = 0.0025;
+const CAPTION_MARGIN = 0.0075;
 /** Giới hạn văn bản của /embed. Mô hình chỉ đọc 256 token đầu nên phần sau không đổi kết quả. */
 const CAPTION_MAX_CHARS = 2000;
 /** Ngăn exp/cost/with/len/season chỉ giữ khi tổng độ tin ≥ ngưỡng: một nguồn mạnh là đủ, nội dung một mình thì không. */

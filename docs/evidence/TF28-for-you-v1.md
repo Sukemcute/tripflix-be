@@ -43,7 +43,7 @@ Endpoint, tham số và JSON trả về không đổi. Bước bật v1 làm sau
 - **Consumer.** Nghe thêm `content.post.viewed` và `content.post.booking_clicked`. Hai sự kiện này đã được phát sẵn, chỉ thêm phía nghe.
 - **Ngăn từ caption (commit cuối).**
   - Job nhúng tiêu đề + nội dung qua ai-service `POST /embed` (multilingual-e5-small INT8) và cache vector theo sha256 ở bảng mới `discovery.recommend_text_vectors`.
-  - `bins.ts` so cosine với câu mô tả 9 ngăn và chỉ gán khi ngăn đầu hơn ngăn thứ hai ít nhất 0,0025 (biên có F1 cao nhất).
+  - `bins.ts` so cosine với câu mô tả 9 ngăn và chỉ gán khi ngăn đầu hơn ngăn thứ hai ít nhất 0,0075 (Duy chọn sau khi quét biên theo F1).
   - AI tắt, lỗi hoặc dùng sai mô hình thì job bỏ nguồn caption và vẫn chạy.
 
 ## Đối chiếu "Xong khi"
@@ -62,15 +62,17 @@ Endpoint, tham số và JSON trả về không đổi. Bước bật v1 làm sau
 
   | Biên | precision | recall | F1 | gán bừa caption không nói gì |
   |---|---|---|---|---|
-  | **0,0025 (đang dùng, F1 cao nhất)** | 0,74 | 0,76 | **0,75** | 59% |
-  | 0,0075 | 0,86 | 0,61 | 0,71 | 14% |
+  | 0,0025 (F1 cao nhất) | 0,74 | 0,76 | 0,75 | 59% |
+  | **0,0075 (đang dùng)** | 0,86 | 0,61 | **0,71** | 14% |
   | 0,02 (bản trước) | 0,97 | 0,35 | 0,52 | 2% |
 
 - **Vì sao không dùng mô hình lớn hơn.** e5-large đúng hơn nhưng quá nặng cho máy chủ 2 vCPU / 8 GB dùng chung. Qwen3 và bge-m3 gán bừa nhiều hơn ở cùng độ phủ.
-- **Trên 243 bài mẫu của DB local, biên 0,0025.**
-  - Caption thêm ngăn cho 104 bài, trong đó 17/30 bài trước đó không có ngăn trải nghiệm nào. Ngăn được thêm nhiều nhất: `cafe` 35, `ve_dem` 21, `nghi_duong` 19.
-  - Đúng: "Tràng An mùa lúa chín" vào `nui`, "Côn Đảo… ngắm rùa" vào `bien`.
-  - Sai: "Vĩnh Long: miệt vườn, chợ nổi" vào `ve_dem`, "Phan Thiết: đồi cát bay" vào `an_uong`. Caption seed theo mẫu ("Ngày 3 ở Nha Trang: bien cả ngày") cũng hay bị gán `ve_dem`.
+- **Chọn 0,0075 thay vì 0,0025.** F1 chỉ thấp hơn 0,04, nhưng tỉ lệ gán bừa giảm từ 59% xuống 14%. Ở 0,0025, caption thêm ngăn cho 104/243 bài mẫu và nhiều ngăn sai rõ, ví dụ "Vĩnh Long: miệt vườn, chợ nổi" bị gán `ve_dem`.
+- **Trên 243 bài mẫu của DB local, biên 0,0075.**
+  - Caption thêm ngăn cho 47 bài, trong đó 5/30 bài trước đó không có ngăn trải nghiệm nào.
+  - Đúng: Tràng An, Ninh Bình vào `nui`; Côn Đảo, Bình Ba, Vũng Tàu vào `bien`; "Nhà hàng Vua Tôm Hùm" vào `an_uong`; "The Dog Bar" vào `ve_dem`.
+  - Sai: "Săn mây Đà Lạt…" bị gán `cafe`; "Vịnh Hạ Long từ trên du thuyền" bị gán `nui`.
+  - 28 lần gán `cafe`, phần lớn rơi vào caption seed theo mẫu có chữ "chill" ("Tối ở X, ăn no rồi ngồi viết cap").
   - Biên chỉ là một hằng số (`CAPTION_MARGIN` trong `bins.ts`). Đổi biên thì lượt job sau tự áp.
 
 ## Kết quả kiểm tra

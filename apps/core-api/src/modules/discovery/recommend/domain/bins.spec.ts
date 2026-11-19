@@ -130,9 +130,9 @@ describe('ngăn từ caption (vector nhúng)', () => {
     expect(post({ body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.9)) })).toEqual({ 'exp:bien': 0.5 });
   });
 
-  it('hai ngăn gần như bằng nhau (biên < 0,0025) thì không gán', () => {
+  it('hai ngăn sát nhau (biên < 0,0075) thì không gán: không cố phân loại', () => {
     const caption = 'Đi chơi cuối tuần';
-    expect(post({ body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.5005)) })).toEqual({});
+    expect(post({ body: caption, vectors: vectorsWith(caption, mix(bien, nui, 0.502)) })).toEqual({});
   });
 
   it('caption = tiêu đề + nội dung; thiếu vector caption hoặc mô tả ngăn thì nguồn caption không góp', () => {
