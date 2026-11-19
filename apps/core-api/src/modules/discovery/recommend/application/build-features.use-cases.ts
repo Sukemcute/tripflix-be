@@ -145,7 +145,9 @@ export class BuildFeaturesUseCases {
 
     const needsSamples = postBuilders.some((b) => b.needsSamples);
     const contentById = new Map(sourcePosts.map((p) => [p.id, contentOf(p)]));
-    const vectors = await this.resolveVectors(textsToEmbed(contentById.values()));
+    // Chỉ nhúng khi builder đang bật đọc ngăn từ caption (v0 thì không gọi AI, không đọc cache).
+    const needsVectors = [...postBuilders, ...userBuilders].some((b) => b.needsVectors);
+    const vectors = needsVectors ? await this.resolveVectors(textsToEmbed(contentById.values())) : new Map<string, number[]>();
     if (vectors.size) for (const content of contentById.values()) if (content) content.vectors = vectors;
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),

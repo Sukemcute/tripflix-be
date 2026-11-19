@@ -129,6 +129,8 @@ export interface PostBuilder {
   key: string;
   /** Cần interactionSamples (tương tác kèm tuổi tài khoản): job chỉ đọc khi có builder khai báo. */
   needsSamples?: boolean;
+  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: PostBuildItem[], now: Date): Promise<PostBuildOutput[]>;
 }
@@ -136,6 +138,8 @@ export interface PostBuilder {
 export interface UserBuilder {
   /** 'tag_affinity@v0' */
   key: string;
+  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: UserBuildItem[], now: Date): Promise<UserBuildOutput[]>;
 }

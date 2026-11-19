@@ -74,6 +74,7 @@ const roundAll = (m: Record<string, number>) => Object.fromEntries(Object.entrie
 
 export const tripProfileV1: UserBuilder = {
   key: 'trip_profile@v1',
+  needsVectors: true,
   featuresSchema: TripProfileV1FeaturesSchema,
   build(items, now) {
     return Promise.resolve(

@@ -45,6 +45,7 @@ Endpoint, tham số và JSON trả về không đổi. Bước bật v1 làm sau
   - Job nhúng tiêu đề + nội dung qua ai-service `POST /embed` (multilingual-e5-small INT8) và cache vector theo sha256 ở bảng mới `discovery.recommend_text_vectors`.
   - `bins.ts` so cosine với câu mô tả 9 ngăn và chỉ gán khi ngăn đầu hơn ngăn thứ hai ít nhất 0,0075 (Duy chọn sau khi quét biên theo F1).
   - AI tắt, lỗi hoặc dùng sai mô hình thì job bỏ nguồn caption và vẫn chạy.
+  - Mỗi văn bản chỉ nhúng một lần: lượt sau lấy từ cache theo sha256. Chạy local 6 lượt job, ai-service chỉ nhận 4 lần `/embed`, đều ở lượt đầu (252 văn bản, lô 64). Job chỉ nhúng khi builder đang bật khai báo `needsVectors` (`post_profile@v1`, `trip_profile@v1`); khi `for_you` còn v0 thì không gọi AI.
 
 ## Đối chiếu "Xong khi"
 

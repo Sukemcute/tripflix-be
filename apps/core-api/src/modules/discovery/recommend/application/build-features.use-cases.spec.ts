@@ -152,6 +152,14 @@ describe('BuildFeaturesUseCases', () => {
       }
     });
 
+    it('thuật toán đang bật không đọc ngăn từ caption (v0): không đọc cache, không gọi AI', async () => {
+      const embedder = embedderOf();
+      const { store, useCases } = setup(embedder);
+      await useCases.runCycle(NOW);
+      expect(store.findTextVectors).not.toHaveBeenCalled();
+      expect(embedder.embed).not.toHaveBeenCalled();
+    });
+
     it('không có embedder (AI chưa cấu hình): không đọc cache', async () => {
       const { store, useCases } = setup();
       await useCases.runCycle(NOW);

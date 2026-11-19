@@ -27,6 +27,7 @@ export function profileFeaturesOf(item: Pick<PostBuildItem, 'tags' | 'placeId' |
 export const postProfileV1: PostBuilder = {
   key: 'post_profile@v1',
   needsSamples: true,
+  needsVectors: true,
   featuresSchema: PostProfileV1FeaturesSchema,
   async build(items, now) {
     const byId = new Map(items.map((i) => [i.postId, i]));
