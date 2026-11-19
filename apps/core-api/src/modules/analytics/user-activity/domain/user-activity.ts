@@ -137,6 +137,8 @@ export interface UserActivityTotals {
 /** Một ngày (giờ Việt Nam, YYYY-MM-DD) với số lượt từng loại. */
 export interface UserActivityDay {
   date: string;
+  /** Số người khác nhau có hoạt động trong ngày. */
+  activeUsers: number;
   reactions: number;
   comments: number;
   shares: number;
