@@ -1,0 +1,66 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "67dcab0a-013c-40be-9afe-dafc4ca88783",
+  "prevIds": [
+    "59b275e1-7214-46d1-a27f-0a7f9f48a2b6"
+  ],
+  "footprints": [
+    {
+      "statementType": "recreate_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "comments",
+        "idx_comments_creator_pending"
+      ],
+      "writes": [
+        "s|idx|content.idx_comments_creator_pending",
+        "n|idx|content.idx_comments_creator_pending",
+        "e|idx|content.idx_comments_creator_pending",
+        "n|rel|content.idx_comments_creator_pending"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comments.post_id",
+        "n|col|content.comments.created_at",
+        "n|col|content.comments.id"
+      ],
+      "sharedWrites": [],
+      "sqlHash": "5be59ddfe7304e49"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "indexes\u0000[\"content\",\"idx_comments_creator_pending\"]",
+      "set": {
+        "columns": [
+          {
+            "value": "post_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": false,
+            "nullsFirst": true,
+            "opclass": null
+          },
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": false,
+            "nullsFirst": true,
+            "opclass": null
+          }
+        ]
+      }
+    }
+  ]
+}
