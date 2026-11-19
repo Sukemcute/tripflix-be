@@ -174,6 +174,30 @@ export class DrizzleOrderStore implements OrderStore {
     return row ? mapOrder(row) : null;
   }
 
+  async findDepartureReminderCandidateIds(input: { fromDate: string; toDate: string; limit: number }) {
+    const startsInWindow = this.db
+      .select({ id: orderItems.id })
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orders.id), gte(orderItems.date, input.fromDate), lte(orderItems.date, input.toDate)));
+    const rows = await this.db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(eq(orders.status, 'paid'), sql`${orders.departureRemindedAt} is null`, exists(startsInWindow)))
+      .orderBy(asc(orders.paidAt))
+      .limit(input.limit);
+    return rows.map((r) => r.id);
+  }
+
+  async markDepartureReminded(orderId: string, at: Date) {
+    // UPDATE có điều kiện: hai lượt chạy cùng lúc thì chỉ một lượt nhận được hàng, lượt kia không ghi sự kiện.
+    const rows = await this.db
+      .update(orders)
+      .set({ departureRemindedAt: at })
+      .where(and(eq(orders.id, orderId), eq(orders.status, 'paid'), sql`${orders.departureRemindedAt} is null`))
+      .returning({ id: orders.id });
+    return rows.length > 0;
+  }
+
   async lockPaymentSkipLocked(paymentId: string) {
     const [row] = await this.db.select().from(payments).where(eq(payments.id, paymentId)).for('update', { skipLocked: true });
     return row ? mapPayment(row) : null;

@@ -105,6 +105,32 @@ export const CommerceOrderPaidV1Schema = z.object({
 });
 export type CommerceOrderPaidV1 = z.infer<typeof CommerceOrderPaidV1Schema>;
 
+/**
+ * commerce.order.departure_reminder v1 (TF37): chuyến của đơn đã trả bắt đầu trong 24 giờ tới; mỗi đơn chỉ phát một lần.
+ * startAt: giờ nhận phòng (14:00) hoặc giờ cất cánh sớm nhất, theo giờ Việt Nam, dạng ISO.
+ */
+export const CommerceOrderDepartureReminderV1Schema = z.object({
+  orderId: z.uuid(),
+  userId: z.uuid(),
+  startAt: z.string(),
+  confirmationCode: z.string().nullable(),
+  contactName: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+  items: z.array(
+    z.object({
+      productType: z.enum(['room', 'flight']),
+      productName: z.string(),
+      propertyName: z.string().nullable(),
+      date: z.string(),
+      nights: z.number().int().positive(),
+      flight: z
+        .object({ fromAirport: z.string(), toAirport: z.string(), departTime: z.string().nullable(), arriveTime: z.string().nullable() })
+        .nullable(),
+    }),
+  ),
+});
+export type CommerceOrderDepartureReminderV1 = z.infer<typeof CommerceOrderDepartureReminderV1Schema>;
+
 /** commerce.order.cancelled v1: khách huỷ đơn đã thanh toán, chỗ đã trả về kho. Mang sẵn dữ liệu để notification báo huỷ. */
 export const CommerceOrderCancelledV1Schema = z.object({
   orderId: z.uuid(),
@@ -520,6 +546,7 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'access.user.profile_updated.v1': AccessUserProfileUpdatedV1Schema,
   'commerce.order.paid.v1': CommerceOrderPaidV1Schema,
   'commerce.order.cancelled.v1': CommerceOrderCancelledV1Schema,
+  'commerce.order.departure_reminder.v1': CommerceOrderDepartureReminderV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
   'content.media.ready.v1': ContentMediaReadyV1Schema,
   'content.media.failed.v1': ContentMediaFailedV1Schema,

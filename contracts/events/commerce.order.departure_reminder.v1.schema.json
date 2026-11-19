@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "orderId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "startAt": {
+      "type": "string"
+    },
+    "confirmationCode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contactName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contactEmail": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "room",
+              "flight"
+            ]
+          },
+          "productName": {
+            "type": "string"
+          },
+          "propertyName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": "string"
+          },
+          "nights": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "flight": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "fromAirport": {
+                    "type": "string"
+                  },
+                  "toAirport": {
+                    "type": "string"
+                  },
+                  "departTime": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "arriveTime": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "fromAirport",
+                  "toAirport",
+                  "departTime",
+                  "arriveTime"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "productType",
+          "productName",
+          "propertyName",
+          "date",
+          "nights",
+          "flight"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "orderId",
+    "userId",
+    "startAt",
+    "confirmationCode",
+    "contactName",
+    "contactEmail",
+    "items"
+  ],
+  "additionalProperties": false
+}
