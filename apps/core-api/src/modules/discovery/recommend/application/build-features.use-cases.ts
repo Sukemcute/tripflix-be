@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { textsToEmbed } from '../domain/bins.js';
+import { captionExpOf, captionOf, EXP_DESCRIPTION_TEXTS } from '../domain/bins.js';
 import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
 import type { PostBuilder, PostContent, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
@@ -22,6 +22,9 @@ const JOB = 'build-features';
 const USER_BATCH = 200;
 /** Văn bản mới nhúng tối đa mỗi chu kỳ (~45 giây ở ai-service 0,5 CPU; 42k bài backfill ~3,5 giờ); phần còn lại để chu kỳ sau. */
 const EMBED_PER_CYCLE = 2048;
+/** Số caption đọc vector mỗi lần: một câu IN vừa phải, và RAM chỉ giữ vector của một lô. */
+const VECTOR_READ_CHUNK = 1000;
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 export interface BuildCycleResult {
   posts: number;
@@ -81,29 +84,57 @@ export class BuildFeaturesUseCases {
   ) {}
 
   /**
-   * Vector của các văn bản (dữ liệu thô cho bins.ts): đọc cache trước, thiếu thì gọi ai-service, ghi lại cache.
-   * Vector của mô hình khác CAPTION_MODEL bị bỏ vì biên đo trên mô hình đó. Lỗi gì cũng chỉ mất nguồn caption, job chạy tiếp.
+   * Vector của các văn bản: đọc cache trước, thiếu thì nhúng tối đa `budget` văn bản qua ai-service rồi ghi cache.
+   * Vector của mô hình khác CAPTION_MODEL bị bỏ vì biên đo trên mô hình đó.
    */
-  private async resolveVectors(texts: string[]): Promise<Map<string, number[]>> {
-    if (!this.embedder || texts.length === 0) return new Map();
+  private async vectorsOf(texts: string[], budget: number): Promise<{ vectors: Map<string, number[]>; embedded: number }> {
+    const hashes = texts.map(sha256);
+    const byHash = await this.store.findTextVectors(CAPTION_MODEL, [...new Set(hashes)]);
+    const missing = [...new Set(texts.filter((_, i) => !byHash.has(hashes[i]!)))].slice(0, budget);
+    if (missing.length) {
+      const embedded = await this.embedder!.embed(missing);
+      if (embedded?.model === CAPTION_MODEL) {
+        const rows = missing.map((t, i) => ({ textHash: sha256(t), vector: embedded.vectors[i]! }));
+        await this.store.insertTextVectors(CAPTION_MODEL, rows);
+        for (const r of rows) byHash.set(r.textHash, r.vector);
+      } else if (embedded) {
+        throw new Error(`ai-service nhúng bằng ${embedded.model}, cần ${CAPTION_MODEL}`);
+      }
+    }
+    const vectors = new Map(texts.flatMap((t, i) => (byHash.has(hashes[i]!) ? [[t, byHash.get(hashes[i]!)!] as const] : [])));
+    return { vectors, embedded: missing.length };
+  }
+
+  /**
+   * Gắn content.captionExp cho từng bài (đầu vào nguồn caption của bins.ts). Bài mới trước: nhúng chưa kịp thì bài cũ
+   * chờ chu kỳ sau. Đọc vector theo lô và bỏ ngay sau khi so với mô tả ngăn. Lỗi gì cũng chỉ mất nguồn caption, job chạy tiếp.
+   */
+  private async resolveCaptionBins(postsNewestFirst: Array<{ content: PostContent | undefined }>): Promise<void> {
+    if (!this.embedder) return;
     try {
-      const hashOf = new Map(texts.map((t) => [t, createHash('sha256').update(t).digest('hex')]));
-      const byHash = await this.store.findTextVectors(CAPTION_MODEL, [...new Set(hashOf.values())]);
-      const missing = texts.filter((t) => !byHash.has(hashOf.get(t)!)).slice(0, EMBED_PER_CYCLE);
-      if (missing.length) {
-        const embedded = await this.embedder.embed(missing);
-        if (embedded?.model === CAPTION_MODEL) {
-          const rows = missing.map((t, i) => ({ textHash: hashOf.get(t)!, vector: embedded.vectors[i]! }));
-          await this.store.insertTextVectors(CAPTION_MODEL, rows);
-          for (const r of rows) byHash.set(r.textHash, r.vector);
-        } else if (embedded) {
-          this.logger.warn(`ai-service nhúng bằng ${embedded.model}, cần ${CAPTION_MODEL}: bỏ nguồn caption`);
+      const descriptions = (await this.vectorsOf([...EXP_DESCRIPTION_TEXTS], EXP_DESCRIPTION_TEXTS.length)).vectors;
+      if (descriptions.size < EXP_DESCRIPTION_TEXTS.length) return;
+      const descriptionVectors = EXP_DESCRIPTION_TEXTS.map((t) => descriptions.get(t)!);
+      const byCaption = new Map<string, PostContent[]>();
+      for (const { content } of postsNewestFirst) {
+        const caption = captionOf(content);
+        if (!caption || !content) continue;
+        const list = byCaption.get(caption);
+        if (list) list.push(content);
+        else byCaption.set(caption, [content]);
+      }
+      const captions = [...byCaption.keys()];
+      let budget = EMBED_PER_CYCLE;
+      for (let i = 0; i < captions.length; i += VECTOR_READ_CHUNK) {
+        const { vectors, embedded } = await this.vectorsOf(captions.slice(i, i + VECTOR_READ_CHUNK), budget);
+        budget -= embedded;
+        for (const [caption, vector] of vectors) {
+          const bin = captionExpOf(vector, descriptionVectors);
+          for (const content of byCaption.get(caption)!) content.captionExp = bin;
         }
       }
-      return new Map(texts.flatMap((t) => (byHash.has(hashOf.get(t)!) ? [[t, byHash.get(hashOf.get(t)!)!]] : [])));
     } catch (err) {
       this.logger.warn(`Không lấy được vector caption, bỏ nguồn caption: ${err instanceof Error ? err.message : String(err)}`);
-      return new Map();
     }
   }
 
@@ -147,8 +178,10 @@ export class BuildFeaturesUseCases {
     const contentById = new Map(sourcePosts.map((p) => [p.id, contentOf(p)]));
     // Chỉ nhúng khi builder đang bật đọc ngăn từ caption (v0 thì không gọi AI, không đọc cache).
     const needsVectors = [...postBuilders, ...userBuilders].some((b) => b.needsVectors);
-    const vectors = needsVectors ? await this.resolveVectors(textsToEmbed(contentById.values())) : new Map<string, number[]>();
-    if (vectors.size) for (const content of contentById.values()) if (content) content.vectors = vectors;
+    if (needsVectors) {
+      const newestFirst = [...sourcePosts].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      await this.resolveCaptionBins(newestFirst.map((p) => ({ content: contentById.get(p.id) })));
+    }
     const [counts, samples] = await Promise.all([
       this.store.countPostInteractions(now),
       needsSamples ? this.store.listPostInteractionSamples(now) : Promise.resolve(null),
