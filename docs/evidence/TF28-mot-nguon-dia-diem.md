@@ -24,11 +24,14 @@
    - `build-features.use-cases.ts`: log `recommend.place_unresolved_ratio` (`{ total, unresolved, ratio }`) cuối mỗi lượt build, không ghi tiêu đề bài.
    - `recommend/eval/`: thêm `unresolvedPlacePosts` (tính lại nơi từ dữ liệu thô, bỏ qua `placeId` dump cũ, đối chiếu khớp với `bins`) vào `formatBinStats` và assert `= []` trong `recommend-eval.spec.ts`; cập nhật `report.md`.
 
+4. **Tìm theo tỉnh gồm cả điểm đến thuộc tỉnh** (`places.ts > bucketsWithin`, `explore/rank.ts`, `explore/memory-source.ts`, `infra/drizzle-explore.store.ts`): 34 tỉnh thành nơi trong câu tìm, mà lọc nơi so tên bucket chính xác, nên đo trên local "resort an giang" 21 → 0 (mất Phú Quốc), "khách sạn lâm đồng" 52 → 13 (mất Đà Lạt), "khách sạn quảng ninh" mất Hạ Long và bài. Tìm một tỉnh nay nhận cả bucket của điểm đến con ở lọc ứng viên (RAM + SQL) và chấm điểm, lý do ghi nơi thật ("Ở Phú Quốc"); 6 thành phố trực thuộc trung ương giữ nguyên chỉ chính nó ("khách sạn đà nẵng" không gồm Hội An). Test `explore.spec.ts` "tìm theo tỉnh gồm cả điểm đến…" (fail trước khi sửa).
+
 ## Đối chiếu "Xong khi"
 
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
-| Các tiêu đề ở mục 1 đều có `place_id` đúng | Đạt ở unit test + eval (SQL local chờ Duy chạy lại stack) | `places.spec.ts` (14/14 tiêu đề pass, 6 tiêu đề không nơi = `[]`), `recommend-eval.spec.ts` (`bài có nhắc nơi mà mất nơi: 0` trên `posts-2026-11-18.json`). Bước chạy lại Docker `core-api` local + SQL mục 1 để cho Duy chạy cùng `MODERATION_SERVICE_CLIENT_SECRET` (tránh ghi đè container đang bật AI). |
+| Các tiêu đề ở mục 1 đều có `place_id` đúng | Có | `places.spec.ts` (14/14 tiêu đề pass, 6 tiêu đề không nơi = `[]`), `recommend-eval.spec.ts` (`bài có nhắc nơi mà mất nơi: 0`). Local (core-api build từ nhánh này): log `recommend.place_unresolved_ratio` 1296 → 1282/3178, phần còn lại là 6 tiêu đề không nói nơi. |
+| Tìm theo tỉnh không mất điểm đến con | Có | Local, so với bản #305: "khách sạn lâm đồng" 52 → 128 (Đà Lạt, Mũi Né), "khách sạn quảng ninh" 57 chỗ ở + 6 bài → 64 + 120 (Hạ Long), "resort an giang" 21 → 35 (Phú Quốc), "khách sạn khánh hòa" 24 → 100 (Nha Trang), "homestay lào cai" 99 → 30 (bản cũ không hiểu nơi, trả gần hết 98 chỗ ở Lào Cai + Sa Pa; nay chỉ homestay). "khách sạn đà lạt", "ks hcm 5 sao", "khách sạn sapa", "cà phê hà giang" không đổi. |
 | Tìm `"cần thơ"`, `"mũi né"`, `"cát bà"`, `"hà giang"` có `placeIds` đúng | Có | `search-events.publisher.spec.ts`: `['can-tho']`, `['mui-ne']`, `['cat-ba']`, `['ha-giang']`. |
 | Tìm khám phá không tụt | Có | `vitest run src/modules/discovery/search`: 16 file pass, 2 skip (147 test pass, 4 skip) gồm `explore.spec.ts`, `typo-regression.spec.ts`; `typo-bench.spec.ts` trước/sau ở bảng dưới (`*/typo` cold 86.7% → 88.1%, seed 80.9% → 84.1%). |
 | Gợi ý không tụt | Có | `vitest run src/modules/discovery/recommend`: 26 file pass (240 test pass); `report.md` cập nhật: `bài có nhắc nơi mà mất nơi: 0`, `đúng nơi@10` mọi persona giữ nguyên ≥ trước. |
