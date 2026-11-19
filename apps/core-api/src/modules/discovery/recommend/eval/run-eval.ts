@@ -142,12 +142,12 @@ const STAGE_LABEL: Record<Stage, string> = {
   guest: 'Khách',
 };
 
-/** Ngưỡng đạt theo thiết kế v1 mục 4; persona không có chỉ số đó thì "–". */
+/** Ngưỡng đạt theo thiết kế v1 mục 4 (đúng nơi hạ 0,5 → 0,4 theo trần 4/10 của feed-policy, 19/11); persona không có chỉ số đó thì "–". */
 const GOAL: Record<Stage, string> = {
   dreaming: 'số nơi ≥ 4, chuỗi ≤ 3',
-  planning: 'đúng nơi ≥ 0,5',
-  upcoming: 'đúng nơi ≥ 0,5, KS khác ≤ 1',
-  on_trip: 'đúng nơi ≥ 0,5',
+  planning: 'đúng nơi ≥ 0,4',
+  upcoming: 'đúng nơi ≥ 0,4, KS khác ≤ 1',
+  on_trip: 'đúng nơi ≥ 0,4',
   after_trip: 'nơi vừa đi ≤ 0,2',
   guest: 'như trending',
 };

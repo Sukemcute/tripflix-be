@@ -82,12 +82,12 @@ describe('diversify', () => {
     expect(out.find((x) => x.postId === 'd1')).toMatchObject({ score: 1, breakdown: { diversityMoved: 1 } });
   });
 
-  it('nơi đang nhắm: được nhiều chỗ hơn nhưng không quá 4 bài liền nhau, không quá 5 trong 10', () => {
+  it('nơi đang nhắm: được nhiều chỗ hơn nhưng không quá 4 bài liền nhau, không quá 4 trong 10', () => {
     const focus = Array.from({ length: 12 }, (_, i) => at(`f${i}`, 10 - i / 100, 'nt', null, true));
     const others = Array.from({ length: 6 }, (_, i) => at(`o${i}`, 1 - i / 100, `p${i}`));
     const out = order([...focus, ...others]);
     expect(out.slice(0, 5)).toEqual(['f0', 'f1', 'f2', 'f3', 'o0']);
-    expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(5);
+    expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(4);
   });
 
   it('không còn bài nào hợp luật thì vẫn xếp theo điểm (chỉ đổi chỗ khi có lựa chọn)', () => {
