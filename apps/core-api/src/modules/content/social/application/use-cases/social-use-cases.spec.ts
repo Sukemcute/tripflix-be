@@ -1011,6 +1011,7 @@ describe('Social Application Use Cases', () => {
       expect(mockCommentRepo.update).toHaveBeenCalledWith(initialRecord.id, {
         body: 'Nội dung đã sửa',
         isEdited: true,
+        mentions: [],
         creatorReview: 'pending',
         status: 'held',
       });
@@ -1050,6 +1051,7 @@ describe('Social Application Use Cases', () => {
       expect(mockCommentRepo.update).toHaveBeenCalledWith(initialRecord.id, {
         body: 'Nội dung đã sửa',
         isEdited: true,
+        mentions: [],
         platformHeld: true,
       });
     });
