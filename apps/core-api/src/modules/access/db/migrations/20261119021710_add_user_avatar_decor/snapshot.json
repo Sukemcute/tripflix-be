@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "884ab2b4-10dc-4551-8f73-e7d44764e1e5",
+  "prevIds": [
+    "35a887ec-e254-4894-a732-957a16ec442f"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "avatar_decor"
+      ],
+      "writes": [
+        "s|col|access.users.avatar_decor",
+        "n|col|access.users.avatar_decor",
+        "e|col|access.users.avatar_decor"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "avatar_decor",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

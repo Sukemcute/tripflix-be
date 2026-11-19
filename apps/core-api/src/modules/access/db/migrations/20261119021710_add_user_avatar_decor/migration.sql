@@ -1,0 +1,1 @@
+ALTER TABLE "access"."users" ADD COLUMN "avatar_decor" jsonb;

@@ -22,6 +22,7 @@ import { mapMyProfile, type MyProfile } from '../../auth/application/public-user
 import { TOO_MANY_ATTEMPTS_MESSAGE } from '../../auth/domain/credentials.js';
 import { AccessError } from '../../auth/domain/errors.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../auth/domain/refresh-rotation.js';
+import type { AvatarDecor } from '../domain/avatar-decor.js';
 import { isStaleTravelPreferences } from '../domain/travel-preferences.js';
 
 export const WRONG_CURRENT_PASSWORD_MESSAGE = 'Mật khẩu hiện tại không đúng';
@@ -65,6 +66,12 @@ export class AccountUseCases {
   /** Xoá ảnh; đăng nhập Google sau đó cũng không tự gắn lại ảnh Google. */
   async removeAvatar(actor: AuthUser, meta: RequestMeta): Promise<MyProfile> {
     return mapMyProfile(await this.applyAvatar(actor.userId, { avatarUrl: null, avatarSource: 'none' }, meta));
+  }
+
+  /** Lưu khung và phụ kiện quanh ảnh đại diện (TF109); null: gỡ hết. Chỉ trang trí, không cần sự kiện hay nhật ký. */
+  async setAvatarDecor(actor: AuthUser, avatarDecor: AvatarDecor | null): Promise<MyProfile> {
+    await this.loadUser(actor.userId);
+    return mapMyProfile((await this.store.users.updateAvatarDecor(actor.userId, avatarDecor))!);
   }
 
   /** Chỉ ghi các trường thật sự đổi. Trả hồ sơ đầy đủ của chính mình (có thông tin cá nhân). */

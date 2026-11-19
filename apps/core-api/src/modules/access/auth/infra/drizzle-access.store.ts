@@ -58,6 +58,7 @@ const mapUserRow = (row: UserRow): UserRecord => ({
   },
   avatarUrl: row.avatarUrl,
   avatarSource: row.avatarSource as UserRecord['avatarSource'],
+  avatarDecor: row.avatarDecor,
 });
 
 const mapSessionRow = (row: SessionRow): SessionRecord => ({
@@ -179,6 +180,10 @@ class DrizzleUserRepository implements UserRepository {
     return this.patch(id, avatar);
   }
 
+  async updateAvatarDecor(id: string, avatarDecor: UserRecord['avatarDecor']) {
+    return this.patch(id, { avatarDecor });
+  }
+
   async markEmailVerified(id: string, at: Date) {
     // coalesce: đã xác thực rồi thì giữ mốc đầu tiên, không đổi updated_at vô ích.
     const [row] = await this.db
@@ -192,7 +197,7 @@ class DrizzleUserRepository implements UserRepository {
   private async patch(
     id: string,
     values: Partial<
-      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality' | 'travelPreferences' | 'avatarUrl' | 'avatarSource'>
+      Pick<UserRow, 'status' | 'displayName' | 'passwordHash' | 'phone' | 'dateOfBirth' | 'gender' | 'nationality' | 'travelPreferences' | 'avatarUrl' | 'avatarSource' | 'avatarDecor'>
     >,
   ) {
     const [row] = await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, id)).returning();

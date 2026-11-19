@@ -3,6 +3,8 @@ import { createDb } from '@tripflix/db';
 import { DB_POOLS, type DbPools } from '../../platform/tokens.js';
 import { AiUsageController } from './ai-usage/api/ai-usage.controller.js';
 import { AI_USAGE_STORE, AiUsageUseCases } from './ai-usage/application/ai-usage.use-cases.js';
+import { AI_INSIGHTS_STORE } from './ai-insights/application/ai-insights.store.js';
+import { DrizzleAiInsightsStore } from './ai-insights/infra/drizzle-ai-insights.store.js';
 import { AiUsageConsumer } from './ai-usage/consumers/ai-usage.consumer.js';
 import { DrizzleAiUsageStore } from './ai-usage/infra/drizzle-ai-usage.store.js';
 import { USER_ACTIVITY_STORE, UserActivityUseCases } from './user-activity/application/user-activity.use-cases.js';
@@ -25,6 +27,11 @@ import { TelemetryEnvSchema } from './observability/infra/telemetry-store.js';
       useFactory: (pools: DbPools) => new DrizzleAiUsageStore(createDb(pools.analytics)),
     },
     {
+      provide: AI_INSIGHTS_STORE,
+      inject: [DB_POOLS],
+      useFactory: (pools: DbPools) => new DrizzleAiInsightsStore(createDb(pools.analytics)),
+    },
+    {
       provide: USER_ACTIVITY_STORE,
       inject: [DB_POOLS],
       useFactory: (pools: DbPools) => new DrizzleUserActivityStore(createDb(pools.analytics)),
@@ -36,6 +43,6 @@ import { TelemetryEnvSchema } from './observability/infra/telemetry-store.js';
     ObservabilityService,
     { provide: TELEMETRY_ENV, useFactory: () => TelemetryEnvSchema.parse(process.env) },
   ],
-  exports: [USER_ACTIVITY_STORE],
+  exports: [USER_ACTIVITY_STORE, AI_INSIGHTS_STORE],
 })
 export class AnalyticsModule {}
