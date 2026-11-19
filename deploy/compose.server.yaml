@@ -199,12 +199,15 @@ services:
       LOG_LEVEL: INFO
       # Tripi v3 (TF31): Controller (OpenAI) chọn công cụ, Responder (DeepSeek) viết câu trả lời.
       # Giá USD mỗi 1 triệu token của gpt-5-nano, Bảo xác nhận lại khi đổi model. Không để giá rỗng:
-      # ai-service đọc "" thành lỗi và không khởi động, kéo theo /moderate.
+      # ai-service đọc "" thành lỗi và không khởi động, kéo theo /moderate. Staging đặt model, giá trong .env.server.
       CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
       CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
       CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
       CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
       CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
+      # Trống thì dùng mặc định của code (minimal). gpt-5.6-luna không nhận minimal, phải đặt none,
+      # nếu không mọi lượt gọi Controller lỗi 400 và Tripi chỉ trả "chưa tìm thấy kết quả".
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
       CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
       # Băm IP của khách để tính hạn mức. Mỗi môi trường một chuỗi; đổi thì hạn mức khách tính lại từ đầu.
       CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
