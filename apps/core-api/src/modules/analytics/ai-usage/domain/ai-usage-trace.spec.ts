@@ -27,6 +27,11 @@ describe('toAiUsageRecord gắn người dùng và lượt chat (SCRUM-179)', ()
     expect(toAiUsageRecord(usageEvent({ feature: 'summary' }, null))).toMatchObject({ userId: null });
   });
 
+  it('ai-service gửi null cho turnId, latencyMs, conversationId thì vẫn ghi, không mất sự kiện chi phí', () => {
+    const record = toAiUsageRecord(usageEvent({ conversationId: null, turnId: null, latencyMs: null }, user));
+    expect(record).toMatchObject({ userId: user, conversationId: null, turnId: null, latencyMs: null, costUsd: 0.001 });
+  });
+
   it('turnId không phải UUID thì ném lỗi để consumer bỏ qua', () => {
     expect(() => toAiUsageRecord(usageEvent({ turnId: 'khong-phai-uuid' }, user))).toThrow();
   });
