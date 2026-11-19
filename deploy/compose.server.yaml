@@ -218,8 +218,10 @@ services:
     depends_on:
       redis: { condition: service_healthy }
     cpus: 0.5
-    # Bản thử của TF32: đỉnh khoảng 290 MiB khi gọi API, 640 MiB khi suy luận văn bản dài. 1g để có chỗ dư.
-    mem_limit: 1g
+    # Bản thử của TF32: đỉnh khoảng 290 MiB khi gọi API, 640 MiB khi suy luận văn bản dài (ViSoBERT).
+    # TF28: e5-small INT8 của POST /embed thêm khoảng 380 MiB, nạp khi core gọi lần đầu. Bật cả hai thì khoảng
+    # 1,03 GiB, vượt 1g và container bị kill, mất luôn /moderate và /chat. 1536m để có chỗ dư.
+    mem_limit: 1536m
     healthcheck:
       test: ['CMD', '/app/.venv/bin/python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 10s
