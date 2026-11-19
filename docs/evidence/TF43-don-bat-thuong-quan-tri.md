@@ -35,3 +35,8 @@
 
 ## Ảnh hưởng tới phần của người khác
 - Không. Chỉ thêm file trong `commerce` và đăng ký controller trong `commerce.module.ts`.
+
+## Bổ sung 19/11
+- `GET /api/admin/commerce/products?kind=room|flight&q=`: danh sách để màn Lịch trống chọn mã thay vì gõ tay.
+- Tối ưu `paid_without_seat`: trên DB local ~220 nghìn đơn, bản đầu quá 10 giây (bị cắt). Giờ tra ô kho theo khoá chính, chỉ xét từ hôm nay, 6 loại chạy song song: cả trang khoảng 1,9 giây.
+- Test tích hợp 9/9 (thêm test danh sách sản phẩm và test ngày đã qua không bị báo).
