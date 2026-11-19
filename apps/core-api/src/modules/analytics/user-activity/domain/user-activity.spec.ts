@@ -140,6 +140,13 @@ describe('toUserActivityRecord', () => {
   it('đúng loại nhưng sai hợp đồng thì ném lỗi để consumer bỏ qua', () => {
     expect(() => toUserActivityRecord(envelope('content.post.shared', { postId: 'không-phải-uuid' }))).toThrow();
   });
+
+  it('đăng bài tính cho tác giả; thiếu tác giả thì bỏ qua', () => {
+    expect(
+      toUserActivityRecord(envelope('content.post.published', { postId: post, authorId: user, postType: 'video', title: 'Đà Lạt' })),
+    ).toMatchObject({ kind: 'post', userId: user, targetId: post, detail: { postType: 'video' } });
+    expect(toUserActivityRecord(envelope('content.post.published', { postId: post }))).toBeNull();
+  });
 });
 
 describe('retentionCutoff', () => {

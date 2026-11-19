@@ -1,6 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { EventEnvelope } from '@tripflix/contracts';
-import type { UserActivityCounts, UserActivityRecord, UserActivityWindow } from '../domain/user-activity.js';
+import type {
+  UserActivityCounts,
+  UserActivityDay,
+  UserActivityRecord,
+  UserActivityTotals,
+  UserActivityWindow,
+} from '../domain/user-activity.js';
 import { toUserActivityRecord } from '../domain/user-activity.js';
 
 export const USER_ACTIVITY_STORE = Symbol('USER_ACTIVITY_STORE');
@@ -22,6 +28,10 @@ export interface UserActivityStore {
   insert(record: UserActivityRecord): Promise<boolean>;
   /** Người có hoạt động trong cửa sổ, mới hoạt động nhất trước. */
   summarize(window: UserActivityWindow & { limit: number; offset: number }): Promise<{ rows: UserActivitySummaryRow[]; total: number }>;
+  /** Tổng toàn hệ thống trong cửa sổ. */
+  totals(window: UserActivityWindow): Promise<UserActivityTotals>;
+  /** Số lượt từng loại theo ngày Việt Nam, cũ trước; ngày không có hoạt động thì không có dòng. */
+  daily(window: UserActivityWindow): Promise<UserActivityDay[]>;
   summarizeUser(userId: string, window: UserActivityWindow): Promise<UserActivityCounts>;
   recentEvents(userId: string, window: UserActivityWindow, limit: number): Promise<UserActivityEventRow[]>;
   /** Xoá mọi dòng xảy ra trước `cutoff`; trả về số dòng đã xoá. */

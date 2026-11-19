@@ -49,6 +49,7 @@ class UserActivityCountsDto {
   @ApiProperty({ example: 2 }) shares!: number;
   @ApiProperty({ example: 40, description: 'Lượt xem đủ điều kiện' }) views!: number;
   @ApiProperty({ example: 5, description: 'Lượt chat với Tripi' }) chats!: number;
+  @ApiProperty({ example: 1, description: 'Bài đã đăng (tính từ lúc bắt đầu ghi sự kiện đăng bài)' }) posts!: number;
   @ApiProperty({ type: String, nullable: true, example: '2026-11-18T10:20:00.000Z' }) lastActiveAt!: string | null;
 }
 
@@ -65,6 +66,33 @@ export class UserActivityListResponseDto {
   @ApiProperty({ example: 20 }) pageSize!: number;
   @ApiProperty({ example: 57, description: 'Số người có hoạt động trong khoảng' }) total!: number;
   @ApiProperty({ type: [UserActivityListItemDto] }) items!: UserActivityListItemDto[];
+}
+
+class UserActivityTotalsDto {
+  @ApiProperty({ example: 57, description: 'Số người có hoạt động trong khoảng' }) activeUsers!: number;
+  @ApiProperty({ example: 120 }) reactions!: number;
+  @ApiProperty({ example: 30 }) comments!: number;
+  @ApiProperty({ example: 18, description: 'Lượt chia sẻ bài (của người đã đăng nhập)' }) shares!: number;
+  @ApiProperty({ example: 640 }) views!: number;
+  @ApiProperty({ example: 95 }) chats!: number;
+  @ApiProperty({ example: 12 }) posts!: number;
+}
+
+class UserActivityDayDto {
+  @ApiProperty({ example: '2026-11-18', description: 'Ngày theo giờ Việt Nam' }) date!: string;
+  @ApiProperty() reactions!: number;
+  @ApiProperty() comments!: number;
+  @ApiProperty() shares!: number;
+  @ApiProperty() views!: number;
+  @ApiProperty() chats!: number;
+  @ApiProperty() posts!: number;
+}
+
+export class UserActivityOverviewResponseDto {
+  @ApiProperty({ example: '2026-11-11T17:00:00.000Z', description: 'Đầu khoảng (gồm)' }) from!: string;
+  @ApiProperty({ example: '2026-11-18T17:00:00.000Z', description: 'Cuối khoảng (không gồm)' }) to!: string;
+  @ApiProperty({ type: UserActivityTotalsDto }) totals!: UserActivityTotalsDto;
+  @ApiProperty({ type: [UserActivityDayDto], description: 'Chỉ có ngày có hoạt động; FE tự điền ngày trống' }) daily!: UserActivityDayDto[];
 }
 
 class UserActivityEventDto {
@@ -132,6 +160,22 @@ export class UserActivityController {
       total,
       items: items.map((item) => ({ ...item, ...toCountsDto(item) })),
     };
+  }
+
+  @Get('overview')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Tổng quan hành vi toàn hệ thống: số người hoạt động, bài đăng, chia sẻ, thích, bình luận, xem, chat và số lượt theo ngày',
+    description: 'Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày tới hôm nay, tối đa 90 ngày.',
+  })
+  @ApiQuery({ name: 'from', required: false, type: String, example: '2026-11-11' })
+  @ApiQuery({ name: 'to', required: false, type: String, example: '2026-11-17' })
+  @ApiOkResponse({ type: UserActivityOverviewResponseDto })
+  @ApiBadRequestResponse({ description: 'Ngày sai dạng, from sau to hoặc quá 90 ngày' })
+  async overview(@Query() query: Record<string, unknown>): Promise<UserActivityOverviewResponseDto> {
+    const parsed = parseQuery(query);
+    const { totals, daily } = await this.activity.overview(parsed);
+    return { from: parsed.from.toISOString(), to: parsed.to.toISOString(), totals, daily };
   }
 
   @Get(':userId')
