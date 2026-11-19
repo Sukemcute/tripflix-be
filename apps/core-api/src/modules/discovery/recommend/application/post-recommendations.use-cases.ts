@@ -33,6 +33,8 @@ const EXPLORE_DAYS = 30;
 /** Số bài khám phá giữ trước cho cả phiên (đủ cho ~50 trang). */
 const EXPLORE_RESERVE = 50;
 const FULL_READ_EXPLORE_SKIP = 100;
+/** Số trang rỗng (bị lọc hết sau hydrate) server tự bỏ qua trong một request. */
+const MAX_EMPTY_PAGE_SKIPS = 3;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
 
@@ -130,9 +132,7 @@ export class PostRecommendationUseCases {
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
     const now = q.now ?? new Date();
-    const { pageItems, algo, nextCursor } = await this.selectRankedPage(q, now);
-
-    const items = await this.hydrate(pageItems);
+    const { pageItems, algo, nextCursor, items } = await this.firstFilledPage(q, now, (ranked) => this.hydrate(ranked));
     if (q.userId) await this.recordSeen(q.userId, pageItems.map((i) => i.postId), now);
     for (const item of items) {
       this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.post.id }, 'recommend.served');
@@ -150,9 +150,7 @@ export class PostRecommendationUseCases {
       throw new ReelsFeedNotWiredError('FeedFacade.getByIds chưa được nối vào RecommendCatalog');
     }
     const now = q.now ?? new Date();
-    const { pageItems, algo, nextCursor } = await this.selectRankedPage({ ...q, postType: 'video' }, now);
-
-    const items = await this.hydrateReels(pageItems, q.userId);
+    const { algo, nextCursor, items } = await this.firstFilledPage({ ...q, postType: 'video' }, now, (ranked) => this.hydrateReels(ranked, q.userId));
     if (q.userId && items.length) {
       await this.recordSeen(q.userId, items.map((i) => i.card.postId), now);
     }
@@ -161,6 +159,20 @@ export class PostRecommendationUseCases {
     }
 
     return { items, algo: algo.name, nextCursor };
+  }
+
+  /**
+   * Trang bị lọc hết sau hydrate (bài đã ẩn, video chưa xử lý xong) mà vẫn còn trang sau: lấy tiếp ở server thay vì trả
+   * `items: []` kèm cursor, để client không bắn liền nhiều request rỗng. Giới hạn số lần để một dải dài bài lỗi không treo request.
+   */
+  private async firstFilledPage<T>(q: PostRecommendationQuery, now: Date, hydrate: (ranked: RankedItem[]) => Promise<T[]>) {
+    let cursor = q.cursor;
+    for (let skipped = 0; ; skipped++) {
+      const page = await this.selectRankedPage({ ...q, cursor }, now);
+      const items = await hydrate(page.pageItems);
+      if (items.length || !page.nextCursor || skipped >= MAX_EMPTY_PAGE_SKIPS) return { ...page, items };
+      cursor = page.nextCursor;
+    }
   }
 
   private async selectRankedPage(q: PostRecommendationQuery, now: Date) {
