@@ -31,6 +31,7 @@ import { ClaimDeferredScansUseCase } from './application/recover-screening.use-c
 import { AiModerationClient } from './infra/ai-moderation.client.js';
 import { ModerationRepository } from './infra/moderation.repository.js';
 import { ReviewQueueUseCase } from './application/review-queue.use-case.js';
+import { PostPartsScreeningUseCase } from './application/post-parts-screening.use-case.js';
 
 const OUTBOX = Symbol('MODERATION_OUTBOX');
 const CONFIG = Symbol('MODERATION_CONFIG');
@@ -47,6 +48,12 @@ const CONFIG = Symbol('MODERATION_CONFIG');
   controllers: [ReportsController, AdminModerationController],
   exports: [CONTENT_GATE_PORT],
   providers: [
+    {
+      provide: PostPartsScreeningUseCase,
+      inject: [ModerationRepository, MediaFacade, AiModerationClient, RecordScreeningUseCase, OUTBOX],
+      useFactory: (repository: ModerationRepository, media: MediaFacade, ai: AiModerationClient,
+        record: RecordScreeningUseCase, outbox: ContentOutbox) => new PostPartsScreeningUseCase(repository, media, ai, record, outbox),
+    },
     {
       provide: ReviewQueueUseCase,
       inject: [ModerationRepository],
@@ -128,13 +135,14 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     },
     {
       provide: ScreenContentUseCase,
-      inject: [ModerationRepository, AiModerationClient, RecordScreeningUseCase, MediaFacade],
+      inject: [ModerationRepository, AiModerationClient, RecordScreeningUseCase, MediaFacade, PostPartsScreeningUseCase],
       useFactory: (
         repository: ModerationRepository,
         ai: AiModerationClient,
         record: RecordScreeningUseCase,
         media: MediaFacade,
-      ) => new ScreenContentUseCase(repository, ai, record, media),
+        parts: PostPartsScreeningUseCase,
+      ) => new ScreenContentUseCase(repository, ai, record, media, parts),
     },
     {
       provide: SubmitReportUseCase,

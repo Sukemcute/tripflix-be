@@ -4,6 +4,7 @@ import type {
   MediaAssetStatus,
   MediaAssetStore,
   MediaKindInfo,
+  ModerationAsset,
   NewUploadingAsset,
   PlaybackAsset,
   ReadyImageAsset,
@@ -24,6 +25,15 @@ type StoredAsset = NewUploadingAsset & {
 
 /** Cùng quy tắc với DrizzleMediaAssetStore, lưu trong bộ nhớ, dùng cho test. Không có rollback. */
 export class MemoryMediaAssetStore implements MediaAssetStore {
+  findModerationAssets(assetIds: string[]): Promise<ModerationAsset[]> {
+    return Promise.resolve(assetIds.flatMap((id) => {
+      const a = this.assets.get(id);
+      return a ? [{ id, ownerId: a.ownerId, kind: a.kind, status: a.status,
+        sourceKey: a.sourceKey, hlsPrefix: a.hlsPrefix ?? null,
+        updatedAt: new Date(a.transcodeAttempts),
+      }] : [];
+    }));
+  }
   readonly assets = new Map<string, StoredAsset>();
   readonly outboxRows: EventEnvelope[] = [];
 

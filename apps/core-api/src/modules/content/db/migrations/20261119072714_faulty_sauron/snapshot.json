@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "79f68c64-e948-4d3d-8b14-580ef985eba4",
+  "prevIds": [
+    "6ce2afda-b33f-4b7a-8560-ca7a16046e79"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_parts",
+        "retried_by"
+      ],
+      "writes": [
+        "s|col|content.moderation_parts.retried_by",
+        "n|col|content.moderation_parts.retried_by",
+        "e|col|content.moderation_parts.retried_by"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_parts",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_parts",
+        "retried_at"
+      ],
+      "writes": [
+        "s|col|content.moderation_parts.retried_at",
+        "n|col|content.moderation_parts.retried_at",
+        "e|col|content.moderation_parts.retried_at"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_parts",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_parts",
+        "name": "retried_by",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_parts",
+        "name": "retried_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

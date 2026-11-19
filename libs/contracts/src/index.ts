@@ -377,6 +377,7 @@ export const ContentMediaReadyV1Schema = z.object({
   durationSec: z.number().int().positive(),
 });
 export type ContentMediaReadyV1 = z.infer<typeof ContentMediaReadyV1Schema>;
+export const ContentImageReadyV1Schema = z.object({ assetId: z.uuid(), ownerId: z.uuid() });
 
 /** content.media.failed v1: không tạo được mức 360p, video không phát được. */
 export const ContentMediaFailedV1Schema = z.object({
@@ -555,6 +556,7 @@ export const exportedSchemas: Record<string, z.ZodType> = {
   'commerce.order.departure_reminder.v1': CommerceOrderDepartureReminderV1Schema,
   'content.media.transcode_requested.v1': ContentMediaTranscodeRequestedV1Schema,
   'content.media.ready.v1': ContentMediaReadyV1Schema,
+  'content.image.ready.v1': ContentImageReadyV1Schema,
   'content.media.failed.v1': ContentMediaFailedV1Schema,
   'media.rendition.completed.v1': MediaRenditionCompletedV1Schema,
   'media.transcode.failed.v1': MediaTranscodeFailedV1Schema,

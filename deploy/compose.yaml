@@ -34,6 +34,9 @@ x-be-env: &be-env
   S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
   S3_KEY_PREFIX: dev/${DEV_NAME:-unknown}/
   MEDIA_CDN_URL: ${MEDIA_CDN_URL:-}
+  AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+  CORE_API_INTERNAL_URL: ${CORE_API_INTERNAL_URL:-http://localhost:3000}
+  MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
 
 x-node-health: &node-health
   interval: 10s

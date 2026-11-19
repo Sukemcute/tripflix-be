@@ -44,6 +44,13 @@ describe('AI moderation client qua HTTP thật', () => {
       batchSizes.push(body.items.length);
       if (slow) await new Promise((resolve) => setTimeout(resolve, 100));
       response.statusCode = refreshOnce && calls === 1 ? 401 : status;
+      if (request.url === '/moderate/parts') {
+        response.end(JSON.stringify({ results: body.items.map((input) => ({
+          id: wrongId ? 'other' : input.id, status: 'flagged', model: 'omni',
+          categories: { violence: true }, scores: { violence: 0.92 }, errorCode: null,
+        })) }));
+        return;
+      }
       response.end(
         JSON.stringify({
           model: 'omni',
@@ -67,6 +74,19 @@ describe('AI moderation client qua HTTP thật', () => {
   });
   const client = (timeoutMs = 3000) =>
     new AiModerationClient({ aiUrl: url, coreUrl: url, secret: 'test-only', timeoutMs });
+  it('BE09: separate endpoint preserves each model/verdict and refreshes expired token', async () => {
+    refreshOnce = true;
+    const result = await client().moderateParts([{ id: 'image:1', kind: 'image', imageUrl: 'https://cdn.test/a.jpg' }]);
+    expect(result).toEqual([{ id: 'image:1', status: 'flagged', model: 'omni', categories: { violence: true }, scores: { violence: 0.92 }, errorCode: null }]);
+    expect(tokenCalls).toBe(2);
+  });
+  it('BE09: mismatched IDs and unavailable provider remain errors', async () => {
+    wrongId = true;
+    expect(await client().moderateParts([{ id: 'caption', kind: 'caption', text: 'Xin chào' }])).toBeNull();
+    wrongId = false;
+    status = 503;
+    expect(await client().moderateParts([{ id: 'caption', kind: 'caption', text: 'Xin chào' }])).toBeNull();
+  });
   it('200 giữ nhãn; cache token dùng chung cả request đồng thời', async () => {
     const ai = client();
     const results = await Promise.all(Array.from({ length: 5 }, () => ai.moderate([item])));

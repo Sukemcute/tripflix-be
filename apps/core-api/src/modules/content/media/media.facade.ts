@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import type { ObjectStorage } from '@tripflix/storage';
 import {
@@ -74,5 +75,19 @@ export class MediaFacade {
   /** Loại (video hay ảnh), chủ và trạng thái của từng id có tồn tại. */
   getKinds(assetIds: string[]): Promise<MediaKindInfo[]> {
     return this.store.findKinds([...new Set(assetIds)]);
+  }
+
+  /** Metadata + pure CDN URL construction; safe inside the caller's transaction. */
+  async getModerationInputs(assetIds: string[], lock = false) {
+    const assets = await this.store.findModerationAssets([...new Set(assetIds)], lock);
+    return assets.map((asset) => ({
+      id: asset.id, kind: asset.kind, status: asset.status,
+      revision: createHash('sha256').update(JSON.stringify([
+        asset.kind, asset.status, asset.sourceKey, asset.hlsPrefix, asset.updatedAt.toISOString(),
+      ])).digest('hex'),
+      url: asset.status === 'ready'
+        ? this.storage.getCdnUrl(asset.kind === 'image' ? asset.sourceKey : `${asset.hlsPrefix}/poster_540.jpg`)
+        : null,
+    }));
   }
 }

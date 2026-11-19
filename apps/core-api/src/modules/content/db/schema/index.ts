@@ -11,4 +11,5 @@ export * from './outbox.js';
 export * from './post-summaries.js';
 export * from './comment-reactions.js';
 export * from './moderation.js';
+export * from './moderation-parts.js';
 export * from './saved-itineraries.js';
