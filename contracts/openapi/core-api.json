@@ -7020,6 +7020,56 @@
         ]
       }
     },
+    "/api/analytics/user-activity/overview": {
+      "get": {
+        "description": "Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày tới hôm nay, tối đa 90 ngày.",
+        "operationId": "UserActivityController_overview",
+        "parameters": [
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-17",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActivityOverviewResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngày sai dạng, from sau to hoặc quá 90 ngày"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tổng quan hành vi toàn hệ thống: số người hoạt động, bài đăng, chia sẻ, thích, bình luận, xem, chat và số lượt theo ngày",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
     "/api/analytics/user-activity/{userId}": {
       "get": {
         "operationId": "UserActivityController_detail",
@@ -17273,6 +17323,11 @@
             "example": 5,
             "description": "Lượt chat với Tripi"
           },
+          "posts": {
+            "type": "number",
+            "example": 1,
+            "description": "Bài đã đăng (tính từ lúc bắt đầu ghi sự kiện đăng bài)"
+          },
           "lastActiveAt": {
             "type": "string",
             "nullable": true,
@@ -17299,6 +17354,7 @@
           "shares",
           "views",
           "chats",
+          "posts",
           "lastActiveAt",
           "userId",
           "displayName",
@@ -17347,6 +17403,118 @@
           "items"
         ]
       },
+      "UserActivityTotalsDto": {
+        "type": "object",
+        "properties": {
+          "activeUsers": {
+            "type": "number",
+            "example": 57,
+            "description": "Số người có hoạt động trong khoảng"
+          },
+          "reactions": {
+            "type": "number",
+            "example": 120
+          },
+          "comments": {
+            "type": "number",
+            "example": 30
+          },
+          "shares": {
+            "type": "number",
+            "example": 18,
+            "description": "Lượt chia sẻ bài (của người đã đăng nhập)"
+          },
+          "views": {
+            "type": "number",
+            "example": 640
+          },
+          "chats": {
+            "type": "number",
+            "example": 95
+          },
+          "posts": {
+            "type": "number",
+            "example": 12
+          }
+        },
+        "required": [
+          "activeUsers",
+          "reactions",
+          "comments",
+          "shares",
+          "views",
+          "chats",
+          "posts"
+        ]
+      },
+      "UserActivityDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-11-18",
+            "description": "Ngày theo giờ Việt Nam"
+          },
+          "reactions": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "number"
+          },
+          "shares": {
+            "type": "number"
+          },
+          "views": {
+            "type": "number"
+          },
+          "chats": {
+            "type": "number"
+          },
+          "posts": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "reactions",
+          "comments",
+          "shares",
+          "views",
+          "chats",
+          "posts"
+        ]
+      },
+      "UserActivityOverviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-11-11T17:00:00.000Z",
+            "description": "Đầu khoảng (gồm)"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-18T17:00:00.000Z",
+            "description": "Cuối khoảng (không gồm)"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UserActivityTotalsDto"
+          },
+          "daily": {
+            "description": "Chỉ có ngày có hoạt động; FE tự điền ngày trống",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserActivityDayDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "totals",
+          "daily"
+        ]
+      },
       "UserActivityCountsDto": {
         "type": "object",
         "properties": {
@@ -17373,6 +17541,11 @@
             "example": 5,
             "description": "Lượt chat với Tripi"
           },
+          "posts": {
+            "type": "number",
+            "example": 1,
+            "description": "Bài đã đăng (tính từ lúc bắt đầu ghi sự kiện đăng bài)"
+          },
           "lastActiveAt": {
             "type": "string",
             "nullable": true,
@@ -17385,6 +17558,7 @@
           "shares",
           "views",
           "chats",
+          "posts",
           "lastActiveAt"
         ]
       },
@@ -17402,7 +17576,8 @@
               "comment",
               "share",
               "view",
-              "chat"
+              "chat",
+              "post"
             ]
           },
           "occurredAt": {

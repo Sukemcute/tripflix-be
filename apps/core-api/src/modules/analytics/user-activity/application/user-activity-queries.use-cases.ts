@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AccessFacade } from '../../../access/index.js';
-import type { UserActivityCounts, UserActivityWindow } from '../domain/user-activity.js';
+import type { UserActivityCounts, UserActivityDay, UserActivityTotals, UserActivityWindow } from '../domain/user-activity.js';
 import { USER_ACTIVITY_STORE, type UserActivityEventRow, type UserActivityStore } from './user-activity.use-cases.js';
 
 const RECENT_EVENT_LIMIT = 50;
@@ -42,6 +42,12 @@ export class UserActivityQueries {
       return { ...row, displayName: contact?.displayName ?? null, email: contact?.email ?? null };
     });
     return { items, total };
+  }
+
+  /** Tổng quan toàn hệ thống: tổng từng loại, số người hoạt động và số lượt theo ngày. */
+  async overview(window: UserActivityWindow): Promise<{ totals: UserActivityTotals; daily: UserActivityDay[] }> {
+    const [totals, daily] = await Promise.all([this.store.totals(window), this.store.daily(window)]);
+    return { totals, daily };
   }
 
   /** Null khi không có tài khoản nào với id này. */
