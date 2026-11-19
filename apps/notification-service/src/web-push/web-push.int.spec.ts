@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { startPostgres, type PostgresFixture } from '@tripflix/testing';
 import { MemorySidBlocklist, type AuthUser } from '@tripflix/auth';
 import pg from 'pg';
-import webPush from 'web-push';
+import * as webPush from 'web-push';
 import { envSchema } from '../env.js';
 import { InboxRepository } from '../inbox/inbox.repository.js';
 import { WebPushWorker } from './web-push.worker.js';
 
 vi.mock('web-push', () => ({
-  default: { sendNotification: vi.fn().mockResolvedValue({ statusCode: 201 }) },
+  sendNotification: vi.fn().mockResolvedValue({ statusCode: 201 }),
 }));
 const subscription = (name: string) => ({
   endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
