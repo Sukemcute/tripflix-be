@@ -154,6 +154,9 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
   for (const hit of postHits) {
     const burst = postHits.some((o) => o.placeId === hit.placeId && o.postId !== hit.postId && Math.abs(o.at - hit.at) <= DAY);
     if (burst) notePlace(hit.placeId, SIGNAL.postBurst, hit.r);
+    // Một tương tác lẻ (thích, bình luận, lưu, chia sẻ, xem gần hết) vừa xảy ra: chỉ đẩy nơi đó lên trong vài giờ,
+    // không tính là đang tìm hiểu (không cộng độ tin, không đổi giai đoạn).
+    else add(ranked, hit.placeId, SIGNAL.postBurst * decay(hit.r) * (recency(hit.r) - 1));
   }
 
   const exploring: Record<string, number> = {};

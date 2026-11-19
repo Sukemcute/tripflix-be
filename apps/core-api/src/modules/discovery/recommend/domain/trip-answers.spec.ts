@@ -107,6 +107,16 @@ describe('answerLive', () => {
       expect(Math.max(...w) / Math.min(...w)).toBeLessThan(1.5);
     });
 
+    it('vừa thích hoặc bình luận một bài cũng kéo nơi đó lên, nhưng không tự thành đang tìm hiểu', () => {
+      const old = [searchAt('nha-trang', 240), searchAt('nha-trang', 180)];
+      const reactAt = (postId: string, kind: RawRow['kind'], m: number) => row({ kind, targetType: 'post', targetId: postId, occurredAt: minsAgo(m) });
+      expect(top(live([...old, reactAt('dl1', 'reaction', 2)]))).toBe('place:da-lat');
+      expect(top(live([...old, reactAt('dl1', 'comment', 2)]))).toBe('place:da-lat');
+      // Tương tác lẻ từ 1 ngày trước không còn tác dụng; một mình nó không đổi giai đoạn.
+      expect(top(live([...old, reactAt('dl1', 'reaction', 24 * 60)]))).toBe('place:nha-trang');
+      expect(live([reactAt('dl1', 'reaction', 2)]).stage).toBe('dreaming');
+    });
+
     it('một lượt tìm vẫn chưa đủ để lên kế hoạch (hệ số vừa tìm chỉ đổi thứ tự nơi)', () => {
       expect(live([searchAt('ha-noi', 1)]).stage).toBe('dreaming');
     });
