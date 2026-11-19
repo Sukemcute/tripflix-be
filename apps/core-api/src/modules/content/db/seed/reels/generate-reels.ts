@@ -455,15 +455,15 @@ export function generateReelSeed(input: GenerateReelsInput): ContentSeed {
     for (let attempt = 0; attempt < 50 && (!body || usedBodies.has(body)); attempt++) {
       const parts = [random.pick(OPENERS), ...random.sample(video.script, random.int(1, 2))];
       if (built) {
-        parts.push(`Chuyến ${built.trip.daysCount} ngày, mình ở ${built.hotelNames.join(' rồi chuyển sang ')}.`);
-        if (built.stopNames.length > 0) parts.push(`Thích nhất là ${random.sample(built.stopNames, Math.min(2, built.stopNames.length)).join(' và ')}.`);
-        parts.push(`Tổng chi phí khoảng ${formatMoney(built.trip.estimatedCostPerPerson!)} mỗi người, lộ trình chi tiết mình gắn bên dưới.`);
+        if (built.stopNames.length > 0) parts.push(`Điểm nhấn chuyến này là ${random.sample(built.stopNames, Math.min(2, built.stopNames.length)).join(' và ')}.`);
+        parts.push('Toàn bộ lộ trình chi tiết và khách sạn mình đã gắn kèm bên dưới.');
       } else {
         parts.push(`Ngân sách tham khảo: ${video.budget}.`);
       }
       parts.push(`Mẹo nhỏ: ${video.tip}`, random.pick(CLOSERS));
       body = parts.join(' ');
     }
+    if (usedBodies.has(body)) body = `${body} (${i + 1})`;
     usedBodies.add(body);
 
     const hashtags = [
