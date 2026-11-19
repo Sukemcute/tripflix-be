@@ -18,6 +18,7 @@ import { ModerationRepository, type TargetSnapshot } from '../infra/moderation.r
 import { ChangeVisibilityUseCase, type ChangeVisibilityCommand } from './change-visibility.use-case.js';
 import type { ModerationAiPort } from './ports.js';
 import { MODERATION_POLICY_VERSION, APPEAL_WINDOW_DAYS } from '../domain/content-version.js';
+import { assertReviewLease } from '../infra/review-lease.js';
 
 export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 export interface ScreeningConfig extends SeverityConfig {
@@ -25,7 +26,10 @@ export interface ScreeningConfig extends SeverityConfig {
 }
 
 export class SubmitAppealUseCase {
-  constructor(private readonly repository: ModerationRepository, private readonly outbox: ContentOutbox) {}
+  constructor(
+    private readonly repository: ModerationRepository,
+    private readonly outbox: ContentOutbox,
+  ) {}
 
   @Transactional('content')
   async execute(decisionId: string, authorId: string, reason: string) {
@@ -71,7 +75,11 @@ export class SubmitAppealUseCase {
       .onConflictDoNothing()
       .returning();
     if (!appeal) throw new ConflictException('Quyết định đã được khiếu nại');
-    await this.outbox.add({ type: 'content.moderation.changed', userId: authorId, payload: { scope: 'appeal', id: appeal.id } });
+    await this.outbox.add({
+      type: 'content.moderation.changed',
+      userId: authorId,
+      payload: { scope: 'appeal', id: appeal.id },
+    });
     return appeal;
   }
 }
@@ -188,7 +196,7 @@ export class RecordScreeningUseCase {
         !(target.status === 'hidden' && (await this.repository.pending(target))?.isAutoHidden))
     )
       return;
-    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+    if (target.status !== 'held' && (await this.repository.hasHeldRelease(target))) {
       await this.repository.supersedeScan(eventId);
       return;
     }
@@ -229,9 +237,17 @@ export class RecordScreeningUseCase {
     const rules = evaluateRules(target.text, this.config.allowedDomains);
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
-    if (!verdict.suspicious && (target.status !== 'held' || (target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld))) return;
+    if (
+      !verdict.suspicious &&
+      (target.status !== 'held' ||
+        (target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld))
+    )
+      return;
     if (verdict.suspicious && target.targetType === 'comment' && target.status === 'held') {
-      await this.repository.db.update(comments).set({ platformHeld: true }).where(eq(comments.id, target.targetId));
+      await this.repository.db
+        .update(comments)
+        .set({ platformHeld: true })
+        .where(eq(comments.id, target.targetId));
     }
     const item = await this.repository.upsertCase(target, {
       sources: [...(rules.length ? ['rule'] : []), ...(ai?.flagged ? ['ai'] : [])],
@@ -293,8 +309,12 @@ export class ScreenContentUseCase {
       await this.repository.supersedeScan(eventId);
       return;
     }
-    if (target.status === 'held' && !(target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld)) await this.record.execute(eventId, target, null, occurredAt);
-    if (target.status !== 'held' && await this.repository.hasHeldRelease(target)) {
+    if (
+      target.status === 'held' &&
+      !(target.creatorReview && target.creatorReview !== 'approved' && !target.platformHeld)
+    )
+      await this.record.execute(eventId, target, null, occurredAt);
+    if (target.status !== 'held' && (await this.repository.hasHeldRelease(target))) {
       await this.repository.supersedeScan(eventId);
       return;
     }
@@ -417,16 +437,22 @@ export class DecideCaseUseCase {
   @Transactional('content')
   async execute(
     caseId: string,
-    input: Omit<ChangeVisibilityCommand, 'targetType' | 'targetId' | 'caseId' | 'actorType'>,
+    input: Omit<ChangeVisibilityCommand, 'targetType' | 'targetId' | 'caseId' | 'actorType'> & {
+      leaseId?: string;
+    },
   ) {
     const item = await this.repository.findCase(caseId);
     if (!item) throw new NotFoundException('Không tìm thấy hồ sơ kiểm duyệt');
     await this.repository.lockPost(item.postId);
+    await assertReviewLease(this.repository.db, item.targetType, item.targetId, input.actorId, input.leaseId);
     const updated = await this.repository.db
       .update(moderationCases)
       .set({
         status: 'resolved',
         resolution: input.action,
+        assigneeId: null,
+        leaseId: null,
+        leaseExpiresAt: null,
         resolvedBy: input.actorId,
         resolvedAt: new Date(),
         updatedAt: new Date(),

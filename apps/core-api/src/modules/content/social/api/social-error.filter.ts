@@ -4,6 +4,7 @@ import {
   CommentNotFoundException,
   DomainException,
   InvalidCommentBodyException,
+  InvalidCommentMentionsException,
   InvalidPostStatusTransitionException,
   PostNotFoundException,
   UnauthorizedCommentActionException,
@@ -22,7 +23,7 @@ export class SocialErrorFilter implements ExceptionFilter<DomainException> {
           ? 403
           : error instanceof InvalidPostStatusTransitionException
             ? 409
-            : error instanceof InvalidCommentBodyException
+            : error instanceof InvalidCommentBodyException || error instanceof InvalidCommentMentionsException
               ? 400
               : 422;
     host

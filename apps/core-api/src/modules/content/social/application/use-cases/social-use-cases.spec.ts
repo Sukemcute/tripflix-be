@@ -94,6 +94,7 @@ describe('Social Application Use Cases', () => {
 
   beforeEach(() => {
     mockPostRepo = {
+      assertModerationLease: vi.fn().mockResolvedValue(undefined),
       create: vi.fn(),
       findById: vi.fn(),
       findByIds: vi.fn(),
@@ -959,6 +960,7 @@ describe('Social Application Use Cases', () => {
       expect(result.isEdited).toBe(true);
       expect(mockCommentRepo.update).toHaveBeenCalledWith('comm-1', {
         body: 'Nội dung sau khi sửa',
+        mentions: [],
         isEdited: true,
       });
       expect(mockOutbox.add).toHaveBeenCalledWith(
@@ -973,6 +975,83 @@ describe('Social Application Use Cases', () => {
           }),
         }),
       );
+    });
+
+    it('không khôi phục platformHeld khi nền tảng gỡ giữ trong lúc sửa bình luận', async () => {
+      const initialRecord: CommentRecord = {
+        id: 'comm-platform-release',
+        postId,
+        authorId: otherUserId,
+        status: 'held',
+        body: 'Nội dung cũ',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
+        parentCommentId: null,
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        platformHeld: true,
+        creatorReview: 'pending',
+      };
+      const lockedRecord = { ...initialRecord, platformHeld: false };
+      mockCommentRepo.findById.mockResolvedValue(initialRecord);
+      mockCommentRepo.findByIdForUpdate = vi.fn().mockResolvedValue(lockedRecord);
+      mockCommentRepo.update.mockImplementation(async (_id: string, changes: Partial<CommentRecord>) => ({
+        ...lockedRecord,
+        ...changes,
+        updatedAt: new Date(),
+      }));
+      mockPostRepo.findByIdForUpdate = vi.fn().mockResolvedValue(samplePostRecord({ status: 'published' }));
+
+      const useCase = new EditCommentUseCase(mockCommentRepo, mockOutbox, mockPostRepo);
+      await useCase.execute({ commentId: initialRecord.id, userId: otherUserId, body: 'Nội dung đã sửa' });
+
+      expect(mockCommentRepo.update).toHaveBeenCalledWith(initialRecord.id, {
+        body: 'Nội dung đã sửa',
+        isEdited: true,
+        creatorReview: 'pending',
+        status: 'held',
+      });
+    });
+
+    it('không đưa creatorReview về pending khi chủ bài duyệt trong lúc sửa bình luận', async () => {
+      const initialRecord: CommentRecord = {
+        id: 'comm-creator-approved',
+        postId,
+        authorId: otherUserId,
+        status: 'held',
+        body: 'Nội dung cũ',
+        hiddenByActionId: null,
+        cascadeRootCommentId: null,
+        parentCommentId: null,
+        likeCount: 0,
+        isEdited: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        platformHeld: true,
+        creatorReview: 'pending',
+      };
+      const lockedRecord = { ...initialRecord, creatorReview: 'approved' as const };
+      mockCommentRepo.findById.mockResolvedValue(initialRecord);
+      mockCommentRepo.findByIdForUpdate = vi.fn().mockResolvedValue(lockedRecord);
+      mockCommentRepo.update.mockImplementation(async (_id: string, changes: Partial<CommentRecord>) => ({
+        ...lockedRecord,
+        ...changes,
+        updatedAt: new Date(),
+      }));
+      mockPostRepo.findByIdForUpdate = vi.fn().mockResolvedValue(samplePostRecord({ status: 'published' }));
+
+      const useCase = new EditCommentUseCase(mockCommentRepo, mockOutbox, mockPostRepo);
+      await useCase.execute({ commentId: initialRecord.id, userId: otherUserId, body: 'Nội dung đã sửa' });
+
+      expect(mockCommentRepo.update).toHaveBeenCalledWith(initialRecord.id, {
+        body: 'Nội dung đã sửa',
+        isEdited: true,
+        platformHeld: true,
+      });
     });
 
     it('xóa bình luận giảm commentCount của bài viết và phát sự kiện outbox content.comment.deleted', async () => {

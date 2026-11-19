@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TripAttachmentDto } from './post.dto.js';
+import { CommentMentionDto } from './comment.dto.js';
 
 export class PostViewerContextDto {
   @ApiProperty({ type: String, enum: ['like', 'love', 'helpful'], nullable: true }) myReaction!:
@@ -78,6 +79,8 @@ export class SharedPostDto {
   @ApiProperty() shareCount!: number;
 }
 export class SocialCommentDto {
+  @ApiProperty({ type: [CommentMentionDto], maxItems: 10, description: 'Tag theo UTF-16; [] nếu không có hoặc nội dung bị che' })
+  mentions!: CommentMentionDto[];
   @ApiPropertyOptional({ enum: ['approved', 'pending', 'rejected'] }) creatorReview?: string;
   @ApiPropertyOptional({ enum: ['visible', 'held', 'hidden', 'removed'] }) status?: string;
   @ApiProperty({ enum: ['hidden'], nullable: true, description: 'Trạng thái kiểm duyệt hiển thị cho tác giả' })

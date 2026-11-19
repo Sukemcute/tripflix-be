@@ -22,8 +22,10 @@ import {
 } from './dto/response.dto.js';
 import {
   CreateCommentDto,
+  CreateCommentRequestSchema,
   ListCommentsQueryDto,
   UpdateCommentDto,
+  UpdateCommentRequestSchema,
 } from './dto/comment.dto.js';
 import {
   SampleCommentsQueryDto,
@@ -41,6 +43,7 @@ import {
   SetCommentReactionUseCase,
 } from '../application/index.js';
 import { CommentReactionRepository } from '../infra/comment-reaction.repository.js';
+import { ZodBody } from './http.js';
 
 @ApiTags('Social - Comments')
 @Controller('v1')
@@ -66,16 +69,18 @@ export class CommentsController {
   async createComment(
     @Param('postId') postId: string,
     @CurrentUser() user: AuthUser,
-    @Body() dto: CreateCommentDto,
+    @Body(new ZodBody(CreateCommentRequestSchema)) dto: CreateCommentDto,
   ) {
     const comment = await this.addCommentUseCase.execute({
       postId,
       authorId: user.userId,
       body: dto.body,
+      ...(dto.mentions !== undefined ? { mentions: dto.mentions } : {}),
       parentCommentId: dto.parent_comment_id,
     });
     return {
       ...comment,
+      mentions: comment.mentions ?? [],
       moderationState: null,
       likeCount: 0,
       isLiked: false,
@@ -138,18 +143,20 @@ export class CommentsController {
   async editComment(
     @Param('commentId') commentId: string,
     @CurrentUser() user: AuthUser,
-    @Body() dto: UpdateCommentDto,
+    @Body(new ZodBody(UpdateCommentRequestSchema)) dto: UpdateCommentDto,
   ) {
     const comment = await this.editCommentUseCase.execute({
       commentId,
       userId: user.userId,
       body: dto.body,
+      ...(dto.mentions !== undefined ? { mentions: dto.mentions } : {}),
     });
     const reaction = this.commentReactionRepository
       ? await this.commentReactionRepository.findByCommentAndUser(commentId, user.userId)
       : null;
     return {
       ...comment,
+      mentions: comment.mentions ?? [],
       moderationState: null,
       likeCount: comment.likeCount ?? 0,
       isLiked: Boolean(reaction),

@@ -8,6 +8,7 @@ import type { ContentOutbox } from '../../social/application/ports/content-outbo
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { AdminModeratePostUseCase } from '../../social/application/use-cases/admin-moderate-post.use-case.js';
 import { MODERATION_POLICY_VERSION } from '../domain/content-version.js';
+import { assertReviewLease } from '../infra/review-lease.js';
 import {
   commentPublicationPayload,
   loadCommentPublicationContext,
@@ -37,6 +38,8 @@ export class ChangeVisibilityUseCase {
     const initial = await this.repository.loadTarget(command.targetType, command.targetId);
     if (!initial) throw new NotFoundException('Không tìm thấy nội dung');
     const parentPost = await this.repository.lockPost(initial.postId);
+    if (command.actorType === 'staff')
+      await assertReviewLease(this.repository.db, command.targetType, command.targetId, command.actorId);
     const lockedTarget = await this.repository.loadTarget(command.targetType, command.targetId);
     if (command.action === 'dismiss' && lockedTarget?.status === 'held' && !lockedTarget.deleted) {
       command = { ...command, action: 'restore' };

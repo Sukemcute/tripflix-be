@@ -14,6 +14,7 @@ import { CommentControlsUseCases } from '../application/comment-controls.use-cas
 import { normalizeCommentKeyword } from '../domain/comment-filter.js';
 import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import { ZodBody } from './http.js';
+import { CommentMentionDto } from './dto/comment.dto.js';
 
 export class CommentSettingsDto {
   @ApiProperty() enabled!: boolean;
@@ -36,6 +37,7 @@ export class CreatorDecisionResultDto {
   @ApiProperty() status!: string;
 }
 export class CreatorReviewCommentDto {
+  @ApiProperty({ type: [CommentMentionDto], maxItems: 10 }) mentions!: CommentMentionDto[];
   @ApiProperty() id!: string;
   @ApiProperty() postId!: string;
   @ApiProperty() authorId!: string;

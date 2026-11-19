@@ -6,6 +6,7 @@ export const ReportSchema = z.object({
   reasonDetail: z.string().trim().max(500).optional(),
 });
 export const DecisionSchema = ReportSchema.extend({
+  leaseId: z.uuid().optional(),
   action: z.enum(['hide', 'restore', 'remove', 'dismiss']),
 });
 export class ReportDto {
@@ -13,6 +14,7 @@ export class ReportDto {
   @ApiPropertyOptional({ maxLength: 500 }) reasonDetail?: string;
 }
 export class DecisionDto extends ReportDto {
+  @ApiPropertyOptional({ format: 'uuid' }) leaseId?: string;
   @ApiProperty({ enum: ['hide', 'restore', 'remove', 'dismiss'] }) action!:
     'hide' | 'restore' | 'remove' | 'dismiss';
 }
@@ -35,6 +37,17 @@ export class QueueQueryDto {
   @ApiPropertyOptional({ default: 20 }) limit?: number;
   @ApiPropertyOptional({ description: 'Vị trí bắt đầu trang, lấy từ nextCursor' }) cursor?: string;
 }
+export const AdminQueueQuerySchema = QueueQuerySchema.extend({
+  cursor: z.string().max(1024).optional(),
+  assignment: z.enum(['all', 'unassigned', 'mine']).optional(),
+  sla: z.enum(['all', 'overdue', 'due_soon']).optional(),
+  search: z.string().trim().max(160).optional(),
+});
+export class AdminQueueQueryDto extends QueueQueryDto {
+  @ApiPropertyOptional({ enum: ['all', 'unassigned', 'mine'] }) assignment?: 'all' | 'unassigned' | 'mine';
+  @ApiPropertyOptional({ enum: ['all', 'overdue', 'due_soon'] }) sla?: 'all' | 'overdue' | 'due_soon';
+  @ApiPropertyOptional({ maxLength: 160 }) search?: string;
+}
 export const LogQuerySchema = z.object({
   moderatorId: z.uuid().optional(),
   targetId: z.uuid().optional(),
@@ -53,6 +66,10 @@ export class LogQueryDto {
 }
 
 export class ModerationCaseDto {
+  @ApiProperty({ type: String, nullable: true }) assigneeId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) leaseId!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) leaseExpiresAt!: string | null;
+  @ApiProperty({ format: 'date-time' }) dueAt!: string;
   @ApiProperty() id!: string;
   @ApiProperty({ enum: ['post', 'comment'] }) targetType!: 'post' | 'comment';
   @ApiProperty() targetId!: string;
@@ -106,7 +123,61 @@ export class ModerationReportDto {
   @ApiProperty({ type: String, nullable: true }) reasonDetail!: string | null;
   @ApiProperty() createdAt!: string;
 }
+export class ReviewLeaseDto {
+  @ApiProperty({ enum: ['claim', 'renew', 'release'] }) action!: 'claim' | 'renew' | 'release';
+  @ApiPropertyOptional({ format: 'uuid' }) leaseId?: string;
+}
+export const ReviewLeaseSchema = z
+  .object({ action: z.enum(['claim', 'renew', 'release']), leaseId: z.uuid().optional() })
+  .refine((value) => value.action === 'claim' || !!value.leaseId, {
+    message: 'Cần phiên nhận hồ sơ hiện tại',
+    path: ['leaseId'],
+  });
+export class ReviewAuditDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() actorId!: string;
+  @ApiProperty({ enum: ['claim', 'renew', 'release', 'evidence_view'] }) action!: string;
+  @ApiProperty({ type: String, nullable: true }) leaseId!: string | null;
+  @ApiProperty() createdAt!: string;
+}
+export class ModerationAuthorDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() displayName!: string;
+  @ApiProperty({ format: 'email' }) email!: string;
+}
+export class ModerationPostContextDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() authorId!: string;
+  @ApiProperty({ type: ModerationAuthorDto, nullable: true }) author!: ModerationAuthorDto | null;
+  @ApiProperty({ type: String, nullable: true }) title!: string | null;
+  @ApiProperty({ type: String, nullable: true }) excerpt!: string | null;
+  @ApiProperty() status!: string;
+  @ApiProperty() visibility!: string;
+  @ApiProperty() unavailable!: boolean;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+}
+export class ModerationParentCommentDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() authorId!: string;
+  @ApiProperty({ type: ModerationAuthorDto, nullable: true }) author!: ModerationAuthorDto | null;
+  @ApiProperty({ type: String, nullable: true }) body!: string | null;
+  @ApiProperty({ enum: ['reply', 'thread'] }) kind!: 'reply' | 'thread';
+  @ApiProperty() status!: string;
+  @ApiProperty() unavailable!: boolean;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+}
 export class ModerationDetailDto extends ModerationCaseDto {
+  @ApiProperty({ type: ModerationPostContextDto, nullable: true })
+  postContext!: ModerationPostContextDto | null;
+  @ApiProperty({ type: ModerationParentCommentDto, nullable: true })
+  parentComment!: ModerationParentCommentDto | null;
+  @ApiProperty({
+    type: ModerationAuthorDto,
+    nullable: true,
+    description: 'Thông tin tài khoản tác giả, chỉ trả trong chi tiết dành cho staff.',
+  })
+  author!: ModerationAuthorDto | null;
+  @ApiProperty({ type: () => [ReviewAuditDto] }) reviewAudit!: ReviewAuditDto[];
   @ApiProperty({ type: ModerationTargetDto, nullable: true }) target!: ModerationTargetDto | null;
   @ApiProperty({ type: [ModerationReportDto] }) reports!: ModerationReportDto[];
   @ApiProperty({ type: [ModerationLogDto] }) actions!: ModerationLogDto[];
@@ -194,7 +265,12 @@ export class FailedScanPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
 }
 export class ModerationStatsDto {
-  @ApiProperty({ description: 'Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending' }) pendingTotal!: number;
+  @ApiProperty() unassigned!: number;
+  @ApiProperty() assignedToMe!: number;
+  @ApiProperty() overdue!: number;
+  @ApiProperty() dueSoon!: number;
+  @ApiProperty({ description: 'Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending' })
+  pendingTotal!: number;
   @ApiProperty({ description: 'Hồ sơ chờ duyệt có severity ≥ urgentSeverity' }) pendingUrgent!: number;
   @ApiProperty() pendingPosts!: number;
   @ApiProperty() pendingComments!: number;

@@ -86,6 +86,12 @@ export const moderationCases = contentSchema.table(
     reportCount: integer('report_count').notNull().default(0),
     isAutoHidden: boolean('is_auto_hidden').notNull().default(false),
     resolution: varchar('resolution', { length: 20 }),
+    assigneeId: uuid('assignee_id'),
+    leaseId: uuid('lease_id'),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+    dueAt: timestamp('due_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '24 hours'`),
     resolvedBy: uuid('resolved_by'),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -99,6 +105,12 @@ export const moderationCases = contentSchema.table(
       .on(t.targetType, t.targetId)
       .where(sql`${t.status} = 'pending'`),
     index('idx_moderation_cases_queue').on(t.status, t.severity.desc(), t.createdAt),
+    index('idx_moderation_cases_due')
+      .on(t.dueAt)
+      .where(sql`${t.status} = 'pending'`),
+    index('idx_moderation_cases_assignee')
+      .on(t.assigneeId, t.leaseExpiresAt)
+      .where(sql`${t.status} = 'pending'`),
   ],
 );
 export const reports = contentSchema.table(
@@ -132,3 +144,26 @@ export const moderationProcessedEvents = contentSchema.table(
   (t) => [primaryKey({ name: 'pk_moderation_processed_events', columns: [t.consumerGroup, t.eventId] })],
 );
 export type ModerationCaseRecord = typeof moderationCases.$inferSelect;
+
+export const moderationReviewAudit = contentSchema.table(
+  'moderation_review_audit',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => moderationCases.id, { onDelete: 'cascade' }),
+    actorId: uuid('actor_id').notNull(),
+    action: varchar('action', { length: 24 })
+      .$type<'claim' | 'renew' | 'release' | 'evidence_view'>()
+      .notNull(),
+    leaseId: uuid('lease_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_moderation_review_audit_case').on(t.caseId, t.createdAt),
+    check(
+      'ck_moderation_review_audit_action',
+      sql`${t.action} IN ('claim', 'renew', 'release', 'evidence_view')`,
+    ),
+  ],
+);
