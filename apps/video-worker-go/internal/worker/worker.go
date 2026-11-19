@@ -29,6 +29,7 @@ type Options struct {
 	ConsumerName string
 	Storage      storage.ObjectStorage
 	Transcoder   transcode.Transcoder
+	ExtractFrame transcode.FrameExtractor
 	Logger       *slog.Logger
 	// Mặc định 2 phút: việc treo lâu hơn thì worker khác nhận lại.
 	ClaimIdle time.Duration
@@ -98,6 +99,9 @@ func (w *Worker) PollOnce(ctx context.Context) (int, error) {
 }
 
 func (w *Worker) handle(ctx context.Context, event events.Envelope, delivery streams.Delivery) error {
+	if event.Type == events.TypeFramesRequested && event.Version == 1 {
+		return w.handleFrames(ctx, event, delivery)
+	}
 	// stream:media còn chứa kết quả của chính worker; bỏ qua để chúng được XACK.
 	if event.Type != events.TypeTranscodeRequested {
 		return nil

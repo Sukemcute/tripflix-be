@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import { FRAME_POLICY, MediaFramesCompletedV1Schema } from '@tripflix/contracts';
 import { eventEnvelopeSchema, type EventEnvelope } from '@tripflix/contracts';
 import { STREAMS } from '@tripflix/event-bus';
 import { InMemoryObjectStorage } from '@tripflix/storage';
@@ -34,7 +36,10 @@ describe('TranscodeConsumer trên Redis thật', () => {
     await Promise.all(consumers.splice(0).map((consumer) => consumer.stop()));
   });
 
-  async function setup(transcoder = new FakeTranscoder(), options: { claimIdleMs?: number; heartbeatMs?: number } = {}) {
+  async function setup(
+    transcoder = new FakeTranscoder(),
+    options: { claimIdleMs?: number; heartbeatMs?: number } = {},
+  ) {
     const assetId = randomUUID();
     const sourceKey = `dev/test/uploads/${assetId}/original.mp4`;
     const storage = new InMemoryObjectStorage({ keyPrefix: 'dev/test/' });
@@ -44,6 +49,9 @@ describe('TranscodeConsumer trên Redis thật', () => {
       consumerName: 'worker-1',
       storage,
       transcoder,
+      extractFrame: async (_source, output) => {
+        await writeFile(output, 'frame');
+      },
       logger: silentLogger,
       blockMs: 50,
       ...options,
@@ -52,7 +60,10 @@ describe('TranscodeConsumer trên Redis thật', () => {
     return { assetId, sourceKey, storage, transcoder, consumer };
   }
 
-  async function publishRequest(payload: Record<string, unknown>, type = 'content.media.transcode_requested') {
+  async function publishRequest(
+    payload: Record<string, unknown>,
+    type = 'content.media.transcode_requested',
+  ) {
     const envelope: EventEnvelope = {
       eventId: randomUUID(),
       type,
@@ -73,6 +84,49 @@ describe('TranscodeConsumer trên Redis thật', () => {
   }
 
   const readPendingCount = async () => ((await redis.xpending(STREAMS.media, GROUP)) as [number])[0];
+  it('BE09-video: frame request produces a complete timestamped manifest on real Redis and ACKs', async () => {
+    const { assetId, sourceKey, consumer } = await setup();
+    await publishRequest(
+      {
+        assetId,
+        sourceKey,
+        requestId: randomUUID(),
+        hlsPrefix: `dev/test/videos/${assetId}/r1`,
+        policy: FRAME_POLICY,
+      },
+      'content.media.frames.requested',
+    );
+    await consumer.start();
+    await vi.waitFor(async () => expect(await readResults('media.frames.completed')).toHaveLength(1), {
+      timeout: 15000,
+    });
+    const result = (await readResults('media.frames.completed'))[0]!;
+    expect(MediaFramesCompletedV1Schema.safeParse(result.payload).success).toBe(true);
+    expect(await readResults('media.rendition.completed')).toHaveLength(0);
+    await vi.waitFor(async () => expect(await readPendingCount()).toBe(0), { timeout: 15000 });
+  });
+  it('BE09-video: extraction error retries separately and never reports the video as transcode failed', async () => {
+    const { assetId, sourceKey, consumer } = await setup(
+      new FakeTranscoder({ displayWidth: 640, displayHeight: 480, durationSeconds: 301, hasAudio: false }),
+      { claimIdleMs: 100 },
+    );
+    await publishRequest(
+      {
+        assetId,
+        sourceKey,
+        requestId: randomUUID(),
+        hlsPrefix: `dev/test/videos/${assetId}/r1`,
+        policy: FRAME_POLICY,
+      },
+      'content.media.frames.requested',
+    );
+    await consumer.start();
+    await vi.waitFor(async () => expect(await readResults('media.frames.failed')).toHaveLength(1), {
+      timeout: 20000,
+    });
+    expect((await readResults('media.frames.failed'))[0]?.payload.errorCode).toBe('video_too_long');
+    expect(await readResults('media.transcode.failed')).toHaveLength(0);
+  });
 
   it('nhận việc, phát kết quả từng mức lên stream:media rồi XACK', async () => {
     const { assetId, sourceKey, consumer } = await setup();
@@ -160,7 +214,12 @@ describe('TranscodeConsumer trên Redis thật', () => {
         // Lâu hơn claimIdleMs nhiều lần. Không có báo còn sống thì việc đã bị nhận lại.
         for (let round = 0; round < 15; round += 1) {
           await new Promise((resolve) => setTimeout(resolve, 100));
-          const pending = (await redis.xpending(STREAMS.media, GROUP, '-', '+', 1)) as [string, string, number, number][];
+          const pending = (await redis.xpending(STREAMS.media, GROUP, '-', '+', 1)) as [
+            string,
+            string,
+            number,
+            number,
+          ][];
           maxDeliveries = Math.max(maxDeliveries, pending[0]?.[3] ?? 0);
         }
       }

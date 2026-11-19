@@ -78,7 +78,7 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   }
   async route(event: EventEnvelope): Promise<void> {
     if (event.version !== 1) return;
-    if (['content.image.ready', 'content.media.ready'].includes(event.type)) {
+    if (['content.image.ready', 'content.media.ready', 'content.media.frames.changed'].includes(event.type)) {
       await this.parts?.mediaReady(z.object({ assetId: z.uuid() }).parse(event.payload).assetId);
       return;
     }

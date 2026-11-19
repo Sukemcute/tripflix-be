@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { MediaFramesUseCases } from './application/media-frames.use-cases.js';
 import { createHash } from 'node:crypto';
 import type { MediaAspect, MediaQualityLevel } from '@tripflix/contracts';
 import type { ObjectStorage } from '@tripflix/storage';
@@ -33,7 +34,18 @@ export class MediaFacade {
   constructor(
     @Inject(MEDIA_ASSET_STORE) private readonly store: MediaAssetStore,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+    @Optional() @Inject(MediaFramesUseCases) private readonly frames?: MediaFramesUseCases,
   ) {}
+
+  async ensureModerationFrames(assetIds: string[], actorId?: string) { await this.frames?.ensure(assetIds, actorId); }
+  async getModerationFrames(assetIds: string[]) {
+    const scans = await this.frames?.list(assetIds) ?? [];
+    return scans.map((scan) => ({
+      assetId: scan.assetId, requestId: scan.requestId, status: scan.status, policy: scan.policy, errorCode: scan.errorCode,
+      durationMs: scan.manifest?.durationMs ?? null,
+      frames: scan.manifest?.frames.map((frame) => ({ timestampMs: frame.timestampMs, url: this.storage.getCdnUrl(frame.key) })) ?? [],
+    }));
+  }
 
   /** Chỉ có video phát được: id không tồn tại hoặc chưa ready thì không có trong kết quả. */
   async getPlayback(assetIds: string[]): Promise<Record<string, PlaybackInfo>> {

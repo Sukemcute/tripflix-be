@@ -1,5 +1,7 @@
 import { hostname } from 'node:os';
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import { MediaFramesCompletedV1Schema, MediaFramesFailedV1Schema } from '@tripflix/contracts';
+import { MediaFramesUseCases } from '../application/media-frames.use-cases.js';
 import { MediaRenditionCompletedV1Schema, MediaTranscodeFailedV1Schema, type EventEnvelope } from '@tripflix/contracts';
 import { RedisStreamsConsumer, STREAMS } from '@tripflix/event-bus';
 import type { Redis } from 'ioredis';
@@ -21,6 +23,7 @@ export class MediaResultConsumer implements OnApplicationBootstrap, OnApplicatio
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(MediaResultUseCases) private readonly results: MediaResultUseCases,
+    @Optional() @Inject(MediaFramesUseCases) private readonly frames?: MediaFramesUseCases,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -45,6 +48,16 @@ export class MediaResultConsumer implements OnApplicationBootstrap, OnApplicatio
   }
 
   private async route(event: EventEnvelope): Promise<void> {
+    if (event.version !== 1) return;
+    if (event.type === 'media.frames.completed') {
+      await this.frames?.complete(MediaFramesCompletedV1Schema.parse(event.payload));
+      return;
+    }
+    if (event.type === 'media.frames.failed') {
+      const failure = MediaFramesFailedV1Schema.parse(event.payload);
+      await this.frames?.fail(failure.assetId, failure.requestId, failure.errorCode);
+      return;
+    }
     if (event.type === 'media.rendition.completed') {
       await this.results.recordRendition(MediaRenditionCompletedV1Schema.parse(event.payload));
     } else if (event.type === 'media.transcode.failed') {
