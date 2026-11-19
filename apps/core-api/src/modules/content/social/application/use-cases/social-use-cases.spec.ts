@@ -1012,7 +1012,6 @@ describe('Social Application Use Cases', () => {
         body: 'Nội dung đã sửa',
         mentions: [],
         isEdited: true,
-        mentions: [],
         creatorReview: 'pending',
         status: 'held',
       });
@@ -1053,7 +1052,6 @@ describe('Social Application Use Cases', () => {
         body: 'Nội dung đã sửa',
         mentions: [],
         isEdited: true,
-        mentions: [],
         platformHeld: true,
       });
     });
