@@ -43,7 +43,7 @@ Endpoint, tham số và JSON trả về không đổi. Bước bật v1 làm sau
 - **Consumer.** Nghe thêm `content.post.viewed` và `content.post.booking_clicked`. Hai sự kiện này đã được phát sẵn, chỉ thêm phía nghe.
 - **Ngăn từ caption (commit cuối).**
   - Job nhúng tiêu đề + nội dung qua ai-service `POST /embed` (multilingual-e5-small INT8) và cache vector theo sha256 ở bảng mới `discovery.recommend_text_vectors`.
-  - `bins.ts` so cosine với câu mô tả 9 ngăn và chỉ gán khi ngăn đầu hơn ngăn thứ hai ít nhất 0,02.
+  - `bins.ts` so cosine với câu mô tả 9 ngăn và chỉ gán khi ngăn đầu hơn ngăn thứ hai ít nhất 0,0025 (biên có F1 cao nhất).
   - AI tắt, lỗi hoặc dùng sai mô hình thì job bỏ nguồn caption và vẫn chạy.
 
 ## Đối chiếu "Xong khi"
@@ -58,15 +58,20 @@ Endpoint, tham số và JSON trả về không đổi. Bước bật v1 làm sau
 
 ## Ngăn từ caption: đo ra sao
 
-- **Caption thật.** Đo trên 283 caption công khai (133 YouTube Shorts + 150 TikTok). Nhãn là bản nháp, chỉ gắn khi chữ nói rõ; 49 caption không nói gì về trải nghiệm. Bản ONNX INT8 chạy thật ở ai-service, khi đã bỏ hashtag:
-  - gán được 36% caption có nội dung rõ, đúng 98%;
-  - gán bừa 2% số caption không nói gì;
-  - top1 0,80.
-- **Biên 0,02.** Biên nhỏ hơn thì gán bừa tăng nhanh: ở 0,01 gán bừa lên 12%.
-- **Vì sao không dùng mô hình lớn hơn.** e5-large đúng hơn (phủ 53%, đúng 100%) nhưng quá nặng cho máy chủ 2 vCPU / 8 GB dùng chung. Qwen3 và bge-m3 gán bừa 35–49%.
-- **Trên 243 bài mẫu của DB local.** Thêm ngăn cho 12 bài.
-  - Đúng: "Tràng An mùa lúa chín" vào `nui`, "Bình Ba… lặn ngắm san hô" vào `bien`.
-  - 9 bài dùng chung một mẫu caption seed ("…ăn no rồi ngồi viết cap… chill") bị gán `cafe`. Đây là gán không chắc trên dữ liệu seed. Tôi không chỉnh biên theo dữ liệu mô phỏng.
+- **Caption thật.** Đo trên 283 caption công khai (133 YouTube Shorts + 150 TikTok). Nhãn là bản nháp, chỉ gắn khi chữ nói rõ; 49 caption không nói gì về trải nghiệm. Bản ONNX INT8 chạy thật ở ai-service, đã bỏ hashtag. Quét biên, FP gồm cả caption không nói gì mà bị gán:
+
+  | Biên | precision | recall | F1 | gán bừa caption không nói gì |
+  |---|---|---|---|---|
+  | **0,0025 (đang dùng, F1 cao nhất)** | 0,74 | 0,76 | **0,75** | 59% |
+  | 0,0075 | 0,86 | 0,61 | 0,71 | 14% |
+  | 0,02 (bản trước) | 0,97 | 0,35 | 0,52 | 2% |
+
+- **Vì sao không dùng mô hình lớn hơn.** e5-large đúng hơn nhưng quá nặng cho máy chủ 2 vCPU / 8 GB dùng chung. Qwen3 và bge-m3 gán bừa nhiều hơn ở cùng độ phủ.
+- **Trên 243 bài mẫu của DB local, biên 0,0025.**
+  - Caption thêm ngăn cho 104 bài, trong đó 17/30 bài trước đó không có ngăn trải nghiệm nào. Ngăn được thêm nhiều nhất: `cafe` 35, `ve_dem` 21, `nghi_duong` 19.
+  - Đúng: "Tràng An mùa lúa chín" vào `nui`, "Côn Đảo… ngắm rùa" vào `bien`.
+  - Sai: "Vĩnh Long: miệt vườn, chợ nổi" vào `ve_dem`, "Phan Thiết: đồi cát bay" vào `an_uong`. Caption seed theo mẫu ("Ngày 3 ở Nha Trang: bien cả ngày") cũng hay bị gán `ve_dem`.
+  - Biên chỉ là một hằng số (`CAPTION_MARGIN` trong `bins.ts`). Đổi biên thì lượt job sau tự áp.
 
 ## Kết quả kiểm tra
 
