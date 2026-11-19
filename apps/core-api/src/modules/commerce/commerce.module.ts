@@ -12,6 +12,8 @@ import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/p
 import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
 import { TraceContext } from './trace-context.js';
 import { CommerceMetrics } from './metrics/commerce-metrics.js';
+import { AdminOrdersController } from './admin/admin-orders.controller.js';
+import { AdminOrdersStore } from './admin/admin-orders.store.js';
 import { AdminMetricsController } from './metrics/admin-metrics.controller.js';
 import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
 import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
@@ -103,8 +105,9 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
     }),
   ],
-  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController, AdminMetricsController],
+  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController, AdminMetricsController, AdminOrdersController],
   providers: [
+    AdminOrdersStore,
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     TraceContext,
     CommerceMetrics,

@@ -6399,6 +6399,115 @@
         ]
       }
     },
+    "/api/admin/commerce/orders": {
+      "get": {
+        "operationId": "AdminOrdersController_search",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "createdAt của đơn cuối trang trước",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc trạng thái, nhiều giá trị cách bằng dấu phẩy",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Mã xác nhận, mã đơn, mã người dùng, số điện thoại hoặc email",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn mới nhất trước; nextBefore=null khi hết"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/orders/{id}": {
+      "get": {
+        "operationId": "AdminOrdersController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn, mục, khách, khoản trừ, khoản hoàn, lịch sử trạng thái và bất thường của đơn"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
+    "/api/admin/commerce/anomalies": {
+      "get": {
+        "operationId": "AdminOrdersController_anomalies",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Tối đa mỗi loại",
+            "schema": {}
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "Loại, cách bằng dấu phẩy: double_charge, charged_without_seat, paid_without_seat, paid_amount_mismatch, stuck_payment, refund_needs_review",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đơn bất thường, cũ nhất trước trong từng loại, kèm số đếm theo loại"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-commerce"
+        ]
+      }
+    },
     "/api/analytics/ai-usage": {
       "get": {
         "description": "Ngày theo giờ Việt Nam, gồm cả `from` và `to`. Mặc định 7 ngày tới hôm nay, tối đa 92 ngày. Chi phí là ước tính.",
