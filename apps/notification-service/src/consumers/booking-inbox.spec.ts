@@ -176,4 +176,35 @@ describe('Thông báo hộp thư cho đặt chỗ', () => {
     await router.route(event);
     expect(await processed.has(event.eventId)).toBe(true);
   });
+
+  it('nhắc 24h trước chuyến (TF37): lưu inbox, gửi email theo giờ Việt Nam; giao lại sự kiện không nhắc lần hai', async () => {
+    const { router, insert, emitToUser, mailer } = setup();
+    const event = createEvent('commerce.order.departure_reminder');
+    event.payload = {
+      orderId: randomUUID(),
+      userId: randomUUID(),
+      startAt: '2026-12-01T07:00:00.000Z',
+      confirmationCode: 'TF-ABC123',
+      contactName: 'An',
+      contactEmail: 'an@example.com',
+      items: [{ productType: 'room', productName: 'Deluxe', propertyName: 'Khách sạn Biển', date: '2026-12-01', nights: 2, flight: null }],
+    };
+    expect(await router.route(event)).toBe('handled');
+    expect(insert).toHaveBeenCalledWith({
+      userId: event.payload.userId,
+      type: 'booking.departure_reminder',
+      title: 'Chuyến đi sắp bắt đầu',
+      body: 'Khách sạn Biển · bắt đầu lúc 14:00 01/12. Mã TF-ABC123',
+      link: '/bookings',
+      data: { orderId: event.payload.orderId },
+      sourceEventId: event.eventId,
+    });
+    expect(emitToUser).toHaveBeenCalledTimes(1);
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]).toMatchObject({ to: 'an@example.com', subject: 'Chuyến đi của bạn bắt đầu lúc 14:00 01/12/2026' });
+    expect(mailer.sent[0]!.text).toContain('Khách sạn Biển · Deluxe · nhận phòng 01/12/2026 · 2 đêm');
+    expect(await router.route(event)).toBe('duplicate');
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(mailer.sent).toHaveLength(1);
+  });
 });
