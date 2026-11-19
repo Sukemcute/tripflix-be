@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
+import { assertReviewLease } from '../../moderation/infra/review-lease.js';
 import { isAfterCursor, isBeforeCursor } from './keyset-cursor.js';
 import {
   postCounterDeltas,
@@ -55,6 +56,10 @@ export type CounterLockResult =
   | { status: 'missing' };
 
 export class PostRepository {
+  async assertModerationLease(postId: string, actorId: string) {
+    await assertReviewLease(this.db, 'post', postId, actorId);
+  }
+
   constructor(private readonly dbOrGetDb: Db | (() => Db)) {}
 
   private get db(): Db {

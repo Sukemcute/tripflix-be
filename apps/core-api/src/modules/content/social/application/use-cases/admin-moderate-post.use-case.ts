@@ -47,6 +47,7 @@ export class AdminModeratePostUseCase {
     }
 
     const previousStatus = record.status;
+    if (command.actorType !== 'system') await this.postRepository.assertModerationLease(command.postId, command.moderatorId);
 
     const domainPost = new Post({
       id: record.id,

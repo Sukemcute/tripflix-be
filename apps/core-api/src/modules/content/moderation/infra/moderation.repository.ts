@@ -1,5 +1,8 @@
 import { and, asc, desc, eq, getTableColumns, gte, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
+import { reviewDueAt } from '../domain/review-policy.js';
+import { decodeReviewCursor, encodeReviewCursor } from './review-cursor.js';
+import { isAfterCursor } from '../../social/infra/keyset-cursor.js';
 import {
   contentVersion,
   postEvidence,
@@ -15,6 +18,7 @@ import {
   moderationScans,
   posts,
   reports,
+  moderationReviewAudit,
   type ModerationCaseRecord,
   type ModerationTarget,
 } from '../../db/schema/index.js';
@@ -113,7 +117,7 @@ export class ModerationRepository {
    * Số liệu tổng cho màn kiểm duyệt, đếm thẳng trong Postgres để không phụ thuộc trang FE tải về.
    * "Hàng chờ" dùng cùng điều kiện với queue view=pending để thẻ số khớp total của danh sách.
    */
-  async stats(urgentSeverity: number) {
+  async stats(urgentSeverity: number, actorId?: string) {
     const result = await this.db.execute<{
       pending_total: number;
       pending_urgent: number;
@@ -125,9 +129,13 @@ export class ModerationRepository {
       pending_appeals: number;
       failed_scans: number;
       deferred_scans: number;
+      unassigned: number;
+      assigned_to_me: number;
+      overdue: number;
+      due_soon: number;
     }>(sql`
       WITH pending AS (
-        SELECT c.target_type, c.severity, c.created_at
+        SELECT c.target_type, c.severity, c.created_at, c.due_at, c.assignee_id, c.lease_expires_at
         FROM ${moderationCases} c
         LEFT JOIN ${posts} p ON c.target_type = 'post' AND p.id = c.target_id
         LEFT JOIN ${comments} cm ON c.target_type = 'comment' AND cm.id = c.target_id
@@ -146,7 +154,11 @@ export class ModerationRepository {
           WHERE created_at >= now() - interval '24 hours') AS reports_24h,
         (SELECT count(*)::int FROM ${moderationAppeals} WHERE status = 'pending') AS pending_appeals,
         (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'failed') AS failed_scans,
-        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'deferred') AS deferred_scans
+        (SELECT count(*)::int FROM ${moderationScans} WHERE status = 'deferred') AS deferred_scans,
+        (SELECT count(*)::int FROM pending WHERE assignee_id IS NULL OR lease_expires_at <= now()) AS unassigned,
+        (SELECT count(*)::int FROM pending WHERE assignee_id = ${actorId ?? null}::uuid AND lease_expires_at > now()) AS assigned_to_me,
+        (SELECT count(*)::int FROM pending WHERE due_at <= now()) AS overdue,
+        (SELECT count(*)::int FROM pending WHERE due_at > now() AND due_at <= now() + interval '1 hour') AS due_soon
     `);
     const row = result.rows[0]!;
     const oldest = row.oldest_pending_at ? new Date(row.oldest_pending_at) : null;
@@ -161,6 +173,10 @@ export class ModerationRepository {
       pendingAppeals: Number(row.pending_appeals),
       failedScans: Number(row.failed_scans),
       deferredScans: Number(row.deferred_scans),
+      unassigned: Number(row.unassigned),
+      assignedToMe: Number(row.assigned_to_me),
+      overdue: Number(row.overdue),
+      dueSoon: Number(row.due_soon),
       urgentSeverity,
       generatedAt: new Date().toISOString(),
     };
@@ -249,15 +265,21 @@ export class ModerationRepository {
   }
 
   async hasHeldRelease(target: TargetSnapshot): Promise<boolean> {
-    const [decision] = await this.db.select({ id: moderationActions.id }).from(moderationActions).where(and(
-      eq(moderationActions.actorType, 'staff'),
-      sql`${moderationActions.previousStatus} IN ('held', 'hidden', 'removed')`,
-      eq(moderationActions.contentVersion, target.version),
-      sql`${moderationActions.postStatus} IN ('published', 'visible')`,
-      target.targetType === 'post'
-        ? and(eq(moderationActions.targetType, 'post'), eq(moderationActions.postId, target.targetId))
-        : eq(moderationActions.commentId, target.targetId),
-    )).limit(1);
+    const [decision] = await this.db
+      .select({ id: moderationActions.id })
+      .from(moderationActions)
+      .where(
+        and(
+          eq(moderationActions.actorType, 'staff'),
+          sql`${moderationActions.previousStatus} IN ('held', 'hidden', 'removed')`,
+          eq(moderationActions.contentVersion, target.version),
+          sql`${moderationActions.postStatus} IN ('published', 'visible')`,
+          target.targetType === 'post'
+            ? and(eq(moderationActions.targetType, 'post'), eq(moderationActions.postId, target.targetId))
+            : eq(moderationActions.commentId, target.targetId),
+        ),
+      )
+      .limit(1);
     return Boolean(decision);
   }
 
@@ -371,6 +393,7 @@ export class ModerationRepository {
           sources: [...new Set([...current.sources, ...patch.sources])],
           flags: { ...current.flags, ...patch.flags },
           severity: Math.max(current.severity, patch.severity),
+          dueAt: reviewDueAt(current.createdAt, Math.max(current.severity, patch.severity)),
           updatedAt: new Date(),
         })
         .where(eq(moderationCases.id, current.id))
@@ -385,6 +408,7 @@ export class ModerationRepository {
         postId: target.postId,
         authorId: target.authorId,
         ...patch,
+        dueAt: reviewDueAt(new Date(), patch.severity),
       })
       .returning();
     return created!;
@@ -415,6 +439,11 @@ export class ModerationRepository {
     source?: string;
     limit: number;
     offset: number;
+    assignment?: 'all' | 'unassigned' | 'mine';
+    sla?: 'all' | 'overdue' | 'due_soon';
+    actorId?: string;
+    search?: string;
+    cursor?: string;
   }) {
     const postJoin = and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId));
     const commentJoin = and(
@@ -423,6 +452,26 @@ export class ModerationRepository {
     );
     const visibility = sql`coalesce(${posts.status}, ${comments.status}, '')`;
     const conditions = [];
+    if (options.assignment && options.assignment !== 'all') {
+      conditions.push(eq(moderationCases.status, 'pending'));
+      conditions.push(
+        options.assignment === 'mine'
+          ? sql`${moderationCases.assigneeId} = ${options.actorId ?? null}::uuid AND ${moderationCases.leaseExpiresAt} > now()`
+          : sql`(${moderationCases.assigneeId} IS NULL OR ${moderationCases.leaseExpiresAt} <= now())`,
+      );
+    }
+    if (options.sla && options.sla !== 'all') {
+      conditions.push(eq(moderationCases.status, 'pending'));
+      conditions.push(
+        options.sla === 'overdue'
+          ? sql`${moderationCases.dueAt} <= now()`
+          : sql`${moderationCases.dueAt} > now() AND ${moderationCases.dueAt} <= now() + interval '1 hour'`,
+      );
+    }
+    if (options.search)
+      conditions.push(
+        sql`position(lower(${options.search}) in lower(concat_ws(' ', ${moderationCases.id}::text, ${moderationCases.targetId}::text, ${moderationCases.authorId}::text, ${posts.title}, ${posts.body}, ${comments.body}))) > 0`,
+      );
     if (options.view) {
       if (options.view !== 'pending') {
         conditions.push(sql`${moderationCases.id} IN (
@@ -459,7 +508,11 @@ export class ModerationRepository {
       OR EXISTS (SELECT 1 FROM ${reports} WHERE ${reports.caseId} = ${moderationCases.id} AND ${reports.reasonCode} = ${options.reasonCode})
       OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(${moderationCases.flags}->'rules', '[]'::jsonb)) AS rule WHERE rule->>'category' = ${options.reasonCode})
     )`);
-    const [items, count] = await Promise.all([
+    const cursor = decodeReviewCursor(options.cursor);
+    const cursorCondition = cursor
+      ? sql`(${moderationCases.severity} < ${cursor.severity} OR (${moderationCases.severity} = ${cursor.severity} AND ${isAfterCursor(moderationCases, moderationCases.createdAt, moderationCases.id, cursor)}))`
+      : undefined;
+    const [rows, count] = await Promise.all([
       this.db
         .select({
           ...getTableColumns(moderationCases),
@@ -472,9 +525,9 @@ export class ModerationRepository {
         .from(moderationCases)
         .leftJoin(posts, postJoin)
         .leftJoin(comments, commentJoin)
-        .where(and(...conditions))
+        .where(and(...conditions, cursorCondition))
         .orderBy(desc(moderationCases.severity), asc(moderationCases.createdAt), asc(moderationCases.id))
-        .limit(options.limit)
+        .limit(options.limit + 1)
         .offset(options.offset),
       this.db
         .select({ total: sql<number>`count(*)::int` })
@@ -483,7 +536,13 @@ export class ModerationRepository {
         .leftJoin(comments, commentJoin)
         .where(and(...conditions)),
     ]);
-    return { items, total: count[0]?.total ?? 0 };
+    const items = rows.slice(0, options.limit);
+    const last = items.at(-1);
+    return {
+      items,
+      total: count[0]?.total ?? 0,
+      nextCursor: rows.length > options.limit && last ? encodeReviewCursor(last) : null,
+    };
   }
   async log(options: {
     targetId?: string;
@@ -509,6 +568,68 @@ export class ModerationRepository {
       .limit(options.limit)
       .offset(options.offset);
   }
+  async commentContext(item: ModerationCaseRecord) {
+    if (item.targetType !== 'comment') return { postContext: null, parentComment: null };
+    const [post] = await this.db
+      .select({
+        id: posts.id,
+        authorId: posts.authorId,
+        title: posts.title,
+        body: posts.body,
+        status: posts.status,
+        visibility: posts.visibility,
+        deletedAt: posts.deletedAt,
+        createdAt: posts.createdAt,
+      })
+      .from(posts)
+      .where(eq(posts.id, item.postId));
+    const [comment] = await this.db
+      .select({ replyToCommentId: comments.replyToCommentId, parentCommentId: comments.parentCommentId })
+      .from(comments)
+      .where(and(eq(comments.id, item.targetId), eq(comments.postId, item.postId)));
+    const parentId = comment?.replyToCommentId ?? comment?.parentCommentId;
+    const [parent] = parentId
+      ? await this.db
+          .select({
+            id: comments.id,
+            authorId: comments.authorId,
+            body: comments.body,
+            status: comments.status,
+            deletedAt: comments.deletedAt,
+            createdAt: comments.createdAt,
+          })
+          .from(comments)
+          .where(and(eq(comments.id, parentId), eq(comments.postId, item.postId)))
+      : [];
+    const postUnavailable = !!post?.deletedAt || post?.status === 'deleted';
+    const parentUnavailable = !!parent?.deletedAt || postUnavailable;
+    return {
+      postContext: post
+        ? {
+            id: post.id,
+            authorId: post.authorId,
+            title: postUnavailable ? null : post.title,
+            excerpt: postUnavailable ? null : post.body.slice(0, 500),
+            status: post.status,
+            visibility: post.visibility,
+            unavailable: postUnavailable,
+            createdAt: post.createdAt,
+          }
+        : null,
+      parentComment: parent
+        ? {
+            id: parent.id,
+            authorId: parent.authorId,
+            body: parentUnavailable ? null : parent.body,
+            status: parent.status,
+            unavailable: parentUnavailable,
+            createdAt: parent.createdAt,
+            kind: comment?.replyToCommentId ? ('reply' as const) : ('thread' as const),
+          }
+        : null,
+    };
+  }
+
   async detail(item: ModerationCaseRecord) {
     const [target, reportItems, actions] = await Promise.all([
       this.loadTarget(item.targetType, item.targetId),
@@ -519,7 +640,20 @@ export class ModerationRepository {
         .orderBy(desc(reports.createdAt)),
       this.log({ targetId: item.targetId, limit: 100, offset: 0 }),
     ]);
-    return { ...item, target, reports: reportItems, actions };
+    const reviewAudit = await this.db
+      .select()
+      .from(moderationReviewAudit)
+      .where(eq(moderationReviewAudit.caseId, item.id))
+      .orderBy(desc(moderationReviewAudit.createdAt), desc(moderationReviewAudit.id))
+      .limit(100);
+    return {
+      ...item,
+      target,
+      reports: reportItems,
+      actions,
+      reviewAudit,
+      ...(await this.commentContext(item)),
+    };
   }
   async report(target: TargetSnapshot, reporterId: string, reasonCode: string, reasonDetail?: string) {
     const [row] = await this.db
