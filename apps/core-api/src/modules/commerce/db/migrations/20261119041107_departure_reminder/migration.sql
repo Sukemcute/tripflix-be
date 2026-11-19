@@ -1,0 +1,2 @@
+ALTER TABLE "commerce"."orders" ADD COLUMN "departure_reminded_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "idx_orders_departure_reminder" ON "commerce"."orders" ("status") WHERE "status" = 'paid' and "departure_reminded_at" is null;

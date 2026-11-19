@@ -159,6 +159,7 @@ export class CheckoutDto {
   @ApiProperty({ description: 'Số hành khách cần nhập (0 khi không có vé bay)' }) passengersRequired!: number;
   @ApiProperty({ enum: ['adult', 'child', 'infant'], isArray: true, description: 'Loại của từng hành khách cần nhập, đúng thứ tự guests; tuổi kiểm theo chặng: người lớn từ 12 tuổi ở chặng đầu, trẻ em tối đa 11 tuổi ở chặng đầu và đủ 2 tuổi ở chặng cuối, em bé dưới 2 tuổi tới chặng cuối' }) passengerTypes!: string[];
   @ApiProperty() policyVersion!: string;
+  @ApiProperty({ type: String, enum: ['upcoming', 'completed'], nullable: true, description: 'Chỉ đơn đã thanh toán: completed khi hôm nay (giờ Việt Nam) đã qua ngày trả phòng / ngày bay cuối, hiện "Đã đi". Đơn huỷ, hoàn tiền, chưa trả là null' }) tripStatus!: 'upcoming' | 'completed' | null;
 }
 
 export class SetGuestsResultDto {
@@ -239,6 +240,7 @@ export class TripDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) paidAt!: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true, description: 'Ngày đi sớm nhất trong đơn' }) startDate!: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true, description: 'Ngày về / trả phòng muộn nhất trong đơn' }) endDate!: string | null;
+  @ApiProperty({ type: String, enum: ['upcoming', 'completed'], nullable: true, description: 'Chỉ đơn đã thanh toán: completed khi hôm nay (giờ Việt Nam) đã qua ngày trả phòng / ngày bay cuối, hiện "Đã đi". Đơn huỷ, hoàn tiền, chưa trả là null' }) tripStatus!: 'upcoming' | 'completed' | null;
   @ApiProperty({ type: [CheckoutItemDto] }) items!: CheckoutItemDto[];
 }
 

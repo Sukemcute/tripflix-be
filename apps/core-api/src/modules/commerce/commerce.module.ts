@@ -17,6 +17,8 @@ import { AdminOrdersStore } from './admin/admin-orders.store.js';
 import { AdminMetricsController } from './metrics/admin-metrics.controller.js';
 import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
 import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
+import { DepartureReminderJob } from './booking/jobs/departure-reminder.job.js';
+import { DepartureReminderUseCases } from './booking/application/departure-reminder.use-cases.js';
 import { ReconcileInventoryJob } from './booking/jobs/reconcile-inventory.job.js';
 import { ReconcileInventoryUseCases } from './booking/application/reconcile-inventory.use-cases.js';
 import { CommerceFacade } from './commerce.facade.js';
@@ -143,9 +145,11 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     PaymentUseCases,
     VnpayUseCases,
     ExpireHoldsUseCases,
+    DepartureReminderUseCases,
     ReconcileInventoryUseCases,
     OpenCalendarJob,
     ExpireHoldsJob,
+    DepartureReminderJob,
     ReconcileInventoryJob,
     CommerceCleanupJob,
     PaymentJobs,

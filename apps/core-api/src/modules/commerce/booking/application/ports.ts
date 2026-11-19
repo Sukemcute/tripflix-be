@@ -120,6 +120,10 @@ export interface OrderStore {
   /** FOR UPDATE SKIP LOCKED: hàng đang bị giữ thì trả null, không chờ. */
   lockOrderSkipLocked(orderId: string): Promise<OrderRecord | null>;
   lockPaymentSkipLocked(paymentId: string): Promise<PaymentRecord | null>;
+  /** TF37: đơn đã trả, chưa nhắc, có mục bắt đầu trong [fromDate, toDate]. Đọc không khoá. */
+  findDepartureReminderCandidateIds(input: { fromDate: string; toDate: string; limit: number }): Promise<string[]>;
+  /** TF37: đánh dấu đã nhắc nếu đơn còn paid và chưa nhắc; false là đã có lượt khác nhắc (chạy lại, nhiều instance). */
+  markDepartureReminded(orderId: string, at: Date): Promise<boolean>;
   /** Đơn của người dùng, mới nhất trước (created_at, id giảm dần), sau con trỏ nếu có. Đọc không khoá. */
   /** hidesUnpaidClosed: bỏ đơn chưa từng trả tiền mà đã hết hạn hoặc huỷ (giữ chỗ hết giờ thì coi như không có). */
   listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number; hidesUnpaidClosed?: boolean }): Promise<OrderRecord[]>;

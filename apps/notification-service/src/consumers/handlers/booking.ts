@@ -1,6 +1,7 @@
-import { CommerceOrderCancelledV1Schema, CommerceOrderPaidV1Schema, type EventEnvelope } from '@tripflix/contracts';
+import { CommerceOrderCancelledV1Schema, CommerceOrderDepartureReminderV1Schema, CommerceOrderPaidV1Schema, type EventEnvelope } from '@tripflix/contracts';
 import { toInboxItemDto, type InboxInsert, type InboxRepository } from '../../inbox/inbox.repository.js';
 import type { Mailer } from '../../outapp/mailer.js';
+import { buildDepartureReminderEmail, formatVietnamTime } from '../../outapp/departure-reminder.email.js';
 import { buildOrderConfirmationEmail } from '../../outapp/order-confirmation.email.js';
 import type { RealtimeService } from '../../realtime/realtime.service.js';
 import type { EventHandler } from './event-handler.js';
@@ -57,6 +58,25 @@ export function createBookingHandlers(options: {
         data: { orderId: payload.orderId },
         sourceEventId: event.eventId,
       });
+    },
+    // TF37: commerce chỉ phát một lần mỗi đơn; inbox chống trùng theo sourceEventId nên chạy lại sự kiện cũng không nhắc hai lần.
+    'commerce.order.departure_reminder.v1': async (event) => {
+      const payload = CommerceOrderDepartureReminderV1Schema.parse(event.payload);
+      const startText = formatVietnamTime(payload.startAt, { hasYear: false });
+      const firstItem = payload.items[0];
+      const name = firstItem?.propertyName || firstItem?.productName;
+      const hasInbox = await createInbox(event, {
+        userId: payload.userId,
+        type: 'booking.departure_reminder',
+        title: 'Chuyến đi sắp bắt đầu',
+        body: `${name ? `${name} · ` : ''}bắt đầu lúc ${startText}. Mã ${payload.confirmationCode || payload.orderId.slice(0, 8)}`,
+        link: '/bookings',
+        data: { orderId: payload.orderId },
+        sourceEventId: event.eventId,
+      });
+      if (!payload.contactEmail) return hasInbox;
+      await options.mailer.send(buildDepartureReminderEmail(payload, payload.contactEmail, options.webAppUrl));
+      return true;
     },
   };
 }

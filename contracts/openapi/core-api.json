@@ -16722,6 +16722,15 @@
           },
           "policyVersion": {
             "type": "string"
+          },
+          "tripStatus": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed"
+            ],
+            "nullable": true,
+            "description": "Chỉ đơn đã thanh toán: completed khi hôm nay (giờ Việt Nam) đã qua ngày trả phòng / ngày bay cuối, hiện \"Đã đi\". Đơn huỷ, hoàn tiền, chưa trả là null"
           }
         },
         "required": [
@@ -16738,7 +16747,8 @@
           "isGuestInfoComplete",
           "passengersRequired",
           "passengerTypes",
-          "policyVersion"
+          "policyVersion",
+          "tripStatus"
         ]
       },
       "TripDto": {
@@ -16806,6 +16816,15 @@
             "nullable": true,
             "description": "Ngày về / trả phòng muộn nhất trong đơn"
           },
+          "tripStatus": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed"
+            ],
+            "nullable": true,
+            "description": "Chỉ đơn đã thanh toán: completed khi hôm nay (giờ Việt Nam) đã qua ngày trả phòng / ngày bay cuối, hiện \"Đã đi\". Đơn huỷ, hoàn tiền, chưa trả là null"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -16827,6 +16846,7 @@
           "paidAt",
           "startDate",
           "endDate",
+          "tripStatus",
           "items"
         ]
       },

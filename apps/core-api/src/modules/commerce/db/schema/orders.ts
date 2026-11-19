@@ -34,6 +34,8 @@ export const orders = commerceSchema.table(
     statusSource: text('status_source'),
     /** x-request-id của request đổi trạng thái lần gần nhất; job thì là mã lượt chạy. */
     statusRequestId: text('status_request_id'),
+    /** TF37: lúc đã nhắc khách 24h trước chuyến; đặt bằng UPDATE ... WHERE ... IS NULL nên mỗi đơn chỉ nhắc một lần. */
+    departureRemindedAt: timestamp('departure_reminded_at', { withTimezone: true }),
   },
   (t) => [
     check('ck_orders_status', sql`${t.status} in ('pending', 'paying', 'paid', 'cancelled', 'expired')`),
@@ -46,6 +48,8 @@ export const orders = commerceSchema.table(
     uniqueIndex('uq_orders_confirmation_code').on(t.confirmationCode),
     index('idx_orders_hold').on(t.status, t.holdExpiresAt),
     // Mỗi tài khoản một giỏ đang giữ: chống một người giữ nhiều giỏ để giam chỗ.
+    // Job nhắc chỉ quét đơn đã trả chưa nhắc: index nhỏ, đơn đã nhắc tự rơi khỏi index.
+    index('idx_orders_departure_reminder').on(t.status).where(sql`${t.status} = 'paid' and ${t.departureRemindedAt} is null`),
     uniqueIndex('uq_orders_one_pending_per_user').on(t.userId).where(sql`${t.status} = 'pending'`),
   ],
 );
