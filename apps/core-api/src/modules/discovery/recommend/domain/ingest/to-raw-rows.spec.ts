@@ -62,9 +62,11 @@ describe('toRawRows', () => {
   it('tìm kiếm: target = nơi đầu tiên; không có nơi thì null', () => {
     const payload = { userId: U, surface: 'explore', placeIds: ['da-lat', 'hue'], intent: 'food', budgetMax: null, postType: null, resultCount: 3 };
     expect(toRawRows(event('discovery.search.performed', payload))).toEqual([
-      expect.objectContaining({ kind: 'search', refId: E, targetType: 'place', targetId: 'da-lat', detail: { placeIds: ['da-lat', 'hue'], intent: 'food', budgetMax: null, surface: 'explore', postType: null } }),
+      expect.objectContaining({ kind: 'search', refId: E, targetType: 'place', targetId: 'da-lat', detail: { placeIds: ['da-lat', 'hue'], intent: 'food', budgetMax: null, surface: 'explore', postType: null, exps: [] } }),
     ]);
     expect(toRawRows(event('discovery.search.performed', { ...payload, placeIds: [] }))![0]).toMatchObject({ targetType: null, targetId: null });
+    // Câu tìm chủ đề ("biển"): giữ ngăn chủ đề để gợi ý dùng.
+    expect(toRawRows(event('discovery.search.performed', { ...payload, placeIds: [], exps: ['exp:bien'] }))![0]).toMatchObject({ detail: { exps: ['exp:bien'] } });
   });
 
   it('tài khoản: registered / guest_merged / locked', () => {

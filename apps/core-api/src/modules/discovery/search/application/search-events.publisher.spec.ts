@@ -36,7 +36,7 @@ describe('Phát sự kiện tìm kiếm', () => {
     const [stream, envelope] = published(publish)[0]!;
     expect(stream).toBe(STREAMS.discovery);
     expect(envelope).toMatchObject({ type: 'discovery.search.performed', version: 1, userId: U, producer: 'core-api' });
-    expect(envelope.payload).toEqual({ userId: U, surface: 'explore', placeIds: ['da-lat'], intent: 'food', budgetMax: 1_500_000, postType: null, resultCount: 5 });
+    expect(envelope.payload).toEqual({ userId: U, surface: 'explore', placeIds: ['da-lat'], intent: 'food', budgetMax: 1_500_000, postType: null, resultCount: 5, exps: [] });
     // Chỉ kiểm payload: eventId (UUID ngẫu nhiên) và thời điểm có thể tình cờ chứa "106" làm test đỏ ngẫu nhiên.
     expect(JSON.stringify(envelope.payload)).not.toMatch(/ăn gì|"lat"|106/);
   });
@@ -50,6 +50,26 @@ describe('Phát sự kiện tìm kiếm', () => {
       ['posts', 'video', 7],
       ['posts', null, 7],
     ]);
+  });
+
+  it('có bộ xếp chủ đề: chạy nền rồi phát kèm exps, không đưa câu tìm vào payload', async () => {
+    const publish = vi.fn().mockResolvedValue('1-0');
+    const classify = vi.fn().mockResolvedValue(['exp:bien']);
+    const publisher = new SearchEventsPublisher({ publish } as EventBus, { classify } as never);
+    publisher.searchPerformed(U, { surface: 'posts', understood: understood({ place: null, intents: [] }), postType: null, resultCount: 3, query: 'biển' });
+    await vi.waitFor(() => expect(publish).toHaveBeenCalled());
+    expect(classify).toHaveBeenCalledWith('biển');
+    const [, envelope] = published(publish)[0]!;
+    expect(envelope.payload).toMatchObject({ placeIds: [], exps: ['exp:bien'] });
+    expect(JSON.stringify(envelope.payload)).not.toContain('biển');
+  });
+
+  it('bộ xếp chủ đề lỗi: vẫn phát, exps rỗng', async () => {
+    const publish = vi.fn().mockResolvedValue('1-0');
+    const publisher = new SearchEventsPublisher({ publish } as EventBus, { classify: vi.fn().mockRejectedValue(new Error('ai')) } as never);
+    publisher.searchPerformed(U, { surface: 'posts', understood: understood(), postType: null, resultCount: 1, query: 'x y' });
+    await vi.waitFor(() => expect(publish).toHaveBeenCalled());
+    expect(published(publish)[0]![1].payload).toMatchObject({ exps: [] });
   });
 
   it('khách: kết quả y như trước, không phát', async () => {

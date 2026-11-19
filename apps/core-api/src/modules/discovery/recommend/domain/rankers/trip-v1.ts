@@ -12,15 +12,18 @@ import { sortByFinal, TRENDING, weightMap, type Scored } from './rankers.js';
  * Mọi hằng chỉnh được nằm ở đầu file. Đổi công thức chỉ sửa file này.
  */
 
-type Part = 'exploring' | 'trip' | 'interestExp' | 'interestPlace' | 'fit' | 'global';
+type Part = 'exploring' | 'topic' | 'trip' | 'interestExp' | 'interestPlace' | 'fit' | 'global';
 
-/** Trọng số khởi điểm theo giai đoạn (chỉnh bằng bộ đo). trip âm ở "vừa về": hạ nơi vừa đi. */
+/**
+ * Trọng số khởi điểm theo giai đoạn (chỉnh bằng bộ đo). trip âm ở "vừa về": hạ nơi vừa đi.
+ * topic: chủ đề vừa tìm (biển, núi…), cộng thêm, không lấy bớt phần khác (19/11).
+ */
 const STAGE_WEIGHTS: Record<Stage, Record<Part, number>> = {
-  dreaming: { exploring: 0, trip: 0, interestExp: 0.35, interestPlace: 0.2, fit: 0.1, global: 0.35 },
-  planning: { exploring: 0.45, trip: 0, interestExp: 0.15, interestPlace: 0.05, fit: 0.15, global: 0.2 },
-  upcoming: { exploring: 0, trip: 0.4, interestExp: 0.2, interestPlace: 0, fit: 0.1, global: 0.3 },
-  on_trip: { exploring: 0, trip: 0.45, interestExp: 0.2, interestPlace: 0, fit: 0.05, global: 0.3 },
-  after_trip: { exploring: 0, trip: -0.3, interestExp: 0.4, interestPlace: 0.1, fit: 0.1, global: 0.4 },
+  dreaming: { exploring: 0, topic: 0.3, trip: 0, interestExp: 0.35, interestPlace: 0.2, fit: 0.1, global: 0.35 },
+  planning: { exploring: 0.45, topic: 0.2, trip: 0, interestExp: 0.15, interestPlace: 0.05, fit: 0.15, global: 0.2 },
+  upcoming: { exploring: 0, topic: 0.15, trip: 0.4, interestExp: 0.2, interestPlace: 0, fit: 0.1, global: 0.3 },
+  on_trip: { exploring: 0, topic: 0.15, trip: 0.45, interestExp: 0.2, interestPlace: 0, fit: 0.05, global: 0.3 },
+  after_trip: { exploring: 0, topic: 0.2, trip: -0.3, interestExp: 0.4, interestPlace: 0.1, fit: 0.1, global: 0.4 },
 };
 /** Điểm toàn cục = hot + đặt được ngay + đúng mùa; lên kế hoạch thì "đặt được ngay" nặng gấp đôi. */
 const GLOBAL = { hot: 0.6, bookable: 0.25, season: 0.15 };
@@ -114,7 +117,8 @@ export const tripRankerV1: Ranker = {
     }
     const live: LiveAnswers | null = viewer ? answerLive({ rows: viewer.rows, posts: metas, productPlaces: viewer.productPlaces, now }) : null;
 
-    const hasSignal = Object.keys(evidence).length > 0 || (live !== null && (live.stage !== 'dreaming' || live.evidence.exploring > 0));
+    const hasSignal =
+      Object.keys(evidence).length > 0 || (live !== null && (live.stage !== 'dreaming' || live.evidence.exploring > 0 || live.evidence.topics > 0));
     if (!hasSignal) {
       return sortByFinal(
         candidates.map((c) => ({ candidate: c, final: c.score, item: { postId: c.postId, score: round4(c.score), source: c.source, breakdown: { global: round4(c.score), final: round4(c.score) }, reason: TRENDING } })),
@@ -144,6 +148,7 @@ export const tripRankerV1: Ranker = {
       const parts: Record<Part, number> = {
         exploring: conf(live?.evidence.exploring, FULL_EVIDENCE.exploring) * cosine(live?.exploring ?? {}, places, idf),
         trip: tripBin ? (bins[tripBin] ?? 0) * (stage === 'after_trip' || Object.keys(bins).some((b) => ON_SITE_EXP.has(b)) ? 1 : NO_LOCAL_EXP_FACTOR) : 0,
+        topic: conf(live?.evidence.topics, FULL_EVIDENCE.live) * cosine(live?.topics ?? {}, ofQuestion(bins, 'exp'), idf),
         interestExp: conf(evidence.exp, FULL_EVIDENCE.interest) * cosine(answers.exp ?? {}, ofQuestion(bins, 'exp'), idf),
         interestPlace: conf(evidence.place, FULL_EVIDENCE.interest) * cosine(answers.place ?? {}, places, idf),
         fit: 0,
@@ -164,7 +169,7 @@ export const tripRankerV1: Ranker = {
       final = Math.max(0, final);
 
       // Lý do = thành phần dương góp nhiều nhất (chỉ dùng reason.code có sẵn trong API).
-      const top = (['exploring', 'trip', 'interestExp', 'interestPlace'] as Part[])
+      const top = (['exploring', 'topic', 'trip', 'interestExp', 'interestPlace'] as Part[])
         .map((k) => ({ k, v: w[k] * parts[k] }))
         .filter((x) => x.v > 0)
         .sort((a, b) => b.v - a.v)[0];
@@ -172,7 +177,9 @@ export const tripRankerV1: Ranker = {
       const place = primaryPlace(bins);
       const exp = bestSharedExp(answers.exp ?? {}, bins);
       if (top?.k === 'exploring' && place) reason = { code: 'matches_place', text: exploringText(live!.exploring, bins, place) };
-      else if (top?.k === 'trip' && live?.trip) {
+      else if (top?.k === 'topic' && live && bestSharedExp(live.topics, bins)) {
+        reason = { code: 'matches_interest', text: `Vì bạn vừa tìm bài về ${expLabel(bestSharedExp(live.topics, bins)!)}` };
+      } else if (top?.k === 'trip' && live?.trip) {
         const [, m, d] = live.trip.checkIn.split('-');
         reason = { code: 'matches_place', text: `Cho chuyến ${placeName(live.trip.placeId)} ${d}/${m} của bạn` };
       } else if (top?.k === 'interestExp' && exp) {

@@ -97,7 +97,7 @@ on('discovery.search.performed', DiscoverySearchPerformedV1Schema, (p, e) => {
     user(p.userId, 'search', e.eventId, {
       targetType: placeId ? 'place' : null,
       targetId: placeId,
-      detail: { placeIds: p.placeIds, intent: p.intent, budgetMax: p.budgetMax, surface: p.surface, postType: p.postType },
+      detail: { placeIds: p.placeIds, intent: p.intent, budgetMax: p.budgetMax, surface: p.surface, postType: p.postType, exps: p.exps },
     }),
   ];
 });

@@ -13,6 +13,7 @@ import { PostRecommendationsController } from './recommend/api/post-recommendati
 import { TripAddonsController } from './recommend/api/trip-addons.controller.js';
 import { HomeRecommendationUseCases } from './recommend/application/home-recommendations.use-cases.js';
 import { BuildFeaturesUseCases } from './recommend/application/build-features.use-cases.js';
+import { QueryTopicUseCases } from './recommend/application/query-topics.use-cases.js';
 import { RecommendIngestUseCases } from './recommend/application/ingest.use-cases.js';
 import { BuildProductFeaturesUseCases } from './recommend/application/build-product-features.use-cases.js';
 import {
@@ -184,6 +185,7 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
         new AiEmbeddingClient({ aiUrl: env.AI_SERVICE_URL, coreUrl: env.CORE_API_INTERNAL_URL, secret: env.MODERATION_SERVICE_CLIENT_SECRET }),
     },
     BuildFeaturesUseCases,
+    QueryTopicUseCases,
     { provide: PRODUCT_PROFILE_CATALOG, inject: [CommerceFacade], useFactory: productProfileCatalog },
     { provide: PRODUCT_FEATURE_STORE, useExisting: RECOMMEND_STORE },
     BuildProductFeaturesUseCases,

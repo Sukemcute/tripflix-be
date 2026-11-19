@@ -117,6 +117,27 @@ describe('answerLive', () => {
       expect(live([reactAt('dl1', 'reaction', 2)]).stage).toBe('dreaming');
     });
 
+    it('tìm chủ đề (biển, núi) trong cùng giờ: cả hai đều tính, chủ đề vừa tìm nặng hơn', () => {
+      const topicSearch = (exps: string[], m: number) => row({ kind: 'search', detail: { placeIds: [], exps }, occurredAt: minsAgo(m) });
+      const a = live([topicSearch(['exp:nui'], 40), topicSearch(['exp:bien'], 2)]);
+      expect(a.topics['exp:bien']).toBeGreaterThan(a.topics['exp:nui']!);
+      expect(a.topics['exp:nui']).toBeGreaterThan(0);
+      expect(a.stage).toBe('dreaming');
+    });
+
+    it('ranker: vừa tìm "biển" thì bài biển lên đầu, lý do "vừa tìm bài về biển đảo"', () => {
+      const cand = (postId: string, score: number, bins: Record<string, number>) => ({
+        postId, authorId: postId, postType: 'video', tags: [], placeId: null, score, source: 'hot' as const, postFeatures: { bins, bookable: 0, hotelId: null },
+      });
+      const out = tripRankerV1.rank({
+        candidates: [cand('hot-food', 0.9, { 'exp:an_uong': 1, 'place:hue': 1 }), cand('beach', 0.2, { 'exp:bien': 1, 'place:quy-nhon': 1 })],
+        userFeatures: null,
+        now: NOW,
+        viewer: { rows: [row({ kind: 'search', detail: { placeIds: [], exps: ['exp:bien'] }, occurredAt: minsAgo(1) })], productPlaces: {} },
+      });
+      expect(out[0]).toMatchObject({ postId: 'beach', reason: { code: 'matches_interest', text: 'Vì bạn vừa tìm bài về biển đảo' } });
+    });
+
     it('một lượt tìm vẫn chưa đủ để lên kế hoạch (hệ số vừa tìm chỉ đổi thứ tự nơi)', () => {
       expect(live([searchAt('ha-noi', 1)]).stage).toBe('dreaming');
     });

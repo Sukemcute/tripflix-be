@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DiscoverySearchPerformedV1Schema, DiscoveryStaysSearchedV1Schema, type EventEnvelope } from '@tripflix/contracts';
 import { STREAMS, type EventBus } from '@tripflix/event-bus';
 import type { ZodType } from 'zod';
+import { QueryTopicUseCases } from '../../recommend/application/query-topics.use-cases.js';
 import { placeIdOfName } from '../domain/places.js';
 import type { ExploreResultPage } from './explore.use-cases.js';
 
@@ -16,22 +17,43 @@ export const SEARCH_EVENT_BUS = Symbol('SEARCH_EVENT_BUS');
 export class SearchEventsPublisher {
   private readonly logger = new Logger(SearchEventsPublisher.name);
 
-  constructor(@Inject(SEARCH_EVENT_BUS) private readonly bus: EventBus) {}
+  constructor(
+    @Inject(SEARCH_EVENT_BUS) private readonly bus: EventBus,
+    @Optional() @Inject(QueryTopicUseCases) private readonly topics?: QueryTopicUseCases,
+  ) {}
 
   searchPerformed(
     userId: string,
-    input: { surface: 'explore' | 'posts'; understood: ExploreResultPage['understood']; postType: string | null; resultCount: number },
+    input: {
+      surface: 'explore' | 'posts';
+      understood: ExploreResultPage['understood'];
+      postType: string | null;
+      resultCount: number;
+      /** Câu tìm: chỉ dùng trong tiến trình để xếp ngăn chủ đề, không đưa vào payload. */
+      query?: string;
+    },
   ): void {
     const place = input.understood.place ? placeIdOfName(input.understood.place) : null;
-    this.fire('discovery.search.performed', DiscoverySearchPerformedV1Schema, userId, {
-      userId,
-      surface: input.surface,
-      placeIds: place ? [place] : [],
-      intent: input.understood.intents[0] ?? null,
-      budgetMax: input.understood.budget === null ? null : Math.round(input.understood.budget),
-      postType: input.postType,
-      resultCount: input.resultCount,
-    });
+    const fire = (exps: string[]) =>
+      this.fire('discovery.search.performed', DiscoverySearchPerformedV1Schema, userId, {
+        userId,
+        surface: input.surface,
+        placeIds: place ? [place] : [],
+        intent: input.understood.intents[0] ?? null,
+        budgetMax: input.understood.budget === null ? null : Math.round(input.understood.budget),
+        postType: input.postType,
+        resultCount: input.resultCount,
+        exps,
+      });
+    if (!this.topics || !input.query) return fire([]);
+    // Xếp ngăn chủ đề có thể phải nhúng câu tìm (ai-service): chạy nền rồi mới phát, không chặn kết quả tìm.
+    void this.topics
+      .classify(input.query)
+      .catch((err: unknown) => {
+        this.logger.warn({ err }, 'Xếp ngăn chủ đề cho câu tìm lỗi, phát sự kiện không có chủ đề');
+        return [];
+      })
+      .then(fire);
   }
 
   staysSearched(

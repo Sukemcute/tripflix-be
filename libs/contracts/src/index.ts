@@ -471,6 +471,8 @@ export const DiscoverySearchPerformedV1Schema = z.object({
   /** Chỉ có với surface 'posts'. */
   postType: z.string().nullable(),
   resultCount: z.number().int().nonnegative(),
+  /** Ngăn chủ đề của câu tìm (vd `exp:bien`), từ từ khoá hoặc nhúng câu tìm; không chứa câu tìm gốc. */
+  exps: z.array(z.string()).max(5).default([]),
 });
 export type DiscoverySearchPerformedV1 = z.infer<typeof DiscoverySearchPerformedV1Schema>;
 

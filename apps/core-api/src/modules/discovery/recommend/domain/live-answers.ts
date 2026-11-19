@@ -24,12 +24,14 @@ export interface LiveAnswers {
   trip: BookedTrip | null;
   /** H1a: ngăn place:* → trọng số đã nhạt dần (kèm tỉnh cha). */
   exploring: Record<string, number>;
+  /** Chủ đề vừa tìm (ngăn exp:* của câu tìm): ngăn → trọng số đã nhạt dần, kèm hệ số vừa xảy ra. */
+  topics: Record<string, number>;
   /** H3, H4, H5 từ tìm phòng / tìm kiếm / đơn: ngăn → trọng số. */
   budget: Record<string, number>;
   party: Record<string, number>;
   len: Record<string, number>;
   /** câu hỏi → tổng trọng số dấu hiệu (độ tin). */
-  evidence: Record<'exploring' | 'budget' | 'party' | 'len', number>;
+  evidence: Record<'exploring' | 'topics' | 'budget' | 'party' | 'len', number>;
 }
 
 /** Cửa sổ đọc dòng thô và các trọng số dấu hiệu "đang tìm hiểu". */
@@ -91,7 +93,9 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
     .filter((r) => {
       if (!DEDUPE_KINDS.has(r.kind)) return true;
-      const key = `${r.kind}|${r.targetId ?? str((r.detail?.placeIds as unknown[] | undefined)?.[0]) ?? ''}|${Math.floor(Date.parse(r.occurredAt) / DEDUPE_MS)}`;
+      // Tìm "núi" rồi "biển" trong cùng giờ (không có nơi) là hai lượt khác nhau: khoá gồm cả ngăn chủ đề.
+      const exps = Array.isArray(r.detail?.exps) ? r.detail.exps.join(',') : '';
+      const key = `${r.kind}|${r.targetId ?? str((r.detail?.placeIds as unknown[] | undefined)?.[0]) ?? ''}|${exps}|${Math.floor(Date.parse(r.occurredAt) / DEDUPE_MS)}`;
       if (seenSignal.has(key)) return false;
       seenSignal.add(key);
       return true;
@@ -103,7 +107,8 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
   const budget: Record<string, number> = {};
   const party: Record<string, number> = {};
   const len: Record<string, number> = {};
-  const evidence = { exploring: 0, budget: 0, party: 0, len: 0 };
+  const evidence = { exploring: 0, topics: 0, budget: 0, party: 0, len: 0 };
+  const topics: Record<string, number> = {};
   const note = (m: Record<string, number>, key: keyof typeof evidence, bin: string, w: number) => {
     add(m, bin, w);
     evidence[key] += w;
@@ -120,6 +125,11 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     if (r.kind === 'search') {
       const placeId = r.targetId ?? str((r.detail?.placeIds as unknown[] | undefined)?.[0]);
       if (placeId) notePlace(placeId, SIGNAL.search, r);
+      const exps = Array.isArray(r.detail?.exps) ? r.detail.exps.filter((e): e is string => typeof e === 'string' && e.startsWith('exp:')) : [];
+      for (const exp of exps) {
+        add(topics, exp, SIGNAL.search * w * recency(r));
+        evidence.topics += SIGNAL.search * w;
+      }
       const budgetMax = num(r.detail?.budgetMax);
       if (budgetMax) note(budget, 'budget', costBin(budgetMax, COST_PER_PERSON), w);
     } else if (r.kind === 'stays_search') {
@@ -175,6 +185,7 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
     stage,
     trip: booked?.trip ?? null,
     exploring: roundAll(exploring),
+    topics: roundAll(topics),
     budget: roundAll(budget),
     party: roundAll(party),
     len: roundAll(len),
