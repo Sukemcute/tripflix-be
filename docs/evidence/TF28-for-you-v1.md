@@ -106,6 +106,26 @@ Test mới:
 
 - Không đổi giao diện. Endpoint và JSON giữ nguyên.
 
+## P6: bật v1 cho `for_you` (19/11)
+
+- Migration `20261119043000_use_for_you_v1`: dòng `for_you` của `discovery.recommend_algos` chuyển sang `post_profile@v1` + `trip_profile@v1` + `trip_v1`. `trending` giữ `hot@v2`. Quay về v0 là một câu `UPDATE` (ghi trong file migration).
+- Job nhúng caption chịu được kho ~42k bài như máy chủ chung:
+  - Đọc vector theo lô 1.000 caption (một câu `IN` nhỏ thay vì ~42k tham số) và so ngay với 9 câu mô tả ngăn. RAM chỉ giữ ngăn exp đã suy (`content.captionExp`), không giữ vector 384 số của mọi bài.
+  - Bài mới đăng được nhúng trước; mỗi chu kỳ nhúng tối đa 2.048 caption (~45 giây ở ai-service 0,5 CPU). 42k bài backfill ~3,5 giờ; trong lúc đó bài chưa có vector vẫn có ngăn từ tag, tiêu đề, lộ trình.
+- Sau khi deploy nên bấm chạy tay job `recommend_build` trên admin để có ngăn v1 ngay, không chờ chu kỳ 10 phút.
+
+Chạy thử local bằng bộ dữ liệu mô phỏng (cùng bộ đang có trên máy chủ chung), lấy 1/14 số bài: 2.984 bài sim + 194 bài seed, 2.000 người, 17.592 dòng tương tác. core-api chạy `pnpm dev`, ai-service local không giới hạn CPU.
+
+| Đo | Kết quả |
+|---|---|
+| Job lượt đầu (nhúng ~1.130 caption mới; caption sim lặp nhiều nên 3.178 bài chỉ ~1,4k câu khác nhau) | 40,0 giây |
+| Job các lượt sau (mọi caption đã có vector) | 4,3–4,9 giây |
+| Bài có ít nhất một ngăn exp | 2.541 / 3.178 (80%) |
+| GET for-you, 4 người, 3 lần mỗi người | 76–191 ms |
+| RSS core-api (chế độ dev) / ai-service | ~414 MB / ~506 MB |
+
+`trip_v1` đọc tối đa 5.000 bài hot mỗi lượt gọi (`candidateLimit`), nên ở 42k bài thời gian trả feed tăng tối đa khoảng 1,6 lần so với số trên.
+
 ## Ảnh hưởng tới phần của người khác
 
 - Chỉ sửa trong `discovery` (Duy).
