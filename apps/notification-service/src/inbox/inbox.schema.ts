@@ -207,6 +207,16 @@ const PUSH_SCHEMA = `
   CREATE UNIQUE INDEX uq_deliveries_inbox_push ON deliveries (inbox_id) WHERE channel = 'push';
 `;
 
+// Thông báo cảm xúc cũ chưa có actorIds: bù người thả gần nhất để web hiện avatar.
+const REACTION_ACTOR_IDS_BACKFILL = `
+  UPDATE inbox i SET data = i.data || jsonb_build_object('actorIds', jsonb_build_array(latest.actor_id))
+  FROM (
+    SELECT DISTINCT ON (inbox_id) inbox_id, actor_id FROM reaction_notification_actors
+    WHERE is_active AND inbox_id IS NOT NULL ORDER BY inbox_id, occurred_at DESC
+  ) latest
+  WHERE i.id = latest.inbox_id AND NOT i.data ? 'actorIds';
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
@@ -218,4 +228,5 @@ const NOTIFICATION_MIGRATIONS = [
   [8, THREAD_PARTICIPANTS_SCHEMA],
   [9, POST_WATCHERS_SCHEMA],
   [10, PUSH_SCHEMA],
+  [11, REACTION_ACTOR_IDS_BACKFILL],
 ] as const;

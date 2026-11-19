@@ -51,7 +51,7 @@ describe('Gom thông báo cảm xúc trên PostgreSQL', () => {
     const events = Array.from({ length: 20 }, (_, i) => postReaction(postId, owner, randomUUID(), 'like', i * 1000));
     await Promise.all([...events, events[0]!].map((event) => router.route(event)));
     const { items } = await inbox.listForUser(owner, { limit: 20, tab: 'interactions' });
-    expect(items).toEqual([expect.objectContaining({ type: 'reaction.post', data: { postId, actorCount: 20 } })]);
+    expect(items).toEqual([expect.objectContaining({ type: 'reaction.post', data: { postId, actorCount: 20, actorIds: [expect.any(String)] } })]);
     expect(await inbox.countUnread(owner)).toBe(1);
     expect(emitToUser.mock.calls.filter(([, name]) => name === 'notification.created')).toHaveLength(1);
   });
@@ -71,7 +71,7 @@ describe('Gom thông báo cảm xúc trên PostgreSQL', () => {
     expect((await inbox.listForUser(owner, { limit: 20 })).items).toEqual([]);
     await router.route(postReaction(postId, owner, actor, 'like', 125_000));
     expect((await inbox.listForUser(owner, { limit: 20 })).items).toEqual([
-      expect.objectContaining({ id: first.id, data: { postId, actorCount: 1 }, read_at: expect.any(Date) }),
+      expect.objectContaining({ id: first.id, data: { postId, actorCount: 1, actorIds: [actor] }, read_at: expect.any(Date) }),
     ]);
     expect(await inbox.countUnread(owner)).toBe(0);
     expect(emitToUser.mock.calls.filter(([, name]) => name === 'notification.created')).toHaveLength(1);
@@ -100,7 +100,7 @@ describe('Gom thông báo cảm xúc trên PostgreSQL', () => {
     };
     await router.route(event);
     expect((await inbox.listForUser(commentAuthorId, { limit: 20 })).items).toEqual([
-      expect.objectContaining({ type: 'reaction.comment', data: { postId, commentId, actorCount: 1 } }),
+      expect.objectContaining({ type: 'reaction.comment', data: { postId, commentId, actorCount: 1, actorIds: [userId] } }),
     ]);
     await new CommentNotificationRepository(pool).hide(commentId, new Date(baseTime + 1000).toISOString());
     await router.route({ ...event, eventId: randomUUID(), payload: { ...payload, userId: randomUUID() } });
@@ -121,8 +121,10 @@ describe('Gom thông báo cảm xúc trên PostgreSQL', () => {
     await router.route(postReaction(postId, owner, minh, 'love', 1000));
     expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.body)
       .toBe('Minh và 1 người khác đã thả cảm xúc vào bài của bạn.');
+    expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.data.actorIds).toEqual([minh]);
     await router.route(postReaction(postId, owner, minh, null, 2000));
     expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.body).toBe('Lan đã thả cảm xúc vào bài của bạn.');
+    expect((await inbox.listForUser(owner, { limit: 20 })).items[0]?.data.actorIds).toEqual([lan]);
   });
 
   it('dùng post_directory cho sự kiện cũ thiếu tác giả', async () => {
