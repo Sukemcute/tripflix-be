@@ -1,6 +1,6 @@
 import { AIRPORTS } from './airports.js';
 import { normalizeText } from './normalize-text.js';
-import { PLACES, type PlaceSeed } from './places.js';
+import { PLACES, searchAliasesOf, type PlaceSeed } from './places.js';
 
 export type SuggestType = 'place' | 'hotel' | 'airport';
 export const SUGGEST_TYPES: readonly SuggestType[] = ['place', 'hotel', 'airport'];
@@ -63,14 +63,15 @@ export function buildSuggestEntities(hotels: readonly HotelSummary[]): SuggestEn
     name: place.name,
     subtitle: describePlace(place),
     placeId: place.id,
-    searchText: normalizeText([place.name, ...place.aliases].join(' ')),
+    searchText: normalizeText([place.name, ...searchAliasesOf(place)].join(' ')),
     popularity: hotelCountByPlace.get(place.id) ?? 0,
   }));
 
   const airports: SuggestEntity[] = AIRPORTS.map((airport) => {
     const label = placeLabel(airport.placeId, '');
     // Gõ "hcm" cũng ra Tân Sơn Nhất: lấy cả tên gọi khác của nơi có sân bay.
-    const placeAliases = PLACE_BY_ID.get(airport.placeId)?.aliases ?? [];
+    const place = PLACE_BY_ID.get(airport.placeId);
+    const placeAliases = place ? searchAliasesOf(place) : [];
     return {
       id: `airport:${airport.code}`,
       type: 'airport',

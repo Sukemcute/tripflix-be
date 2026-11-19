@@ -88,7 +88,7 @@ describe('Phát sự kiện tìm kiếm', () => {
     const { publish } = setup();
     const publisher = new SearchEventsPublisher({ publish } as EventBus);
     publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: null, intents: [], budget: null }), postType: null, resultCount: 0 });
-    publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Hòn Sơn' }), postType: null, resultCount: 0 });
+    publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Bangkok' }), postType: null, resultCount: 0 });
     publisher.searchPerformed(U, { surface: 'explore', understood: understood({ place: 'Hà Giang' }), postType: null, resultCount: 0 });
     expect(published(publish).map(([, e]) => e.payload.placeIds)).toEqual([[], [], ['ha-giang']]);
   });

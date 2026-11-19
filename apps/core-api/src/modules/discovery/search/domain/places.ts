@@ -11,40 +11,65 @@ export interface PlaceSeed {
   kind: 'province' | 'destination';
   /** Điểm đến thuộc tỉnh nào; tỉnh thì null. */
   parentId: string | null;
-  /** Tên gọi khác, gõ tắt; sẽ được chuẩn hoá trước khi so khớp. */
+  /** Tên gọi khác (dạng bỏ dấu và viết liền được tự sinh); dùng cả trong câu tìm lẫn văn bản bài viết. */
   aliases: string[];
+  /** Viết tắt ngắn dễ trùng ('hn', 'sg', 'dn'…): chỉ dùng cho câu tìm, gợi ý và DB aliases, không đọc từ văn bản bài viết. */
+  queryOnly?: string[];
+  /** Địa danh / thắng cảnh nổi tiếng gắn với nơi này ('cau rong', 'royal city'…): nhận ra trong bài viết/tag, không biến thành nơi của LEX tìm khám phá. */
+  landmarks?: string[];
+  /** Nhóm nơi trên tìm khám phá nếu hai nút PLACES gộp chung một bucket (chỉ 'ho-chi-minh' → 'Sài Gòn'). */
+  exploreBucket?: string;
 }
 
-const province = (id: string, name: string, aliases: string[] = []): PlaceSeed => ({
+type PlaceExtra = Partial<Pick<PlaceSeed, 'aliases' | 'queryOnly' | 'landmarks' | 'exploreBucket'>>;
+
+const province = (id: string, name: string, extra: PlaceExtra = {}): PlaceSeed => ({
   id,
   name,
   kind: 'province',
   parentId: null,
-  aliases,
+  aliases: extra.aliases ?? [],
+  ...(extra.queryOnly ? { queryOnly: extra.queryOnly } : {}),
+  ...(extra.landmarks ? { landmarks: extra.landmarks } : {}),
+  ...(extra.exploreBucket ? { exploreBucket: extra.exploreBucket } : {}),
 });
 
-const destination = (id: string, name: string, parentId: string, aliases: string[] = []): PlaceSeed => ({
+const destination = (id: string, name: string, parentId: string, extra: PlaceExtra = {}): PlaceSeed => ({
   id,
   name,
   kind: 'destination',
   parentId,
-  aliases,
+  aliases: extra.aliases ?? [],
+  ...(extra.queryOnly ? { queryOnly: extra.queryOnly } : {}),
+  ...(extra.landmarks ? { landmarks: extra.landmarks } : {}),
+  ...(extra.exploreBucket ? { exploreBucket: extra.exploreBucket } : {}),
 });
 
+/** Tự sinh biến thể bỏ dấu và viết liền (vd 'Hà Giang' → ['ha giang', 'hagiang']). */
+export function placeVariants(raw: string): string[] {
+  const spaced = normalizeText(raw);
+  if (!spaced) return [];
+  const joined = spaced.replace(/ /g, '');
+  return joined !== spaced ? [spaced, joined] : [spaced];
+}
+
+/** Toàn bộ bí danh tìm kiếm (gồm cả viết tắt queryOnly) để nạp DB places.aliases và chỉ mục gợi ý. */
+export const searchAliasesOf = (place: PlaceSeed): string[] => [...place.aliases, ...(place.queryOnly ?? [])];
+
 export const PLACES: readonly PlaceSeed[] = [
-  province('ha-noi', 'Hà Nội', ['hn', 'hanoi']),
-  province('hue', 'Huế', ['thua thien hue']),
-  province('hai-phong', 'Hải Phòng', ['hp']),
-  province('da-nang', 'Đà Nẵng', ['dn', 'danang']),
-  province('ho-chi-minh', 'TP. Hồ Chí Minh', ['hcm', 'tphcm', 'tp hcm', 'ho chi minh']),
-  province('can-tho', 'Cần Thơ', ['ct']),
+  province('ha-noi', 'Hà Nội', { aliases: ['ha loi', 'thu do'], queryOnly: ['hn'], landmarks: ['ho guom', 'royal city'] }),
+  province('hue', 'Huế', { aliases: ['thua thien hue', 'co do'], landmarks: ['song huong'] }),
+  province('hai-phong', 'Hải Phòng', { queryOnly: ['hp'] }),
+  province('da-nang', 'Đà Nẵng', { queryOnly: ['dn'], landmarks: ['my khe', 'cau rong'] }),
+  province('ho-chi-minh', 'TP. Hồ Chí Minh', { aliases: ['ho chi minh', 'tp hcm', 'hcm'], exploreBucket: 'Sài Gòn' }),
+  province('can-tho', 'Cần Thơ', { queryOnly: ['ct'] }),
   province('lai-chau', 'Lai Châu'),
   province('dien-bien', 'Điện Biên'),
   province('son-la', 'Sơn La'),
   province('lang-son', 'Lạng Sơn'),
   province('quang-ninh', 'Quảng Ninh'),
-  province('thanh-hoa', 'Thanh Hóa', ['thanh hoa']),
-  province('nghe-an', 'Nghệ An'),
+  province('thanh-hoa', 'Thanh Hóa'),
+  province('nghe-an', 'Nghệ An', { landmarks: ['xu nghe'] }),
   province('ha-tinh', 'Hà Tĩnh'),
   province('cao-bang', 'Cao Bằng'),
   province('tuyen-quang', 'Tuyên Quang'),
@@ -53,35 +78,55 @@ export const PLACES: readonly PlaceSeed[] = [
   province('phu-tho', 'Phú Thọ'),
   province('bac-ninh', 'Bắc Ninh'),
   province('hung-yen', 'Hưng Yên'),
-  province('ninh-binh', 'Ninh Bình'),
+  province('ninh-binh', 'Ninh Bình', { aliases: ['trang an', 'tam coc'], landmarks: ['hang mua'] }),
   province('quang-tri', 'Quảng Trị'),
   province('quang-ngai', 'Quảng Ngãi'),
   province('gia-lai', 'Gia Lai'),
   province('khanh-hoa', 'Khánh Hòa'),
   province('lam-dong', 'Lâm Đồng'),
-  province('dak-lak', 'Đắk Lắk', ['daklak', 'dac lac']),
+  province('dak-lak', 'Đắk Lắk', { aliases: ['dac lac'] }),
   province('dong-nai', 'Đồng Nai'),
   province('tay-ninh', 'Tây Ninh'),
   province('vinh-long', 'Vĩnh Long'),
   province('dong-thap', 'Đồng Tháp'),
   province('ca-mau', 'Cà Mau'),
   province('an-giang', 'An Giang'),
-  destination('sai-gon', 'Sài Gòn', 'ho-chi-minh', ['sg', 'saigon']),
+  destination('sai-gon', 'Sài Gòn', 'ho-chi-minh', { queryOnly: ['sg'], landmarks: ['landmark 81', 'dong khoi'] }),
   destination('con-dao', 'Côn Đảo', 'ho-chi-minh'),
-  destination('vung-tau', 'Vũng Tàu', 'ho-chi-minh', ['vt', 'vungtau']),
-  destination('hoi-an', 'Hội An', 'da-nang', ['hoian']),
-  destination('da-lat', 'Đà Lạt', 'lam-dong', ['dl', 'dalat']),
-  destination('nha-trang', 'Nha Trang', 'khanh-hoa', ['nt', 'nhatrang']),
-  destination('phu-quoc', 'Phú Quốc', 'an-giang', ['pq', 'phuquoc']),
-  destination('ha-long', 'Hạ Long', 'quang-ninh', ['halong']),
-  destination('quy-nhon', 'Quy Nhơn', 'gia-lai', ['quynhon']),
-  // Có trong lexicon tìm khám phá: thiếu ở đây thì lượt tìm và bài ở các nơi này mất nơi, gợi ý không nhận ra (19/11).
-  destination('ha-giang', 'Hà Giang', 'tuyen-quang', ['hagiang']),
-  destination('sa-pa', 'Sa Pa', 'lao-cai', ['sapa']),
-  destination('co-to', 'Cô Tô', 'quang-ninh', ['coto']),
+  destination('vung-tau', 'Vũng Tàu', 'ho-chi-minh', { queryOnly: ['vt'] }),
+  destination('hoi-an', 'Hội An', 'da-nang', { aliases: ['pho hoi'] }),
+  destination('da-lat', 'Đà Lạt', 'lam-dong', { queryOnly: ['dl'] }),
+  destination('nha-trang', 'Nha Trang', 'khanh-hoa', { queryOnly: ['nt'] }),
+  destination('phu-quoc', 'Phú Quốc', 'an-giang', { queryOnly: ['pq'] }),
+  destination('ha-long', 'Hạ Long', 'quang-ninh', { aliases: ['vinh ha long'] }),
+  destination('quy-nhon', 'Quy Nhơn', 'gia-lai', { aliases: ['qui nhon'], queryOnly: ['qn'], landmarks: ['eo gio', 'ky co'] }),
+  destination('ha-giang', 'Hà Giang', 'tuyen-quang'),
+  destination('sa-pa', 'Sa Pa', 'lao-cai'),
+  destination('co-to', 'Cô Tô', 'quang-ninh'),
+  // Điểm đến bổ sung theo dữ liệu bài viết và bảng tỉnh sau sáp nhập 2025.
+  destination('mui-ne', 'Mũi Né', 'lam-dong', { aliases: ['phan thiet'], landmarks: ['doi cat'] }),
+  destination('cat-ba', 'Cát Bà', 'hai-phong', { landmarks: ['lan ha'] }),
+  destination('moc-chau', 'Mộc Châu', 'son-la'),
+  destination('mu-cang-chai', 'Mù Cang Chải', 'lao-cai'),
+  destination('ba-na', 'Bà Nà', 'da-nang', { landmarks: ['ba na hills', 'cau vang'] }),
+  destination('buon-ma-thuot', 'Buôn Ma Thuột', 'dak-lak', { landmarks: ['dray nur', 'dray'] }),
+  destination('pleiku', 'Pleiku', 'gia-lai'),
+  destination('bien-hoa', 'Biên Hòa', 'dong-nai'),
+  // Không thêm 'vinh' đứng riêng: bỏ dấu trùng 'vịnh' ("vịnh Lan Hạ", "view vịnh") và làm placeFix sửa nhầm 'vin' → 'vinh'.
+  destination('cua-lo', 'Cửa Lò', 'nghe-an', { aliases: ['tp vinh', 'thanh pho vinh'] }),
+  destination('cam-ranh', 'Cam Ranh', 'khanh-hoa', { aliases: ['binh ba'] }),
+  destination('phu-yen', 'Phú Yên', 'dak-lak', { aliases: ['tuy hoa'] }),
+  destination('hon-son', 'Hòn Sơn', 'an-giang'),
+  destination('kon-tum', 'Kon Tum', 'quang-ngai'),
 ];
 
-const PLACE_ID_BY_NAME = new Map(PLACES.flatMap((p) => [p.name, ...p.aliases].map((n) => [normalizeText(n), p.id] as const)));
+const PLACE_ID_BY_NAME = new Map(
+  PLACES.flatMap((p) =>
+    [p.name, ...p.aliases, ...(p.queryOnly ?? []), ...(p.landmarks ?? [])].flatMap((raw) =>
+      placeVariants(raw).map((v) => [v, p.id] as const),
+    ),
+  ),
+);
 
 /** Tên hoặc bí danh nơi (vd 'Đà Lạt' của lexicon tìm khám phá) → id trong PLACES; không có thì null. */
 export const placeIdOfName = (name: string): string | null => PLACE_ID_BY_NAME.get(normalizeText(name)) ?? null;
