@@ -103,10 +103,10 @@ export interface PostContent {
   isVerified?: boolean;
   trip?: PostTripSummary | null;
   /**
-   * Vector đơn vị theo văn bản (caption, câu mô tả ngăn) job đã nhúng được trong chu kỳ, dùng chung cho mọi bài.
-   * Thiếu (AI tắt, lỗi, chưa kịp nhúng) thì nguồn caption không góp. Văn bản cần nhúng do bins.textsToEmbed quyết định.
+   * Ngăn exp job suy từ vector caption (bins.captionExpOf). null = có vector nhưng không rõ ngăn nào;
+   * thiếu (AI tắt, lỗi, chưa kịp nhúng) = chưa biết. Cả hai thì nguồn caption không góp.
    */
-  vectors?: ReadonlyMap<string, readonly number[]>;
+  captionExp?: string | null;
 }
 
 export interface UserBuildItem {
@@ -129,7 +129,7 @@ export interface PostBuilder {
   key: string;
   /** Cần interactionSamples (tương tác kèm tuổi tài khoản): job chỉ đọc khi có builder khai báo. */
   needsSamples?: boolean;
-  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  /** Đọc ngăn từ caption (content.captionExp): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
   needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: PostBuildItem[], now: Date): Promise<PostBuildOutput[]>;
@@ -138,7 +138,7 @@ export interface PostBuilder {
 export interface UserBuilder {
   /** 'tag_affinity@v0' */
   key: string;
-  /** Đọc ngăn từ caption (content.vectors): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
+  /** Đọc ngăn từ caption (content.captionExp): job chỉ nhúng văn bản khi có builder đang bật khai báo. */
   needsVectors?: boolean;
   featuresSchema: ZodType;
   build(items: UserBuildItem[], now: Date): Promise<UserBuildOutput[]>;

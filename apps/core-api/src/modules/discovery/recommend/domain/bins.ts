@@ -45,35 +45,22 @@ function binsInText(text: string): Set<string> {
 }
 
 /** Văn bản nhúng của bài: tiêu đề + nội dung. Bài không có chữ thì null. */
-function captionOf(content: PostContent | undefined): string | null {
+export function captionOf(content: PostContent | undefined): string | null {
   const text = [content?.title, content?.body].filter(Boolean).join('\n').trim();
   return text ? Array.from(text).slice(0, CAPTION_MAX_CHARS).join('') : null;
 }
 
-/** Mọi văn bản job phải nhúng trong chu kỳ: câu mô tả ngăn + caption từng bài (trùng thì một lần). */
-export function textsToEmbed(contents: Iterable<PostContent | undefined>): string[] {
-  const texts = new Set<string>(Object.values(EXP_DESCRIPTIONS));
-  for (const content of contents) {
-    const caption = captionOf(content);
-    if (caption) texts.add(caption);
-  }
-  return [...texts];
-}
+/** Câu mô tả 9 ngăn exp, theo thứ tự EXP: job nhúng trước rồi so từng caption với chúng. */
+export const EXP_DESCRIPTION_TEXTS: readonly string[] = EXP.map((exp) => EXP_DESCRIPTIONS[exp]);
 
-/** Ngăn exp gần caption nhất theo cosine, chỉ khi rõ (biên ≥ CAPTION_MARGIN). Thiếu vector thì null. */
-function captionExpBin(content: PostContent | undefined): string | null {
-  const caption = captionOf(content);
-  const vectors = content?.vectors;
-  const v = caption ? vectors?.get(caption) : undefined;
-  if (!v || !vectors) return null;
-  const scored: Array<[string, number]> = [];
-  for (const exp of EXP) {
-    const pool = vectors.get(EXP_DESCRIPTIONS[exp]);
-    if (!pool) return null;
-    scored.push([`exp:${exp}`, pool.reduce((sum, x, i) => sum + x * v[i]!, 0)]);
-  }
-  scored.sort((a, b) => b[1] - a[1]);
-  return scored[0]![1] - scored[1]![1] >= CAPTION_MARGIN ? scored[0]![0] : null;
+/**
+ * Ngăn exp gần caption nhất theo cosine, chỉ khi rõ (biên ≥ CAPTION_MARGIN). descriptions theo thứ tự EXP_DESCRIPTION_TEXTS.
+ * Job gọi ngay khi đọc vector rồi bỏ vector: RAM chỉ giữ kết quả, không giữ 384 số mỗi bài.
+ */
+export function captionExpOf(caption: readonly number[], descriptions: readonly (readonly number[])[]): string | null {
+  const scored = EXP.map((exp, i) => [`exp:${exp}`, descriptions[i]!.reduce((sum, x, j) => sum + x * caption[j]!, 0)] as const);
+  const sorted = [...scored].sort((a, b) => b[1] - a[1]);
+  return sorted[0]![1] - sorted[1]![1] >= CAPTION_MARGIN ? sorted[0]![0] : null;
 }
 
 /** Nơi chính của bài và độ tin: nguồn có thứ tự cao hơn thắng (recommend-topics mục 6.2). */
@@ -115,7 +102,7 @@ export function assignBins(post: PostBinInput): Record<string, number> {
   const { title, body, trip } = post.content ?? {};
   if (title) addSource(binsInText(title), W.title);
   if (body) addSource(binsInText(body), W.body);
-  const captionBin = captionExpBin(post.content);
+  const captionBin = post.content?.captionExp;
   if (captionBin) addSource([captionBin], W.caption);
   if (trip) {
     addSource(trip.items.flatMap((i) => (i.category && ITEM_CATEGORY_BINS[i.category] ? [ITEM_CATEGORY_BINS[i.category]!] : [])), W.itemCategory);

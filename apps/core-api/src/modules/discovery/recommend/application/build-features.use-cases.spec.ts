@@ -118,14 +118,16 @@ describe('BuildFeaturesUseCases', () => {
     const binsOfP1 = (store: Store) =>
       (store.replacePostScores.mock.calls.find((c) => c[0] === postProfileV1.key)![1] as Array<{ features: { bins: Record<string, number> } }>)[0]!
         .features.bins;
-    const allTexts = [...EXP.map((e) => EXP_DESCRIPTIONS[e]), 't'];
+    const descriptionTexts = EXP.map((e) => EXP_DESCRIPTIONS[e]);
+    const allTexts = [...descriptionTexts, 't'];
 
     it('cache thiếu thì gọi ai-service, ghi cache, builder thấy ngăn từ caption', async () => {
       const embedder = embedderOf();
       const { store, useCases } = setup(embedder);
       withProfileV1(store);
       await useCases.runCycle(NOW);
-      expect(embedder.embed).toHaveBeenCalledWith(allTexts);
+      // Mô tả ngăn trước, rồi caption theo lô.
+      expect(embedder.embed.mock.calls).toEqual([[descriptionTexts], [['t']]]);
       expect(store.insertTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, expect.arrayContaining([{ textHash: sha('t'), vector: vectorOf('t') }]));
       expect(binsOfP1(store)).toMatchObject({ 'exp:bien': 0.5 });
     });
@@ -136,7 +138,8 @@ describe('BuildFeaturesUseCases', () => {
       withProfileV1(store);
       store.findTextVectors.mockResolvedValue(new Map(allTexts.map((t) => [sha(t), vectorOf(t)])));
       await useCases.runCycle(NOW);
-      expect(store.findTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, allTexts.map(sha));
+      expect(store.findTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, descriptionTexts.map(sha));
+      expect(store.findTextVectors).toHaveBeenCalledWith(CAPTION_MODEL, [sha('t')]);
       expect(embedder.embed).not.toHaveBeenCalled();
       expect(binsOfP1(store)).toMatchObject({ 'exp:bien': 0.5 });
     });
