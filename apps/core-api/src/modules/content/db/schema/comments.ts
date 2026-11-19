@@ -41,7 +41,7 @@ export const comments = contentSchema.table(
   },
   (t) => [
     index('idx_comments_creator_pending')
-      .on(t.postId, t.createdAt.desc(), t.id.desc())
+      .on(t.postId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst())
       .where(sql`${t.creatorReview} = 'pending' AND ${t.deletedAt} IS NULL`),
     check('ck_comments_status', sql`${t.status} IN ('visible', 'held', 'hidden', 'removed')`),
     check('ck_comments_creator_review', sql`${t.creatorReview} IN ('approved', 'pending', 'rejected')`),

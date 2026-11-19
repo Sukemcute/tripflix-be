@@ -35,8 +35,7 @@ export class EditCommentUseCase {
       throw new CommentNotFoundException(command.commentId);
     }
     let postVisibility: PostVisibility | undefined;
-    let creatorHeld = record.creatorReview === 'pending' || record.creatorReview === 'rejected';
-    const platformHeld = shouldHold || Boolean(record.platformHeld);
+    let matchesCreatorKeywords = false;
     if (this.postRepository) {
       const post = this.postRepository.findByIdForUpdate
         ? await this.postRepository.findByIdForUpdate(record.postId)
@@ -44,7 +43,8 @@ export class EditCommentUseCase {
       if (!post || post.status !== 'published' || post.deletedAt)
         throw new CommentNotFoundException(command.commentId);
       postVisibility = post.visibility;
-      creatorHeld ||= command.userId !== post.authorId && matchesCommentKeywords(command.body, post.commentKeywords ?? []);
+      matchesCreatorKeywords =
+        command.userId !== post.authorId && matchesCommentKeywords(command.body, post.commentKeywords ?? []);
     }
 
     // Khoá theo cùng thứ tự với moderation: bài trước, bình luận sau.
@@ -53,6 +53,9 @@ export class EditCommentUseCase {
     if (!locked || locked.status !== record.status || locked.body !== record.body || locked.deletedAt)
       throw new ConflictException('Bình luận vừa thay đổi, vui lòng thử lại');
     record = locked;
+    const creatorHeld =
+      locked.creatorReview === 'pending' || locked.creatorReview === 'rejected' || matchesCreatorKeywords;
+    const platformHeld = shouldHold || Boolean(locked.platformHeld);
     const domainComment = new Comment({
       id: record.id,
       postId: record.postId,
