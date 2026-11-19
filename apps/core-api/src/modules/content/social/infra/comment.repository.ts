@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, getTableColumns, gt, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { alias, getTableConfig } from 'drizzle-orm/pg-core';
 import type { Db } from '@tripflix/db';
-import { isBeforeCursor } from './keyset-cursor.js';
+import { isAfterCursor, isBeforeCursor } from './keyset-cursor.js';
 import { commentReactions, comments, type CommentRecord, type NewCommentRecord } from '../../db/schema/index.js';
 
 export type SampledCommentRecord = CommentRecord & {
@@ -52,6 +52,15 @@ export class CommentRepository {
       .where(and(eq(comments.id, id), isNull(comments.deletedAt)))
       .limit(1);
     return record ?? null;
+  }
+
+  async findByIds(postId: string, ids: string[]): Promise<CommentRecord[]> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.postId, postId), inArray(comments.id, uniqueIds)));
   }
 
   async findByIdForUpdate(id: string): Promise<CommentRecord | null> {
@@ -196,6 +205,10 @@ export class CommentRepository {
     return rows.length;
   }
 
+  private isReplyList(options: Pick<FindCommentsOptions, 'flat' | 'parentCommentId'>): boolean {
+    return Boolean(!options.flat && options.parentCommentId);
+  }
+
   private pageConditions(options: FindCommentsOptions): SQL[] {
     const conditions = [
       eq(comments.postId, options.postId),
@@ -212,19 +225,25 @@ export class CommentRepository {
     }
 
     if (options.cursorCreatedAt && options.cursorId) {
+      const cursor = { time: options.cursorCreatedAt, id: options.cursorId };
       conditions.push(
-        isBeforeCursor(comments, comments.createdAt, comments.id, { time: options.cursorCreatedAt, id: options.cursorId }),
+        this.isReplyList(options)
+          ? isAfterCursor(comments, comments.createdAt, comments.id, cursor)
+          : isBeforeCursor(comments, comments.createdAt, comments.id, cursor),
       );
     }
     return conditions;
   }
 
   async findByPostId(options: FindCommentsOptions): Promise<CommentRecord[]> {
+    const order = this.isReplyList(options)
+      ? [asc(comments.createdAt), asc(comments.id)]
+      : [desc(comments.createdAt), desc(comments.id)];
     return this.db
       .select()
       .from(comments)
       .where(and(...this.pageConditions(options)))
-      .orderBy(desc(comments.createdAt), desc(comments.id))
+      .orderBy(...order)
       .limit(options.limit);
   }
 
@@ -249,11 +268,16 @@ export class CommentRepository {
         )`
       : sql<boolean>`false`;
 
+    // Trả lời trong một luồng đọc theo thứ tự cũ -> mới; bình luận gốc giữ mới nhất lên đầu.
+    const order = this.isReplyList(options)
+      ? [asc(comments.createdAt), asc(comments.id)]
+      : [desc(comments.createdAt), desc(comments.id)];
+
     return this.db
       .select({ ...getTableColumns(comments), replyCount, isLiked })
       .from(comments)
       .where(and(...this.pageConditions(options)))
-      .orderBy(desc(comments.createdAt), desc(comments.id))
+      .orderBy(...order)
       .limit(options.limit);
   }
 

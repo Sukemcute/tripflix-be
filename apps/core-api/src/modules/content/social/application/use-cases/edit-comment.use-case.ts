@@ -7,6 +7,7 @@ import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostVisibility } from '../../../db/schema/index.js';
 import { PostRepository } from '../../infra/post.repository.js';
 import { matchesCommentKeywords } from '../../domain/comment-filter.js';
+import { formatReplyExcerpt, isPublicReplyTarget } from '../common/reply-excerpt.js';
 import { validateMentionedUsers } from '../common/validate-mentioned-users.js';
 import type { CommentMention } from '../../domain/index.js';
 import type { UserDirectoryPort } from '../ports/user-directory.port.js';
@@ -27,7 +28,9 @@ export class EditCommentUseCase {
     private readonly userDirectory?: UserDirectoryPort,
   ) {}
 
-  async execute(command: EditCommentCommand): Promise<CommentRecord> {
+  async execute(
+    command: EditCommentCommand,
+  ): Promise<CommentRecord & { replyToCommentId: string | null; replyToExcerpt: string | null }> {
     const body = Comment.validateBody(command.body);
     const shouldHold = this.gate?.precheck(body).shouldHold ?? false;
     const initial = await this.commentRepository.findById(command.commentId);
@@ -37,9 +40,22 @@ export class EditCommentUseCase {
     const comment = new Comment({ ...initial });
     comment.updateBody(command.userId, command.body, command.mentions ?? initial.mentions ?? []);
     await validateMentionedUsers(comment.mentions, this.userDirectory);
-    return this.editInTransaction(
+    const updated = await this.editInTransaction(
       { ...command, body: comment.body, mentions: comment.mentions }, shouldHold, initial,
     );
+    const replyToCommentId = updated.replyToCommentId ?? null;
+    let replyToExcerpt: string | null = null;
+    if (replyToCommentId && typeof this.commentRepository.findByIds === 'function') {
+      const [target] = await this.commentRepository.findByIds(updated.postId, [replyToCommentId]);
+      if (isPublicReplyTarget(target, updated.postId)) {
+        replyToExcerpt = formatReplyExcerpt(target.body);
+      }
+    }
+    return {
+      ...updated,
+      replyToCommentId,
+      replyToExcerpt,
+    };
   }
 
   @Transactional('content')

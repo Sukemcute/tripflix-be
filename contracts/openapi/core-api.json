@@ -9616,10 +9616,20 @@
             "type": "string",
             "nullable": true
           },
+          "replyToCommentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "ID bình luận hoặc phản hồi được trả lời trực tiếp"
+          },
           "replyToName": {
             "type": "string",
             "nullable": true,
             "description": "Tên hiển thị của người được trả lời"
+          },
+          "replyToExcerpt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Đoạn trích tối đa 120 ký tự của câu được trả lời; null nếu câu đó không còn công khai"
           },
           "body": {
             "type": "string"
@@ -9662,6 +9672,8 @@
           "postId",
           "authorId",
           "parentCommentId",
+          "replyToCommentId",
+          "replyToExcerpt",
           "body",
           "isEdited",
           "likeCount",

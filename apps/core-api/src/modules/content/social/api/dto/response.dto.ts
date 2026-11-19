@@ -91,8 +91,16 @@ export class SocialCommentDto {
   @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
   authorName?: string | null;
   @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'ID bình luận hoặc phản hồi được trả lời trực tiếp' })
+  replyToCommentId!: string | null;
   @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của người được trả lời' })
   replyToName?: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Đoạn trích tối đa 120 ký tự của câu được trả lời; null nếu câu đó không còn công khai',
+  })
+  replyToExcerpt!: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() isEdited!: boolean;
   @ApiProperty({ example: 0, description: 'Số lượt thích bình luận' }) likeCount!: number;
