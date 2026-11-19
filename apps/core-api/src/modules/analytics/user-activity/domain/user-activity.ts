@@ -6,8 +6,16 @@ import {
   ContentReactionUpdatedV1Schema,
   type EventEnvelope,
 } from '@tripflix/contracts';
+import { z } from 'zod';
 
-export const USER_ACTIVITY_KINDS = ['reaction', 'comment', 'share', 'view', 'chat'] as const;
+export const USER_ACTIVITY_KINDS = ['reaction', 'comment', 'share', 'view', 'chat', 'post'] as const;
+
+/** Chỉ lấy những trường cần từ sự kiện đăng bài; content chưa đăng ký hợp đồng cho sự kiện này. */
+const PostPublishedPayloadSchema = z.object({
+  postId: z.uuid(),
+  authorId: z.uuid().nullish(),
+  postType: z.string().nullish(),
+});
 export type UserActivityKind = (typeof USER_ACTIVITY_KINDS)[number];
 
 /** Dữ liệu hành vi giữ tối đa 90 ngày (TF177). */
@@ -62,6 +70,18 @@ export function toUserActivityRecord(event: EventEnvelope): UserActivityRecord |
         detail: { watchedMs: payload.watchedMs, surface: payload.surface },
       };
     }
+    case 'content.post.published': {
+      const payload = PostPublishedPayloadSchema.parse(event.payload);
+      // Bài do quản trị viên gỡ giữ rồi cho đăng lại cũng phát sự kiện này; thiếu tác giả thì không tính cho ai.
+      if (!payload.authorId) return null;
+      return {
+        ...base,
+        userId: payload.authorId,
+        kind: 'post',
+        targetId: payload.postId,
+        detail: payload.postType ? { postType: payload.postType } : {},
+      };
+    }
     case 'ai.chat.turn.recorded': {
       const parsed = AiChatTurnRecordedV1Schema.parse(event);
       return {
@@ -99,5 +119,28 @@ export interface UserActivityCounts {
   shares: number;
   views: number;
   chats: number;
+  posts: number;
   lastActiveAt: Date | null;
+}
+
+/** Tổng hợp toàn hệ thống trong cửa sổ, cho phần tổng quan của trang hành vi. */
+export interface UserActivityTotals {
+  activeUsers: number;
+  reactions: number;
+  comments: number;
+  shares: number;
+  views: number;
+  chats: number;
+  posts: number;
+}
+
+/** Một ngày (giờ Việt Nam, YYYY-MM-DD) với số lượt từng loại. */
+export interface UserActivityDay {
+  date: string;
+  reactions: number;
+  comments: number;
+  shares: number;
+  views: number;
+  chats: number;
+  posts: number;
 }

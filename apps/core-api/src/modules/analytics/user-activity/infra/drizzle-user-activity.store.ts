@@ -2,17 +2,28 @@ import type { Db } from '@tripflix/db';
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { userActivityEvents } from '../../db/schema/index.js';
 import type { UserActivityEventRow, UserActivityStore, UserActivitySummaryRow } from '../application/user-activity.use-cases.js';
-import type { UserActivityCounts, UserActivityRecord, UserActivityWindow } from '../domain/user-activity.js';
+import type {
+  UserActivityCounts,
+  UserActivityDay,
+  UserActivityRecord,
+  UserActivityTotals,
+  UserActivityWindow,
+} from '../domain/user-activity.js';
 
 const countKind = (kind: string) =>
   sql<number>`count(*) filter (where ${userActivityEvents.kind} = ${kind})::int`;
 
-const countColumns = {
+const kindColumns = {
   reactions: countKind('reaction'),
   comments: countKind('comment'),
   shares: countKind('share'),
   views: countKind('view'),
   chats: countKind('chat'),
+  posts: countKind('post'),
+};
+
+const countColumns = {
+  ...kindColumns,
   // Drizzle chỉ đổi chuỗi thời gian sang Date cho cột khai báo; giá trị từ SQL thô vẫn là chuỗi.
   lastActiveAt: sql<Date | string | null>`max(${userActivityEvents.occurredAt})`,
 };
@@ -44,6 +55,42 @@ export class DrizzleUserActivityStore implements UserActivityStore {
       .from(userActivityEvents)
       .where(inWindow);
     return { rows: rows.map(toSummaryRow), total: Number(totalRow?.total ?? 0) };
+  }
+
+  async totals({ from, to }: UserActivityWindow): Promise<UserActivityTotals> {
+    const [row] = await this.db
+      .select({ ...kindColumns, activeUsers: sql<number>`count(distinct ${userActivityEvents.userId})::int` })
+      .from(userActivityEvents)
+      .where(and(gte(userActivityEvents.occurredAt, from), lt(userActivityEvents.occurredAt, to)));
+    return {
+      activeUsers: Number(row?.activeUsers ?? 0),
+      reactions: Number(row?.reactions ?? 0),
+      comments: Number(row?.comments ?? 0),
+      shares: Number(row?.shares ?? 0),
+      views: Number(row?.views ?? 0),
+      chats: Number(row?.chats ?? 0),
+      posts: Number(row?.posts ?? 0),
+    };
+  }
+
+  async daily({ from, to }: UserActivityWindow): Promise<UserActivityDay[]> {
+    // Chuỗi ngày theo giờ Việt Nam; to_char trả text nên không dính lỗi chuỗi thời gian của SQL thô.
+    const day = sql<string>`to_char(${userActivityEvents.occurredAt} at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')`;
+    const rows = await this.db
+      .select({ date: day, ...kindColumns })
+      .from(userActivityEvents)
+      .where(and(gte(userActivityEvents.occurredAt, from), lt(userActivityEvents.occurredAt, to)))
+      .groupBy(day)
+      .orderBy(day);
+    return rows.map((row) => ({
+      date: row.date,
+      reactions: Number(row.reactions),
+      comments: Number(row.comments),
+      shares: Number(row.shares),
+      views: Number(row.views),
+      chats: Number(row.chats),
+      posts: Number(row.posts),
+    }));
   }
 
   async summarizeUser(userId: string, { from, to }: UserActivityWindow): Promise<UserActivityCounts> {
@@ -96,6 +143,7 @@ export function toCounts(row: {
   shares: number;
   views: number;
   chats: number;
+  posts: number;
   lastActiveAt: Date | string | null;
 } | undefined): UserActivityCounts {
   return {
@@ -104,6 +152,7 @@ export function toCounts(row: {
     shares: Number(row?.shares ?? 0),
     views: Number(row?.views ?? 0),
     chats: Number(row?.chats ?? 0),
+    posts: Number(row?.posts ?? 0),
     lastActiveAt: row?.lastActiveAt ? new Date(row.lastActiveAt) : null,
   };
 }

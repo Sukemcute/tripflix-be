@@ -9,6 +9,7 @@ describe('toCounts', () => {
       shares: 0,
       views: 2,
       chats: 3,
+      posts: 0,
       lastActiveAt: '2026-11-18 15:42:10.123+00',
     });
     expect(counts.lastActiveAt).toBeInstanceOf(Date);
@@ -17,7 +18,7 @@ describe('toCounts', () => {
 
   it('giữ nguyên Date và trả null khi không có hoạt động', () => {
     const at = new Date('2026-11-18T15:42:10.123Z');
-    expect(toCounts({ reactions: 0, comments: 0, shares: 0, views: 0, chats: 0, lastActiveAt: at }).lastActiveAt).toEqual(at);
-    expect(toCounts(undefined)).toEqual({ reactions: 0, comments: 0, shares: 0, views: 0, chats: 0, lastActiveAt: null });
+    expect(toCounts({ reactions: 0, comments: 0, shares: 0, views: 0, chats: 0, posts: 0, lastActiveAt: at }).lastActiveAt).toEqual(at);
+    expect(toCounts(undefined)).toEqual({ reactions: 0, comments: 0, shares: 0, views: 0, chats: 0, posts: 0, lastActiveAt: null });
   });
 });
