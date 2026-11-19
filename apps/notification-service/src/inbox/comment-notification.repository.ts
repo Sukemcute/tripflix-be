@@ -66,11 +66,11 @@ export class CommentNotificationRepository {
          FROM unnest($1::uuid[], $2::text[]) AS recipient(user_id, type)
          LEFT JOIN user_directory AS actor ON actor.user_id = $3
          WHERE NOT EXISTS (SELECT 1 FROM deleted_notification_comments WHERE comment_id = $7)
-           -- TF25: mỗi (bình luận, người nhận) tối đa một thông báo; sự kiện phát lại với eventId khác cũng không tạo tag trùng.
-           AND (recipient.type <> 'comment.mentioned' OR NOT EXISTS (
+           -- TF25: mỗi (bình luận, người nhận) tối đa một thông báo, kể cả sự kiện phát lại với eventId khác.
+           AND NOT EXISTS (
              SELECT 1 FROM inbox AS existing
              WHERE existing.comment_id = $7 AND existing.user_id = recipient.user_id
-               AND existing.type IN ('comment.created', 'comment.replied', 'comment.mentioned')))
+               AND existing.type IN ('comment.created', 'comment.replied', 'comment.mentioned'))
          ON CONFLICT DO NOTHING
          RETURNING *`,
         [
