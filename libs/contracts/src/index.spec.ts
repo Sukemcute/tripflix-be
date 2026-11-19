@@ -155,3 +155,28 @@ describe('TF23: sự kiện xem và bấm đặt từ Reels', () => {
     expect(ContentPostBookingClickedV1Schema.safeParse({ ...click, hotelId: '' }).success).toBe(false);
   });
 });
+
+describe('TF25: mentionedUserIds trong content.comment.created', () => {
+  const base = {
+    commentId: randomUUID(),
+    postId: randomUUID(),
+    postAuthorId: randomUUID(),
+    authorId: randomUUID(),
+    parentCommentId: null,
+    body: '@Trang đẹp quá',
+    createdAt: new Date().toISOString(),
+  };
+
+  it('nhận sự kiện cũ không có tag và danh sách UUID không trùng tối đa 10', () => {
+    expect(ContentCommentCreatedV1Schema.parse(base)).not.toHaveProperty('mentionedUserIds');
+    const ids = Array.from({ length: 10 }, () => randomUUID());
+    expect(ContentCommentCreatedV1Schema.parse({ ...base, mentionedUserIds: ids }).mentionedUserIds).toEqual(ids);
+  });
+
+  it('từ chối id trùng, không phải UUID hoặc quá 10 người', () => {
+    const id = randomUUID();
+    for (const mentionedUserIds of [[id, id], ['x'], Array.from({ length: 11 }, () => randomUUID())]) {
+      expect(ContentCommentCreatedV1Schema.safeParse({ ...base, mentionedUserIds }).success).toBe(false);
+    }
+  });
+});

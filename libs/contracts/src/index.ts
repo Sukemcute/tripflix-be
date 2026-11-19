@@ -193,6 +193,12 @@ export const ContentCommentCreatedV1Schema = z.object({
   body: z.string().min(1).max(10_000),
   createdAt: z.iso.datetime(),
   postVisibility: PostVisibilitySchema.optional(),
+  /** Người được tag trong bình luận (TF25). Chỉ có khi bình luận có tag. */
+  mentionedUserIds: z
+    .array(z.uuid())
+    .max(10)
+    .refine((ids) => new Set(ids).size === ids.length, 'mentionedUserIds không được trùng')
+    .optional(),
 });
 export type ContentCommentCreatedV1 = z.infer<typeof ContentCommentCreatedV1Schema>;
 
