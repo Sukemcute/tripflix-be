@@ -109,6 +109,10 @@ services:
     environment:
       <<: *be-env
       PORT: 3001
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
+      WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
+      WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: Tripflix <no-reply@tripflix.local>
       WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3100}

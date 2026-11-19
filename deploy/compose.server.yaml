@@ -159,6 +159,10 @@ services:
       # Web, admin gọi /notifications từ trình duyệt (TF46): cùng danh sách origin với core-api.
       WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
       # Push mobile qua Expo (N3, PR #202). Bật khi app đã gửi Expo push token lên. Khoá FCM, APNs nằm trên Expo, không nằm ở đây.
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
+      WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
+      WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
       PUSH_ENABLED: ${PUSH_ENABLED:-false}
       # Chỉ cần khi bật "Enhanced Push Security" trên Expo. EXPO_PUSH_URL để mặc định trong code.
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
