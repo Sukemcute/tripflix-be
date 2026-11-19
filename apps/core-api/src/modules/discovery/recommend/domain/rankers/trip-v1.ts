@@ -21,9 +21,10 @@ type Part = 'exploring' | 'topic' | 'trip' | 'interestExp' | 'interestPlace' | '
 const STAGE_WEIGHTS: Record<Stage, Record<Part, number>> = {
   dreaming: { exploring: 0, topic: 0.3, trip: 0, interestExp: 0.35, interestPlace: 0.2, fit: 0.1, global: 0.35 },
   planning: { exploring: 0.45, topic: 0.2, trip: 0, interestExp: 0.15, interestPlace: 0.05, fit: 0.15, global: 0.2 },
-  upcoming: { exploring: 0, topic: 0.15, trip: 0.4, interestExp: 0.2, interestPlace: 0, fit: 0.1, global: 0.3 },
-  on_trip: { exploring: 0, topic: 0.15, trip: 0.45, interestExp: 0.2, interestPlace: 0, fit: 0.05, global: 0.3 },
-  after_trip: { exploring: 0, topic: 0.2, trip: -0.3, interestExp: 0.4, interestPlace: 0.1, fit: 0.1, global: 0.4 },
+  // Có chuyến vẫn tìm nơi khác (chuyến sau, chuyến dài ngày đi nhiều nơi): nơi vừa tìm có trọng số, lấy bớt từ phần hot (chốt 19/11).
+  upcoming: { exploring: 0.2, topic: 0.15, trip: 0.4, interestExp: 0.2, interestPlace: 0, fit: 0.1, global: 0.15 },
+  on_trip: { exploring: 0.2, topic: 0.15, trip: 0.45, interestExp: 0.2, interestPlace: 0, fit: 0.05, global: 0.15 },
+  after_trip: { exploring: 0.2, topic: 0.2, trip: -0.3, interestExp: 0.4, interestPlace: 0.1, fit: 0.1, global: 0.25 },
 };
 /** Điểm toàn cục = hot + đặt được ngay + đúng mùa; lên kế hoạch thì "đặt được ngay" nặng gấp đôi. */
 const GLOBAL = { hot: 0.6, bookable: 0.25, season: 0.15 };
