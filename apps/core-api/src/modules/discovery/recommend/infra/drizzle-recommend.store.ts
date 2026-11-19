@@ -1,6 +1,7 @@
 import type { Db } from '@tripflix/db';
 import { and, desc, eq, gt, inArray, isNotNull, lte, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import pg from 'pg';
 import {
   recommendAlgos,
   recommendProductFeatures,
@@ -69,8 +70,14 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
   }
 
   async withLock<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
-    // Khoá theo phiên cần giữ đúng một kết nối suốt lượt chạy; fn vẫn dùng pool bình thường.
-    const client = await this.db.$client.connect();
+    // Khoá theo phiên cần giữ đúng một kết nối suốt lượt chạy (có job chờ /embed hàng chục giây). Kết nối này mở riêng,
+    // ngoài pool: pool discovery cố ý chỉ 5 (docs/architecture/11 §3.3), lấy từ pool thì search mất một chỗ suốt lượt job.
+    // fn vẫn dùng pool bình thường.
+    const client = new pg.Client(this.db.$client.options);
+    // Kết nối ngoài pool không có ai nghe sự kiện 'error': đứt kết nối khi đang chờ fn (Postgres restart) sẽ làm sập tiến trình.
+    // Nuốt ở đây; câu unlock sau đó lỗi nên lượt job báo lỗi, Postgres tự trả khoá khi phiên đóng.
+    client.on('error', () => {});
+    await client.connect();
     try {
       const lock = await client.query<{ ok: boolean }>('select pg_try_advisory_lock(hashtextextended($1, 0)) as ok', [name]);
       if (!lock.rows[0]?.ok) return null;
@@ -80,7 +87,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
         await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [name]);
       }
     } finally {
-      client.release();
+      await client.end();
     }
   }
 
