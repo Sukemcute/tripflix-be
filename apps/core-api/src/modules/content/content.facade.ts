@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { decodeSyncCursor, encodeSyncCursor } from './social/application/common/cursor.js';
 import { Post, type TripAttachment } from './social/domain/index.js';
+import { FollowRepository } from './social/infra/follow.repository.js';
 import { PostRepository } from './social/infra/post.repository.js';
 
 export interface ListPostsFacadeQuery {
@@ -39,6 +40,18 @@ export interface VisiblePostSummary {
   updatedAt: Date;
 }
 
+/** Số liệu hồ sơ như trang cá nhân công khai: người theo dõi, đang theo dõi, lượt thích nhận được, số bài. */
+export interface ProfileStats {
+  followerCount: number;
+  followingCount: number;
+  /** Tổng cảm xúc trên các bài công khai của người này. */
+  likeCount: number;
+  /** Số bài công khai đã đăng và chưa xoá. */
+  postCount: number;
+}
+
+export const EMPTY_PROFILE_STATS: ProfileStats = { followerCount: 0, followingCount: 0, likeCount: 0, postCount: 0 };
+
 export interface PostStatsSummary {
   postId: string;
   reactionTotal: number;
@@ -54,7 +67,27 @@ export interface PostStatsSummary {
  */
 @Injectable()
 export class ContentFacade {
-  constructor(private readonly postRepo: PostRepository) {}
+  constructor(
+    private readonly postRepo: PostRepository,
+    private readonly followRepo: FollowRepository,
+  ) {}
+
+  /**
+   * Số liệu hồ sơ của nhiều người một lần, cho trang quản trị (analytics).
+   * Người không có gì vẫn có mặt trong Map với toàn số 0.
+   */
+  async getProfileStats(userIds: string[]): Promise<Map<string, ProfileStats>> {
+    const ids = [...new Set(userIds.map((id) => id.toLowerCase()))];
+    const [followCounts, postStats] = await Promise.all([
+      this.followRepo.countForMany(ids),
+      this.postRepo.publicStatsForAuthors(ids),
+    ]);
+    return new Map(ids.map((id) => [id, {
+      ...EMPTY_PROFILE_STATS,
+      ...followCounts.get(id),
+      ...postStats.get(id),
+    }]));
+  }
 
   /**
    * Lấy thông tin bài viết theo ID cho các module khác (discovery, analytics, feed...).

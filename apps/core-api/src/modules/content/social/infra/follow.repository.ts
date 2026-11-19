@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, lte } from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, lte } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { follows } from '../../db/schema/index.js';
 
@@ -37,6 +37,26 @@ export class FollowRepository {
       this.db.select({ n: count() }).from(follows).where(eq(follows.followerId, userId)),
     ]);
     return { followerCount: followers?.n ?? 0, followingCount: following?.n ?? 0 };
+  }
+
+  /** Như countFor nhưng cho nhiều người một lần; người không có ai theo dõi thì không có trong Map. */
+  async countForMany(userIds: string[]): Promise<Map<string, { followerCount: number; followingCount: number }>> {
+    const result = new Map<string, { followerCount: number; followingCount: number }>();
+    if (userIds.length === 0) return result;
+    const [followers, following] = await Promise.all([
+      this.db.select({ userId: follows.authorId, n: count() }).from(follows)
+        .where(inArray(follows.authorId, userIds)).groupBy(follows.authorId),
+      this.db.select({ userId: follows.followerId, n: count() }).from(follows)
+        .where(inArray(follows.followerId, userIds)).groupBy(follows.followerId),
+    ]);
+    const entry = (userId: string) => {
+      const current = result.get(userId) ?? { followerCount: 0, followingCount: 0 };
+      result.set(userId, current);
+      return current;
+    };
+    for (const row of followers) entry(row.userId).followerCount = Number(row.n);
+    for (const row of following) entry(row.userId).followingCount = Number(row.n);
+    return result;
   }
 
   async reachesThreshold(authorId: string, threshold: number): Promise<boolean> {
