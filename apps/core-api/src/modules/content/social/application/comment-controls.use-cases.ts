@@ -134,6 +134,7 @@ export class CommentControlsUseCases {
           authorName: row.authorDisplayName,
           parentCommentId: row.parentCommentId,
           body: ['hidden', 'removed'].includes(row.status) ? '' : row.body,
+          mentions: ['hidden', 'removed'].includes(row.status) ? [] : (row.mentions ?? []),
           platformBlocked,
           canApprove: approvalBlockReason === null,
           approvalBlockReason,

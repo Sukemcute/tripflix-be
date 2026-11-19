@@ -1,4 +1,4 @@
-import { boolean, check, index, integer, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { contentSchema } from './content-schema.js';
 import { posts } from './posts.js';
 import { sql } from 'drizzle-orm';
@@ -20,6 +20,7 @@ export const comments = contentSchema.table(
     authorDisplayName: text('author_display_name'),
     replyToName: text('reply_to_name'),
     body: text('body').notNull(),
+    mentions: jsonb('mentions').$type<{ userId: string; offset: number; length: number }[]>().notNull().default([]),
     // held: luật nhanh giữ lại lúc đăng, chờ kiểm duyệt (TF90).
     status: varchar('status', { length: 20 })
       .$type<'visible' | 'held' | 'hidden' | 'removed'>()
@@ -63,7 +64,7 @@ export const comments = contentSchema.table(
 type StoredComment = typeof comments.$inferSelect;
 export type CommentRecord = Omit<
   StoredComment,
-  'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt' | 'replyToCommentId' | 'authorDisplayName'
+  'replyToName' | 'creatorReview' | 'platformHeld' | 'publishedAt' | 'replyToCommentId' | 'authorDisplayName' | 'mentions'
 > &
   Partial<
     Pick<
@@ -74,6 +75,7 @@ export type CommentRecord = Omit<
       | 'publishedAt'
       | 'replyToCommentId'
       | 'authorDisplayName'
+      | 'mentions'
     >
   >;
 export type NewCommentRecord = typeof comments.$inferInsert;

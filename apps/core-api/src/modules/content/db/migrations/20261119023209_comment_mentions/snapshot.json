@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "ffa62f2d-30a7-4623-aa93-90532c9f7ceb",
+  "prevIds": [
+    "59b275e1-7214-46d1-a27f-0a7f9f48a2b6"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "comments",
+        "mentions"
+      ],
+      "writes": [
+        "s|col|content.comments.mentions",
+        "n|col|content.comments.mentions",
+        "e|col|content.comments.mentions"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "mentions",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

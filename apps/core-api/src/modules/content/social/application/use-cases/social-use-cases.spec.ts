@@ -959,6 +959,7 @@ describe('Social Application Use Cases', () => {
       expect(result.isEdited).toBe(true);
       expect(mockCommentRepo.update).toHaveBeenCalledWith('comm-1', {
         body: 'Nội dung sau khi sửa',
+        mentions: [],
         isEdited: true,
       });
       expect(mockOutbox.add).toHaveBeenCalledWith(

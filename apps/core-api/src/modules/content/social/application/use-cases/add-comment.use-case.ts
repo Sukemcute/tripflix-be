@@ -10,11 +10,14 @@ import type { UserDirectoryPort } from '../ports/user-directory.port.js';
 import type { ContentOutbox } from '../ports/content-outbox.port.js';
 import type { CommentRecord, PostRecord } from '../../../db/schema/index.js';
 import { commentPublicationPayload } from '../common/comment-publication.js';
+import { validateMentionedUsers } from '../common/validate-mentioned-users.js';
+import type { CommentMention } from '../../domain/index.js';
 
 export interface AddCommentCommand {
   postId: string;
   authorId: string;
   body: string;
+  mentions?: CommentMention[];
   parentCommentId?: string;
 }
 
@@ -44,12 +47,13 @@ export class AddCommentUseCase {
   ) {}
 
   async execute(command: AddCommentCommand): Promise<CommentRecord> {
-    const body = Comment.validateBody(command.body);
+    const { body, mentions } = Comment.prepareContent(command.body, command.mentions);
     const shouldHold = this.gate?.precheck(body).shouldHold ?? false;
 
     // Đọc, kiểm và tra tên trước khi khoá dòng bài: trong khoá chỉ còn phần ghi (TF99).
     // Bài và luồng được kiểm lại sau khi khoá, vì có thể vừa bị ẩn, xoá trong lúc chuẩn bị.
     this.assertCanComment(await this.postRepository.findById(command.postId), command);
+    await validateMentionedUsers(mentions, this.userDirectory);
     const thread = command.parentCommentId
       ? await this.findThread(command.postId, command.parentCommentId)
       : null;
@@ -57,7 +61,7 @@ export class AddCommentUseCase {
     const names = await this.userDirectory?.getDisplayNames(displayIds).catch(() => undefined);
 
     return this.createInTransaction(
-      { ...command, body },
+      { ...command, body, mentions },
       {
         shouldHold,
         thread,
@@ -101,6 +105,7 @@ export class AddCommentUseCase {
       authorDisplayName: authorDisplayName ?? null,
       ...(replyToName ? { replyToName } : {}),
       body,
+      mentions: command.mentions ?? [],
       isEdited: false,
       status: shouldHold ? 'held' : 'visible',
       creatorReview: creatorHeld ? 'pending' : 'approved',
