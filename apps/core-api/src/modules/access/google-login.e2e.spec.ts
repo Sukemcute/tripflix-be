@@ -302,5 +302,39 @@ describe('TF059: đăng nhập Google và gộp gu khách X-Anon-Id', () => {
       await http().put('/api/auth/me/avatar').send({ mediaId: UPLOADED_MEDIA_ID }).expect(401);
       expect(store.userRows.get(decodeJwt(res.body.accessToken).sub!)?.avatarUrl).toBeNull();
     });
+
+    it('khung và phụ kiện: lưu rồi người khác đọc được; gỡ thì null; dữ liệu sai 400; chưa đăng nhập 401', async () => {
+      const res = await google(await googleToken({ sub: 'sub-trang-tri', email: 'trang-tri@gmail.com' })).expect(200);
+      const userId = decodeJwt(res.body.accessToken).sub!;
+      const decor = {
+        frameId: 'fox-hat',
+        stickers: [{ instanceId: 's-1', presetId: 'headphones', x: 0.5, y: -0.1, scale: 1.4, rotationDeg: -15, isFlipped: true }],
+      };
+      await http().get(`/api/v1/users/${userId}/avatar-decor`).expect(200).expect({ avatarDecor: null });
+
+      const saved = await http().put('/api/auth/me/avatar-decor').set(bearer(res.body.accessToken)).send(decor).expect(200);
+      expect(saved.body.avatarDecor).toEqual(decor);
+      const publicRes = await http().get(`/api/v1/users/${userId}/avatar-decor`).expect(200);
+      expect(publicRes.body).toEqual({ avatarDecor: decor });
+      expect(publicRes.headers['cache-control']).toBe('public, max-age=300');
+      expect((await http().get('/api/auth/me').set(bearer(res.body.accessToken)).expect(200)).body.avatarDecor).toEqual(decor);
+
+      const tooMany = { frameId: 'none', stickers: Array.from({ length: 13 }, (_, i) => ({ ...decor.stickers[0], instanceId: `s-${i}` })) };
+      for (const bad of [
+        tooMany,
+        { ...decor, frameId: '<script>' },
+        { ...decor, stickers: [{ ...decor.stickers[0], x: 5 }] },
+        { ...decor, stickers: [{ ...decor.stickers[0], scale: 9 }] },
+        { ...decor, extra: 1 },
+      ]) {
+        await http().put('/api/auth/me/avatar-decor').set(bearer(res.body.accessToken)).send(bad).expect(400);
+      }
+      await http().put('/api/auth/me/avatar-decor').send(decor).expect(401);
+      expect(store.userRows.get(userId)?.avatarDecor).toEqual(decor);
+
+      const removed = await http().delete('/api/auth/me/avatar-decor').set(bearer(res.body.accessToken)).expect(200);
+      expect(removed.body.avatarDecor).toBeNull();
+      await http().get(`/api/v1/users/${userId}/avatar-decor`).expect(200).expect({ avatarDecor: null });
+    });
   });
 });

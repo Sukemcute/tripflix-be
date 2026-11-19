@@ -2,6 +2,7 @@ import { Controller, Get, Header, Inject, NotFoundException, Param, ParseUUIDPip
 import { ApiFoundResponse, ApiNotFoundResponse, ApiOkResponse, ApiProperty, ApiQuery, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
+import { AvatarDecorResponseDto } from '../../auth/api/dto.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { TOO_MANY_SEARCHES_MESSAGE, UserSearchUseCases } from '../application/user-search.use-cases.js';
 import {
@@ -95,5 +96,14 @@ export class UserSearchController {
     const url = await this.users.findAvatarUrl(userId);
     if (!url) throw new NotFoundException('Chưa có ảnh đại diện');
     return { url, statusCode: 302 };
+  }
+
+  /** Khung và phụ kiện quanh ảnh đại diện của một người (TF109). Chưa trang trí, bị khoá: avatarDecor null. */
+  @Get(':id/avatar-decor')
+  // shortcut: đổi trang trí chậm tối đa 5 phút ở máy người khác, giống ảnh đại diện.
+  @Header('Cache-Control', 'public, max-age=300')
+  @ApiOkResponse({ type: AvatarDecorResponseDto })
+  async avatarDecor(@Param('id', new ParseUUIDPipe()) userId: string): Promise<AvatarDecorResponseDto> {
+    return { avatarDecor: await this.users.findAvatarDecor(userId) };
   }
 }

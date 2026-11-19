@@ -1,6 +1,7 @@
 import type { Role } from '@tripflix/contracts';
 import type { NewOutboxEvent } from '@tripflix/outbox';
 import type { JWK } from 'jose';
+import type { AvatarDecor } from '../../account/domain/avatar-decor.js';
 import type { PersonalInfo } from '../../account/domain/personal-info.js';
 import type { ParsedPasswordEnvelope } from '../domain/password-envelope.js';
 import type { RefreshState } from '../domain/refresh-rotation.js';
@@ -22,6 +23,8 @@ export interface UserRecord {
   avatarUrl: string | null;
   /** null: chưa từng có ảnh. none: tự xoá, Google không ghi lại. */
   avatarSource: AvatarSource | null;
+  /** Khung và phụ kiện bọc ngoài ảnh đại diện (TF109); null: chưa trang trí. */
+  avatarDecor: AvatarDecor | null;
 }
 
 export type AvatarSource = 'upload' | 'google' | 'none';
@@ -170,6 +173,7 @@ export interface UserRepository {
   /** passwordHash null: xoá mật khẩu (tài khoản chỉ còn đăng nhập Google). */
   updatePasswordHash(id: string, passwordHash: string | null): Promise<UserRecord | null>;
   updateAvatar(id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>): Promise<UserRecord | null>;
+  updateAvatarDecor(id: string, avatarDecor: AvatarDecor | null): Promise<UserRecord | null>;
   /** Đặt email_verified_at nếu đang trống (giữ mốc đầu tiên); trả người dùng sau khi đổi. */
   markEmailVerified(id: string, at: Date): Promise<UserRecord | null>;
 }
