@@ -1,9 +1,8 @@
-import { PLACES } from '../../search/domain/places.js';
 import { assignBins, captionExpOf, EXP_DESCRIPTION_TEXTS, expsOfQuery, queryExpOf } from './bins.js';
 import { hotV2 } from './builders/hot.js';
 import { postProfileV1 } from './builders/post-profile.js';
 import type { PostBuildItem } from './contracts.js';
-import { EXP, EXP_DESCRIPTIONS, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
+import { EXP, EXP_DESCRIPTIONS, PHRASE_BINS, TAG_BINS } from './topics.js';
 
 type Content = NonNullable<Parameters<typeof assignBins>[0]['content']>;
 const post = ({ tags = [], placeId = null, ...content }: { tags?: string[]; placeId?: string | null } & Content) =>
@@ -18,11 +17,9 @@ describe('topics', () => {
     ...['xuan', 'he', 'thu', 'dong', 'tet'].map((s) => `season:${s}`),
   ]);
 
-  it('mọi ngăn trong bảng map thuộc bộ từ vựng, mọi nơi có trong PLACES', () => {
+  it('mọi ngăn trong bảng map thuộc bộ từ vựng', () => {
     for (const bins of Object.values(TAG_BINS)) for (const b of bins) expect(binCodes).toContain(b);
     for (const b of Object.keys(PHRASE_BINS)) expect(binCodes).toContain(b);
-    const placeIds = new Set(PLACES.map((p) => p.id));
-    for (const id of Object.values(TAG_PLACES)) expect(placeIds).toContain(id);
   });
 });
 
@@ -37,7 +34,14 @@ describe('assignBins', () => {
 
   it('nơi: chưa có placeId thì lấy tag nơi (0,8), rồi tới tên nơi trong nội dung (0,6)', () => {
     expect(post({ tags: ['fyp', 'SaPa'] })).toEqual({ 'place:sa-pa': 0.8, 'place:lao-cai': 0.8 });
+    expect(post({ tags: ['caurong'] })).toEqual({ 'place:da-nang': 0.8 });
+    expect(post({ tags: ['catba'] })).toEqual({ 'place:cat-ba': 0.8, 'place:hai-phong': 0.8 });
+    expect(post({ title: 'Cần Thơ chợ nổi Cái Răng' })).toMatchObject({ 'place:can-tho': 0.9 });
     expect(post({ body: 'Ba ngày lang thang Đà Lạt' })).toMatchObject({ 'place:da-lat': 0.6, 'place:lam-dong': 0.6 });
+    expect(post({ trip: { hotelId: null, daysCount: null, estimatedCostPerPerson: null, items: [{ location: 'Mù Cang Chải', category: null }] } })).toEqual({
+      'place:mu-cang-chai': 0.6,
+      'place:lao-cai': 0.6,
+    });
     expect(post({ placeId: 'hue', tags: ['sapa'] })['place:sa-pa']).toBeUndefined();
   });
 

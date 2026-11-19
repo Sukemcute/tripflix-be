@@ -120,13 +120,89 @@ export const PLACES: readonly PlaceSeed[] = [
   destination('kon-tum', 'Kon Tum', 'quang-ngai'),
 ];
 
-const PLACE_ID_BY_NAME = new Map(
-  PLACES.flatMap((p) =>
-    [p.name, ...p.aliases, ...(p.queryOnly ?? []), ...(p.landmarks ?? [])].flatMap((raw) =>
-      placeVariants(raw).map((v) => [v, p.id] as const),
-    ),
-  ),
-);
+const PLACE_BY_ID = new Map(PLACES.map((p) => [p.id, p]));
+
+function buildTermIndex(includeQueryOnly: boolean): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const p of PLACES) {
+    const raws = includeQueryOnly
+      ? [p.name, ...p.aliases, ...(p.landmarks ?? []), ...(p.queryOnly ?? [])]
+      : [p.name, ...p.aliases, ...(p.landmarks ?? [])];
+    for (const raw of raws) {
+      for (const v of placeVariants(raw)) map.set(v, p.id);
+    }
+  }
+  return map;
+}
+
+const TEXT_TERMS = buildTermIndex(false);
+const QUERY_TERMS = buildTermIndex(true);
+const MAX_PLACE_TOKENS = Math.max(1, ...[...QUERY_TERMS.keys()].map((t) => t.split(' ').length));
+
+export interface PlacesInOptions {
+  /** true khi đọc câu tìm ngắn: nhận thêm viết tắt 2 chữ ('hn', 'sg', 'dn', 'ct', 'vt', 'nt', 'dl', 'hp', 'pq', 'qn'). */
+  isQuery?: boolean;
+}
+
+/**
+ * Tìm id các nơi (PLACES) xuất hiện trong văn bản theo thứ tự gặp:
+ * chuẩn hoá, tách ranh giới từ và ưu tiên cụm dài nhất ('hoi an' thắng 'an').
+ */
+export function placesIn(text: string, options: PlacesInOptions = {}): string[] {
+  const norm = normalizeText(text);
+  if (!norm) return [];
+  const tokens = norm.split(' ');
+  const table = options.isQuery ? QUERY_TERMS : TEXT_TERMS;
+  const seen: string[] = [];
+  for (let i = 0; i < tokens.length; ) {
+    let matchedLen = 0;
+    for (let n = Math.min(MAX_PLACE_TOKENS, tokens.length - i); n >= 1; n--) {
+      const id = table.get(tokens.slice(i, i + n).join(' '));
+      if (id) {
+        if (!seen.includes(id)) seen.push(id);
+        matchedLen = n;
+        break;
+      }
+    }
+    i += matchedLen || 1;
+  }
+  return seen;
+}
+
+export const placeParentOf = (id: string): string | null => PLACE_BY_ID.get(id)?.parentId ?? null;
+
+export const placeBucketOfId = (id: string): string | null => {
+  const p = PLACE_BY_ID.get(id);
+  return p ? (p.exploreBucket ?? p.name) : null;
+};
+
+/**
+ * Chọn nơi tiêu biểu từ danh sách đã nhận ra: nếu tỉnh và điểm đến con cùng xuất hiện ('Nghệ An' + 'Cửa Lò')
+ * thì ưu tiên điểm đến con; ngược lại giữ nơi gặp đầu tiên.
+ */
+export function mostSpecificPlace(ids: readonly string[]): string | null {
+  const first = ids[0];
+  if (!first) return null;
+  return ids.find((id) => placeParentOf(id) === first) ?? first;
+}
 
 /** Tên hoặc bí danh nơi (vd 'Đà Lạt' của lexicon tìm khám phá) → id trong PLACES; không có thì null. */
-export const placeIdOfName = (name: string): string | null => PLACE_ID_BY_NAME.get(normalizeText(name)) ?? null;
+export const placeIdOfName = (name: string): string | null => placesIn(name, { isQuery: true })[0] ?? null;
+
+/** Sinh các dòng 'place' của lexicon tìm khám phá trực tiếp từ PLACES (không gồm landmarks). */
+export function explorePlaceRows(): ReadonlyArray<readonly ['place', string, string, 0]> {
+  const seen = new Set<string>();
+  const rows: Array<readonly ['place', string, string, 0]> = [];
+  for (const p of PLACES) {
+    const bucket = p.exploreBucket ?? p.name;
+    for (const raw of [p.name, ...p.aliases, ...(p.queryOnly ?? [])]) {
+      for (const term of placeVariants(raw)) {
+        const key = `${bucket}|${term}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push(['place', bucket, term, 0]);
+      }
+    }
+  }
+  return rows;
+}

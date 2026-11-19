@@ -1,4 +1,5 @@
-// Bảng từ vựng (lexicon-rows.ts) nạp lên RAM một lần. Thêm cách viết mới = thêm dòng, không sửa code.
+// Bảng từ vựng (lexicon-rows.ts) nạp lên RAM một lần; dòng địa điểm sinh từ PLACES. Thêm cách viết mới = thêm dòng, không sửa code.
+import { explorePlaceRows } from '../places.js';
 import { LEXICON_ROWS, type LexiconRow } from './lexicon-rows.js';
 
 /** Một nghĩa của cụm: (loại, nhóm, trọng số). */
@@ -79,4 +80,4 @@ export class Lexicon {
   }
 }
 
-export const LEX = new Lexicon(LEXICON_ROWS);
+export const LEX = new Lexicon([...LEXICON_ROWS, ...explorePlaceRows()]);

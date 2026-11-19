@@ -1,8 +1,8 @@
-import { destOf } from '../../search/domain/explore/text.js';
 import { normalizeText } from '../../search/domain/normalize-text.js';
-import { PLACES, placeIdOfName } from '../../search/domain/places.js';
+import { PLACES } from '../../search/domain/places.js';
 import { round4, type PostContent } from './contracts.js';
-import { COST_PER_PERSON, costBin, EXP, EXP_DESCRIPTIONS, ITEM_CATEGORY_BINS, lenBin, PHRASE_BINS, TAG_BINS, TAG_PLACES } from './topics.js';
+import { resolvePostPlace, type PostPlaceSource } from './place-of-post.js';
+import { COST_PER_PERSON, costBin, EXP, EXP_DESCRIPTIONS, ITEM_CATEGORY_BINS, lenBin, PHRASE_BINS, TAG_BINS } from './topics.js';
 
 /** Những gì của bài dùng để xếp ngăn. Nhận thẳng PostMeta / PostBuildItem. Mọi trường trong content là tuỳ chọn: thiếu thì nguồn đó không góp. */
 export interface PostBinInput {
@@ -85,20 +85,29 @@ export function captionExpOf(caption: readonly number[], descriptions: readonly 
   return sorted[0]![1] - sorted[1]![1] >= CAPTION_MARGIN ? sorted[0]![0] : null;
 }
 
-/** Nơi chính của bài và độ tin: nguồn có thứ tự cao hơn thắng (recommend-topics mục 6.2). */
+const PLACE_WEIGHT: Record<PostPlaceSource, number> = {
+  hotel: 1,
+  placeId: 0.9,
+  destination: 0.9,
+  title: 0.9,
+  tag: 0.8,
+  body: 0.6,
+  item: 0.6,
+};
+
+/** Nơi chính của bài và độ tin: cùng nguồn và thứ tự với placeIdOfPost (khách sạn → placeId → tag → destinationName → title → body → trip.items). */
 function placeOf(post: PostBinInput): { placeId: string; w: number } | null {
-  if (post.placeId) return { placeId: post.placeId, w: post.content?.trip?.hotelId ? 1 : 0.9 };
-  for (const t of post.tags) {
-    const placeId = TAG_PLACES[tagKey(t)];
-    if (placeId) return { placeId, w: 0.8 };
-  }
-  const texts = [post.content?.body ?? '', ...(post.content?.trip?.items ?? []).map((i) => i.location ?? '')];
-  for (const text of texts) {
-    const name = text ? destOf(text) : null;
-    const placeId = name ? placeIdOfName(name) : null;
-    if (placeId) return { placeId, w: 0.6 };
-  }
-  return null;
+  const match = resolvePostPlace({
+    placeId: post.placeId,
+    tags: post.tags,
+    destinationName: post.content?.trip?.destinationName ?? null,
+    title: post.content?.title ?? null,
+    body: post.content?.body ?? null,
+    items: post.content?.trip?.items,
+  });
+  if (!match) return null;
+  const w = match.source === 'placeId' && post.content?.trip?.hotelId ? 1 : PLACE_WEIGHT[match.source];
+  return { placeId: match.placeId, w };
 }
 
 /**

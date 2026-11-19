@@ -57,6 +57,7 @@ function contentOf(p: RecommendSourcePost | undefined): PostContent | undefined 
     trip: trip
       ? {
           hotelId: strOrNull(trip.hotelId),
+          destinationName: strOrNull(trip.destinationName),
           daysCount: numOrNull(trip.daysCount),
           estimatedCostPerPerson: numOrNull(trip.estimatedCostPerPerson),
           items: (trip.items ?? []).map((i) => {
@@ -150,15 +151,24 @@ export class BuildFeaturesUseCases {
     ]);
     const hotelProvinces = new Map(hotels.map((h) => [h.id, h.provinceSlug]));
     const completenessById = new Map<string, number>();
+    const contentById = new Map(sourcePosts.map((p) => [p.id, contentOf(p)]));
     const posts: RecommendPostRow[] = sourcePosts.map((p) => {
       completenessById.set(p.id, calculateCompleteness(p));
+      const content = contentById.get(p.id);
       return {
         postId: p.id,
         authorId: p.authorId,
         postType: p.postType,
         tags: p.hashtags,
         placeId: placeIdOfPost(
-          { hotelId: p.tripAttachment?.hotelId ?? null, destinationName: p.tripAttachment?.destinationName ?? null, title: p.title },
+          {
+            hotelId: p.tripAttachment?.hotelId ?? null,
+            tags: p.hashtags,
+            destinationName: p.tripAttachment?.destinationName ?? null,
+            title: p.title,
+            body: p.body,
+            items: content?.trip?.items,
+          },
           hotelProvinces,
         ),
         isVerified: p.isVerified,
@@ -175,7 +185,6 @@ export class BuildFeaturesUseCases {
     const failedBuilders: string[] = [];
 
     const needsSamples = postBuilders.some((b) => b.needsSamples);
-    const contentById = new Map(sourcePosts.map((p) => [p.id, contentOf(p)]));
     // Chỉ nhúng khi builder đang bật đọc ngăn từ caption (v0 thì không gọi AI, không đọc cache).
     const needsVectors = [...postBuilders, ...userBuilders].some((b) => b.needsVectors);
     if (needsVectors) {

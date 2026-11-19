@@ -1,5 +1,6 @@
 // Chuẩn hoá chữ, dùng chung cho câu tìm lẫn tài liệu ở mọi nhánh. Port từ experiments/natural-search/search/core/text.py.
 // Lưu ý: \b của JS chỉ hiểu chữ ASCII, nên với chữ có dấu dùng lookaround \p{L} thay cho \b.
+import { mostSpecificPlace, placeBucketOfId, placesIn } from '../places.js';
 import { LEX } from './lexicon.js';
 import type { ExploreObject } from './types.js';
 
@@ -140,7 +141,10 @@ export function bucketsIn(text: string, type: string): string[] {
   return seen;
 }
 
-export const destOf = (text: string): string | null => bucketsIn(text, 'place')[0] ?? null;
+export const destOf = (text: string): string | null => {
+  const id = mostSpecificPlace(placesIn(text));
+  return id ? placeBucketOfId(id) : null;
+};
 
 /** 3n2đ · 3 ngày · 3 ngày 2 đêm (trên chữ đã bỏ dấu). */
 export const DAYS = /\b(\d+) ?n ?\d+ ?d\b|\b(\d+) ngay(?: \d+ dem)?\b/;
