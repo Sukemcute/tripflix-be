@@ -44,13 +44,40 @@ export const envSchema = baseEnvSchema
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    WEB_PUSH_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    WEB_PUSH_PUBLIC_KEY: z.string().optional(),
+    WEB_PUSH_PRIVATE_KEY: z.string().optional(),
+    WEB_PUSH_SUBJECT: z.string().optional(),
     EXPO_PUSH_URL: z.url().default('https://exp.host/--/api/v2/push/send'),
     // Chỉ cần khi bật "Enhanced Push Security" trên Expo.
     EXPO_ACCESS_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   })
   .superRefine((env, ctx) => {
+    if (env.WEB_PUSH_ENABLED) {
+      if (!env.WEB_PUSH_PUBLIC_KEY || !/^[A-Za-z0-9_-]{87}$/.test(env.WEB_PUSH_PUBLIC_KEY))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['WEB_PUSH_PUBLIC_KEY'],
+          message: 'Cần khóa VAPID công khai hợp lệ',
+        });
+      if (!env.WEB_PUSH_PRIVATE_KEY || !/^[A-Za-z0-9_-]{43}$/.test(env.WEB_PUSH_PRIVATE_KEY))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['WEB_PUSH_PRIVATE_KEY'],
+          message: 'Cần khóa VAPID riêng hợp lệ',
+        });
+      if (!env.WEB_PUSH_SUBJECT || !/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(env.WEB_PUSH_SUBJECT))
+        ctx.addIssue({ code: 'custom', path: ['WEB_PUSH_SUBJECT'], message: 'Cần địa chỉ liên hệ VAPID' });
+    }
     if (env.FOLLOWER_NOTIFICATION_SECRET && !env.FOLLOWER_CORE_URL) {
-      ctx.addIssue({ code: 'custom', path: ['FOLLOWER_CORE_URL'], message: 'bắt buộc khi bật fan-out follower' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['FOLLOWER_CORE_URL'],
+        message: 'bắt buộc khi bật fan-out follower',
+      });
     }
     // Production mà vẫn gửi tới Mailpit thì email xác thực, đặt lại mật khẩu không tới người dùng: dừng ngay lúc khởi động.
     if (env.NODE_ENV === 'production' && env.SMTP_URL === DEV_SMTP_URL) {

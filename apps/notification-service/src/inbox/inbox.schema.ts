@@ -1,3 +1,4 @@
+import { WEB_PUSH_SCHEMA } from '../web-push/web-push.schema.js';
 import type pg from 'pg';
 
 export async function ensureInboxSchema(pool: pg.Pool): Promise<void> {
@@ -229,4 +230,5 @@ const NOTIFICATION_MIGRATIONS = [
   [9, POST_WATCHERS_SCHEMA],
   [10, PUSH_SCHEMA],
   [11, REACTION_ACTOR_IDS_BACKFILL],
+  [12, WEB_PUSH_SCHEMA],
 ] as const;

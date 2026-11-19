@@ -82,8 +82,13 @@ describe('InboxRepository trên Postgres thật', () => {
     );
     expect(indexNames).toContain('uq_inbox_group_key');
     expect(indexNames).not.toContain('uq_inbox_source_event_id');
+    const webPushTables = await pool.query<{ tablename: string }>(
+      "SELECT tablename FROM pg_tables WHERE schemaname=current_schema() AND tablename LIKE 'web_push_%'",
+    );
+    expect(webPushTables.rows.map((row) => row.tablename).sort()).toEqual(['web_push_deliveries','web_push_subscriptions']);
+
     const migrations = await pool.query<{ version: number }>('SELECT version FROM __migrations ORDER BY version');
-    expect(migrations.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }]);
+    expect(migrations.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }]);
   });
 
   it('giữ thông báo đã đọc và chống ghi lại sự kiện đã xử lý trước khi migrate', async () => {

@@ -60,6 +60,7 @@ describe('notification-service kiểm access token qua JWKS', () => {
       NOTIFICATION_CONSUMER_NAME: undefined,
       NOTIFICATION_DLQ_REPLAY_INTERVAL_MS: 60_000,
       PUSH_ENABLED: false,
+      WEB_PUSH_ENABLED: false,
       EXPO_PUSH_URL: 'https://exp.host/--/api/v2/push/send',
     };
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
