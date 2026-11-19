@@ -28,7 +28,8 @@ describe('AI moderation client qua HTTP thật', () => {
       const body = JSON.parse(Buffer.concat(chunks).toString()) as {
         clientId: string;
         audience: string;
-        items: ModerationItem[];
+        items?: ModerationItem[];
+        imageBase64?: string;
       };
       response.setHeader('Content-Type', 'application/json');
       if (request.url === '/api/auth/service-token') {
@@ -41,20 +42,44 @@ describe('AI moderation client qua HTTP thật', () => {
         return;
       }
       calls++;
-      batchSizes.push(body.items.length);
+      batchSizes.push(body.items?.length ?? 0);
       if (slow) await new Promise((resolve) => setTimeout(resolve, 100));
       response.statusCode = refreshOnce && calls === 1 ? 401 : status;
+      if (request.url === '/moderate/cover-ocr') {
+        expect(Buffer.from(body.imageBase64 ?? '', 'base64').subarray(0, 3)).toEqual(
+          Buffer.from([0xff, 0xd8, 0xff]),
+        );
+        response.end(
+          JSON.stringify({
+            status: 'flagged',
+            extractedText: 'Chữ trên bìa',
+            categories: { harassment: true },
+            scores: { harassment: 0.93 },
+            model: 'ocr+omni',
+            errorCode: null,
+          }),
+        );
+        return;
+      }
       if (request.url === '/moderate/parts') {
-        response.end(JSON.stringify({ results: body.items.map((input) => ({
-          id: wrongId ? 'other' : input.id, status: 'flagged', model: 'omni',
-          categories: { violence: true }, scores: { violence: 0.92 }, errorCode: null,
-        })) }));
+        response.end(
+          JSON.stringify({
+            results: body.items!.map((input) => ({
+              id: wrongId ? 'other' : input.id,
+              status: 'flagged',
+              model: 'omni',
+              categories: { violence: true },
+              scores: { violence: 0.92 },
+              errorCode: null,
+            })),
+          }),
+        );
         return;
       }
       response.end(
         JSON.stringify({
           model: 'omni',
-          results: body.items.map((input) => ({
+          results: body.items!.map((input) => ({
             id: wrongId ? 'other' : input.id,
             flagged: true,
             categories: { 'harassment/threatening': true },
@@ -76,9 +101,30 @@ describe('AI moderation client qua HTTP thật', () => {
     new AiModerationClient({ aiUrl: url, coreUrl: url, secret: 'test-only', timeoutMs });
   it('BE09: separate endpoint preserves each model/verdict and refreshes expired token', async () => {
     refreshOnce = true;
-    const result = await client().moderateParts([{ id: 'image:1', kind: 'image', imageUrl: 'https://cdn.test/a.jpg' }]);
-    expect(result).toEqual([{ id: 'image:1', status: 'flagged', model: 'omni', categories: { violence: true }, scores: { violence: 0.92 }, errorCode: null }]);
+    const result = await client().moderateParts([
+      { id: 'image:1', kind: 'image', imageUrl: 'https://cdn.test/a.jpg' },
+    ]);
+    expect(result).toEqual([
+      {
+        id: 'image:1',
+        status: 'flagged',
+        model: 'omni',
+        categories: { violence: true },
+        scores: { violence: 0.92 },
+        errorCode: null,
+      },
+    ]);
     expect(tokenCalls).toBe(2);
+  });
+  it('BE09-cover-OCR: sends bounded JPEG bytes and keeps extracted text with its verdict', async () => {
+    const result = await client().ocrVideoCover('cover-1', Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+    expect(result).toMatchObject({
+      id: 'cover-1',
+      status: 'flagged',
+      extractedText: 'Chữ trên bìa',
+      model: 'ocr+omni',
+    });
+    expect(calls).toBe(1);
   });
   it('BE09: mismatched IDs and unavailable provider remain errors', async () => {
     wrongId = true;

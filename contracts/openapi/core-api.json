@@ -3969,6 +3969,67 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/cover-ocr": {
+      "get": {
+        "operationId": "AdminModerationController_coverOcr",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "flagged",
+                "failed",
+                "in_progress",
+                "passed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Vị trí trang kế tiếp",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverOcrPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Theo dõi các lượt OCR ảnh bìa video và lọc theo trạng thái",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/posts/{id}/parts": {
       "get": {
         "operationId": "AdminModerationController_postParts",
@@ -11659,6 +11720,106 @@
           "createdAt"
         ]
       },
+      "CoverOcrCountsDto": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "number"
+          },
+          "flagged": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          },
+          "inProgress": {
+            "type": "number"
+          },
+          "passed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "all",
+          "flagged",
+          "failed",
+          "inProgress",
+          "passed"
+        ]
+      },
+      "CoverOcrItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "postTitle": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "extractedText": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "postTitle",
+          "authorId",
+          "assetId",
+          "status",
+          "attempts",
+          "extractedText",
+          "errorCode",
+          "updatedAt"
+        ]
+      },
+      "CoverOcrPageDto": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/CoverOcrCountsDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverOcrItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "counts",
+          "items",
+          "nextCursor"
+        ]
+      },
       "ModerationPartDto": {
         "type": "object",
         "properties": {
@@ -11669,7 +11830,8 @@
               "image",
               "video_poster",
               "video_frame",
-              "video_sampling"
+              "video_sampling",
+              "video_cover_ocr"
             ]
           },
           "timestampMs": {

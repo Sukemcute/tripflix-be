@@ -30,6 +30,7 @@ export interface PartVerdict {
   scores: Record<string, number>;
   model: string | null;
   errorCode: string | null;
+  extractedText?: string;
 }
 export const moderationParts = contentSchema.table(
   'moderation_parts',

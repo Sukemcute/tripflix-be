@@ -14,4 +14,5 @@ export interface ModerationItem {
 export interface ModerationAiPort {
   moderate(items: ModerationItem[]): Promise<AiVerdict[] | null>;
   moderateParts?(items: ModerationPartInput[]): Promise<PartVerdict[] | null>;
+  ocrVideoCover?(id: string, jpeg: Buffer): Promise<PartVerdict | null>;
 }
