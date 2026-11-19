@@ -120,7 +120,7 @@ describe('Thông báo kiểm duyệt bài và video trên PostgreSQL', () => {
     expect((await list()).items.filter((row) => row.data.postId === postId)).toEqual([]);
     await router.route(reaction(randomUUID(), 'like', 6));
     expect((await list()).items.filter((row) => row.data.postId === postId)).toEqual([
-      expect.objectContaining({ type: 'reaction.post', data: { postId, actorCount: 1 } }),
+      expect.objectContaining({ type: 'reaction.post', data: { postId, actorCount: 1, actorIds: [expect.any(String)] } }),
     ]);
   });
 

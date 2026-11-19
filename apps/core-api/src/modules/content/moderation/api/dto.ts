@@ -253,6 +253,8 @@ export class MyReportPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
 }
 export class FailedScanDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) partKind?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) assetId?: string | null;
   @ApiProperty() eventId!: string;
   @ApiProperty() targetType!: string;
   @ApiProperty() targetId!: string;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { ModerationAiPort, ModerationItem } from '../application/ports.js';
+import type { ModerationAiPort, ModerationItem, ModerationPartInput } from '../application/ports.js';
+import type { PartVerdict } from '../../db/schema/moderation-parts.js';
 import type { AiVerdict } from '../domain/severity.js';
 
 const TokenSchema = z.object({
@@ -33,6 +34,34 @@ export class AiModerationClient implements ModerationAiPort {
     private readonly request: typeof fetch = fetch,
     private readonly now = Date.now,
   ) {}
+
+  async moderateParts(items: ModerationPartInput[]): Promise<PartVerdict[] | null> {
+    if (!this.config.aiUrl || !this.config.coreUrl || !this.config.secret) return null;
+    const schema = z.object({ results: z.array(z.object({
+      id: z.string(), status: z.enum(['passed', 'flagged', 'error']),
+      categories: z.record(z.string(), z.boolean()),
+      scores: z.record(z.string(), z.number().min(0).max(1)),
+      model: z.string().nullable(), errorCode: z.string().nullable(),
+    })) });
+    try {
+      let token = await this.getToken();
+      const call = (value: string) => this.request(`${this.config.aiUrl!.replace(/\/$/, '')}/moderate/parts`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${value}` },
+        body: JSON.stringify({ items }), signal: AbortSignal.timeout(this.config.timeoutMs ?? 15_000),
+      });
+      let response = await call(token);
+      if (response.status === 401) {
+        if (this.token?.value === token) this.token = undefined;
+        token = await this.getToken();
+        response = await call(token);
+      }
+      if (!response.ok) return null;
+      const parsed = schema.parse(await response.json());
+      if (parsed.results.length !== items.length || parsed.results.some((r, i) => r.id !== items[i]?.id ||
+        (r.status !== 'error' && !r.model))) return null;
+      return parsed.results;
+    } catch { return null; }
+  }
 
   async moderate(items: ModerationItem[]): Promise<AiVerdict[] | null> {
     if (!this.config.aiUrl || !this.config.coreUrl || !this.config.secret) return null;

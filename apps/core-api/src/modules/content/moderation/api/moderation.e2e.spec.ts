@@ -33,6 +33,7 @@ import { ClaimDeferredScansUseCase } from '../application/recover-screening.use-
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { AdminModerationController, ReportsController } from './moderation.controller.js';
 import { MediaFacade } from '../../media/media.facade.js';
+import { PostPartsScreeningUseCase } from '../application/post-parts-screening.use-case.js';
 
 @Global()
 @Module({
@@ -76,6 +77,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
       ],
       controllers: [AdminModerationController, ReportsController],
       providers: [
+        { provide: PostPartsScreeningUseCase, useValue: { detail: async () => ({ items: [], contentVersion: 'qa', imagePolicy: 'review_only' }), exists: async () => false, retry: vi.fn() } },
         { provide: MediaFacade, useValue: { getPlayback: async () => ({}) } },
         { provide: SubmitReportUseCase, useValue: { execute: submit } },
         { provide: SubmitAppealUseCase, useValue: { execute: submitAppeal } },
@@ -128,6 +130,17 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await app?.close();
   });
   const http = () => request(app.getHttpServer());
+  it('BE09: evidence and retry endpoints are staff-only and writes require idempotency', async () => {
+    const id = randomUUID();
+    const url = `/api/v1/admin/moderation/posts/${id}/parts`;
+    await http().get(url).expect(401);
+    await http().get(url).auth(tokens.member!, { type: 'bearer' }).expect(403);
+    await http().get(url).auth(tokens.moderator!, { type: 'bearer' }).expect(200);
+    const retry = `/api/v1/admin/moderation/parts/${id}/retry`;
+    await http().post(retry).auth(tokens.member!, { type: 'bearer' }).set('Idempotency-Key', randomUUID()).expect(403);
+    await http().post(retry).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
+    await http().post(retry).auth(tokens.moderator!, { type: 'bearer' }).set('Idempotency-Key', randomUUID()).expect(201);
+  });
   it('bảo vệ API cá nhân và chỉ staff được xử lý khiếu nại', async () => {
     for (const path of ['me/moderation/decisions', 'me/moderation/appeals', 'me/reports']) {
       await http().get(`/api/v1/${path}`).expect(401);

@@ -128,7 +128,7 @@ export class MediaUploadUseCases {
     await this.assertSourceFileSize(target.sourceKey, target.fileSizeBytes);
     if (target.kind === 'image') {
       await this.assertImageMatchesDeclaredType(assetId, target.sourceKey, target.mimeType);
-      await this.store.markImageReady(assetId);
+      await this.completeImage(assetId, ownerId);
       return { assetId, status: 'ready' };
     }
     await this.requestTranscode(assetId, ownerId, target.sourceKey);
@@ -186,6 +186,12 @@ export class MediaUploadUseCases {
     if (actualSizeBytes !== expectedSizeBytes) {
       throw new MediaError('MEDIA_UPLOAD_INCOMPLETE', 'Dung lượng file không khớp với lúc xin link');
     }
+  }
+
+  @Transactional('content')
+  private async completeImage(assetId: string, ownerId: string): Promise<void> {
+    if (!(await this.store.markImageReady(assetId))) return;
+    await this.store.outbox.add({ type: 'content.image.ready', userId: ownerId, payload: { assetId, ownerId } });
   }
 
   @Transactional('content')

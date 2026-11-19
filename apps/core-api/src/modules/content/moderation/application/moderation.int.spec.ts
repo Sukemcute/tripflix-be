@@ -15,6 +15,14 @@ import {
 import { OutboxWriter } from '@tripflix/outbox';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import { ClsModule } from 'nestjs-cls';
+import { InMemoryObjectStorage } from '@tripflix/storage';
+import { MediaFacade } from '../../media/media.facade.js';
+import { DrizzleMediaAssetStore } from '../../media/infra/drizzle-media-asset.store.js';
+import { MediaFramesUseCases } from '../../media/application/media-frames.use-cases.js';
+import { FRAME_POLICY, sampleFrameTimes, type MediaFramesCompletedV1 } from '@tripflix/contracts';
+import { PostPartsScreeningUseCase } from './post-parts-screening.use-case.js';
+import type { PartVerdict } from '../../db/schema/moderation-parts.js';
+import type { ModerationPartInput } from './ports.js';
 import type pg from 'pg';
 import { contentOutboxEvents } from '../../db/schema/index.js';
 import { PostRepository } from '../../social/infra/post.repository.js';
@@ -51,6 +59,19 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   let postId: string;
   let failOutbox = false;
   const displayNames = new Map<string, string>();
+  const partAi = {
+    moderate: async () => null,
+    moderateParts: vi.fn(async (items: ModerationPartInput[]): Promise<PartVerdict[] | null> =>
+      items.map((i) => ({
+        id: i.id,
+        status: 'passed',
+        categories: {},
+        scores: {},
+        model: 'qa-parts',
+        errorCode: null,
+      })),
+    ),
+  };
   function bundle(tx: ModuleTransactionHost) {
     const repository = new ModerationRepository(() => tx.tx);
     const posts = new PostRepository(() => tx.tx);
@@ -65,7 +86,21 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     };
     const moderate = new AdminModeratePostUseCase(posts, new ModerationActionRepository(() => tx.tx), outbox);
     const visibility = new ChangeVisibilityUseCase(repository, posts, outbox, moderate);
+    const frames = new MediaFramesUseCases(() => tx.tx);
+    const partScreen = new PostPartsScreeningUseCase(
+      repository,
+      new MediaFacade(
+        new DrizzleMediaAssetStore(() => tx.tx),
+        new InMemoryObjectStorage({ cdnBaseUrl: 'https://cdn.test', keyPrefix: 'qa/' }),
+        frames,
+      ),
+      partAi,
+      new RecordScreeningUseCase(repository, visibility, CONFIG, outbox),
+      outbox,
+    );
     return {
+      frames,
+      partScreen,
       repository,
       review: new ReviewQueueUseCase(repository),
       recovery: new ClaimDeferredScansUseCase(repository, outbox),
@@ -114,6 +149,17 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     cases = moduleRef.get('cases');
   });
   beforeEach(async () => {
+    partAi.moderateParts.mockClear();
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: 'passed',
+        categories: {},
+        scores: {},
+        model: 'qa-parts',
+        errorCode: null,
+      })),
+    );
     displayNames.clear();
     failOutbox = false;
     await pool.query(
@@ -141,10 +187,464 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     });
   const add = (parentCommentId?: string) =>
     cases.add.execute({ postId, authorId: AUTHOR, body: 'Bình luận', parentCommentId });
+
+  async function attachImages(status = 'ready', count = 2) {
+    const ids = Array.from({ length: count }, () => randomUUID());
+    for (const id of ids)
+      await pool.query(
+        `insert into content.media_assets
+      (id,owner_id,kind,status,mime_type,file_size_bytes,source_key) values ($1,$2,'image',$3,'image/jpeg',100,$4)`,
+        [id, AUTHOR, status, `qa/${id}.jpg`],
+      );
+    await pool.query('update content.posts set media_ids=$2::jsonb where id=$1', [
+      postId,
+      JSON.stringify(ids),
+    ]);
+    return ids;
+  }
+
+  async function attachVideo() {
+    const id = randomUUID();
+    await pool.query(
+      `insert into content.media_assets (id,owner_id,kind,status,mime_type,file_size_bytes,source_key,hls_prefix,duration_sec,aspect)
+      values ($1,$2,'video','ready','video/mp4',100,$3,$4,10,'16:9')`,
+      [id, AUTHOR, `qa/${id}/source.mp4`, `qa/videos/${id}/r1`],
+    );
+    await pool.query('update content.posts set cover_media_id=$2 where id=$1', [postId, id]);
+    return id;
+  }
+  async function frameManifest(assetId: string): Promise<MediaFramesCompletedV1> {
+    const row = (
+      await pool.query(
+        'select * from content.media_frame_scans where asset_id=$1 order by created_at desc limit 1',
+        [assetId],
+      )
+    ).rows[0];
+    return {
+      assetId,
+      requestId: row.request_id,
+      hlsPrefix: row.revision,
+      policy: FRAME_POLICY,
+      durationMs: 10000,
+      frames: sampleFrameTimes(10000).map((timestampMs) => ({
+        timestampMs,
+        key: `${row.revision}/moderation/${FRAME_POLICY}/${row.request_id}/${timestampMs}.jpg`,
+      })),
+    };
+  }
+  it('BE09-video: requests sampling once across workers; poster clean never means video clean', async () => {
+    const id = await attachVideo();
+    await Promise.all([cases.partScreen.execute(postId), cases.partScreen.execute(postId)]);
+    const detail = await cases.partScreen.detail(postId);
+    expect(detail.items.find((i) => i.modality === 'video_poster')?.status).toBe('passed');
+    expect(detail.items.find((i) => i.modality === 'video_sampling')?.status).toBe('waiting');
+    expect(
+      (
+        await pool.query(
+          "select * from content.outbox_events where type='content.media.frames.requested' and payload->>'assetId'=$1",
+          [id],
+        )
+      ).rows,
+    ).toHaveLength(1);
+    expect(partAi.moderateParts).toHaveBeenCalledTimes(2);
+  });
+  it('BE09-video: middle frame creates a timestamped review case while cover and caption stay clean', async () => {
+    const id = await attachVideo();
+    await cases.partScreen.execute(postId);
+    const manifest = await frameManifest(id);
+    await cases.frames.complete(manifest);
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: i.imageUrl?.endsWith('/4950.jpg') ? 'flagged' : 'passed',
+        model: 'qa-frames',
+        categories: { violence: !!i.imageUrl?.endsWith('/4950.jpg') },
+        scores: { violence: i.imageUrl?.endsWith('/4950.jpg') ? 0.95 : 0 },
+        errorCode: null,
+      })),
+    );
+    await cases.partScreen.mediaReady(id);
+    const detail = await cases.partScreen.detail(postId);
+    expect(
+      detail.items.filter((i) => i.modality === 'video_frame').map((i) => [i.timestampMs, i.status]),
+    ).toEqual([
+      [0, 'passed'],
+      [4950, 'flagged'],
+      [9900, 'passed'],
+    ]);
+    expect(
+      detail.items
+        .filter((i) => i.modality === 'video_frame')
+        .every((i) => i.sampleDurationMs === 10000 && i.sampleCount === 3),
+    ).toBe(true);
+    const target = (await cases.repository.loadTarget('post', postId))!;
+    expect(target.status).toBe('published');
+    const item = (await cases.repository.pending(target))!;
+    expect(
+      Object.values(item.flags.imageFindings as Record<string, { timestampMs: number }>)[0]?.timestampMs,
+    ).toBe(4950);
+    const calls = partAi.moderateParts.mock.calls.length;
+    await cases.partScreen.execute(postId);
+    expect(partAi.moderateParts.mock.calls).toHaveLength(calls);
+  });
+  it('BE09-video: extraction failure is visible and staff retry records the actor', async () => {
+    const id = await attachVideo();
+    await cases.partScreen.execute(postId);
+    const manifest = await frameManifest(id);
+    await cases.frames.fail(id, manifest.requestId, 'extraction_failed');
+    await cases.partScreen.mediaReady(id);
+    const part = (await cases.partScreen.detail(postId)).items.find((i) => i.modality === 'video_sampling')!;
+    expect(part.status).toBe('failed');
+    expect(part.errorCode).toBe('extraction_failed');
+    await cases.partScreen.retry(part.id!, AUTHOR);
+    expect(
+      (await cases.partScreen.detail(postId)).items.find((i) => i.modality === 'video_sampling')?.status,
+    ).toBe('waiting');
+    const row = (
+      await pool.query(
+        'select status,retried_by,request_id from content.media_frame_scans where asset_id=$1',
+        [id],
+      )
+    ).rows[0];
+    expect(row).toMatchObject({ status: 'requested', retried_by: AUTHOR });
+    expect(row.request_id).not.toBe(manifest.requestId);
+  });
+  it('BE09-video: delayed response from an earlier request or revision cannot become current evidence', async () => {
+    const id = await attachVideo();
+    await cases.partScreen.execute(postId);
+    const old = await frameManifest(id);
+    await pool.query('update content.media_frame_scans set next_attempt_at=now() where asset_id=$1', [id]);
+    await cases.frames.ensure([id]);
+    await cases.frames.complete(old);
+    expect((await cases.frames.list([id]))[0]?.status).toBe('requested');
+    const current = await frameManifest(id);
+    await pool.query(
+      "update content.media_assets set hls_prefix=replace(hls_prefix,'/r1','/r2'),updated_at=now() where id=$1",
+      [id],
+    );
+    await cases.frames.complete(current);
+    expect(await cases.frames.list([id])).toHaveLength(0);
+    await cases.partScreen.execute(postId);
+    expect((await cases.frames.list([id]))[0]?.revision).toContain('/r2');
+  });
+  it('BE09-video: missing worker exhausts extraction retries without changing playable status', async () => {
+    const id = await attachVideo();
+    await cases.partScreen.execute(postId);
+    for (let i = 0; i < 3; i++) {
+      await pool.query('update content.media_frame_scans set next_attempt_at=now() where asset_id=$1', [id]);
+      await cases.frames.ensure([id]);
+    }
+    expect((await cases.frames.list([id]))[0]).toMatchObject({
+      status: 'failed',
+      attempts: 3,
+      errorCode: 'extraction_timeout',
+    });
+    expect(
+      (await pool.query('select status from content.media_assets where id=$1', [id])).rows[0].status,
+    ).toBe('ready');
+  });
+
+  it('BE09: caption and every image independently; replay never calls provider twice', async () => {
+    await attachImages();
+    await Promise.all([cases.partScreen.execute(postId), cases.partScreen.execute(postId)]);
+    const calls = partAi.moderateParts.mock.calls.flatMap(([items]) => items);
+    expect(calls).toHaveLength(3);
+    expect(calls.filter((i) => i.kind === 'caption')).toEqual([
+      expect.objectContaining({ text: 'Bài sạch\n', kind: 'caption' }),
+    ]);
+    expect(calls.filter((i) => i.kind === 'image')).toHaveLength(2);
+    for (const i of calls) expect(i.kind === 'caption' ? i.imageUrl : i.text).toBeUndefined();
+    await cases.partScreen.execute(postId);
+    expect(partAi.moderateParts).toHaveBeenCalledTimes(3);
+    expect((await cases.partScreen.detail(postId)).items.map((i) => i.status)).toEqual([
+      'passed',
+      'passed',
+      'passed',
+    ]);
+  });
+
+  it('BE09: flagged image creates review case without hiding post; caption remains clean', async () => {
+    await attachImages();
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: i.kind === 'image' ? 'flagged' : 'passed',
+        model: 'qa-parts',
+        categories: { violence: i.kind === 'image' },
+        scores: { violence: 0.99 },
+        errorCode: null,
+      })),
+    );
+    await cases.partScreen.execute(postId);
+    expect((await cases.repository.loadTarget('post', postId))?.status).toBe('published');
+    expect(
+      (await cases.repository.pending((await cases.repository.loadTarget('post', postId))!))?.flags,
+    ).toMatchObject({ imageReviewOnly: true });
+    expect(
+      (await pool.query('select * from content.moderation_actions where post_id=$1', [postId])).rows,
+    ).toHaveLength(0);
+    expect((await cases.partScreen.detail(postId)).items[0]!.status).toBe('passed');
+  });
+
+  it('BE09: image upload waits, ready event scans all attached images; failed image never becomes clean', async () => {
+    const ids = await attachImages('uploading');
+    await cases.partScreen.execute(postId);
+    expect((await cases.partScreen.detail(postId)).items.map((i) => i.status)).toEqual([
+      'passed',
+      'waiting',
+      'waiting',
+    ]);
+    await pool.query(
+      "update content.media_assets set status='ready',updated_at=now() where id=any($1::uuid[])",
+      [ids],
+    );
+    await cases.partScreen.mediaReady(ids[1]!);
+    expect((await cases.partScreen.detail(postId)).items.map((i) => i.status)).toEqual([
+      'passed',
+      'passed',
+      'passed',
+    ]);
+    await pool.query("update content.media_assets set status='failed',updated_at=now() where id=$1", [
+      ids[1],
+    ]);
+    await cases.partScreen.execute(postId);
+    expect((await cases.partScreen.detail(postId)).items.filter((i) => i.status === 'failed')).toHaveLength(
+      1,
+    );
+  });
+
+  it('BE09: partial failure retries only failed input and recovers after service returns', async () => {
+    await attachImages();
+    let failedId = '';
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => {
+        if (i.kind === 'image' && !failedId) failedId = i.id;
+        return {
+          id: i.id,
+          status: i.id === failedId ? 'error' : 'passed',
+          model: 'qa-parts',
+          categories: {},
+          scores: {},
+          errorCode: i.id === failedId ? 'provider_timeout' : null,
+        };
+      }),
+    );
+    await cases.partScreen.execute(postId);
+    expect((await cases.partScreen.detail(postId)).items.filter((i) => i.status === 'deferred')).toHaveLength(
+      1,
+    );
+    partAi.moderateParts.mockClear();
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: 'passed',
+        model: 'qa-parts',
+        categories: {},
+        scores: {},
+        errorCode: null,
+      })),
+    );
+    await pool.query('update content.moderation_parts set next_attempt_at=now() where id=$1', [failedId]);
+    await cases.partScreen.recover();
+    expect(partAi.moderateParts).toHaveBeenCalledTimes(1);
+    expect((await cases.partScreen.detail(postId)).items.every((i) => i.status === 'passed')).toBe(true);
+  });
+
+  it.each(['caption', 'asset', 'staff'])(
+    'BE09: stale %s result cannot create a decision',
+    async (changed) => {
+      const ids = await attachImages();
+      const prepared = (await cases.partScreen.prepare(postId))!;
+      const part = prepared.parts.find((p) => p.kind === 'image')!;
+      const claim = (await cases.partScreen.claim(part))!;
+      const startedAt = new Date(Date.now() - 1000).toISOString();
+      if (changed === 'caption')
+        await pool.query("update content.posts set body='Đã chỉnh sửa' where id=$1", [postId]);
+      else if (changed === 'asset')
+        await pool.query(
+          "update content.media_assets set source_key='new.jpg',updated_at=now() where id=any($1::uuid[])",
+          [ids],
+        );
+      else
+        await cases.visibility.execute({
+          targetType: 'post',
+          targetId: postId,
+          action: 'dismiss',
+          actorId: AUTHOR,
+          actorType: 'staff',
+          reasonCode: 'OTHER',
+        });
+      await cases.partScreen.complete(
+        claim,
+        {
+          id: part.id,
+          status: 'flagged',
+          categories: { violence: true },
+          scores: { violence: 1 },
+          model: 'qa',
+          errorCode: null,
+        },
+        startedAt,
+      );
+      expect(
+        (await pool.query('select status from content.moderation_parts where id=$1', [part.id])).rows[0]
+          .status,
+      ).toBe('superseded');
+      expect(
+        await cases.repository.pending((await cases.repository.loadTarget('post', postId))!),
+      ).toBeUndefined();
+    },
+  );
+
+  it('BE09: eight errors exhaust retries; manual retry checks version and resets caption scan', async () => {
+    partAi.moderateParts.mockResolvedValue(null);
+    for (let n = 0; n < 8; n++) {
+      await pool.query('update content.moderation_parts set next_attempt_at=now() where post_id=$1', [
+        postId,
+      ]);
+      await cases.partScreen.execute(postId);
+    }
+    const part = (await cases.partScreen.detail(postId)).items[0]!;
+    expect(part).toMatchObject({ status: 'failed', attempts: 8, errorCode: 'ai_unavailable' });
+    await cases.partScreen.retry(part.id!, AUTHOR);
+    expect((await cases.partScreen.detail(postId)).items[0]).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+    });
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: 'passed',
+        model: 'qa',
+        categories: {},
+        scores: {},
+        errorCode: null,
+      })),
+    );
+    await cases.partScreen.execute(postId);
+    expect((await cases.partScreen.detail(postId)).items[0]!.status).toBe('passed');
+    expect(
+      (await pool.query('select status from content.moderation_scans where event_id=$1', [part.id])).rows[0]
+        .status,
+    ).toBe('passed');
+  });
+
+  it('BE09: outbox failure rolls back completion and permits lease recovery', async () => {
+    const prepared = (await cases.partScreen.prepare(postId))!;
+    const claim = (await cases.partScreen.claim(prepared.parts[0]!))!;
+    failOutbox = true;
+    await expect(
+      cases.partScreen.complete(
+        claim,
+        { id: claim.part.id, status: 'passed', model: 'qa', categories: {}, scores: {}, errorCode: null },
+        new Date().toISOString(),
+      ),
+    ).rejects.toThrow('outbox unavailable');
+    expect((await cases.partScreen.detail(postId)).items[0]!.status).toBe('checking');
+    failOutbox = false;
+    await pool.query(
+      "update content.moderation_parts set lease_expires_at=now()-interval '1 minute',next_attempt_at=now() where post_id=$1",
+      [postId],
+    );
+    await cases.partScreen.recover();
+    expect((await cases.partScreen.detail(postId)).items[0]).toMatchObject({ status: 'passed', attempts: 2 });
+  });
   async function count() {
     return (await pool.query('select comment_count from content.posts where id=$1', [postId])).rows[0]
       .comment_count;
   }
+
+  it('BE09: caption violations still use the existing text auto-hide policy', async () => {
+    await attachImages();
+    partAi.moderateParts.mockImplementation(async (items) =>
+      items.map((i) => ({
+        id: i.id,
+        status: i.kind === 'caption' ? 'flagged' : 'passed',
+        model: 'qa',
+        categories: { 'harassment/threatening': i.kind === 'caption' },
+        scores: { 'harassment/threatening': i.kind === 'caption' ? 0.99 : 0 },
+        errorCode: null,
+      })),
+    );
+    await cases.partScreen.execute(postId);
+    expect((await cases.repository.loadTarget('post', postId))?.status).toBe('hidden');
+    expect((await cases.partScreen.detail(postId)).items).toHaveLength(3);
+  });
+
+  it('BE09: expired final lease becomes failed and stale completion cannot overwrite a new lease', async () => {
+    const prepared = (await cases.partScreen.prepare(postId))!;
+    const old = (await cases.partScreen.claim(prepared.parts[0]!))!;
+    await pool.query(
+      "update content.moderation_parts set lease_expires_at=now()-interval '1 minute',next_attempt_at=now() where post_id=$1",
+      [postId],
+    );
+    const next = (await cases.partScreen.claim(prepared.parts[0]!))!;
+    await cases.partScreen.complete(
+      old,
+      { id: old.part.id, status: 'flagged', model: 'qa', categories: {}, scores: {}, errorCode: null },
+      new Date().toISOString(),
+    );
+    expect((await cases.partScreen.detail(postId)).items[0]!.status).toBe('checking');
+    await pool.query(
+      "update content.moderation_parts set attempts=8,lease_expires_at=now()-interval '1 minute',next_attempt_at=now() where id=$1",
+      [next.part.id],
+    );
+    await cases.partScreen.recover();
+    expect((await cases.partScreen.detail(postId)).items[0]).toMatchObject({
+      status: 'failed',
+      attempts: 8,
+      errorCode: 'worker_interrupted',
+    });
+    await pool.query("update content.posts set body='Phiên bản mới' where id=$1", [postId]);
+    await expect(cases.partScreen.retry(next.part.id, AUTHOR)).rejects.toThrow('Đầu vào đã thay đổi');
+  });
+
+  it('BE09: waiting media does not starve other due posts and does not spend AI attempts', async () => {
+    await attachImages('uploading');
+    await cases.partScreen.execute(postId);
+    await pool.query(
+      "update content.moderation_parts set next_attempt_at=now()-interval '1 minute' where post_id=$1 and status='waiting'",
+      [postId],
+    );
+    await cases.partScreen.recover();
+    const result = await pool.query(
+      "select attempts,next_attempt_at > now() as scheduled from content.moderation_parts where post_id=$1 and status='waiting'",
+      [postId],
+    );
+    expect(result.rows).toEqual([
+      { attempts: 0, scheduled: true },
+      { attempts: 0, scheduled: true },
+    ]);
+  });
+
+  it('BE09: trip poster images participate in readiness and input revision checks', async () => {
+    const [id] = await attachImages();
+    await pool.query("update content.posts set media_ids='[]'::jsonb,trip_attachment=$2::jsonb where id=$1", [
+      postId,
+      JSON.stringify({ posterMediaId: id }),
+    ]);
+    await cases.partScreen.mediaReady(id!);
+    expect((await cases.partScreen.detail(postId)).items.map((i) => i.assetId)).toEqual([null, id]);
+  });
+
+  it('BE09: superseding a caption retires its legacy deferred scan and failed stats count each part once', async () => {
+    partAi.moderateParts.mockResolvedValue(null);
+    await cases.partScreen.execute(postId);
+    const oldId = (await cases.partScreen.detail(postId)).items[0]!.id;
+    await pool.query("update content.posts set body='Caption mới' where id=$1", [postId]);
+    await cases.partScreen.execute(postId);
+    expect(
+      (await pool.query('select status from content.moderation_scans where event_id=$1', [oldId])).rows[0]
+        .status,
+    ).toBe('superseded');
+    await pool.query(
+      "update content.moderation_parts set status='failed',attempts=8 where post_id=$1 and status<>'superseded'",
+      [postId],
+    );
+    await pool.query("update content.moderation_scans set status='failed' where event_id<>$1", [oldId]);
+    expect((await cases.repository.stats(80)).failedScans).toBe(1);
+    expect(await cases.repository.failedScans(20, 0)).toHaveLength(1);
+  });
 
   async function reviewCase(): Promise<string> {
     const report = await cases.report.execute({

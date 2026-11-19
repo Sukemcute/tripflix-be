@@ -1,5 +1,9 @@
 import { fileURLToPath } from 'node:url';
-import { createDb, createPool, type Db } from '@tripflix/db';
+import 'reflect-metadata';
+import { Global, Module } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { ClsModule } from 'nestjs-cls';
+import { createDb, createPool, MODULES, buildDrizzleToken, buildTransactionHostToken, createTransactionalPlugins, type ModuleTransactionHost } from '@tripflix/db';
 import { InMemoryObjectStorage } from '@tripflix/storage';
 import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
 import type pg from 'pg';
@@ -14,7 +18,7 @@ const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 
 describe('Ảnh trong media_assets (Postgres thật)', () => {
   let postgres: PostgresFixture;
   let pool: pg.Pool;
-  let db: Db;
+  let moduleRef: TestingModule;
   let storage: InMemoryObjectStorage;
   let useCases: MediaUploadUseCases;
   let facade: MediaFacade;
@@ -28,14 +32,23 @@ describe('Ảnh trong media_assets (Postgres thật)', () => {
       migrationsFolder: fileURLToPath(new URL('../../db/migrations', import.meta.url)),
     });
     pool = createPool({ url, max: 2, applicationName: 'media-image-int-test' });
-    db = createDb(pool);
-    const store = new DrizzleMediaAssetStore(() => db);
+    const db = createDb(pool);
+    @Global()
+    @Module({ providers: MODULES.map((name) => ({ provide: buildDrizzleToken(name), useValue: db })), exports: MODULES.map(buildDrizzleToken) })
+    class TestDb {}
+    moduleRef = await Test.createTestingModule({
+      imports: [TestDb, ClsModule.forRoot({ global: true, plugins: createTransactionalPlugins([TestDb]) })],
+      providers: [{ provide: DrizzleMediaAssetStore, inject: [buildTransactionHostToken('content')], useFactory: (tx: ModuleTransactionHost) => new DrizzleMediaAssetStore(() => tx.tx) }],
+    }).compile();
+    await moduleRef.init();
+    const store = moduleRef.get(DrizzleMediaAssetStore);
     storage = new InMemoryObjectStorage({ keyPrefix: 'dev/test/', cdnBaseUrl: 'https://cdn.test' });
     useCases = new MediaUploadUseCases(store, storage, () => new Date('2026-11-13T08:00:00Z'));
     facade = new MediaFacade(store, storage);
   }, 120_000);
 
   afterAll(async () => {
+    await moduleRef?.close();
     await pool?.end();
     await postgres?.stop();
   });
@@ -63,6 +76,8 @@ describe('Ảnh trong media_assets (Postgres thật)', () => {
       [assetId]: { url: `https://cdn.test/dev/test/images/posts/${assetId}.jpg`, widthPx: 800, heightPx: 600 },
     });
     expect(await facade.getKinds([assetId])).toEqual([{ id: assetId, ownerId: OWNER_ID, kind: 'image', status: 'ready' }]);
+    await useCases.completeUpload(OWNER_ID, assetId, [{ partNumber: 1, etag }]);
+    expect((await pool.query("select * from content.outbox_events where type='content.image.ready' and payload->>'assetId'=$1", [assetId])).rows).toHaveLength(1);
     // Ảnh không có mức chất lượng nên không bao giờ thành video phát được trên Reels.
     expect(await facade.getPlayback([assetId])).toEqual({});
   });

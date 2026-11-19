@@ -4,6 +4,8 @@ export {
   ContentFacade,
   type VisiblePostSummary,
   type PostStatsSummary,
+  type ProfileStats,
+  EMPTY_PROFILE_STATS,
   type ListPostsFacadeQuery,
   type ListPostsFacadeResult,
 } from './content.facade.js';

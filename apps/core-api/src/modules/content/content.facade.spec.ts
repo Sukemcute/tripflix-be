@@ -42,7 +42,7 @@ describe('ContentFacade', () => {
     findPostsForSync: vi.fn(),
   };
 
-  const facade = new ContentFacade(mockPostRepo as any);
+  const facade = new ContentFacade(mockPostRepo as any, {} as any);
 
   describe('getPostById', () => {
     it('trả về bài viết an toàn đã mask PII khi tồn tại và published', async () => {

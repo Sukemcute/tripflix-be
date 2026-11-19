@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AccessFacade } from '../../../access/index.js';
+import { ContentFacade, EMPTY_PROFILE_STATS, type ProfileStats } from '../../../content/index.js';
 import type { UserActivityCounts, UserActivityDay, UserActivityTotals, UserActivityWindow } from '../domain/user-activity.js';
 import { USER_ACTIVITY_STORE, type UserActivityEventRow, type UserActivityStore } from './user-activity.use-cases.js';
 
@@ -10,6 +11,8 @@ export interface UserActivityListItem extends UserActivityCounts {
   /** Null khi tài khoản không còn tồn tại. */
   displayName: string | null;
   email: string | null;
+  /** Số liệu hồ sơ từ trước tới nay, không theo khoảng thời gian. */
+  profile: ProfileStats;
 }
 
 export interface UserActivityDetail {
@@ -17,6 +20,7 @@ export interface UserActivityDetail {
   displayName: string;
   email: string;
   createdAt: Date;
+  profile: ProfileStats;
   counts: UserActivityCounts;
   recentEvents: UserActivityEventRow[];
 }
@@ -27,6 +31,7 @@ export class UserActivityQueries {
   constructor(
     @Inject(USER_ACTIVITY_STORE) private readonly store: UserActivityStore,
     private readonly access: AccessFacade,
+    private readonly content: ContentFacade,
   ) {}
 
   async list(input: UserActivityWindow & { page: number; pageSize: number }) {
@@ -36,10 +41,19 @@ export class UserActivityQueries {
       limit: input.pageSize,
       offset: (input.page - 1) * input.pageSize,
     });
-    const contacts = await this.access.getUserContacts(rows.map((row) => row.userId));
+    const userIds = rows.map((row) => row.userId);
+    const [contacts, profiles] = await Promise.all([
+      this.access.getUserContacts(userIds),
+      this.content.getProfileStats(userIds),
+    ]);
     const items: UserActivityListItem[] = rows.map((row) => {
       const contact = contacts.get(row.userId);
-      return { ...row, displayName: contact?.displayName ?? null, email: contact?.email ?? null };
+      return {
+        ...row,
+        displayName: contact?.displayName ?? null,
+        email: contact?.email ?? null,
+        profile: profiles.get(row.userId) ?? EMPTY_PROFILE_STATS,
+      };
     });
     return { items, total };
   }
@@ -54,10 +68,11 @@ export class UserActivityQueries {
   async detail(userId: string, window: UserActivityWindow): Promise<UserActivityDetail | null> {
     const contact = (await this.access.getUserContacts([userId])).get(userId);
     if (!contact) return null;
-    const [counts, recentEvents] = await Promise.all([
+    const [counts, recentEvents, profiles] = await Promise.all([
       this.store.summarizeUser(userId, window),
       this.store.recentEvents(userId, window, RECENT_EVENT_LIMIT),
+      this.content.getProfileStats([userId]),
     ]);
-    return { userId, ...contact, counts, recentEvents };
+    return { userId, ...contact, profile: profiles.get(userId) ?? EMPTY_PROFILE_STATS, counts, recentEvents };
   }
 }

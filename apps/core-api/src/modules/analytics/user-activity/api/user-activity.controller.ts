@@ -53,10 +53,18 @@ class UserActivityCountsDto {
   @ApiProperty({ type: String, nullable: true, example: '2026-11-18T10:20:00.000Z' }) lastActiveAt!: string | null;
 }
 
+class UserProfileStatsDto {
+  @ApiProperty({ example: 120, description: 'Số người theo dõi' }) followerCount!: number;
+  @ApiProperty({ example: 35, description: 'Số người đang theo dõi' }) followingCount!: number;
+  @ApiProperty({ example: 2400, description: 'Tổng cảm xúc nhận được trên các bài công khai' }) likeCount!: number;
+  @ApiProperty({ example: 8, description: 'Số bài công khai đã đăng (không gồm bài đã xoá)' }) postCount!: number;
+}
+
 class UserActivityListItemDto extends UserActivityCountsDto {
   @ApiProperty({ format: 'uuid' }) userId!: string;
   @ApiProperty({ type: String, nullable: true, description: 'Null khi tài khoản không còn' }) displayName!: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Email đăng ký; null khi tài khoản không còn' }) email!: string | null;
+  @ApiProperty({ type: UserProfileStatsDto, description: 'Số liệu hồ sơ từ trước tới nay, không theo khoảng thời gian' }) profile!: UserProfileStatsDto;
 }
 
 export class UserActivityListResponseDto {
@@ -80,6 +88,7 @@ class UserActivityTotalsDto {
 
 class UserActivityDayDto {
   @ApiProperty({ example: '2026-11-18', description: 'Ngày theo giờ Việt Nam' }) date!: string;
+  @ApiProperty({ example: 9, description: 'Số người khác nhau có hoạt động trong ngày' }) activeUsers!: number;
   @ApiProperty() reactions!: number;
   @ApiProperty() comments!: number;
   @ApiProperty() shares!: number;
@@ -113,6 +122,7 @@ export class UserActivityDetailResponseDto {
   @ApiProperty() displayName!: string;
   @ApiProperty({ description: 'Email đăng ký' }) email!: string;
   @ApiProperty({ example: '2026-10-01T03:00:00.000Z', description: 'Ngày đăng ký' }) createdAt!: string;
+  @ApiProperty({ type: UserProfileStatsDto, description: 'Số liệu hồ sơ từ trước tới nay' }) profile!: UserProfileStatsDto;
   @ApiProperty({ type: UserActivityCountsDto }) counts!: UserActivityCountsDto;
   @ApiProperty({ type: [UserActivityEventDto], description: '50 sự kiện gần nhất trong khoảng' }) recentEvents!: UserActivityEventDto[];
   @ApiProperty({ example: '2026-11-11T17:00:00.000Z' }) from!: string;
@@ -140,7 +150,7 @@ export class UserActivityController {
   @Get()
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
-    summary: 'Danh sách người dùng có hoạt động trong khoảng, kèm số lượt thích, bình luận, chia sẻ, xem, chat',
+    summary: 'Danh sách người dùng có hoạt động trong khoảng, kèm số liệu hồ sơ (theo dõi, lượt thích, bài đăng) và số lượt trong khoảng',
     description: 'Ngày theo giờ Việt Nam, gồm cả from và to. Mặc định 7 ngày tới hôm nay, tối đa 90 ngày. Sắp theo hoạt động gần nhất.',
   })
   @ApiQuery({ name: 'from', required: false, type: String, example: '2026-11-11' })
@@ -198,6 +208,7 @@ export class UserActivityController {
       displayName: detail.displayName,
       email: detail.email,
       createdAt: detail.createdAt.toISOString(),
+      profile: detail.profile,
       counts: toCountsDto(detail.counts),
       recentEvents: detail.recentEvents.map(toEventDto),
       from: parsed.from.toISOString(),

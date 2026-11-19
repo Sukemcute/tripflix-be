@@ -125,6 +125,25 @@ export class PostRepository {
   }
 
   /**
+   * Số bài công khai và tổng cảm xúc trên các bài đó của nhiều tác giả một lần
+   * (cùng điều kiện với sumPublicReactions). Tác giả chưa có bài thì không có trong Map.
+   */
+  async publicStatsForAuthors(authorIds: string[]): Promise<Map<string, { postCount: number; likeCount: number }>> {
+    if (authorIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        authorId: posts.authorId,
+        postCount: sql<string>`count(*)`,
+        likeCount: sql<string | null>`sum(${posts.reactionTotal})`,
+      })
+      .from(posts)
+      .where(and(inArray(posts.authorId, authorIds), eq(posts.status, 'published'), eq(posts.visibility, 'public'),
+        sql`${posts.deletedAt} IS NULL`))
+      .groupBy(posts.authorId);
+    return new Map(rows.map((row) => [row.authorId, { postCount: Number(row.postCount), likeCount: Number(row.likeCount ?? 0) }]));
+  }
+
+  /**
    * Truy vấn bảng tin công khai với Keyset Cursor Pagination (created_at DESC, id DESC).
    */
   async findPublicPosts(options: FindPublicPostsOptions): Promise<PostRecord[]> {

@@ -61,8 +61,8 @@ describe('Tổng quan hành vi: SQL thật trên PostgreSQL (SCRUM-181)', () => 
     const days = await store.daily(window);
 
     expect(days.map((day) => day.date)).toEqual(['2026-11-16', '2026-11-18']);
-    expect(days[0]).toMatchObject({ reactions: 1, posts: 0, shares: 0 });
-    expect(days[1]).toMatchObject({ reactions: 0, posts: 2, shares: 2 });
+    expect(days[0]).toMatchObject({ activeUsers: 1, reactions: 1, posts: 0, shares: 0 });
+    expect(days[1]).toMatchObject({ activeUsers: 2, reactions: 0, posts: 2, shares: 2 });
   });
 
   it('số bài của từng người nằm trong bảng người dùng', async () => {

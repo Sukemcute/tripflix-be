@@ -7,6 +7,7 @@ import type {
   MediaAssetStatus,
   MediaAssetStore,
   MediaKindInfo,
+  ModerationAsset,
   MediaOutbox,
   NewUploadingAsset,
   PlaybackAsset,
@@ -180,6 +181,17 @@ export class DrizzleMediaAssetStore implements MediaAssetStore {
       .select({ id: mediaAssets.id, ownerId: mediaAssets.ownerId, kind: mediaAssets.kind, status: mediaAssets.status })
       .from(mediaAssets)
       .where(inArray(mediaAssets.id, assetIds));
+    return rows.map((row) => ({ ...row, kind: row.kind as MediaKind, status: row.status as MediaAssetStatus }));
+  }
+
+  async findModerationAssets(assetIds: string[], lock = false): Promise<ModerationAsset[]> {
+    if (!assetIds.length) return [];
+    const query = this.db.select({
+      id: mediaAssets.id, ownerId: mediaAssets.ownerId, kind: mediaAssets.kind,
+      status: mediaAssets.status, sourceKey: mediaAssets.sourceKey,
+      hlsPrefix: mediaAssets.hlsPrefix, updatedAt: mediaAssets.updatedAt,
+    }).from(mediaAssets).where(inArray(mediaAssets.id, assetIds)).orderBy(mediaAssets.id);
+    const rows = lock ? await query.for('share') : await query;
     return rows.map((row) => ({ ...row, kind: row.kind as MediaKind, status: row.status as MediaAssetStatus }));
   }
 }

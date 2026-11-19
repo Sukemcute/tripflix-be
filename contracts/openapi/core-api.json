@@ -3969,6 +3969,77 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/posts/{id}/parts": {
+      "get": {
+        "operationId": "AdminModerationController_postParts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationPartsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bằng chứng quét riêng caption và từng ảnh của phiên bản bài hiện tại",
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/parts/{id}/retry": {
+      "post": {
+        "operationId": "AdminModerationController_retryPart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationPartRetryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/stats": {
       "get": {
         "operationId": "AdminModerationController_stats",
@@ -7186,7 +7257,7 @@
             "bearer": []
           }
         ],
-        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số lượt thích, bình luận, chia sẻ, xem, chat",
+        "summary": "Danh sách người dùng có hoạt động trong khoảng, kèm số liệu hồ sơ (theo dõi, lượt thích, bài đăng) và số lượt trong khoảng",
         "tags": [
           "analytics"
         ]
@@ -9616,10 +9687,20 @@
             "type": "string",
             "nullable": true
           },
+          "replyToCommentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "ID bình luận hoặc phản hồi được trả lời trực tiếp"
+          },
           "replyToName": {
             "type": "string",
             "nullable": true,
             "description": "Tên hiển thị của người được trả lời"
+          },
+          "replyToExcerpt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Đoạn trích tối đa 120 ký tự của câu được trả lời; null nếu câu đó không còn công khai"
           },
           "body": {
             "type": "string"
@@ -9662,6 +9743,8 @@
           "postId",
           "authorId",
           "parentCommentId",
+          "replyToCommentId",
+          "replyToExcerpt",
           "body",
           "isEdited",
           "likeCount",
@@ -11576,6 +11659,167 @@
           "createdAt"
         ]
       },
+      "ModerationPartDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "caption",
+              "image",
+              "video_poster",
+              "video_frame",
+              "video_sampling"
+            ]
+          },
+          "timestampMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "sampleDurationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "sampleCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "playbackUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "caption",
+              "image"
+            ]
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "mediaKind": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "previewUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "checking",
+              "waiting",
+              "deferred",
+              "passed",
+              "flagged",
+              "failed",
+              "not_applicable",
+              "superseded"
+            ]
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "categories": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "assetId",
+          "mediaKind",
+          "text",
+          "previewUrl",
+          "status",
+          "attempts",
+          "model",
+          "categories",
+          "scores",
+          "errorCode",
+          "updatedAt"
+        ]
+      },
+      "ModerationPartsDto": {
+        "type": "object",
+        "properties": {
+          "contentVersion": {
+            "type": "string"
+          },
+          "imagePolicy": {
+            "type": "string",
+            "enum": [
+              "review_only"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationPartDto"
+            }
+          }
+        },
+        "required": [
+          "contentVersion",
+          "imagePolicy",
+          "items"
+        ]
+      },
+      "ModerationPartRetryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "ModerationStatsDto": {
         "type": "object",
         "properties": {
@@ -11659,6 +11903,14 @@
       "FailedScanDto": {
         "type": "object",
         "properties": {
+          "partKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
           "eventId": {
             "type": "string"
           },
@@ -17709,6 +17961,37 @@
           "spans"
         ]
       },
+      "UserProfileStatsDto": {
+        "type": "object",
+        "properties": {
+          "followerCount": {
+            "type": "number",
+            "example": 120,
+            "description": "Số người theo dõi"
+          },
+          "followingCount": {
+            "type": "number",
+            "example": 35,
+            "description": "Số người đang theo dõi"
+          },
+          "likeCount": {
+            "type": "number",
+            "example": 2400,
+            "description": "Tổng cảm xúc nhận được trên các bài công khai"
+          },
+          "postCount": {
+            "type": "number",
+            "example": 8,
+            "description": "Số bài công khai đã đăng (không gồm bài đã xoá)"
+          }
+        },
+        "required": [
+          "followerCount",
+          "followingCount",
+          "likeCount",
+          "postCount"
+        ]
+      },
       "UserActivityListItemDto": {
         "type": "object",
         "properties": {
@@ -17758,6 +18041,14 @@
             "type": "string",
             "nullable": true,
             "description": "Email đăng ký; null khi tài khoản không còn"
+          },
+          "profile": {
+            "description": "Số liệu hồ sơ từ trước tới nay, không theo khoảng thời gian",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileStatsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -17770,7 +18061,8 @@
           "lastActiveAt",
           "userId",
           "displayName",
-          "email"
+          "email",
+          "profile"
         ]
       },
       "UserActivityListResponseDto": {
@@ -17867,6 +18159,11 @@
             "example": "2026-11-18",
             "description": "Ngày theo giờ Việt Nam"
           },
+          "activeUsers": {
+            "type": "number",
+            "example": 9,
+            "description": "Số người khác nhau có hoạt động trong ngày"
+          },
           "reactions": {
             "type": "number"
           },
@@ -17888,6 +18185,7 @@
         },
         "required": [
           "date",
+          "activeUsers",
           "reactions",
           "comments",
           "shares",
@@ -18035,6 +18333,14 @@
             "example": "2026-10-01T03:00:00.000Z",
             "description": "Ngày đăng ký"
           },
+          "profile": {
+            "description": "Số liệu hồ sơ từ trước tới nay",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileStatsDto"
+              }
+            ]
+          },
           "counts": {
             "$ref": "#/components/schemas/UserActivityCountsDto"
           },
@@ -18059,6 +18365,7 @@
           "displayName",
           "email",
           "createdAt",
+          "profile",
           "counts",
           "recentEvents",
           "from",

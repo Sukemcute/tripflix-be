@@ -77,13 +77,14 @@ export class DrizzleUserActivityStore implements UserActivityStore {
     // Chuỗi ngày theo giờ Việt Nam; to_char trả text nên không dính lỗi chuỗi thời gian của SQL thô.
     const day = sql<string>`to_char(${userActivityEvents.occurredAt} at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')`;
     const rows = await this.db
-      .select({ date: day, ...kindColumns })
+      .select({ date: day, ...kindColumns, activeUsers: sql<number>`count(distinct ${userActivityEvents.userId})::int` })
       .from(userActivityEvents)
       .where(and(gte(userActivityEvents.occurredAt, from), lt(userActivityEvents.occurredAt, to)))
       .groupBy(day)
       .orderBy(day);
     return rows.map((row) => ({
       date: row.date,
+      activeUsers: Number(row.activeUsers),
       reactions: Number(row.reactions),
       comments: Number(row.comments),
       shares: Number(row.shares),

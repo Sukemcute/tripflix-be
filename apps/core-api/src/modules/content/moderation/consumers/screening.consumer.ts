@@ -14,6 +14,7 @@ import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV, REDIS } from '../../../../platform/tokens.js';
 import { ScreenContentUseCase } from '../application/moderation.use-cases.js';
 import { ClaimDeferredScansUseCase } from '../application/recover-screening.use-case.js';
+import { PostPartsScreeningUseCase } from '../application/post-parts-screening.use-case.js';
 
 @Injectable()
 export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -28,6 +29,7 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ScreenContentUseCase) private readonly screen: ScreenContentUseCase,
     @Inject(ClaimDeferredScansUseCase) private readonly claim: ClaimDeferredScansUseCase,
+    @Inject(PostPartsScreeningUseCase) private readonly parts?: PostPartsScreeningUseCase,
   ) {}
   onApplicationBootstrap(): void {
     if (!['worker', 'all'].includes(this.env.APP_ROLE)) return;
@@ -52,6 +54,7 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   }
   async recover() {
     try {
+      await this.parts?.recover();
       const scans = await this.claim.execute();
       for (const scan of scans) {
         if (this.stopping) break;
@@ -75,6 +78,10 @@ export class ScreeningConsumer implements OnApplicationBootstrap, OnApplicationS
   }
   async route(event: EventEnvelope): Promise<void> {
     if (event.version !== 1) return;
+    if (['content.image.ready', 'content.media.ready', 'content.media.frames.changed'].includes(event.type)) {
+      await this.parts?.mediaReady(z.object({ assetId: z.uuid() }).parse(event.payload).assetId);
+      return;
+    }
     if (['content.post.published', 'content.post.updated', 'content.post.held'].includes(event.type)) {
       await this.screen.execute(
         event.eventId,

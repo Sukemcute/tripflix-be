@@ -1,4 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { MediaFramesRequestedV1Schema, type MediaFramesCompletedV1 } from '@tripflix/contracts';
+import {
+  FrameExtractionError,
+  ModerationFramesJob,
+  type ExtractFrame,
+} from '../transcode/moderation-frames-job.js';
 import {
   ContentMediaTranscodeRequestedV1Schema,
   eventEnvelopeSchema,
@@ -32,6 +38,7 @@ export interface TranscodeConsumerOptions {
   consumerName: string;
   storage: ObjectStorage;
   transcoder: Transcoder;
+  extractFrame?: ExtractFrame;
   logger: TranscodeConsumerLogger;
   claimIdleMs?: number;
   heartbeatMs?: number;
@@ -62,7 +69,8 @@ export class TranscodeConsumer {
       batchSize: 1,
       claimIdleMs: options.claimIdleMs ?? DEFAULT_CLAIM_IDLE_MS,
       ...(options.blockMs === undefined ? {} : { blockMs: options.blockMs }),
-      onError: (err, delivery) => options.logger.error({ err, ...delivery }, 'Xử lý việc chuyển mã lỗi, sẽ thử lại'),
+      onError: (err, delivery) =>
+        options.logger.error({ err, ...delivery }, 'Xử lý việc chuyển mã lỗi, sẽ thử lại'),
     });
   }
 
@@ -78,6 +86,30 @@ export class TranscodeConsumer {
   }
 
   private async handle(event: EventEnvelope, delivery: DeliveryInfo): Promise<void> {
+    if (event.type === 'content.media.frames.requested' && event.version === 1) {
+      const request = MediaFramesRequestedV1Schema.parse(event.payload);
+      const signal = AbortSignal.any([this.abortController.signal, AbortSignal.timeout(300_000)]);
+      const stopHeartbeat = this.startHeartbeat(delivery);
+      try {
+        const result = await new ModerationFramesJob(
+          this.options.storage,
+          this.options.transcoder,
+          this.options.extractFrame,
+        ).run(request, signal);
+        await this.publish(event, 'media.frames.completed', result);
+      } catch (error) {
+        if (this.abortController.signal.aborted) throw error;
+        if (delivery.deliveryCount < MAX_TRANSCODE_ATTEMPTS) throw error;
+        await this.publish(event, 'media.frames.failed', {
+          assetId: request.assetId,
+          requestId: request.requestId,
+          errorCode: error instanceof FrameExtractionError ? error.code : 'extraction_failed',
+        });
+      } finally {
+        stopHeartbeat();
+      }
+      return;
+    }
     // stream:media còn chứa kết quả của chính worker; bỏ qua để chúng được XACK.
     if (event.type !== TRANSCODE_REQUESTED_TYPE) return;
     const request = ContentMediaTranscodeRequestedV1Schema.parse(event.payload);
@@ -113,20 +145,47 @@ export class TranscodeConsumer {
     return () => clearInterval(timer);
   }
 
-  private async publishRendition(request: EventEnvelope, rendition: MediaRenditionCompletedV1): Promise<void> {
+  private async publishRendition(
+    request: EventEnvelope,
+    rendition: MediaRenditionCompletedV1,
+  ): Promise<void> {
     await this.publish(request, 'media.rendition.completed', rendition);
-    this.options.logger.info({ assetId: rendition.assetId, qualityLevel: rendition.level }, 'Xong một mức chất lượng');
+    this.options.logger.info(
+      { assetId: rendition.assetId, qualityLevel: rendition.level },
+      'Xong một mức chất lượng',
+    );
   }
 
-  private async publishFailure(request: EventEnvelope, assetId: string, error: unknown, attempts: number): Promise<void> {
+  private async publishFailure(
+    request: EventEnvelope,
+    assetId: string,
+    error: unknown,
+    attempts: number,
+  ): Promise<void> {
     const level = error instanceof TranscodeLevelError ? error.level : 360;
     const message = error instanceof Error ? error.message : String(error);
-    const payload: MediaTranscodeFailedV1 = { assetId, level, reason: message.slice(0, MAX_REASON_CHARS) || 'Không rõ lỗi', attempts };
+    const payload: MediaTranscodeFailedV1 = {
+      assetId,
+      level,
+      reason: message.slice(0, MAX_REASON_CHARS) || 'Không rõ lỗi',
+      attempts,
+    };
     await this.publish(request, 'media.transcode.failed', payload);
-    this.options.logger.error({ assetId, qualityLevel: level, attempts, err: error }, 'Chuyển mã lỗi quá số lần thử');
+    this.options.logger.error(
+      { assetId, qualityLevel: level, attempts, err: error },
+      'Chuyển mã lỗi quá số lần thử',
+    );
   }
 
-  private async publish(request: EventEnvelope, type: string, payload: MediaRenditionCompletedV1 | MediaTranscodeFailedV1): Promise<void> {
+  private async publish(
+    request: EventEnvelope,
+    type: string,
+    payload:
+      | MediaRenditionCompletedV1
+      | MediaTranscodeFailedV1
+      | MediaFramesCompletedV1
+      | { assetId: string; requestId: string; errorCode: string },
+  ): Promise<void> {
     const envelope = eventEnvelopeSchema.parse({
       eventId: randomUUID(),
       type,
