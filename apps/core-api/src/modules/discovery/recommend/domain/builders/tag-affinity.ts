@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { round4, type Kind, type PostMeta, type UserBuilder } from '../contracts.js';
+import { placeOfProduct } from '../place-of-post.js';
 
 const WeightMapSchema = z.record(z.string(), z.number().min(0).max(1));
 
@@ -79,7 +80,7 @@ export const tagAffinityV0: UserBuilder = {
 
           // 3. Xem / đặt phòng.
           if (row.kind === 'view' || row.kind === 'order_item' || (row.targetType && PRODUCT_TARGETS.has(row.targetType))) {
-            const placeId = str(row.detail?.placeId) ?? (row.targetId ? item.productPlaces[row.targetId] : undefined);
+            const placeId = str(row.detail?.placeId) ?? (row.targetId ? placeOfProduct(item.productPlaces, row.targetId) : undefined);
             if (placeId) add(places, placeId, w);
           }
         }

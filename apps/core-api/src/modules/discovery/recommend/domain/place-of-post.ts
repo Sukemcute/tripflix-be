@@ -18,3 +18,11 @@ export function placeIdOfPost(post: PostPlaceInput, hotelProvinces: ReadonlyMap<
   const name = destOf(`${post.destinationName ?? ''} ${post.title}`);
   return name ? placeIdOfName(name) : null;
 }
+
+/** Mã loại phòng của commerce là `<mã khách sạn>--<mã phòng>`: đơn ghi mã phòng, nơi thì tra theo khách sạn. */
+export const hotelIdOfProduct = (productId: string): string => productId.split('--')[0]!;
+
+/** Nơi (tỉnh) của sản phẩm trong đơn: tra mã phòng trước, không có thì tra khách sạn chứa phòng đó. */
+export function placeOfProduct(productPlaces: Record<string, string>, productId: string): string | undefined {
+  return productPlaces[productId] ?? productPlaces[hotelIdOfProduct(productId)];
+}

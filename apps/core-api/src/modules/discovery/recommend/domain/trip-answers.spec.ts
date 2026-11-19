@@ -143,6 +143,11 @@ describe('answerLive', () => {
     });
   });
 
+  it('đơn ghi mã loại phòng (<khách sạn>--<phòng>): vẫn biết nơi của chuyến qua khách sạn → đang đi', () => {
+    const order = row({ kind: 'order_item', targetType: 'room', targetId: 'P-osm-nha-trang-013--DLX', occurredAt: daysAgo(0.2), detail: { date: '2026-11-12', nights: 3 } });
+    expect(live([order], { 'P-osm-nha-trang-013': 'nha-trang' })).toMatchObject({ stage: 'on_trip', trip: { placeId: 'nha-trang', hotelId: 'P-osm-nha-trang-013' } });
+  });
+
   it('một lượt tìm phòng đủ để lên kế hoạch; đọc ngân sách, số người, số ngày', () => {
     const a = live([
       row({

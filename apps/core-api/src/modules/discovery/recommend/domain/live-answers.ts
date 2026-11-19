@@ -1,5 +1,6 @@
 import { PLACES } from '../../search/domain/places.js';
 import { round4, type Kind, type PostMeta, type RawRow } from './contracts.js';
+import { hotelIdOfProduct, placeOfProduct } from './place-of-post.js';
 import { COST_PER_PERSON, costBin, lenBin, PRICE_PER_NIGHT } from './topics.js';
 
 /**
@@ -65,10 +66,10 @@ const roundAll = (m: Record<string, number>) => Object.fromEntries(Object.entrie
 
 function bookedTrip(row: RawRow, productPlaces: Record<string, string>): BookedTrip | null {
   if (row.kind !== 'order_item' || row.isRemoved || !row.targetType || !PRODUCT_TARGETS.has(row.targetType)) return null;
-  const placeId = (row.targetId ? productPlaces[row.targetId] : undefined) ?? str(row.detail?.placeId);
+  const placeId = (row.targetId ? placeOfProduct(productPlaces, row.targetId) : undefined) ?? str(row.detail?.placeId);
   const checkIn = str(row.detail?.date);
   if (!placeId || !checkIn) return null;
-  return { placeId, hotelId: row.targetId, checkIn, nights: num(row.detail?.nights) ?? 1 };
+  return { placeId, hotelId: row.targetId ? hotelIdOfProduct(row.targetId) : null, checkIn, nights: num(row.detail?.nights) ?? 1 };
 }
 
 /** Giai đoạn theo chuyến đã đặt; ưu tiên đang đi > sắp đi (gần nhất) > vừa về (gần nhất). */
@@ -145,7 +146,7 @@ export function answerLive(input: { rows: RawRow[]; posts: Record<string, PostMe
       const checkOut = str(r.detail?.checkOut);
       if (checkIn && checkOut) note(len, 'len', lenBin(Math.max(1, (Date.parse(checkOut) - Date.parse(checkIn)) / DAY) + 1), w);
     } else if (r.kind === 'view') {
-      const placeId = str(r.detail?.placeId) ?? (r.targetId ? productPlaces[r.targetId] : undefined);
+      const placeId = str(r.detail?.placeId) ?? (r.targetId ? placeOfProduct(productPlaces, r.targetId) : undefined);
       if (placeId) notePlace(placeId, SIGNAL.productView, r);
     } else if (r.kind === 'booking_click') {
       // Bấm "Đặt" trên lộ trình của reels: đang tính đi nơi của bài đó.

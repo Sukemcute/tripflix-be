@@ -3,6 +3,7 @@ import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domai
 import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts.js';
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
+import { hotelIdOfProduct } from '../domain/place-of-post.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import {
   RECENT_POSTS_STORE,
@@ -386,7 +387,9 @@ export class PostRecommendationUseCases {
         }),
       ),
     ];
-    const [productPlaces, metas] = await Promise.all([this.store.findProductPlaces(productIds), this.store.findPostMetas(postIds)]);
+    // Đơn ghi mã loại phòng (`<khách sạn>--<phòng>`), bảng đặc trưng lưu nơi theo khách sạn: tra cả hai.
+    const lookupIds = [...new Set([...productIds, ...productIds.map(hotelIdOfProduct)])];
+    const [productPlaces, metas] = await Promise.all([this.store.findProductPlaces(lookupIds), this.store.findPostMetas(postIds)]);
     return { rows, productPlaces, posts: Object.fromEntries(metas.map((m) => [m.postId, m])) };
   }
 
