@@ -138,6 +138,28 @@ describe('answerLive', () => {
       expect(out[0]).toMatchObject({ postId: 'beach', reason: { code: 'matches_interest', text: 'Vì bạn vừa tìm bài về biển đảo' } });
     });
 
+    it('tìm Nha Trang rồi Phú Quốc (nơi nhiều bài biển): bài biển ở nơi chưa tìm (Quy Nhơn) cũng được đẩy lên', () => {
+      const cand = (postId: string, score: number, bins: Record<string, number>) => ({
+        postId, authorId: postId, postType: 'video', tags: [], placeId: null, score, source: 'hot' as const, postFeatures: { bins, bookable: 0, hotelId: null },
+      });
+      const many = (place: string, exp: string, n: number) =>
+        Array.from({ length: n }, (_, i) => cand(`${place}-${i}`, 0.3, { [`place:${place}`]: 1, [`exp:${exp}`]: 1 }));
+      const search = (placeId: string, m: number) => row({ kind: 'search', targetType: 'place', targetId: placeId, occurredAt: minsAgo(m) });
+      const out = tripRankerV1.rank({
+        candidates: [
+          ...many('nha-trang', 'bien', 6), ...many('phu-quoc', 'bien', 6), ...many('ha-noi', 'an_uong', 6), ...many('da-lat', 'nui', 6),
+          cand('qn-beach', 0.3, { 'place:quy-nhon': 1, 'exp:bien': 1 }),
+          cand('sg-food', 0.3, { 'place:sai-gon': 1, 'exp:an_uong': 1 }),
+        ],
+        userFeatures: null,
+        now: NOW,
+        viewer: { rows: [search('nha-trang', 30), search('nha-trang', 100), search('phu-quoc', 5), search('phu-quoc', 70)], productPlaces: {} },
+      });
+      const at = (id: string) => out.findIndex((r) => r.postId === id);
+      expect(at('qn-beach')).toBeLessThan(at('sg-food'));
+      expect(out[at('qn-beach')]!.reason.text).toBe('Vì bạn đang tìm hiểu các nơi có biển đảo');
+    });
+
     it('một lượt tìm vẫn chưa đủ để lên kế hoạch (hệ số vừa tìm chỉ đổi thứ tự nơi)', () => {
       expect(live([searchAt('ha-noi', 1)]).stage).toBe('dreaming');
     });

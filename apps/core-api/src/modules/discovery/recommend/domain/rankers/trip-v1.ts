@@ -70,6 +70,56 @@ function bestSharedExp(u: Record<string, number>, p: Record<string, number>): st
 const expLabel = (bin: string) => EXP_LABEL[bin.slice(4) as Exp] ?? bin.slice(4);
 const PARENT = new Map(PLACES.map((p) => [p.id, p.parentId]));
 
+/** Nơi vừa tìm cũng nói lên chủ đề: chủ đề suy từ nơi nặng bằng chừng này so với tìm chủ đề trực tiếp. */
+const PLACE_TOPIC_FACTOR = 0.5;
+/** Nơi có ít bài hơn thì chưa đủ để nói nơi đó thiên về chủ đề gì. */
+const MIN_PLACE_POSTS = 5;
+
+/**
+ * Nơi thiên về chủ đề nào, tính từ chính các bài của nơi đó (embed của tên nơi không biết Phú Quốc là biển, đo 19/11):
+ * tỉ lệ ngăn exp trong bài của nơi trừ tỉ lệ chung của cả kho, chỉ giữ phần dương. Ăn uống có ở mọi nơi nên không nổi lên.
+ */
+function placeTopicProfiles(postBins: Iterable<Record<string, number>>): Map<string, Record<string, number>> {
+  const perPlace = new Map<string, { posts: number; exps: Record<string, number>; total: number }>();
+  const all: Record<string, number> = {};
+  let allTotal = 0;
+  for (const bins of postBins) {
+    const exps = ofQuestion(bins, 'exp');
+    const sum = Object.values(exps).reduce((a, b) => a + b, 0);
+    for (const [e, w] of Object.entries(exps)) all[e] = (all[e] ?? 0) + w;
+    allTotal += sum;
+    for (const place of Object.keys(bins).filter((b) => b.startsWith('place:'))) {
+      const p = perPlace.get(place) ?? { posts: 0, exps: {}, total: 0 };
+      p.posts += 1;
+      p.total += sum;
+      for (const [e, w] of Object.entries(exps)) p.exps[e] = (p.exps[e] ?? 0) + w;
+      perPlace.set(place, p);
+    }
+  }
+  const profiles = new Map<string, Record<string, number>>();
+  for (const [place, p] of perPlace) {
+    if (p.posts < MIN_PLACE_POSTS || p.total === 0 || allTotal === 0) continue;
+    const lift = Object.fromEntries(
+      Object.entries(p.exps)
+        .map(([e, w]) => [e, w / p.total - (all[e] ?? 0) / allTotal] as const)
+        .filter(([, d]) => d > 0),
+    );
+    if (Object.keys(lift).length) profiles.set(place, lift);
+  }
+  return profiles;
+}
+
+/** Chủ đề suy từ các nơi đang tìm hiểu (đã có hệ số vừa xảy ra); bỏ tỉnh cha khi đã có nơi con để không đếm hai lần. */
+function topicsFromPlaces(exploring: Record<string, number>, profiles: Map<string, Record<string, number>>): Record<string, number> {
+  const parents = new Set(Object.keys(exploring).map((b) => PARENT.get(b.slice(6))).filter(Boolean).map((p) => `place:${p}`));
+  const out: Record<string, number> = {};
+  for (const [place, w] of Object.entries(exploring)) {
+    if (parents.has(place)) continue;
+    for (const [e, d] of Object.entries(profiles.get(place) ?? {})) out[e] = (out[e] ?? 0) + w * d;
+  }
+  return out;
+}
+
 /**
  * "Vì bạn đang tìm hiểu Nha Trang" khi bài ở đúng nơi đó. Bài chỉ khớp qua tỉnh cha (Cam Ranh khi người xem tìm Nha Trang)
  * thì nói "Gần Nha Trang mà bạn đang tìm hiểu", không nói tên tỉnh mà người xem chưa từng gõ.
@@ -116,6 +166,14 @@ export const tripRankerV1: Ranker = {
       for (const [q, w] of Object.entries(fresh.evidence)) evidence[q] = (evidence[q] ?? 0) + w;
     }
     const live: LiveAnswers | null = viewer ? answerLive({ rows: viewer.rows, posts: metas, productPlaces: viewer.productPlaces, now }) : null;
+    // Chủ đề: gõ thẳng (biển, núi) + suy từ các nơi đang tìm hiểu (Nha Trang, Phú Quốc → biển), nặng bằng nửa.
+    const topicVector: Record<string, number> = { ...live?.topics };
+    if (live) {
+      for (const [e, w] of Object.entries(topicsFromPlaces(live.exploring, placeTopicProfiles(postBins.values())))) {
+        topicVector[e] = (topicVector[e] ?? 0) + PLACE_TOPIC_FACTOR * w;
+      }
+    }
+    const topicEvidence = (live?.evidence.topics ?? 0) + PLACE_TOPIC_FACTOR * (live?.evidence.exploring ?? 0);
 
     const hasSignal =
       Object.keys(evidence).length > 0 || (live !== null && (live.stage !== 'dreaming' || live.evidence.exploring > 0 || live.evidence.topics > 0));
@@ -148,7 +206,7 @@ export const tripRankerV1: Ranker = {
       const parts: Record<Part, number> = {
         exploring: conf(live?.evidence.exploring, FULL_EVIDENCE.exploring) * cosine(live?.exploring ?? {}, places, idf),
         trip: tripBin ? (bins[tripBin] ?? 0) * (stage === 'after_trip' || Object.keys(bins).some((b) => ON_SITE_EXP.has(b)) ? 1 : NO_LOCAL_EXP_FACTOR) : 0,
-        topic: conf(live?.evidence.topics, FULL_EVIDENCE.live) * cosine(live?.topics ?? {}, ofQuestion(bins, 'exp'), idf),
+        topic: conf(topicEvidence, FULL_EVIDENCE.live) * cosine(topicVector, ofQuestion(bins, 'exp'), idf),
         interestExp: conf(evidence.exp, FULL_EVIDENCE.interest) * cosine(answers.exp ?? {}, ofQuestion(bins, 'exp'), idf),
         interestPlace: conf(evidence.place, FULL_EVIDENCE.interest) * cosine(answers.place ?? {}, places, idf),
         fit: 0,
@@ -177,8 +235,12 @@ export const tripRankerV1: Ranker = {
       const place = primaryPlace(bins);
       const exp = bestSharedExp(answers.exp ?? {}, bins);
       if (top?.k === 'exploring' && place) reason = { code: 'matches_place', text: exploringText(live!.exploring, bins, place) };
-      else if (top?.k === 'topic' && live && bestSharedExp(live.topics, bins)) {
-        reason = { code: 'matches_interest', text: `Vì bạn vừa tìm bài về ${expLabel(bestSharedExp(live.topics, bins)!)}` };
+      else if (top?.k === 'topic' && bestSharedExp(topicVector, bins)) {
+        const topicExp = bestSharedExp(topicVector, bins)!;
+        // Chủ đề gõ thẳng ("biển") thì "vừa tìm bài về"; chỉ suy từ nơi (Nha Trang, Phú Quốc…) thì nói theo nơi.
+        reason = (live?.topics[topicExp] ?? 0) > 0
+          ? { code: 'matches_interest', text: `Vì bạn vừa tìm bài về ${expLabel(topicExp)}` }
+          : { code: 'matches_interest', text: `Vì bạn đang tìm hiểu các nơi có ${expLabel(topicExp)}` };
       } else if (top?.k === 'trip' && live?.trip) {
         const [, m, d] = live.trip.checkIn.split('-');
         reason = { code: 'matches_place', text: `Cho chuyến ${placeName(live.trip.placeId)} ${d}/${m} của bạn` };
