@@ -256,6 +256,8 @@ export interface RankInput {
 export interface ViewerRaw {
   rows: RawRow[];
   productPlaces: Record<string, string>;
+  /** Bài mà rows đụng tới (kể cả bài ngoài ứng viên: bài viết khi đang xem Reels), để biết nơi của từng tương tác. */
+  posts?: Record<string, PostMeta>;
 }
 
 /** Tất định: không Math.random. Trả đúng các ứng viên được đưa vào (lọc hết thì rỗng). */

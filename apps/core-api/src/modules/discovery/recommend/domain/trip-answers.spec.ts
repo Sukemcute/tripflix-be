@@ -169,4 +169,15 @@ describe('trip_v1', () => {
       ['cr', 'Gần Nha Trang mà bạn đang tìm hiểu', 'khanh-hoa'],
     ]);
   });
+
+  it('thích 2 bài viết Hà Nội (không phải ứng viên Reels) thì vẫn là đang tìm hiểu Hà Nội', () => {
+    const vlog = (postId: string): PostMeta => ({ postId, authorId: 'b', postType: 'vlog', tags: [], placeId: 'ha-noi' });
+    const out = tripRankerV1.rank({
+      candidates: [cand('hn', 0.1, { 'place:ha-noi': 1 }), cand('nt', 0.9, { 'place:nha-trang': 1 })],
+      userFeatures: null,
+      now: NOW,
+      viewer: { rows: [react('v1', 0.1), react('v2', 0.2, 'comment')], productPlaces: {}, posts: { v1: vlog('v1'), v2: vlog('v2') } },
+    });
+    expect(out[0]).toMatchObject({ postId: 'hn', reason: { text: 'Vì bạn đang tìm hiểu Hà Nội' } });
+  });
 });

@@ -372,7 +372,16 @@ export class PostRecommendationUseCases {
   private async loadViewer(userId: string, until: Date): Promise<ViewerRaw> {
     const rows = await this.store.listUserRows([userId], until);
     const productIds = [...new Set(rows.flatMap((r) => (r.kind === 'order_item' && r.targetId ? [r.targetId] : [])))];
-    return { rows, productPlaces: await this.store.findProductPlaces(productIds) };
+    const postIds = [
+      ...new Set(
+        rows.flatMap((r) => {
+          const source = r.detail?.sourcePostId;
+          return [r.targetType === 'post' && r.targetId ? r.targetId : null, typeof source === 'string' ? source : null].filter((id): id is string => id !== null);
+        }),
+      ),
+    ];
+    const [productPlaces, metas] = await Promise.all([this.store.findProductPlaces(productIds), this.store.findPostMetas(postIds)]);
+    return { rows, productPlaces, posts: Object.fromEntries(metas.map((m) => [m.postId, m])) };
   }
 
   private async listRecent(userId: string, until: Date): Promise<Array<{ postId: string; at: number }>> {

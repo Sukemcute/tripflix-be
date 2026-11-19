@@ -93,7 +93,8 @@ export const tripRankerV1: Ranker = {
   needsViewerRows: true,
   rank({ candidates, userFeatures, now, viewer }) {
     const postBins = new Map(candidates.map((c) => [c.postId, weightMap(c.postFeatures.bins)]));
-    const metas: Record<string, PostMeta> = Object.fromEntries(candidates.map((c) => [c.postId, c]));
+    // Nơi của tương tác tra cả bài ngoài ứng viên: Reels chỉ xếp video, nhưng thích bài viết Hà Nội vẫn là đang tìm hiểu Hà Nội.
+    const metas: Record<string, PostMeta> = { ...viewer?.posts, ...Object.fromEntries(candidates.map((c) => [c.postId, c])) };
 
     // idf trên kho bài đang xét: ngăn ai cũng có (ăn uống, sống ảo) nhẹ đi.
     const df = new Map<string, number>();
