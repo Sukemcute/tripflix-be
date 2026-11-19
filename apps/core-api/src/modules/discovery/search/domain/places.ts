@@ -171,6 +171,19 @@ export function placesIn(text: string, options: PlacesInOptions = {}): string[] 
 
 export const placeParentOf = (id: string): string | null => PLACE_BY_ID.get(id)?.parentId ?? null;
 
+/** Thành phố trực thuộc trung ương: tìm tên là tìm chính thành phố ("khách sạn đà nẵng" không gồm Hội An, Bà Nà). */
+const CITY_PROVINCES = new Set(['ha-noi', 'hai-phong', 'hue', 'da-nang', 'ho-chi-minh', 'can-tho']);
+
+/**
+ * Các nơi (bucket tìm khám phá) coi là "ở" bucket này: tỉnh thì gồm cả điểm đến con ("lâm đồng" gồm Đà Lạt, Mũi Né);
+ * thành phố trực thuộc trung ương và điểm đến thì chỉ chính nó.
+ */
+export function bucketsWithin(bucket: string): string[] {
+  const province = PLACES.find((p) => p.kind === 'province' && (p.exploreBucket ?? p.name) === bucket);
+  if (!province || CITY_PROVINCES.has(province.id)) return [bucket];
+  return [bucket, ...PLACES.filter((p) => p.parentId === province.id).map((p) => p.exploreBucket ?? p.name)];
+}
+
 export const placeBucketOfId = (id: string): string | null => {
   const p = PLACE_BY_ID.get(id);
   return p ? (p.exploreBucket ?? p.name) : null;

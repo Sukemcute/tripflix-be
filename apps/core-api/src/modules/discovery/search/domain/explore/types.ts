@@ -73,6 +73,8 @@ export interface CandidateFilter {
   tiers: string[];
   days: number | null;
   place: string | null;
+  /** Các bucket coi là đúng nơi (bucketsWithin(place)): tìm một tỉnh thì gồm cả điểm đến con. */
+  places: string[];
   /** Token (trong tf) của mọi bí danh của place: bài chưa rõ nơi chứa một trong số này là ứng viên (rank kiểm khớp đủ bí danh).
    * Câu có từ (!isAll): mọi bài chưa rõ nơi là ứng viên. */
   placeTerms: string[];

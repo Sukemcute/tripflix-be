@@ -62,7 +62,7 @@ export class DrizzleExploreStore implements ExploreStore {
     if (f.place) {
       where.push(
         or(
-          eq(searchDocuments.place, f.place),
+          inArray(searchDocuments.place, f.places.length ? f.places : [f.place]),
           !f.isAll ? isNull(searchDocuments.place) : undefined, // điều kiện khớp từ bên dưới vẫn áp dụng
           f.placeTerms.length ? and(isNull(searchDocuments.place), arrayOverlaps(searchDocuments.terms, f.placeTerms)) : undefined,
           f.center
