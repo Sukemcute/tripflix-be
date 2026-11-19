@@ -20,8 +20,8 @@ import {
 const LOCK = 'discovery.recommend-features';
 const JOB = 'build-features';
 const USER_BATCH = 200;
-/** Văn bản mới nhúng tối đa mỗi chu kỳ (~6 giây ở ai-service 1 luồng); phần còn lại để chu kỳ sau. */
-const EMBED_PER_CYCLE = 512;
+/** Văn bản mới nhúng tối đa mỗi chu kỳ (~45 giây ở ai-service 0,5 CPU; 42k bài backfill ~3,5 giờ); phần còn lại để chu kỳ sau. */
+const EMBED_PER_CYCLE = 2048;
 
 export interface BuildCycleResult {
   posts: number;
