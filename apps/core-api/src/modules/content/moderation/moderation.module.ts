@@ -2,6 +2,7 @@ import { PostShareLinks } from '../social/application/post-share-links.js';
 import { CONTENT_GATE_PORT } from '../social/application/ports/content-gate.port.js';
 import { RulesContentGate } from './application/content-gate.js';
 import { Module } from '@nestjs/common';
+import { AccessModule } from '../../access/index.js';
 import { buildTransactionHostToken, createDb, type ModuleTransactionHost } from '@tripflix/db';
 import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
 import { OutboxWriter } from '@tripflix/outbox';
@@ -29,11 +30,13 @@ import { ScreeningConsumer } from './consumers/screening.consumer.js';
 import { ClaimDeferredScansUseCase } from './application/recover-screening.use-case.js';
 import { AiModerationClient } from './infra/ai-moderation.client.js';
 import { ModerationRepository } from './infra/moderation.repository.js';
+import { ReviewQueueUseCase } from './application/review-queue.use-case.js';
 
 const OUTBOX = Symbol('MODERATION_OUTBOX');
 const CONFIG = Symbol('MODERATION_CONFIG');
 @Module({
   imports: [
+    AccessModule,
     MediaModule,
     IdempotencyModule.forFeature({
       inject: [DB_POOLS],
@@ -44,6 +47,11 @@ const CONFIG = Symbol('MODERATION_CONFIG');
   controllers: [ReportsController, AdminModerationController],
   exports: [CONTENT_GATE_PORT],
   providers: [
+    {
+      provide: ReviewQueueUseCase,
+      inject: [ModerationRepository],
+      useFactory: (repository: ModerationRepository) => new ReviewQueueUseCase(repository),
+    },
     { provide: CONTENT_GATE_PORT, useClass: RulesContentGate },
     {
       provide: ModerationRepository,
@@ -91,8 +99,12 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     {
       provide: AdminModeratePostUseCase,
       inject: [PostRepository, ModerationActionRepository, OUTBOX, CORE_ENV],
-      useFactory: (posts: PostRepository, actions: ModerationActionRepository, outbox: ContentOutbox, env: CoreEnv) =>
-        new AdminModeratePostUseCase(posts, actions, outbox, new PostShareLinks(env.WEB_APP_URL)),
+      useFactory: (
+        posts: PostRepository,
+        actions: ModerationActionRepository,
+        outbox: ContentOutbox,
+        env: CoreEnv,
+      ) => new AdminModeratePostUseCase(posts, actions, outbox, new PostShareLinks(env.WEB_APP_URL)),
     },
     {
       provide: ChangeVisibilityUseCase,
@@ -146,7 +158,8 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     {
       provide: SubmitAppealUseCase,
       inject: [ModerationRepository, OUTBOX],
-      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) => new SubmitAppealUseCase(repository, outbox),
+      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) =>
+        new SubmitAppealUseCase(repository, outbox),
     },
     {
       provide: DecideCaseUseCase,
@@ -158,7 +171,8 @@ const CONFIG = Symbol('MODERATION_CONFIG');
     {
       provide: ClaimDeferredScansUseCase,
       inject: [ModerationRepository, OUTBOX],
-      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) => new ClaimDeferredScansUseCase(repository, outbox),
+      useFactory: (repository: ModerationRepository, outbox: ContentOutbox) =>
+        new ClaimDeferredScansUseCase(repository, outbox),
     },
   ],
 })

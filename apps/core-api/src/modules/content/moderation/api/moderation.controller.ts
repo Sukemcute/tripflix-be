@@ -18,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Authenticated, CurrentUser, Roles, type AuthUser } from '@tripflix/auth';
+import { AccessFacade } from '../../../access/index.js';
 import { Idempotent } from '@tripflix/idempotency';
 import { MediaFacade } from '../../media/media.facade.js';
 import { ZodBody } from '../../social/api/http.js';
@@ -59,6 +60,9 @@ import {
   ScanRetryDto,
 } from './dto.js';
 import { URGENT_SEVERITY } from '../domain/severity.js';
+import { ReviewQueueUseCase } from '../application/review-queue.use-case.js';
+import { ReviewLeaseDto, ReviewLeaseSchema, ModerationCaseDto } from './dto.js';
+import { AdminQueueQueryDto, AdminQueueQuerySchema } from './dto.js';
 
 @ApiTags('Moderation - Reports')
 @ApiBearerAuth()
@@ -149,12 +153,14 @@ export class AdminModerationController {
     @Inject(MediaFacade) private readonly media: MediaFacade,
     @Inject(DecideAppealUseCase) private readonly decideAppeal: DecideAppealUseCase,
     @Inject(ClaimDeferredScansUseCase) private readonly recovery: ClaimDeferredScansUseCase,
+    @Inject(ReviewQueueUseCase) private readonly review: ReviewQueueUseCase,
+    @Inject(AccessFacade) private readonly access: AccessFacade,
   ) {}
   @Get('stats')
   @ApiOkResponse({ type: ModerationStatsDto })
   @ApiOperation({ summary: 'Số liệu tổng của hàng chờ, khiếu nại và scan, tính ở server' })
-  stats() {
-    return this.repository.stats(URGENT_SEVERITY);
+  stats(@CurrentUser() user: AuthUser) {
+    return this.repository.stats(URGENT_SEVERITY, user.userId);
   }
   @Get('scans/failed')
   @ApiOkResponse({ type: FailedScanPageDto })
@@ -191,30 +197,64 @@ export class AdminModerationController {
   @Get('queue')
   @ApiOkResponse({ type: ModerationQueuePageDto })
   @ApiOperation({ summary: 'Hàng chờ kiểm duyệt theo mức ưu tiên' })
-  async queue(@Query(new ZodBody(QueueQuerySchema)) input: QueueQueryDto) {
-    const query = QueueQuerySchema.parse(input);
-    const page = await this.repository.queue({ ...query, offset: query.cursor });
+  async queue(
+    @Query(new ZodBody(AdminQueueQuerySchema)) input: AdminQueueQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const query = AdminQueueQuerySchema.parse(input);
+    const page = await this.repository.queue({
+      ...query,
+      offset: query.cursor && /^\d+$/.test(query.cursor) ? Number(query.cursor) : 0,
+      actorId: user.userId,
+    });
     return {
       ...page,
-      nextCursor:
-        query.cursor + page.items.length < page.total ? String(query.cursor + page.items.length) : null,
+      nextCursor: page.nextCursor ?? null,
     };
   }
   @Get('queue/:id')
   @ApiOkResponse({ type: ModerationDetailDto })
-  async detail(@Param('id', ParseUUIDPipe) id: string) {
+  async detail(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
     const item = await this.repository.findCase(id);
     if (!item) throw new NotFoundException('Không tìm thấy hồ sơ kiểm duyệt');
+    await this.review.recordEvidenceView(id, user.userId);
     const detail = await this.repository.detail(item);
+    const ids = [item.authorId, detail.postContext?.authorId, detail.parentComment?.authorId].filter(
+      (id): id is string => !!id,
+    );
+    const contacts = await this.access.getUserContacts(ids);
+    const author = (id: string) => {
+      const contact = contacts.get(id);
+      return contact ? { id, displayName: contact.displayName, email: contact.email } : null;
+    };
     const assetId = detail.target?.coverMediaId;
     const playback = assetId ? await this.media.getPlayback([assetId]) : {};
     return {
       ...detail,
+      author: author(item.authorId),
+      postContext: detail.postContext
+        ? { ...detail.postContext, author: author(detail.postContext.authorId) }
+        : null,
+      parentComment: detail.parentComment
+        ? { ...detail.parentComment, author: author(detail.parentComment.authorId) }
+        : null,
       target: detail.target
         ? { ...detail.target, coverUrl: assetId ? (playback[assetId]?.posters.w540 ?? null) : null }
         : null,
     };
   }
+  @Post('queue/:id/lease')
+  @ApiBody({ type: ReviewLeaseDto })
+  @ApiCreatedResponse({ type: ModerationCaseDto })
+  @Idempotent()
+  reviewLease(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodBody(ReviewLeaseSchema)) body: ReviewLeaseDto,
+  ) {
+    return this.review.execute(id, user.userId, body.action, body.leaseId);
+  }
+
   @Post('queue/:id/decisions')
   @ApiCreatedResponse({ type: ModerationDecisionResultDto })
   @Idempotent()

@@ -94,6 +94,7 @@ describe('Social Application Use Cases', () => {
 
   beforeEach(() => {
     mockPostRepo = {
+      assertModerationLease: vi.fn().mockResolvedValue(undefined),
       create: vi.fn(),
       findById: vi.fn(),
       findByIds: vi.fn(),

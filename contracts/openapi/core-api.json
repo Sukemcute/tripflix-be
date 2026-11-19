@@ -4225,6 +4225,41 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "assignment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "unassigned",
+                "mine"
+              ]
+            }
+          },
+          {
+            "name": "sla",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "overdue",
+                "due_soon"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 160,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4270,6 +4305,51 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModerationDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/queue/{id}/lease": {
+      "post": {
+        "operationId": "AdminModerationController_reviewLease",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewLeaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationCaseDto"
                 }
               }
             }
@@ -11057,6 +11137,18 @@
       "ModerationStatsDto": {
         "type": "object",
         "properties": {
+          "unassigned": {
+            "type": "number"
+          },
+          "assignedToMe": {
+            "type": "number"
+          },
+          "overdue": {
+            "type": "number"
+          },
+          "dueSoon": {
+            "type": "number"
+          },
           "pendingTotal": {
             "type": "number",
             "description": "Hồ sơ chờ duyệt, cùng điều kiện với queue view=pending"
@@ -11104,6 +11196,10 @@
           }
         },
         "required": [
+          "unassigned",
+          "assignedToMe",
+          "overdue",
+          "dueSoon",
           "pendingTotal",
           "pendingUrgent",
           "pendingPosts",
@@ -11311,6 +11407,23 @@
       "ModerationCaseDto": {
         "type": "object",
         "properties": {
+          "assigneeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "leaseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "id": {
             "type": "string"
           },
@@ -11373,6 +11486,10 @@
           }
         },
         "required": [
+          "assigneeId",
+          "leaseId",
+          "leaseExpiresAt",
+          "dueAt",
           "id",
           "targetType",
           "targetId",
@@ -11412,6 +11529,164 @@
           "nextCursor"
         ]
       },
+      "ModerationAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "email"
+        ]
+      },
+      "ModerationPostContextDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "author": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationAuthorDto"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "excerpt": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "unavailable": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "author",
+          "title",
+          "excerpt",
+          "status",
+          "visibility",
+          "unavailable",
+          "createdAt"
+        ]
+      },
+      "ModerationParentCommentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "author": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationAuthorDto"
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "thread"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "unavailable": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "author",
+          "body",
+          "kind",
+          "status",
+          "unavailable",
+          "createdAt"
+        ]
+      },
+      "ReviewAuditDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "claim",
+              "renew",
+              "release",
+              "evidence_view"
+            ]
+          },
+          "leaseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actorId",
+          "action",
+          "leaseId",
+          "createdAt"
+        ]
+      },
       "ModerationTargetDto": {
         "type": "object",
         "properties": {
@@ -11439,6 +11714,23 @@
       "ModerationDetailDto": {
         "type": "object",
         "properties": {
+          "assigneeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "leaseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "id": {
             "type": "string"
           },
@@ -11499,6 +11791,40 @@
             "nullable": true,
             "description": "Text preview returned in the queue."
           },
+          "postContext": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationPostContextDto"
+              }
+            ]
+          },
+          "parentComment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationParentCommentDto"
+              }
+            ]
+          },
+          "author": {
+            "nullable": true,
+            "description": "Thông tin tài khoản tác giả, chỉ trả trong chi tiết dành cho staff.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModerationAuthorDto"
+              }
+            ]
+          },
+          "reviewAudit": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewAuditDto"
+            }
+          },
           "target": {
             "nullable": true,
             "type": "object",
@@ -11522,6 +11848,10 @@
           }
         },
         "required": [
+          "assigneeId",
+          "leaseId",
+          "leaseExpiresAt",
+          "dueAt",
           "id",
           "targetType",
           "targetId",
@@ -11536,9 +11866,33 @@
           "resolution",
           "createdAt",
           "updatedAt",
+          "postContext",
+          "parentComment",
+          "author",
+          "reviewAudit",
           "target",
           "reports",
           "actions"
+        ]
+      },
+      "ReviewLeaseDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "claim",
+              "renew",
+              "release"
+            ]
+          },
+          "leaseId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "action"
         ]
       },
       "DecisionDto": {
@@ -11560,6 +11914,10 @@
           "reasonDetail": {
             "type": "string",
             "maxLength": 500
+          },
+          "leaseId": {
+            "type": "string",
+            "format": "uuid"
           },
           "action": {
             "type": "string",
