@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { answerLive } from '../domain/live-answers.js';
 import { hitAt, maxSamePlaceRun, placeCoverageAt, placeShareAt } from './metrics.js';
 import { buildPersonas, EVAL_NOW, type EvalPost } from './personas.js';
-import { formatBinStats, formatReport, forYouV0, forYouV1, runEval, toMeta } from './run-eval.js';
+import { formatBinStats, formatReport, forYouV0, forYouV1, runEval, toMeta, unresolvedPlacePosts } from './run-eval.js';
 
 /**
  * Bộ đo offline for-you (TF28, thiết kế v1 mục 4).
@@ -77,6 +77,10 @@ describe('báo cáo bộ đo', () => {
       '',
     ];
     await expect([...intro, formatBinStats(posts), ...sections].join('\n')).toMatchFileSnapshot('./report.md');
+  });
+
+  it('bài có nhắc nơi trong fixture đều giải được nơi và khớp với ngăn', () => {
+    expect(unresolvedPlacePosts(posts)).toEqual([]);
   });
 });
 

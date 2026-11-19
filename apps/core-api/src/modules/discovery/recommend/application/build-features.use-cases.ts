@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { captionExpOf, captionOf, EXP_DESCRIPTION_TEXTS } from '../domain/bins.js';
 import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
-import type { PostBuilder, PostContent, PostMeta, RawRow, UserBuilder } from '../domain/contracts.js';
+import { round4, type PostBuilder, type PostContent, type PostMeta, type RawRow, type UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
 import { CAPTION_MODEL } from '../domain/topics.js';
@@ -246,6 +246,8 @@ export class BuildFeaturesUseCases {
     }
 
     await this.store.setJobState(JOB, { lastRunAt: now, lastError: failedBuilders.length ? `Builder lỗi: ${failedBuilders.join(', ')}` : null, watermark: now });
+    const unresolved = posts.filter((p) => p.placeId === null).length;
+    this.logger.log({ total: posts.length, unresolved, ratio: round4(unresolved / posts.length) }, 'recommend.place_unresolved_ratio');
     return { posts: posts.length, users: userIds.length, failedBuilders };
   }
 

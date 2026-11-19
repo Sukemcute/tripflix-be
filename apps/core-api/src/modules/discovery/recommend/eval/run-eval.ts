@@ -6,6 +6,7 @@ import { assignBins, primaryPlace } from '../domain/bins.js';
 import { mergeCandidates } from '../domain/candidates.js';
 import type { Candidate, PostMeta, RankedItem } from '../domain/contracts.js';
 import { applyFeedPolicy } from '../domain/feed-policy.js';
+import { placeIdOfPost } from '../domain/place-of-post.js';
 import { tagAffinityRankerV0 } from '../domain/rankers/rankers.js';
 import { tripRankerV1 } from '../domain/rankers/trip-v1.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
@@ -157,7 +158,35 @@ const fmt = (x: number | null) => (x === null ? '–' : Number.isInteger(x) ? St
 /** Ngăn của từng bài fixture, đúng như post_profile@v1 tính trong job. */
 export const binsOf = (p: EvalPost) => assignBins(toMeta(p));
 
-/** Độ phủ ngăn trên fixture: số bài mỗi ngăn, bài không có nơi / không có trải nghiệm nào. */
+/** Bài trong fixture tính lại nơi từ dữ liệu thô (bỏ qua placeId dump cũ) bị mất nơi hoặc lệch với bins. */
+export function unresolvedPlacePosts(posts: readonly EvalPost[]): EvalPost[] {
+  const hotelProvinces = new Map(
+    posts.flatMap((p) => (p.trip?.hotelId && p.placeId ? [[p.trip.hotelId, p.placeId] as const] : [])),
+  );
+  return posts.filter((p) => {
+    const resolved = placeIdOfPost(
+      {
+        hotelId: p.trip?.hotelId ?? null,
+        tags: p.tags,
+        destinationName: p.trip?.destinationName ?? null,
+        title: p.title,
+        body: p.body,
+        items: p.trip?.items,
+      },
+      hotelProvinces,
+    );
+    const fromBins = primaryPlace(
+      assignBins({
+        tags: p.tags,
+        placeId: resolved,
+        content: { title: p.title, body: p.body, isVerified: p.isVerified, trip: p.trip },
+      }),
+    );
+    return resolved === null || fromBins === null || resolved !== fromBins;
+  });
+}
+
+/** Độ phủ ngăn trên fixture: số bài mỗi ngăn, bài không có nơi / bài nhắc nơi bị mất nơi / không có trải nghiệm nào. */
 export function formatBinStats(posts: EvalPost[]): string {
   const counts = new Map<string, number>();
   let noPlace = 0;
@@ -168,11 +197,12 @@ export function formatBinStats(posts: EvalPost[]): string {
     if (!bins.some((b) => b.startsWith('exp:'))) noExp++;
     for (const b of bins) if (!b.startsWith('place:')) counts.set(b, (counts.get(b) ?? 0) + 1);
   }
+  const unresolved = unresolvedPlacePosts(posts).length;
   const rows = [...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([bin, n]) => `| \`${bin}\` | ${n} |`);
   return [
     '### Ngăn của bài (post_profile@v1)',
     '',
-    `${posts.length} bài: ${posts.length - noPlace} có nơi, ${noPlace} không có nơi; ${noExp} không có ngăn trải nghiệm nào.`,
+    `${posts.length} bài: ${posts.length - noPlace} có nơi, ${noPlace} không có nơi; bài có nhắc nơi mà mất nơi: ${unresolved}; ${noExp} không có ngăn trải nghiệm nào.`,
     '',
     '| Ngăn | Số bài |',
     '|---|---|',

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { hotV0 } from '../domain/builders/hot.js';
 import { postProfileV1 } from '../domain/builders/post-profile.js';
 import { CAPTION_MODEL, EXP, EXP_DESCRIPTIONS } from '../domain/topics.js';
@@ -168,5 +169,39 @@ describe('BuildFeaturesUseCases', () => {
       await useCases.runCycle(NOW);
       expect(store.findTextVectors).not.toHaveBeenCalled();
     });
+  });
+
+  it('log recommend.place_unresolved_ratio cuối lượt build mà không ghi tiêu đề bài', async () => {
+    const { store, useCases } = setup();
+    const secretTitle = 'Một ngày bình thường thôi';
+    (useCases as unknown as { catalog: RecommendCatalog }).catalog.listPosts = () =>
+      Promise.resolve({
+        items: [
+          {
+            id: 'p1',
+            authorId: 'a',
+            postType: 'video',
+            title: secretTitle,
+            body: '',
+            hashtags: [],
+            isVerified: false,
+            mediaIds: [],
+            coverMediaId: null,
+            tripAttachment: null,
+            createdAt: NOW,
+          },
+        ],
+        nextCursor: null,
+      });
+    const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      await useCases.runCycle(NOW);
+      const entry = logSpy.mock.calls.find((c) => c[1] === 'recommend.place_unresolved_ratio');
+      expect(entry?.[0]).toEqual({ total: 1, unresolved: 1, ratio: 1 });
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain(secretTitle);
+    } finally {
+      logSpy.mockRestore();
+    }
+    expect(store.replacePosts).toHaveBeenCalled();
   });
 });
