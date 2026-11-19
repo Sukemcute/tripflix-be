@@ -13,6 +13,7 @@ import type { RecordScreeningUseCase } from './moderation.use-cases.js';
 
 const POLICY = `${MODERATION_POLICY_VERSION}:parts-v1-review-images`;
 const FRAME_PART_POLICY = `${POLICY}:${FRAME_POLICY}`;
+const COVER_OCR_POLICY = `${POLICY}:video-cover-ocr-v1`;
 type Part = typeof moderationParts.$inferSelect;
 type Input = {
   key: string;
@@ -22,7 +23,7 @@ type Input = {
   text?: string;
   url?: string;
   mediaKind?: 'video' | 'image';
-  modality?: 'video_frame' | 'video_sampling' | 'video_poster';
+  modality?: 'video_frame' | 'video_sampling' | 'video_poster' | 'video_cover_ocr';
   timestampMs?: number;
   sampleDurationMs?: number | null;
   sampleCount?: number;
@@ -31,7 +32,11 @@ type Input = {
 };
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const inputPolicy = (input: Input) =>
-  input.modality === 'video_frame' || input.modality === 'video_sampling' ? FRAME_PART_POLICY : POLICY;
+  input.modality === 'video_cover_ocr'
+    ? COVER_OCR_POLICY
+    : input.modality === 'video_frame' || input.modality === 'video_sampling'
+      ? FRAME_PART_POLICY
+      : POLICY;
 
 /** Only claim/complete hold DB locks. All provider calls happen between these transactions. */
 export class PostPartsScreeningUseCase {
@@ -76,6 +81,18 @@ export class PostPartsScreeningUseCase {
           state: asset?.status === 'failed' ? 'failed' : asset?.url ? 'pending' : 'waiting',
         };
       }),
+      ...assets
+        .filter((asset) => asset.kind === 'video')
+        .map((asset): Input => ({
+          key: `cover-ocr:${asset.id}`,
+          kind: 'image',
+          assetId: asset.id,
+          mediaKind: 'video',
+          modality: 'video_cover_ocr',
+          hash: asset.revision,
+          ...(asset.url ? { url: asset.url } : {}),
+          state: asset.status === 'failed' ? 'failed' : asset.url ? 'pending' : 'waiting',
+        })),
       ...assets
         .filter((a) => a.kind === 'video')
         .flatMap((asset): Input[] => {
@@ -211,7 +228,7 @@ export class PostPartsScreeningUseCase {
           and(
             eq(moderationParts.postId, postId),
             eq(moderationParts.contentVersion, target.version),
-            inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY]),
+            inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY, COVER_OCR_POLICY]),
             ne(moderationParts.status, 'superseded'),
           ),
         )
@@ -396,13 +413,23 @@ export class PostPartsScreeningUseCase {
       const startedAt = new Date().toISOString();
       const claim = await this.claim(part, occurredAt);
       if (!claim) continue;
-      const input: ModerationPartInput =
-        claim.input.kind === 'caption'
-          ? { id: part.id, kind: 'caption', text: claim.input.text! }
-          : { id: part.id, kind: 'image', imageUrl: claim.input.url! };
       let results: PartVerdict[] | null = null;
       try {
-        results = (await this.ai.moderateParts?.([input])) ?? null;
+        if (claim.input.modality === 'video_cover_ocr') {
+          if (this.ai.ocrVideoCover)
+            results = [
+              await this.ai.ocrVideoCover(
+                part.id,
+                await this.media.readModerationVideoPoster(claim.input.assetId!),
+              ),
+            ].filter((value): value is PartVerdict => !!value);
+        } else {
+          const input: ModerationPartInput =
+            claim.input.kind === 'caption'
+              ? { id: part.id, kind: 'caption', text: claim.input.text! }
+              : { id: part.id, kind: 'image', imageUrl: claim.input.url! };
+          results = (await this.ai.moderateParts?.([input])) ?? null;
+        }
       } catch {
         /* saved below as retryable failure */
       }
@@ -468,7 +495,7 @@ export class PostPartsScreeningUseCase {
         and(
           eq(moderationParts.postId, postId),
           eq(moderationParts.contentVersion, target.version),
-          inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY]),
+          inArray(moderationParts.policyVersion, [POLICY, FRAME_PART_POLICY, COVER_OCR_POLICY]),
         ),
       );
     return {
@@ -481,7 +508,10 @@ export class PostPartsScreeningUseCase {
           kind: input.kind,
           assetId: input.assetId,
           mediaKind: input.mediaKind ?? null,
-          text: input.text ?? null,
+          text:
+            input.modality === 'video_cover_ocr'
+              ? (row?.verdict?.extractedText ?? null)
+              : (input.text ?? null),
           previewUrl: input.url ?? null,
           status: row?.status ?? (input.state === 'pending' ? 'pending' : input.state),
           attempts: row?.attempts ?? 0,

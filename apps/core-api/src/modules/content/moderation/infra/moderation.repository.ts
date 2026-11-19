@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gte, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { reviewDueAt } from '../domain/review-policy.js';
 import { decodeReviewCursor, encodeReviewCursor } from './review-cursor.js';
@@ -63,6 +63,74 @@ export class ModerationRepository {
       FROM ${moderationParts} WHERE status = 'failed'
     ) scans ORDER BY "updatedAt", "eventId" LIMIT ${limit + 1} OFFSET ${offset}`);
     return result.rows;
+  }
+
+  async coverOcrOverview({ status, limit, cursor }: {
+    status: 'all' | 'flagged' | 'failed' | 'in_progress' | 'passed';
+    limit: number;
+    cursor: number;
+  }) {
+    const base = and(
+      like(moderationParts.partKey, 'cover-ocr:%'),
+      inArray(moderationParts.status, ['pending', 'checking', 'waiting', 'deferred', 'passed', 'flagged', 'failed']),
+      isNull(posts.deletedAt),
+    );
+    const groups = await this.db
+      .select({ status: moderationParts.status, count: sql<number>`count(*)::int` })
+      .from(moderationParts)
+      .innerJoin(posts, eq(moderationParts.postId, posts.id))
+      .where(base)
+      .groupBy(moderationParts.status);
+    const counts = { all: 0, flagged: 0, failed: 0, inProgress: 0, passed: 0 };
+    for (const group of groups) {
+      const count = Number(group.count);
+      counts.all += count;
+      if (group.status === 'flagged') counts.flagged += count;
+      else if (group.status === 'failed') counts.failed += count;
+      else if (group.status === 'passed') counts.passed += count;
+      else counts.inProgress += count;
+    }
+    const selected =
+      status === 'in_progress'
+        ? inArray(moderationParts.status, ['pending', 'checking', 'waiting', 'deferred'])
+        : status === 'all'
+          ? undefined
+          : eq(moderationParts.status, status);
+    const rows = await this.db
+      .select({
+        id: moderationParts.id,
+        postId: moderationParts.postId,
+        postTitle: posts.title,
+        authorId: posts.authorId,
+        assetId: moderationParts.assetId,
+        status: moderationParts.status,
+        attempts: moderationParts.attempts,
+        verdict: moderationParts.verdict,
+        errorCode: moderationParts.errorCode,
+        updatedAt: moderationParts.updatedAt,
+      })
+      .from(moderationParts)
+      .innerJoin(posts, eq(moderationParts.postId, posts.id))
+      .where(and(base, selected))
+      .orderBy(desc(moderationParts.updatedAt), desc(moderationParts.id))
+      .limit(limit + 1)
+      .offset(cursor);
+    return {
+      counts,
+      items: rows.slice(0, limit).map((row) => ({
+        id: row.id,
+        postId: row.postId,
+        postTitle: row.postTitle,
+        authorId: row.authorId,
+        assetId: row.assetId!,
+        status: row.status,
+        attempts: row.attempts,
+        extractedText: row.verdict?.extractedText ?? null,
+        errorCode: row.errorCode,
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+      nextCursor: rows.length > limit ? String(cursor + limit) : null,
+    };
   }
 
   async claimDeferredScans() {

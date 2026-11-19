@@ -64,7 +64,13 @@ import { ReviewQueueUseCase } from '../application/review-queue.use-case.js';
 import { ReviewLeaseDto, ReviewLeaseSchema, ModerationCaseDto } from './dto.js';
 import { AdminQueueQueryDto, AdminQueueQuerySchema } from './dto.js';
 import { PostPartsScreeningUseCase } from '../application/post-parts-screening.use-case.js';
-import { ModerationPartsDto, ModerationPartRetryDto } from './parts.dto.js';
+import {
+  CoverOcrPageDto,
+  CoverOcrQueryDto,
+  CoverOcrQuerySchema,
+  ModerationPartsDto,
+  ModerationPartRetryDto,
+} from './parts.dto.js';
 
 @ApiTags('Moderation - Reports')
 @ApiBearerAuth()
@@ -159,6 +165,12 @@ export class AdminModerationController {
     @Inject(AccessFacade) private readonly access: AccessFacade,
     @Inject(PostPartsScreeningUseCase) private readonly parts: PostPartsScreeningUseCase,
   ) {}
+  @Get('cover-ocr')
+  @ApiOkResponse({ type: CoverOcrPageDto })
+  @ApiOperation({ summary: 'Theo dõi các lượt OCR ảnh bìa video và lọc theo trạng thái' })
+  coverOcr(@Query(new ZodBody(CoverOcrQuerySchema)) raw: CoverOcrQueryDto) {
+    return this.repository.coverOcrOverview(CoverOcrQuerySchema.parse(raw));
+  }
   @Get('posts/:id/parts')
   @ApiOkResponse({ type: ModerationPartsDto })
   @ApiOperation({ summary: 'Bằng chứng quét riêng caption và từng ảnh của phiên bản bài hiện tại' })

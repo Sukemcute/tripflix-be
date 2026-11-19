@@ -60,6 +60,11 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
   const decideAppeal = vi.fn().mockResolvedValue({ status: 'upheld' });
   const mine = vi.fn().mockResolvedValue([]);
   const stats = vi.fn().mockResolvedValue({ pendingTotal: 3, urgentSeverity: 80 });
+  const coverOcrOverview = vi.fn().mockResolvedValue({
+    counts: { all: 0, flagged: 0, failed: 0, inProgress: 0, passed: 0 },
+    items: [],
+    nextCursor: null,
+  });
   const decide = vi.fn().mockResolvedValue({
     actionId: randomUUID(),
     changedCount: 1,
@@ -93,6 +98,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
             findCase,
             detail,
             stats,
+            coverOcrOverview,
             log: async () => [],
             pendingAppeals: mine,
             decisionsByUser: mine,
@@ -140,6 +146,14 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await http().post(retry).auth(tokens.member!, { type: 'bearer' }).set('Idempotency-Key', randomUUID()).expect(403);
     await http().post(retry).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
     await http().post(retry).auth(tokens.moderator!, { type: 'bearer' }).set('Idempotency-Key', randomUUID()).expect(201);
+  });
+  it('BE09-cover-OCR: monitor is staff-only and validates status and pagination', async () => {
+    const url = '/api/v1/admin/moderation/cover-ocr';
+    await http().get(url).expect(401);
+    await http().get(url).auth(tokens.member!, { type: 'bearer' }).expect(403);
+    await http().get(`${url}?status=bad`).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
+    await http().get(`${url}?status=failed&limit=10&cursor=20`).auth(tokens.moderator!, { type: 'bearer' }).expect(200);
+    expect(coverOcrOverview).toHaveBeenLastCalledWith({ status: 'failed', limit: 10, cursor: 20 });
   });
   it('bảo vệ API cá nhân và chỉ staff được xử lý khiếu nại', async () => {
     for (const path of ['me/moderation/decisions', 'me/moderation/appeals', 'me/reports']) {

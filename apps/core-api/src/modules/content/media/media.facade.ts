@@ -37,14 +37,50 @@ export class MediaFacade {
     @Optional() @Inject(MediaFramesUseCases) private readonly frames?: MediaFramesUseCases,
   ) {}
 
-  async ensureModerationFrames(assetIds: string[], actorId?: string) { await this.frames?.ensure(assetIds, actorId); }
+  async ensureModerationFrames(assetIds: string[], actorId?: string) {
+    await this.frames?.ensure(assetIds, actorId);
+  }
   async getModerationFrames(assetIds: string[]) {
-    const scans = await this.frames?.list(assetIds) ?? [];
+    const scans = (await this.frames?.list(assetIds)) ?? [];
     return scans.map((scan) => ({
-      assetId: scan.assetId, requestId: scan.requestId, status: scan.status, policy: scan.policy, errorCode: scan.errorCode,
+      assetId: scan.assetId,
+      requestId: scan.requestId,
+      status: scan.status,
+      policy: scan.policy,
+      errorCode: scan.errorCode,
       durationMs: scan.manifest?.durationMs ?? null,
-      frames: scan.manifest?.frames.map((frame) => ({ timestampMs: frame.timestampMs, url: this.storage.getCdnUrl(frame.key) })) ?? [],
+      frames:
+        scan.manifest?.frames.map((frame) => ({
+          timestampMs: frame.timestampMs,
+          url: this.storage.getCdnUrl(frame.key),
+        })) ?? [],
     }));
+  }
+
+  /** Read poster from private storage for OCR, with a hard byte cap. Never fetch arbitrary URLs. */
+  async readModerationVideoPoster(assetId: string): Promise<Buffer> {
+    const [asset] = await this.store.findModerationAssets([assetId]);
+    if (!asset || asset.kind !== 'video' || asset.status !== 'ready' || !asset.hlsPrefix)
+      throw new Error('Video poster is not ready');
+    const key = `${asset.hlsPrefix}/poster_540.jpg`;
+    if ((await this.storage.getObjectSizeBytes(key)) > 2_000_000)
+      throw new Error('Video poster exceeds OCR size limit');
+    const stream = await this.storage.getObject(key);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of stream) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+      size += bytes.length;
+      if (size > 2_000_000) {
+        stream.destroy();
+        throw new Error('Video poster exceeds OCR size limit');
+      }
+      chunks.push(bytes);
+    }
+    const poster = Buffer.concat(chunks);
+    if (!poster.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])))
+      throw new Error('Video poster is not JPEG');
+    return poster;
   }
 
   /** Chỉ có video phát được: id không tồn tại hoặc chưa ready thì không có trong kết quả. */
@@ -93,13 +129,26 @@ export class MediaFacade {
   async getModerationInputs(assetIds: string[], lock = false) {
     const assets = await this.store.findModerationAssets([...new Set(assetIds)], lock);
     return assets.map((asset) => ({
-      id: asset.id, kind: asset.kind, status: asset.status,
-      revision: createHash('sha256').update(JSON.stringify([
-        asset.kind, asset.status, asset.sourceKey, asset.hlsPrefix, asset.updatedAt.toISOString(),
-      ])).digest('hex'),
-      url: asset.status === 'ready'
-        ? this.storage.getCdnUrl(asset.kind === 'image' ? asset.sourceKey : `${asset.hlsPrefix}/poster_540.jpg`)
-        : null,
+      id: asset.id,
+      kind: asset.kind,
+      status: asset.status,
+      revision: createHash('sha256')
+        .update(
+          JSON.stringify([
+            asset.kind,
+            asset.status,
+            asset.sourceKey,
+            asset.hlsPrefix,
+            asset.updatedAt.toISOString(),
+          ]),
+        )
+        .digest('hex'),
+      url:
+        asset.status === 'ready'
+          ? this.storage.getCdnUrl(
+              asset.kind === 'image' ? asset.sourceKey : `${asset.hlsPrefix}/poster_540.jpg`,
+            )
+          : null,
     }));
   }
 }

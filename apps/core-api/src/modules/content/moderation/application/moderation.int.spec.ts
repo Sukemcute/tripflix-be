@@ -59,8 +59,18 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   let postId: string;
   let failOutbox = false;
   const displayNames = new Map<string, string>();
+  const posterStorage = new InMemoryObjectStorage({ cdnBaseUrl: 'https://cdn.test', keyPrefix: 'qa/' });
   const partAi = {
     moderate: async () => null,
+    ocrVideoCover: vi.fn(async (id: string): Promise<PartVerdict> => ({
+      id,
+      status: 'passed',
+      categories: {},
+      scores: {},
+      model: 'qa-ocr+qa-text',
+      errorCode: null,
+      extractedText: 'Chào Việt Nam',
+    })),
     moderateParts: vi.fn(async (items: ModerationPartInput[]): Promise<PartVerdict[] | null> =>
       items.map((i) => ({
         id: i.id,
@@ -89,11 +99,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const frames = new MediaFramesUseCases(() => tx.tx);
     const partScreen = new PostPartsScreeningUseCase(
       repository,
-      new MediaFacade(
-        new DrizzleMediaAssetStore(() => tx.tx),
-        new InMemoryObjectStorage({ cdnBaseUrl: 'https://cdn.test', keyPrefix: 'qa/' }),
-        frames,
-      ),
+      new MediaFacade(new DrizzleMediaAssetStore(() => tx.tx), posterStorage, frames),
       partAi,
       new RecordScreeningUseCase(repository, visibility, CONFIG, outbox),
       outbox,
@@ -150,6 +156,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   });
   beforeEach(async () => {
     partAi.moderateParts.mockClear();
+    partAi.ocrVideoCover.mockClear();
     partAi.moderateParts.mockImplementation(async (items) =>
       items.map((i) => ({
         id: i.id,
@@ -205,6 +212,11 @@ describe('TF32 moderation: transaction Postgres thật', () => {
 
   async function attachVideo() {
     const id = randomUUID();
+    await posterStorage.putObject({
+      key: `qa/videos/${id}/r1/poster_540.jpg`,
+      body: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      contentType: 'image/jpeg',
+    });
     await pool.query(
       `insert into content.media_assets (id,owner_id,kind,status,mime_type,file_size_bytes,source_key,hls_prefix,duration_sec,aspect)
       values ($1,$2,'video','ready','video/mp4',100,$3,$4,10,'16:9')`,
@@ -247,6 +259,98 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       ).rows,
     ).toHaveLength(1);
     expect(partAi.moderateParts).toHaveBeenCalledTimes(2);
+    expect(partAi.ocrVideoCover).toHaveBeenCalledTimes(1);
+  });
+  it('BE09-cover-OCR: only poster text is reviewed, never a frame or automatic hide', async () => {
+    const id = await attachVideo();
+    partAi.ocrVideoCover.mockImplementationOnce(async (partId) => ({
+      id: partId,
+      status: 'flagged',
+      categories: { harassment: true },
+      scores: { harassment: 0.9 },
+      model: 'qa-ocr+qa-text',
+      errorCode: null,
+      extractedText: 'Chữ xúc phạm trên bìa',
+    }));
+    await cases.partScreen.execute(postId);
+    const detail = await cases.partScreen.detail(postId);
+    const evidence = detail.items.find((i) => i.modality === 'video_cover_ocr');
+    expect(evidence).toMatchObject({ assetId: id, status: 'flagged', text: 'Chữ xúc phạm trên bìa' });
+    expect(detail.items.find((i) => i.modality === 'video_poster')?.status).toBe('passed');
+    expect(detail.items.find((i) => i.modality === 'video_sampling')?.status).toBe('waiting');
+    expect((await cases.repository.loadTarget('post', postId))?.status).toBe('published');
+    expect(await cases.repository.pending((await cases.repository.loadTarget('post', postId))!)).toBeTruthy();
+    await cases.partScreen.execute(postId);
+    expect(partAi.ocrVideoCover).toHaveBeenCalledTimes(1);
+  });
+  it('BE09-cover-OCR: admin overview counts, filters and paginates current cover scans', async () => {
+    const assetId = await attachVideo();
+    await cases.partScreen.execute(postId);
+    const passed = await cases.repository.coverOcrOverview({ status: 'all', limit: 1, cursor: 0 });
+    expect(passed.counts).toEqual({ all: 1, flagged: 0, failed: 0, inProgress: 0, passed: 1 });
+    expect(passed.items[0]).toMatchObject({
+      postId,
+      postTitle: 'Bài sạch',
+      authorId: AUTHOR,
+      assetId,
+      status: 'passed',
+      extractedText: 'Chào Việt Nam',
+    });
+    expect(passed.nextCursor).toBeNull();
+    expect((await cases.repository.coverOcrOverview({ status: 'flagged', limit: 20, cursor: 0 })).items).toEqual([]);
+    await pool.query(
+      "update content.moderation_parts set status='failed',error_code='ocr_unavailable' where part_key=$1",
+      [`cover-ocr:${assetId}`],
+    );
+    const failed = await cases.repository.coverOcrOverview({ status: 'failed', limit: 20, cursor: 0 });
+    expect(failed.counts).toEqual({ all: 1, flagged: 0, failed: 1, inProgress: 0, passed: 0 });
+    expect(failed.items[0]).toMatchObject({ status: 'failed', errorCode: 'ocr_unavailable' });
+    await cases.partScreen.retry(failed.items[0]!.id, AUTHOR);
+    const retrying = await cases.repository.coverOcrOverview({ status: 'in_progress', limit: 20, cursor: 0 });
+    expect(retrying.counts.inProgress).toBe(1);
+    expect(retrying.items[0]?.status).toBe('pending');
+    postId = randomUUID();
+    await pool.query(
+      "insert into content.posts (id,author_id,post_type,title,status,published_at) values ($1,$2,'video','Bài thứ hai','published',now())",
+      [postId, AUTHOR],
+    );
+    await attachVideo();
+    await cases.partScreen.execute(postId);
+    const firstPage = await cases.repository.coverOcrOverview({ status: 'all', limit: 1, cursor: 0 });
+    const secondPage = await cases.repository.coverOcrOverview({ status: 'all', limit: 1, cursor: 1 });
+    expect(firstPage.counts.all).toBe(2);
+    expect(firstPage.nextCursor).toBe('1');
+    expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
+  });
+  it('BE09-cover-OCR: changed poster revision cannot attach a stale verdict', async () => {
+    const id = await attachVideo();
+    const prepared = await cases.partScreen.prepare(postId);
+    const part = prepared!.parts.find((row) => row.partKey === `cover-ocr:${id}`)!;
+    const claim = await cases.partScreen.claim(part);
+    expect(claim).toBeTruthy();
+    await pool.query(
+      "update content.media_assets set hls_prefix=replace(hls_prefix,'/r1','/r2'),updated_at=now() where id=$1",
+      [id],
+    );
+    await cases.partScreen.complete(
+      claim!,
+      {
+        id: part.id,
+        status: 'flagged',
+        model: 'qa',
+        categories: { harassment: true },
+        scores: { harassment: 1 },
+        errorCode: null,
+        extractedText: 'Chữ của bìa cũ',
+      },
+      new Date().toISOString(),
+    );
+    expect(
+      (await cases.partScreen.detail(postId)).items.find((item) => item.modality === 'video_cover_ocr')
+        ?.status,
+    ).not.toBe('flagged');
+    expect(await cases.repository.pending((await cases.repository.loadTarget('post', postId))!)).toBeFalsy();
   });
   it('BE09-video: middle frame creates a timestamped review case while cover and caption stay clean', async () => {
     const id = await attachVideo();
@@ -313,7 +417,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const id = await attachVideo();
     await cases.partScreen.execute(postId);
     const old = await frameManifest(id);
-    await pool.query('update content.media_frame_scans set next_attempt_at=now() where asset_id=$1', [id]);
+    await pool.query("update content.media_frame_scans set next_attempt_at=now()-interval '1 minute' where asset_id=$1", [id]);
     await cases.frames.ensure([id]);
     await cases.frames.complete(old);
     expect((await cases.frames.list([id]))[0]?.status).toBe('requested');
@@ -331,7 +435,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     const id = await attachVideo();
     await cases.partScreen.execute(postId);
     for (let i = 0; i < 3; i++) {
-      await pool.query('update content.media_frame_scans set next_attempt_at=now() where asset_id=$1', [id]);
+      await pool.query("update content.media_frame_scans set next_attempt_at=now()-interval '1 minute' where asset_id=$1", [id]);
       await cases.frames.ensure([id]);
     }
     expect((await cases.frames.list([id]))[0]).toMatchObject({
@@ -444,7 +548,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
         errorCode: null,
       })),
     );
-    await pool.query('update content.moderation_parts set next_attempt_at=now() where id=$1', [failedId]);
+    await pool.query("update content.moderation_parts set next_attempt_at=now()-interval '1 minute' where id=$1", [failedId]);
     await cases.partScreen.recover();
     expect(partAi.moderateParts).toHaveBeenCalledTimes(1);
     expect((await cases.partScreen.detail(postId)).items.every((i) => i.status === 'passed')).toBe(true);
@@ -499,7 +603,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
   it('BE09: eight errors exhaust retries; manual retry checks version and resets caption scan', async () => {
     partAi.moderateParts.mockResolvedValue(null);
     for (let n = 0; n < 8; n++) {
-      await pool.query('update content.moderation_parts set next_attempt_at=now() where post_id=$1', [
+      await pool.query("update content.moderation_parts set next_attempt_at=now()-interval '1 minute' where post_id=$1", [
         postId,
       ]);
       await cases.partScreen.execute(postId);
