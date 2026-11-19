@@ -81,8 +81,11 @@ describe('BuildFeaturesUseCases trên Postgres thật', () => {
     expect(scores.rows).toHaveLength(3);
     expect(scores.rows.find((r: { post_id: string }) => r.post_id === dalat.id)).toMatchObject({ score: 1, post_type: 'video' });
 
-    const tagAffinity = await store.findUserFeatures('tag_affinity@v0', U);
-    expect(tagAffinity).toMatchObject({ tags: { dalat: 1, sanmay: 1 }, places: { 'da-lat': 1 }, interactionCount: 2 });
+    // for_you chạy v1 từ migration use_for_you_v1: ngăn của bài + câu trả lời của người dùng.
+    const bins = await pool.query(`select features->'bins' as bins from discovery.recommend_post_scores where builder = 'post_profile' and post_id = $1`, [dalat.id]);
+    expect(bins.rows[0].bins).toMatchObject({ 'place:da-lat': 0.9, 'exp:nui': 1 });
+    const tripProfile = await store.findUserFeatures('trip_profile@v1', U);
+    expect(tripProfile).toMatchObject({ answers: { place: { 'place:da-lat': expect.any(Number), 'place:lam-dong': expect.any(Number) } } });
     expect(await store.findUserFeatures('none@v0', U)).toEqual({});
 
     const state = await pool.query(`select name, last_error from discovery.recommend_job_state order by name`);
@@ -90,7 +93,8 @@ describe('BuildFeaturesUseCases trên Postgres thật', () => {
       { name: 'build-features', last_error: null },
       { name: 'hot@v2', last_error: null },
       { name: 'none@v0', last_error: null },
-      { name: 'tag_affinity@v0', last_error: null },
+      { name: 'post_profile@v1', last_error: null },
+      { name: 'trip_profile@v1', last_error: null },
     ]);
   });
 
