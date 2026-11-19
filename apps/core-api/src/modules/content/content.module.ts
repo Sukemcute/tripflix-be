@@ -311,9 +311,9 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     {
       provide: EditCommentUseCase,
-      inject: [CommentRepository, CONTENT_OUTBOX, PostRepository, CONTENT_GATE_PORT],
-      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox, postRepo: PostRepository, gate: ContentGatePort) =>
-        new EditCommentUseCase(commentRepo, outbox, postRepo, gate),
+      inject: [CommentRepository, CONTENT_OUTBOX, PostRepository, CONTENT_GATE_PORT, USER_DIRECTORY_PORT],
+      useFactory: (commentRepo: CommentRepository, outbox: ContentOutbox, postRepo: PostRepository, gate: ContentGatePort, userDirectory: UserDirectoryPort) =>
+        new EditCommentUseCase(commentRepo, outbox, postRepo, gate, userDirectory),
     },
     {
       provide: DeleteCommentUseCase,

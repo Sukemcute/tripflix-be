@@ -145,6 +145,7 @@ export class ListCommentsUseCase {
       ...publicComment,
       status: moderated ? 'hidden' : comment.status,
       body: moderated ? '' : comment.body,
+      mentions: moderated ? [] : (comment.mentions ?? []),
       moderationState: moderated ? 'hidden' : null,
       authorName: authorNames.get(comment.authorId) ?? null,
       likeCount: comment.likeCount ?? 0,

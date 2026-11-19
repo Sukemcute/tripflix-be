@@ -52,6 +52,12 @@ export class InvalidCommentBodyException extends DomainException {
   }
 }
 
+export class InvalidCommentMentionsException extends DomainException {
+  constructor(message = 'Tag người dùng không hợp lệ: tối đa 10 người, khoảng UTF-16 bắt đầu bằng @ và không trùng hoặc chồng nhau') {
+    super(message);
+  }
+}
+
 export class UnauthorizedCommentActionException extends DomainException {
   constructor(action: string, commentId: string) {
     super(`Bạn không có quyền ${action} trên bình luận ID: ${commentId}`);
