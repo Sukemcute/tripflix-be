@@ -9238,6 +9238,61 @@
           "heightPx"
         ]
       },
+      "PostVideoPostersDto": {
+        "type": "object",
+        "properties": {
+          "w360": {
+            "type": "string"
+          },
+          "w540": {
+            "type": "string"
+          },
+          "w720": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "w360",
+          "w540",
+          "w720"
+        ]
+      },
+      "PostVideoDto": {
+        "type": "object",
+        "properties": {
+          "hlsUrl": {
+            "type": "string",
+            "description": "master.m3u8 trên CloudFront"
+          },
+          "posters": {
+            "$ref": "#/components/schemas/PostVideoPostersDto"
+          },
+          "durationSec": {
+            "type": "number"
+          },
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1"
+            ]
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "hlsUrl",
+          "posters",
+          "durationSec",
+          "aspect",
+          "levels"
+        ]
+      },
       "PostViewerContextDto": {
         "type": "object",
         "properties": {
@@ -9321,7 +9376,9 @@
           },
           "coverMediaId": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "deprecated": true,
+            "description": "ID media làm ảnh bìa (DEPRECATED: UI dùng post.images[0].url hoặc video.posters)"
           },
           "images": {
             "description": "Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng",
@@ -9329,6 +9386,16 @@
             "items": {
               "$ref": "#/components/schemas/PostImageDto"
             }
+          },
+          "video": {
+            "nullable": true,
+            "description": "Thông tin phát video và posters của Reels",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PostVideoDto"
+              }
+            ]
           },
           "tripAttachment": {
             "nullable": true,

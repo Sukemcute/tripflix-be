@@ -142,7 +142,27 @@ describe('PostImagesResolver', () => {
       nextCursor: 'next',
     });
 
-    expect(page).toEqual({ items: [{ postType: 'vlog', mediaIds: [], images: [] }], nextCursor: 'next' });
+    expect(page).toEqual({ items: [{ postType: 'vlog', mediaIds: [], images: [], video: null }], nextCursor: 'next' });
     expect(postMedia.getImages).not.toHaveBeenCalled();
+  });
+
+  it('gắn video playback cho bài video khi có getPlayback', async () => {
+    const playbackInfo = {
+      hlsUrl: 'https://cdn.test/master.m3u8',
+      posters: { w360: 'https://cdn/360.jpg', w540: 'https://cdn/540.jpg', w720: 'https://cdn/720.jpg' },
+      durationSec: 30,
+      aspect: '9:16' as const,
+      levels: [360, 720] as any[],
+    };
+    const postMedia = {
+      ...createPostMedia({}),
+      getPlayback: vi.fn(async (ids: string[]) => new Map(ids.map((id) => [id, playbackInfo]))),
+    };
+    const [reel] = await new PostImagesResolver(postMedia).attach([
+      { postType: 'video', mediaIds: ['v1'] },
+    ]);
+    expect(reel!.video).toEqual(playbackInfo);
+    expect(reel!.images).toEqual([]);
+    expect(postMedia.getPlayback).toHaveBeenCalledWith(['v1']);
   });
 });
