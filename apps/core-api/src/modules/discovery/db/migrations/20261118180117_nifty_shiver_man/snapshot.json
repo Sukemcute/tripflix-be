@@ -1,0 +1,119 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4d3a951f-886d-4df3-a881-85714f7c8913",
+  "prevIds": [
+    "eb4c3c29-ddcd-4695-834f-7959732c77b3"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_text_vectors"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_text_vectors",
+        "n|tbl|discovery.recommend_text_vectors",
+        "e|tbl|discovery.recommend_text_vectors",
+        "n|rel|discovery.recommend_text_vectors",
+        "n|type|discovery.recommend_text_vectors",
+        "n|rel|discovery.recommend_text_vectors_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_text_vectors",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_text_vectors",
+        "name": "model",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_text_vectors",
+        "name": "text_hash",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_text_vectors",
+        "name": "vector",
+        "type": "real",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_text_vectors",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_text_vectors",
+        "name": "recommend_text_vectors_pkey",
+        "columns": [
+          "model",
+          "text_hash"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

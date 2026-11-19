@@ -76,6 +76,9 @@ export function toUserActivityRecord(event: EventEnvelope): UserActivityRecord |
           intent: parsed.payload.intent,
           answerKind: parsed.payload.answerKind,
           isAction: parsed.payload.isAction,
+          // Có từ ai-service bản mới (SCRUM-179); sự kiện cũ không có thì bỏ khoá, không ghi null.
+          ...(parsed.payload.turnId ? { turnId: parsed.payload.turnId } : {}),
+          ...(typeof parsed.payload.latencyMs === 'number' ? { latencyMs: parsed.payload.latencyMs } : {}),
         },
       };
     }

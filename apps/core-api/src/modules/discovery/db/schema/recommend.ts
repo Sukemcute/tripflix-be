@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, doublePrecision, index, jsonb, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, doublePrecision, index, jsonb, primaryKey, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { discoverySchema } from './discovery-schema.js';
 
 const at = (name: string) => timestamp(name, { withTimezone: true });
@@ -122,3 +122,20 @@ export const recommendJobState = discoverySchema.table('recommend_job_state', {
 });
 
 export type RecommendInteractionRow = typeof recommendInteractions.$inferInsert;
+
+/**
+ * Cache vector nhúng văn bản (caption bài, câu mô tả ngăn) từ ai-service POST /embed (TF28).
+ * Khoá theo nội dung: bài không đổi chữ thì không nhúng lại; đổi mô hình thì khoá mới.
+ * ponytail: không dọn dòng cũ (bài sửa chữ để lại vector cũ, ~1,5 KB/dòng); thêm dọn theo created_at khi bảng lớn.
+ */
+export const recommendTextVectors = discoverySchema.table(
+  'recommend_text_vectors',
+  {
+    model: text('model').notNull(),
+    /** sha256 hex của văn bản. */
+    textHash: text('text_hash').notNull(),
+    vector: real('vector').array().notNull(),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ name: 'recommend_text_vectors_pkey', columns: [t.model, t.textHash] })],
+);

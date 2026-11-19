@@ -1,20 +1,25 @@
 import { hotV0, hotV1, hotV2 } from './builders/hot.js';
 import { noneV0 } from './builders/none.js';
+import { postProfileV1 } from './builders/post-profile.js';
+import { tripProfileV1 } from './builders/trip-profile.js';
 import { tagAffinityV0 } from './builders/tag-affinity.js';
 import type { PostBuilder, Ranker, UserBuilder } from './contracts.js';
 import { popularRankerV0, tagAffinityRankerV0 } from './rankers/rankers.js';
+import { tripRankerV1 } from './rankers/trip-v1.js';
 
 /** 'tên@version' → builder. Thêm builder = viết hàm + thêm một dòng ở đây. */
 export const BUILDERS = new Map<string, { kind: 'post'; builder: PostBuilder } | { kind: 'user'; builder: UserBuilder }>([
   [hotV0.key, { kind: 'post', builder: hotV0 }],
   [hotV1.key, { kind: 'post', builder: hotV1 }],
   [hotV2.key, { kind: 'post', builder: hotV2 }],
+  [postProfileV1.key, { kind: 'post', builder: postProfileV1 }],
   [tagAffinityV0.key, { kind: 'user', builder: tagAffinityV0 }],
   [noneV0.key, { kind: 'user', builder: noneV0 }],
+  [tripProfileV1.key, { kind: 'user', builder: tripProfileV1 }],
 ]);
 
 /** tên → ranker, khớp recommend_algos.ranker. */
-export const RANKERS = new Map<string, Ranker>([tagAffinityRankerV0, popularRankerV0].map((r) => [r.name, r]));
+export const RANKERS = new Map<string, Ranker>([tagAffinityRankerV0, popularRankerV0, tripRankerV1].map((r) => [r.name, r]));
 
 export interface AlgoRow {
   name: string;

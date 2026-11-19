@@ -1,4 +1,5 @@
 import type { Role } from '@tripflix/contracts';
+import type { AvatarDecor } from '../../account/domain/avatar-decor.js';
 import type { UserRecord } from './ports.js';
 
 /** Phần thông tin người dùng được trả ra API; không bao giờ có password_hash. */
@@ -29,8 +30,9 @@ export interface MyProfile extends PublicUser {
   gender: UserRecord['personal']['gender'];
   nationality: string | null;
   avatarUrl: string | null;
+  avatarDecor: AvatarDecor | null;
 }
 
 export function mapMyProfile(user: UserRecord): MyProfile {
-  return { ...mapPublicUser(user), emailVerified: user.emailVerifiedAt !== null, ...user.personal, avatarUrl: user.avatarUrl };
+  return { ...mapPublicUser(user), emailVerified: user.emailVerifiedAt !== null, ...user.personal, avatarUrl: user.avatarUrl, avatarDecor: user.avatarDecor };
 }

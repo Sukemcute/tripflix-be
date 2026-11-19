@@ -1,6 +1,7 @@
 import { createOutboxTable } from '@tripflix/outbox';
 import { sql } from 'drizzle-orm';
 import { bigint, check, date, foreignKey, index, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { AvatarDecor } from '../../account/domain/avatar-decor.js';
 import type { TravelPreferences } from '../../account/domain/travel-preferences.js';
 
 /** Mọi bảng của module access khai báo trong schema này. */
@@ -31,6 +32,8 @@ export const users = accessSchema.table(
     // Trống cả hai: chưa từng có ảnh; đăng nhập Google chỉ ghi ảnh khi source trống hoặc google.
     avatarUrl: text('avatar_url'),
     avatarSource: text('avatar_source'),
+    // Khung và phụ kiện bọc ngoài ảnh đại diện (TF109): { frameId, stickers[] }, kiểm ở dto. Trống: chưa trang trí.
+    avatarDecor: jsonb('avatar_decor').$type<AvatarDecor>(),
     termsVersion: text('terms_version'),
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     role: text('role').notNull().default('member'),

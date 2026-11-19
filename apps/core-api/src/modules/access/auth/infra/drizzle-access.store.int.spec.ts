@@ -186,6 +186,15 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     await expect(store.users.updateAvatar(user!.id, { avatarUrl: null, avatarSource: 'lạ' as never })).rejects.toThrow();
   });
 
+  it('TF109: khung và phụ kiện avatar lưu dạng JSON, gỡ được', async () => {
+    const user = await store.users.insert({ email: 'decor@example.com', passwordHash: null, displayName: 'E', role: 'member' });
+    expect(user!.avatarDecor).toBeNull();
+    const decor = { frameId: 'fox-hat', stickers: [{ instanceId: 's-1', presetId: 'camera', x: 0.9, y: 0.8, scale: 1, rotationDeg: 0, isFlipped: false }] };
+    expect((await store.users.updateAvatarDecor(user!.id, decor))?.avatarDecor).toEqual(decor);
+    expect((await store.users.findById(user!.id))?.avatarDecor).toEqual(decor);
+    expect((await store.users.updateAvatarDecor(user!.id, null))?.avatarDecor).toBeNull();
+  });
+
   it('TF06M: thông tin cá nhân lưu, xoá được; DB chặn giá trị sai dù bỏ qua kiểm tra của API', async () => {
     const user = await store.users.insert({ email: 'personal@example.com', passwordHash: 'x', displayName: 'C', role: 'member' });
     expect(user!.personal).toEqual({ phone: null, dateOfBirth: null, gender: null, nationality: null, travelPreferences: null });

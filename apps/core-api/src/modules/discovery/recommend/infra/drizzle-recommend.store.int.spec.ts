@@ -214,6 +214,15 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', hasPlan: false }]);
   });
 
+  it('cache vector theo (mô hình, sha256): đọc đúng mô hình, ghi trùng khoá giữ dòng cũ', async () => {
+    await store.insertTextVectors('e5@1', [{ textHash: 'h1', vector: [0.5, -0.25] }]);
+    await store.insertTextVectors('e5@1', [{ textHash: 'h1', vector: [9, 9] }, { textHash: 'h2', vector: [1, 0] }]);
+    await store.insertTextVectors('other@1', [{ textHash: 'h3', vector: [1, 1] }]);
+    const found = await store.findTextVectors('e5@1', ['h1', 'h2', 'h3']);
+    expect(found).toEqual(new Map([['h1', [0.5, -0.25]], ['h2', [1, 0]]]));
+    expect(await store.findTextVectors('e5@1', [])).toEqual(new Map());
+  });
+
   it('khoá advisory: lượt thứ hai cùng lúc bỏ lượt', async () => {
     let release!: () => void;
     const first = store.withLock('t', () => new Promise<string>((r) => (release = () => r('a'))));

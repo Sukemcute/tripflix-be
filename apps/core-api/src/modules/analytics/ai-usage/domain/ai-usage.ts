@@ -17,6 +17,11 @@ const AiUsagePayloadSchema = z.object({
   outputTokens: tokens,
   costUsd: z.number().nonnegative().finite(),
   estimated: z.boolean(),
+  // SCRUM-179: tuỳ chọn, chỉ có từ ai-service bản mới; chat có conversationId, tóm tắt và kiểm duyệt thì không.
+  // ai-service serialize trường rỗng thành null (không exclude_none): nhận cả thiếu lẫn null, không thì mất cả sự kiện chi phí.
+  conversationId: z.uuid().nullish(),
+  turnId: z.uuid().nullish(),
+  latencyMs: z.number().int().nonnegative().nullish(),
 });
 
 export interface AiUsageRecord {
@@ -29,6 +34,11 @@ export interface AiUsageRecord {
   outputTokens: number | null;
   costUsd: number;
   isEstimated: boolean;
+  /** Người dùng gây ra lượt gọi (chat); null với tóm tắt, kiểm duyệt và sự kiện cũ. */
+  userId: string | null;
+  conversationId: string | null;
+  turnId: string | null;
+  latencyMs: number | null;
 }
 
 export interface AiUsageQuery {
@@ -59,6 +69,10 @@ export function toAiUsageRecord(event: EventEnvelope): AiUsageRecord | null {
     outputTokens: payload.outputTokens ?? null,
     costUsd: payload.costUsd,
     isEstimated: payload.estimated,
+    userId: event.userId ?? null,
+    conversationId: payload.conversationId ?? null,
+    turnId: payload.turnId ?? null,
+    latencyMs: payload.latencyMs ?? null,
   };
 }
 

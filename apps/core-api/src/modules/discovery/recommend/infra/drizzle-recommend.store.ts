@@ -8,6 +8,7 @@ import {
   recommendJobState,
   recommendPostScores,
   recommendPosts,
+  recommendTextVectors,
   recommendUserFeatures,
 } from '../../db/schema/index.js';
 import type { CandidateQuery, InteractionCounts, ProductFeatureStore, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
@@ -21,7 +22,7 @@ const chunks = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / CHUNK)
 
 /** Hạn lưu bảng thô (đề xuất mục 4). Dòng thêm mới (ref = eventId) giữ ngắn hơn dòng trạng thái. */
 const RETENTION = { removedDays: 7, appendOnlyDays: 90, otherDays: 180 };
-const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_search'];
+const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_search', 'booking_click'];
 
 const excluded = (column: string) => sql.raw(`excluded."${column}"`);
 
@@ -372,11 +373,38 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     return rows.flatMap((r) => (r.id ? [r.id] : []));
   }
 
+  async findProductPlaces(productIds: string[]): Promise<Record<string, string>> {
+    if (!productIds.length) return {};
+    const t = recommendProductFeatures;
+    const rows = await this.db
+      .selectDistinct({ productId: t.productId, groupKey: t.groupKey })
+      .from(t)
+      .where(and(eq(t.productType, 'hotel'), inArray(t.productId, productIds)));
+    return Object.fromEntries(rows.map((r) => [r.productId, r.groupKey]));
+  }
+
   async findPostMetas(postIds: string[]): Promise<PostMeta[]> {
     if (!postIds.length) return [];
     const { postId, authorId, postType, tags, placeId, hasPlan } = recommendPosts;
     // hasPlan: mode has_plan lọc bài tự đăng (own) theo cờ này; thiếu thì mọi bài tự đăng bị loại.
     return this.db.select({ postId, authorId, postType, tags, placeId, hasPlan }).from(recommendPosts).where(inArray(recommendPosts.postId, postIds));
+  }
+
+  async findTextVectors(model: string, textHashes: string[]): Promise<Map<string, number[]>> {
+    if (textHashes.length === 0) return new Map();
+    const rows = await this.db
+      .select({ textHash: recommendTextVectors.textHash, vector: recommendTextVectors.vector })
+      .from(recommendTextVectors)
+      .where(and(eq(recommendTextVectors.model, model), inArray(recommendTextVectors.textHash, textHashes)));
+    return new Map(rows.map((r) => [r.textHash, r.vector]));
+  }
+
+  async insertTextVectors(model: string, rows: Array<{ textHash: string; vector: number[] }>): Promise<void> {
+    if (rows.length === 0) return;
+    await this.db
+      .insert(recommendTextVectors)
+      .values(rows.map((r) => ({ model, ...r })))
+      .onConflictDoNothing();
   }
 
   async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {

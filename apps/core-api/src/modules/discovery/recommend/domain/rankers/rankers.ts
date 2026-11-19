@@ -1,19 +1,19 @@
 import { PLACES } from '../../../search/domain/places.js';
 import { round4, type Candidate, type RankedItem, type Ranker } from '../contracts.js';
 
-const TRENDING = { code: 'trending', text: 'Bài viết thịnh hành trên TripFlix' };
+export const TRENDING = { code: 'trending', text: 'Bài viết thịnh hành trên TripFlix' };
 
-type Scored = { candidate: Candidate; final: number; item: Omit<RankedItem, 'authorId'> };
+export type Scored = { candidate: Candidate; final: number; item: Omit<RankedItem, 'authorId'> };
 
 /** Sắp giảm dần theo final, rồi hot, rồi postId (phá hoà cố định). Đa dạng tác giả: feed-policy.ts. */
-function sortByFinal(scored: Scored[]): RankedItem[] {
+export function sortByFinal(scored: Scored[]): RankedItem[] {
   scored.sort(
     (a, b) => b.final - a.final || b.candidate.score - a.candidate.score || a.candidate.postId.localeCompare(b.candidate.postId),
   );
   return scored.map(({ candidate, item }) => ({ ...item, authorId: candidate.authorId }));
 }
 
-const weightMap = (v: unknown): Record<string, number> =>
+export const weightMap = (v: unknown): Record<string, number> =>
   v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([, w]) => typeof w === 'number')) : {};
 const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
 const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? id;

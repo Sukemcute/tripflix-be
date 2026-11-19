@@ -57,6 +57,7 @@ export class MemoryAccessStore implements AccessStore {
         personal: { phone: null, dateOfBirth: null, gender: null, nationality: null, travelPreferences: null, ...personal },
         avatarUrl: avatar?.avatarUrl ?? null,
         avatarSource: avatar?.avatarSource ?? null,
+        avatarDecor: null,
       };
       if (terms) this.acceptedTerms.set(row.id, terms);
       this.userRows.set(row.id, row);
@@ -94,6 +95,7 @@ export class MemoryAccessStore implements AccessStore {
     },
     updatePasswordHash: async (id: string, passwordHash: string | null) => this.patchUser(id, { passwordHash }),
     updateAvatar: async (id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>) => this.patchUser(id, avatar),
+    updateAvatarDecor: async (id: string, avatarDecor: UserRecord['avatarDecor']) => this.patchUser(id, { avatarDecor }),
     markEmailVerified: async (id: string, at: Date) => {
       const row = this.userRows.get(id);
       if (!row) return null;
