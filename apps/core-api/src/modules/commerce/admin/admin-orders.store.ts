@@ -135,6 +135,8 @@ export class AdminOrdersStore {
     const kinds = input.kinds?.length ? input.kinds : [...ANOMALY_KINDS];
     const now = sql`${input.now.toISOString()}::timestamptz`;
     const onlyOrder = input.orderId ? sql`and o.id = ${input.orderId}::uuid` : sql``;
+    const onlyOrderCells = input.orderId ? sql`and c.order_id = ${input.orderId}::uuid` : sql``;
+    const today = sql`(${now} at time zone 'Asia/Ho_Chi_Minh')::date`;
     const queries: Record<AnomalyKind, SQL> = {
       // Hai khoản trở lên đã vào tiền mà chưa hoàn xong. Database chỉ chặn hai khoản cùng "đang sống"; khoản đã failed
       // nhưng cổng vẫn có giờ trả (IPN đến muộn, mất phản hồi) thì vẫn lọt.
@@ -153,38 +155,48 @@ export class AdminOrdersStore {
         where o.status <> 'paid' and o.paid_at is null and ${CHARGED} and ${UNREFUNDED} > 0
           and p.created_at < ${now} - interval '10 minutes' ${onlyOrder}
         group by o.id`,
-      // Đơn paid mà kho không ghi đủ chỗ bán ở ít nhất một ô (ngày) của đơn, hoặc mục chưa có mã xác nhận.
+      // Đơn paid mà kho ghi thiếu chỗ bán ở một ngày từ hôm nay trở đi, hoặc mục chưa có mã xác nhận. Bỏ ngày đã qua:
+      // job dọn dẹp có thể đã xoá lịch cũ, xét vào sẽ báo nhầm, và cũng không còn gì để giữ chỗ cho khách.
+      // Dùng phép nối thường thay cho IN theo bộ và truy vấn con từng đơn: với ~60 nghìn đơn paid bản cũ quá 10 giây.
       paid_without_seat: sql`
-        with cells as (
-          select i.order_id, i.product_type, i.product_id, (i.date + g.n)::date as date
+        with order_cells as (
+          select i.order_id, i.product_type, i.product_id, (i.date + g.n)::date as date, i.qty
           from commerce.order_items i join commerce.orders o on o.id = i.order_id
           cross join lateral generate_series(0, greatest(i.nights, 1) - 1) as g(n)
-          where o.status = 'paid' ${onlyOrder}
+          where o.status = 'paid' and (i.date + g.n) >= ${today}
         ),
         expected as (
-          select i.product_type, i.product_id, (i.date + g.n)::date as date, sum(i.qty)::int as sold
-          from commerce.order_items i join commerce.orders o on o.id = i.order_id
-          cross join lateral generate_series(0, greatest(i.nights, 1) - 1) as g(n)
-          where o.status = 'paid' and (i.product_type, i.product_id, (i.date + g.n)::date) in (select product_type, product_id, date from cells)
+          select c.product_type, c.product_id, c.date, sum(c.qty)::int as sold
+          from order_cells c ${input.orderId ? sql`join (select distinct product_type, product_id, date from order_cells c where true ${onlyOrderCells}) t using (product_type, product_id, date)` : sql``}
           group by 1, 2, 3
         ),
+        -- Tra từng ô kho theo khoá chính: planner đoán sai số dòng của generate_series nên tự chọn quét cả bảng kho (~1 triệu ô).
         short as (
-          select e.product_type, e.product_id, e.date, e.sold as expected_sold, coalesce(ri.sold, fi.sold, 0) as sold
-          from expected e
-          left join commerce.room_inventory ri on e.product_type = 'room' and ri.room_type_id = e.product_id and ri.date = e.date
-          left join commerce.flight_inventory fi on e.product_type = 'flight' and fi.flight_id = e.product_id and fi.date = e.date
-          where coalesce(ri.sold, fi.sold, 0) < e.sold
+          select * from (
+            select e.product_type, e.product_id, e.date, e.sold as expected_sold,
+                   coalesce(case when e.product_type = 'room'
+                                 then (select ri.sold from commerce.room_inventory ri where ri.room_type_id = e.product_id and ri.date = e.date)
+                                 else (select fi.sold from commerce.flight_inventory fi where fi.flight_id = e.product_id and fi.date = e.date) end, 0) as sold
+            from expected e
+          ) cell where cell.sold < cell.expected_sold
+        ),
+        flagged as (
+          select c.order_id as id,
+                 jsonb_agg(jsonb_build_object('productId', s.product_id, 'date', s.date, 'sold', s.sold, 'expectedSold', s.expected_sold) order by s.date) as short_cells
+          from order_cells c join short s using (product_type, product_id, date)
+          where true ${onlyOrderCells}
+          group by c.order_id
+        ),
+        no_code as (
+          select i.order_id as id, count(*)::int as n
+          from commerce.order_items i join commerce.orders o on o.id = i.order_id
+          where o.status = 'paid' and i.confirmation_code is null ${onlyOrder}
+          group by i.order_id
         )
         select o.id, o.paid_at as since,
-               jsonb_build_object(
-                 'shortCells', coalesce((select jsonb_agg(jsonb_build_object('productId', s.product_id, 'date', s.date, 'sold', s.sold, 'expectedSold', s.expected_sold))
-                                         from short s where (s.product_type, s.product_id, s.date) in (select product_type, product_id, date from cells c where c.order_id = o.id)), '[]'::jsonb),
-                 'itemsWithoutCode', (select count(*) from commerce.order_items i where i.order_id = o.id and i.confirmation_code is null)
-               ) as detail
-        from commerce.orders o
-        where o.status = 'paid' ${onlyOrder}
-          and (exists (select 1 from short s join cells c on (c.product_type, c.product_id, c.date) = (s.product_type, s.product_id, s.date) where c.order_id = o.id)
-               or exists (select 1 from commerce.order_items i where i.order_id = o.id and i.confirmation_code is null))`,
+               jsonb_build_object('shortCells', coalesce(f.short_cells, '[]'::jsonb), 'itemsWithoutCode', coalesce(n.n, 0)) as detail
+        from flagged f full join no_code n on n.id = f.id
+        join commerce.orders o on o.id = coalesce(f.id, n.id)`,
       // Đơn paid mà không có khoản trừ thành công nào, hoặc số đã trừ khác tổng đơn.
       paid_amount_mismatch: sql`
         select o.id, o.paid_at as since,
@@ -209,12 +221,14 @@ export class AdminOrdersStore {
         group by o.id`,
     };
 
-    const parts = kinds.map(
-      (kind) => sql`(select ${kind}::text as kind, o.id as "orderId", o.confirmation_code as "confirmationCode", o.status as "orderStatus", o.total, a.detail, a.since
-         from (${queries[kind]}) a join commerce.orders o on o.id = a.id order by a.since asc nulls last limit ${input.limitPerKind})`,
+    // Mỗi loại một câu, chạy song song (ngoài transaction nên mỗi câu lấy một kết nối riêng): gộp union all thì chạy nối tiếp.
+    const perKind = await Promise.all(
+      kinds.map((kind) =>
+        this.db.execute<AnomalyRow>(sql`select ${kind}::text as kind, o.id as "orderId", o.confirmation_code as "confirmationCode", o.status as "orderStatus", o.total, a.detail, a.since
+          from (${queries[kind]}) a join commerce.orders o on o.id = a.id order by a.since asc nulls last limit ${input.limitPerKind}`),
+      ),
     );
-    const result = await this.db.execute<AnomalyRow>(sql.join(parts, sql` union all `));
-    return result.rows.map((row) => ({ ...row, total: Number(row.total), since: new Date(row.since) }));
+    return perKind.flatMap((result) => result.rows).map((row) => ({ ...row, total: Number(row.total), since: new Date(row.since) }));
   }
 }
 

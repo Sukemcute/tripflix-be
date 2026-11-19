@@ -116,6 +116,13 @@ describe('TF43 đơn bất thường cho quản trị', () => {
     expect(await kindsOf(noSeat)).toEqual<AnomalyKind[]>(['paid_without_seat']);
   });
 
+  it('ngày đã qua không bị báo thiếu chỗ (lịch cũ có thể đã bị dọn)', async () => {
+    const past = await createOrder({ status: 'paid', paid: true, code: 'PAST0001' });
+    await addPayment(past, { status: 'succeeded' });
+    await pool.query("update commerce.order_items set date = '2026-11-01' where order_id = $1", [past]);
+    expect(await kindsOf(past)).toEqual([]);
+  });
+
   it('đơn paid không có khoản trừ, hoặc trừ lệch tổng đơn', async () => {
     await setSold(2);
     const none = await createOrder({ status: 'paid', paid: true, code: 'AMNT0001' });
