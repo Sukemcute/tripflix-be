@@ -14,9 +14,11 @@ describe('placeIdOfPost', () => {
     expect(placeIdOfPost({ hotelId: null, destinationName: null, title: 'review dalat' }, hotels)).toBe('da-lat');
   });
 
-  it('không nhận ra nơi, hoặc nơi không có trong PLACES → null', () => {
+  it('không nhận ra nơi → null; điểm đến của lexicon (Sa Pa, Hà Giang, Cô Tô) có id', () => {
     expect(placeIdOfPost({ hotelId: null, destinationName: null, title: 'Ăn gì hôm nay' }, hotels)).toBeNull();
-    expect(placeIdOfPost({ hotelId: null, destinationName: 'Sa Pa', title: '' }, hotels)).toBeNull();
+    expect(placeIdOfPost({ hotelId: null, destinationName: 'Sa Pa', title: '' }, hotels)).toBe('sa-pa');
+    expect(placeIdOfPost({ hotelId: null, destinationName: 'Hà Giang', title: '' }, hotels)).toBe('ha-giang');
+    expect(placeIdOfPost({ hotelId: null, destinationName: null, title: 'Ngày 2 ở Cô Tô' }, hotels)).toBe('co-to');
   });
 
   it('mọi id trả ra đều có trong PLACES', () => {

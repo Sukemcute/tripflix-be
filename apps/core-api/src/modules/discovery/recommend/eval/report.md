@@ -15,7 +15,7 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 
 ### Ngăn của bài (post_profile@v1)
 
-243 bài: 239 có nơi, 4 không có nơi; 30 không có ngăn trải nghiệm nào.
+243 bài: 243 có nơi, 0 không có nơi; 30 không có ngăn trải nghiệm nào.
 
 | Ngăn | Số bài |
 |---|---|
@@ -50,8 +50,8 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 | `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,20 | – | 5 | 6 | – | Vì bạn quan tâm Phú Quốc · Bài viết thịnh hành trên TripFlix |
 | `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,4, KS khác ≤ 1 | – | 0,70 | – | 8 | 6 | 0 | Vì bạn quan tâm Nha Trang · Vì bạn thích chủ đề #xuhuong · Vì bạn thích chủ đề #checkin |
 | `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,4 | – | 0,60 | – | 7 | 2 | 0 | Vì bạn quan tâm Đà Lạt · Vì bạn thích chủ đề #cafe · Vì bạn thích chủ đề #fyp |
-| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0,40 | 9 | 2 | – | Vì bạn quan tâm Phú Quốc · Vì bạn thích chủ đề #xuhuong · Vì bạn thích chủ đề #bien |
-| `mo-xem-reels-bien` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 8 | 2 | – | Vì bạn quan tâm Huế · Vì bạn thích chủ đề #bien · Vì bạn quan tâm Nha Trang |
+| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0,40 | 10 | 2 | – | Vì bạn quan tâm Phú Quốc · Vì bạn thích chủ đề #xuhuong · Vì bạn thích chủ đề #bien |
+| `mo-xem-reels-bien` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn quan tâm Huế · Vì bạn thích chủ đề #bien · Vì bạn quan tâm Nha Trang |
 | `kh-bam-dat-reels-danang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,10 | – | 5 | 3 | – | Vì bạn quan tâm Đà Lạt · Vì bạn quan tâm Ninh Bình · Vì bạn quan tâm Đà Nẵng |
 | `khach` | Khách | như trending | – | – | – | 6 | 5 | – | Bài viết thịnh hành trên TripFlix |
 
@@ -59,16 +59,16 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 
 | Persona | Giai đoạn | Mục tiêu | hit@20 | đúng nơi@10 | nơi vừa đi@10 | số nơi@20 | chuỗi cùng nơi@20 | KS khác@10 | Lý do top 10 |
 |---|---|---|---|---|---|---|---|---|---|
-| `mo-bien-capdoi` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 12 | 2 | – | Vì bạn hay xem bài về biển đảo · Vì bạn quan tâm Vũng Tàu · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
-| `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 10 | 2 | – | Vì bạn hay xem bài về núi, thiên nhiên · Vì bạn quan tâm Ninh Bình · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
+| `mo-bien-capdoi` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 13 | 2 | – | Vì bạn hay xem bài về biển đảo · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về ăn uống |
+| `mo-nui-phuot` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 9 | 2 | – | Vì bạn hay xem bài về núi, thiên nhiên · Vì bạn quan tâm Ninh Bình · Vì bạn hay xem bài về ngắm cảnh, sống ảo |
 | `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 11 | 2 | – | Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
 | `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 12 | 2 | – | Vì bạn hay xem bài về văn hoá, di tích · Vì bạn quan tâm Nha Trang |
 | `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,70 | – | 5 | 4 | – | Vì bạn đang tìm hiểu Đà Lạt · Vì bạn đang tìm hiểu Nha Trang · Vì bạn đang tìm hiểu Hà Nội |
-| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 10 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
+| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 11 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
 | `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 8 | 4 | – | Vì bạn đang tìm hiểu Phú Quốc · Vì bạn đang tìm hiểu các nơi có nghỉ dưỡng · Vì bạn đang tìm hiểu các nơi có biển đảo |
-| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,4, KS khác ≤ 1 | – | 0,40 | – | 12 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về biển đảo |
-| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,4 | – | 0,40 | – | 7 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về khu vui chơi, mua sắm · Vì bạn hay xem bài về cà phê |
-| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0 | 13 | 2 | – | Bạn vừa đi Phú Quốc, thử thêm bài về biển đảo |
-| `mo-xem-reels-bien` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 10 | 2 | – | Vì bạn hay xem bài về biển đảo · Vì bạn hay xem bài về cà phê · Vì bạn quan tâm Nha Trang |
+| `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,4, KS khác ≤ 1 | – | 0,40 | – | 11 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về biển đảo |
+| `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,4 | – | 0,40 | – | 10 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về cà phê · Vì bạn hay xem bài về ăn uống |
+| `vua-ve-phuquoc` | Vừa về | nơi vừa đi ≤ 0,2 | – | – | 0 | 14 | 2 | – | Bạn vừa đi Phú Quốc, thử thêm bài về biển đảo |
+| `mo-xem-reels-bien` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 11 | 2 | – | Vì bạn hay xem bài về biển đảo · Vì bạn hay xem bài về cà phê · Vì bạn quan tâm Nha Trang |
 | `kh-bam-dat-reels-danang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 9 | 4 | – | Vì bạn đang tìm hiểu Đà Nẵng · Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
 | `khach` | Khách | như trending | – | – | – | 6 | 5 | – | Bài viết thịnh hành trên TripFlix |

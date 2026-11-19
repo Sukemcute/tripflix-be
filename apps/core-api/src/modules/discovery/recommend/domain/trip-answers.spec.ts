@@ -266,6 +266,27 @@ describe('trip_v1', () => {
     expect(out[1]!.score).toBeCloseTo(out[0]!.score / 2, 3);
   });
 
+  it('đang đi mà vừa tìm và thích bài nơi khác: chuyến vẫn đầu, nơi đó xếp trên bài hot ở nơi khác', () => {
+    const order = row({ kind: 'order_item', targetType: 'hotel', targetId: 'H1', occurredAt: daysAgo(5), detail: { date: '2026-11-12', nights: 4 } });
+    const dl2 = { ...posts.dl1!, postId: 'dl2' };
+    const out = tripRankerV1.rank({
+      candidates: [
+        cand('food', 0.1, { 'place:nha-trang': 1, 'exp:an_uong': 1 }),
+        cand('da-lat', 0.1, { 'place:da-lat': 1 }),
+        cand('hot-elsewhere', 0.9, { 'place:sa-pa': 1 }),
+      ],
+      userFeatures: null,
+      now: NOW,
+      viewer: {
+        rows: [order, search('da-lat', 0.02), react('dl1', 0.01), react('dl2', 0.01)],
+        productPlaces: { H1: 'nha-trang' },
+        posts: { dl1: posts.dl1!, dl2 },
+      },
+    });
+    expect(out.map((r) => r.postId)).toEqual(['food', 'da-lat', 'hot-elsewhere']);
+    expect(out[1]!.reason.code).toBe('matches_place');
+  });
+
   it('nơi chính là nơi cụ thể nhất dù jsonb đặt tỉnh cha lên trước', () => {
     const search = (h: number) => row({ kind: 'search', targetType: 'place', targetId: 'nha-trang', occurredAt: daysAgo(h / 24) });
     const out = tripRankerV1.rank({
