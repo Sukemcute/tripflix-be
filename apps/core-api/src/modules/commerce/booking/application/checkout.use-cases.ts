@@ -20,6 +20,7 @@ import {
   type GuestInput,
 } from '../domain/order-rules.js';
 import { CellGate } from './cell-gate.js';
+import { computeTripStatus, findEndDate, type TripStatus } from '../domain/trip-status.js';
 import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore, type RefundRecord } from './ports.js';
 
 export interface CheckoutItemInput {
@@ -60,6 +61,8 @@ export interface CheckoutView {
   /** Loại của từng hành khách cần nhập, đúng thứ tự gửi guests; rỗng khi không có vé bay. */
   passengerTypes: PassengerType[];
   policyVersion: string;
+  /** TF37: chỉ đơn đã trả mới có; completed = đã qua ngày kết thúc chuyến theo giờ Việt Nam. Optional để các bản dựng view có sẵn không phải đổi. */
+  tripStatus?: TripStatus | null;
 }
 
 export interface TripView {
@@ -77,6 +80,7 @@ export interface TripView {
   /** Ngày sớm nhất / muộn nhất của các mục (nhận phòng, bay; trả phòng). */
   startDate: string | null;
   endDate: string | null;
+  tripStatus: TripStatus | null;
   items: CheckoutView['items'];
 }
 
@@ -472,6 +476,7 @@ export class CheckoutUseCases {
         : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
     const passengerTypes = listRequiredPassengers(order, items);
     const passengersRequired = passengerTypes.length;
+    const itemViews = toItemViews(items);
     return {
       orderId: order.id,
       status: order.status,
@@ -484,11 +489,12 @@ export class CheckoutUseCases {
       cancelReason: order.cancelReason,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
       refund: summarizeRefunds(order, refunds),
-      items: toItemViews(items),
+      items: itemViews,
       isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates, passengersRequired }),
       passengersRequired,
       passengerTypes,
       policyVersion: POLICY_VERSION,
+      tripStatus: computeTripStatus({ status: order.status, endDate: findEndDate(itemViews) }, this.today()),
     };
   }
 
@@ -502,8 +508,10 @@ export class CheckoutUseCases {
     for (const item of await this.orders.findItemsOfOrders(page.map((o) => o.id))) {
       itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
     }
+    const today = this.today();
     const trips = page.map((order): TripView => {
       const items = toItemViews(itemsByOrder.get(order.id) ?? []);
+      const endDate = findEndDate(items);
       return {
         orderId: order.id,
         status: order.status,
@@ -517,7 +525,8 @@ export class CheckoutUseCases {
         createdAt: order.createdAt.toISOString(),
         paidAt: order.paidAt?.toISOString() ?? null,
         startDate: items.reduce<string | null>((min, i) => (min === null || i.date < min ? i.date : min), null),
-        endDate: items.reduce<string | null>((max, i) => (max === null || i.dateTo > max ? i.dateTo : max), null),
+        endDate,
+        tripStatus: computeTripStatus({ status: order.status, endDate }, today),
         items,
       };
     });
