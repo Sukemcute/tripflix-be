@@ -27,6 +27,8 @@ const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
 const EXPLORE_POOL_LIMIT = 500;
 const EXPLORE_DAYS = 30;
+/** Số bài khám phá giữ trước cho cả phiên (đủ cho ~50 trang). */
+const EXPLORE_RESERVE = 50;
 const FULL_READ_EXPLORE_SKIP = 100;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
@@ -222,26 +224,30 @@ export class PostRecommendationUseCases {
     const ownExtra: RankedItem[] = ownRecent
       .filter((postId) => !inCandidates.has(postId))
       .map((postId) => ({ postId, authorId: q.userId!, score: 0, source: 'own', breakdown: {}, reason: OWN_POST_REASON }));
-    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now, viewer }), ...ownExtra], {
+    // Xếp theo mốc trang đầu (sessionAt), không theo giờ gọi: điểm "vừa xảy ra" đổi theo phút, trang sau mà xếp lại thì offset lệch, bài lặp.
+    const ranked = applyFeedPolicy([...algo.ranker.rank({ candidates, userFeatures, now: new Date(sessionAt), viewer }), ...ownExtra], {
       userId: q.userId,
       seen,
       interacted: new Set(interacted),
       ownRecent: new Set(ownRecent),
     });
     // Ranker đọc toàn bộ bài thì mọi bài đều là ứng viên: ô khám phá lấy bài xếp ngoài top, không lấy bài ngoài ứng viên.
-    // ponytail: người cuộn sâu quá top có thể gặp lại bài khám phá ở vị trí xếp hạng của nó.
     const topIds = new Set(ranked.slice(0, FULL_READ_EXPLORE_SKIP).map((r) => r.postId));
     const explorePool = rawExplorePool.filter(
       (c) => !seen.has(c.postId) && (algo.ranker.candidateLimit ? !topIds.has(c.postId) : !inCandidates.has(c.postId)),
     );
-    const explore = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: now.toISOString().slice(0, 10) }, slots, page * slots);
+    // Giữ trước một tập bài khám phá cố định cho cả phiên và bỏ chúng khỏi danh sách xếp hạng: bài khám phá không gặp lại ở trang sau.
+    const reserved = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: new Date(sessionAt).toISOString().slice(0, 10) }, EXPLORE_RESERVE, 0);
+    const reservedIds = new Set(reserved.map((r) => r.postId));
+    const rankedOnly = ranked.filter((r) => !reservedIds.has(r.postId));
+    const explore = reserved.slice(page * slots, (page + 1) * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
-    const rankedTake = ranked.slice(offset, offset + q.limit - explore.length);
+    const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
     const pageItems = interleave(rankedTake, explore, q.limit);
 
     // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
     const nextOffset = offset + rankedTake.length;
-    const hasMore = ranked.length > nextOffset || explorePool.length > (page + 1) * slots;
+    const hasMore = rankedOnly.length > nextOffset || reserved.length > (page + 1) * slots;
     return {
       pageItems,
       algo,

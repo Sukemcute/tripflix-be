@@ -98,6 +98,27 @@ describe('PostRecommendationUseCases', () => {
     expect(page.items.some((i) => i.source === 'explore')).toBe(true);
   });
 
+  it('trip_v1: cuộn hết các trang không gặp lại bài nào, kể cả khi gọi trang sau vài phút sau (điểm "vừa xảy ra" đổi theo phút)', async () => {
+    const search = (minsAgo: number, placeId: string): RawRow => ({
+      actorType: 'user', actorId: U, kind: 'search', refId: `s${minsAgo}`, targetType: 'place', targetId: placeId,
+      value: null, isRemoved: false, detail: null, occurredAt: new Date(NOW.getTime() - minsAgo * 60_000).toISOString(),
+    });
+    const { useCases } = setup({
+      algos: [{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }, ALGOS[1]!],
+      viewerRows: [search(5, 'nha-trang'), search(120, 'da-lat'), search(130, 'da-lat')],
+    });
+    const all: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page++) {
+      const res = await useCases.recommend(query({ limit: 5, cursor, now: new Date(NOW.getTime() + page * 7 * 60_000) }));
+      all.push(...ids(res));
+      cursor = res.nextCursor;
+      if (!cursor) break;
+    }
+    expect(all.length).toBeGreaterThan(10);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
   it('ranker cũ không đọc dòng thô người xem và giữ giới hạn 150 bài hot', async () => {
     const { useCases, store } = setup();
     await useCases.recommend(query());

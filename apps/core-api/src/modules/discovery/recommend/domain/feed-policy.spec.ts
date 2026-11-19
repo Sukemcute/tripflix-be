@@ -90,6 +90,15 @@ describe('diversify', () => {
     expect(out.slice(0, 10).filter((id) => id.startsWith('f')).length).toBe(4);
   });
 
+  it('nơi vừa được chú ý: đẩy 4 bài lên đầu dù điểm thấp hơn, các trang sau giảm dần 3, 2, 1', () => {
+    const focus = Array.from({ length: 20 }, (_, i) => at(`f${i}`, 1 - i / 100, 'nt', null, true));
+    const others = Array.from({ length: 40 }, (_, i) => at(`o${i}`, 5 - i / 100, `p${i % 10}`));
+    const out = order([...others, ...focus]);
+    expect(out.slice(0, 4)).toEqual(['f0', 'f1', 'f2', 'f3']);
+    const perPage = [0, 1, 2, 3, 4].map((p) => out.slice(p * 10, (p + 1) * 10).filter((id) => id.startsWith('f')).length);
+    expect(perPage).toEqual([4, 3, 2, 1, 1]);
+  });
+
   it('không còn bài nào hợp luật thì vẫn xếp theo điểm (chỉ đổi chỗ khi có lựa chọn)', () => {
     expect(order([at('n1', 3, 'nt'), at('n2', 2, 'nt'), at('n3', 1, 'nt')])).toEqual(['n1', 'n2', 'n3']);
   });

@@ -16,9 +16,13 @@ export interface FeedPolicyConfig {
     window: number;
     maxSamePlace: number;
     maxSameExp: number;
-    /** Nơi đang nhắm / đã đặt: tối đa `maxFocus` trong mỗi `focusWindow` bài, không quá `maxFocusRun` bài liền nhau. */
+    /**
+     * Nơi đang nhắm / đã đặt: chia danh sách thành khối `focusWindow` bài. Khối đầu đưa `maxFocus` bài của nơi đó lên đầu
+     * (dù điểm thấp hơn), mỗi khối sau bớt 1, không dưới `minFocus`; ngoài số đó thì không thêm. Không quá `maxFocusRun` bài liền nhau.
+     */
     focusWindow: number;
     maxFocus: number;
+    minFocus: number;
     maxFocusRun: number;
     /** Chỉ sắp lại chừng này vị trí đầu (người xem hiếm khi cuộn sâu hơn); phần sau giữ thứ tự điểm. */
     top: number;
@@ -32,7 +36,7 @@ export const FEED_POLICY: FeedPolicyConfig = {
   authorFactor: 0.5,
   freePostsPerAuthor: 2,
   ownBoost: 10,
-  diversity: { window: 5, maxSamePlace: 2, maxSameExp: 2, focusWindow: 10, maxFocus: 4, maxFocusRun: 4, top: 100 },
+  diversity: { window: 5, maxSamePlace: 2, maxSameExp: 2, focusWindow: 10, maxFocus: 4, minFocus: 1, maxFocusRun: 4, top: 100 },
 };
 
 /** Tín hiệu của người xem, chốt theo mốc trang đầu để phân trang ổn định. */
@@ -94,22 +98,26 @@ export function diversify(items: RankedItem[], cfg: FeedPolicyConfig['diversity'
   if (!items.some((i) => i.diversity)) return items;
   const pool = [...items];
   const out: RankedItem[] = [];
+  // Khối đầu nhiều bài nơi vừa được chú ý, các khối sau giảm dần: cuộn sâu vẫn thấy nơi khác.
+  const focusQuota = () => Math.max(cfg.minFocus, cfg.maxFocus - Math.floor(out.length / cfg.focusWindow));
+  const focusInBlock = () => out.slice(out.length - (out.length % cfg.focusWindow)).filter((i) => i.diversity?.isFocus).length;
   const violates = (c: RankedItem, checkExp: boolean): boolean => {
     const d = c.diversity;
     if (!d) return false;
     const recent = out.slice(-(cfg.window - 1)).map((i) => i.diversity);
     if (d.isFocus) {
-      const focusInWindow = out.slice(-(cfg.focusWindow - 1)).filter((i) => i.diversity?.isFocus).length;
       let run = 0;
       for (let k = out.length - 1; k >= 0 && out[k]!.diversity?.isFocus; k--) run++;
-      if (focusInWindow >= cfg.maxFocus || run >= cfg.maxFocusRun) return true;
+      if (focusInBlock() >= focusQuota() || run >= cfg.maxFocusRun) return true;
     } else if (d.place && recent.filter((r) => r && !r.isFocus && r.place === d.place).length >= cfg.maxSamePlace) {
       return true;
     }
     return checkExp && d.exp !== null && recent.filter((r) => r?.exp === d.exp).length >= cfg.maxSameExp;
   };
   while (out.length < cfg.top && pool.length) {
-    let at = pool.findIndex((c) => !violates(c, true));
+    // Đầu mỗi khối: đẩy bài của nơi vừa được chú ý lên trước cho đủ số của khối.
+    let at = focusInBlock() < focusQuota() ? pool.findIndex((c) => c.diversity?.isFocus && !violates(c, false)) : -1;
+    if (at < 0) at = pool.findIndex((c) => !violates(c, true));
     if (at < 0) at = pool.findIndex((c) => !violates(c, false));
     if (at < 0) at = 0;
     const [picked] = pool.splice(at, 1);

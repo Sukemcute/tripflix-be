@@ -64,7 +64,7 @@ docker exec -i tripflix-postgres-1 psql -U postgres -d core -A -t < fixtures/dum
 | `mo-an-uong` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 0 | – | – | 11 | 2 | – | Vì bạn hay xem bài về ăn uống · Vì bạn hay xem bài về cà phê |
 | `mo-van-hoa` | Mơ | số nơi ≥ 4, chuỗi ≤ 3 | 1 | – | – | 12 | 2 | – | Vì bạn hay xem bài về văn hoá, di tích · Vì bạn quan tâm Nha Trang |
 | `ca-that-18-11` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,70 | – | 5 | 4 | – | Vì bạn đang tìm hiểu Đà Lạt · Vì bạn đang tìm hiểu Nha Trang · Gần Đà Lạt mà bạn đang tìm hiểu |
-| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 10 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
+| `kh-dalat-sang-nhatrang` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 11 | 4 | – | Vì bạn đang tìm hiểu Nha Trang · Gần Nha Trang mà bạn đang tìm hiểu · Vì bạn hay xem bài về núi, thiên nhiên |
 | `kh-moi-phuquoc` | Lên kế hoạch | đúng nơi ≥ 0,4 | – | 0,40 | – | 7 | 4 | – | Vì bạn đang tìm hiểu Phú Quốc · Bài viết thịnh hành trên TripFlix |
 | `sap-di-nhatrang` | Sắp đi | đúng nơi ≥ 0,4, KS khác ≤ 1 | – | 0,40 | – | 11 | 4 | 0 | Cho chuyến Nha Trang 16/11 của bạn · Vì bạn hay xem bài về ngắm cảnh, sống ảo · Vì bạn hay xem bài về biển đảo |
 | `dang-di-dalat` | Đang đi | đúng nơi ≥ 0,4 | – | 0,40 | – | 7 | 4 | 0 | Cho chuyến Đà Lạt 12/11 của bạn · Vì bạn hay xem bài về khu vui chơi, mua sắm · Vì bạn hay xem bài về cà phê |
