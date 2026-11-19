@@ -20,12 +20,13 @@ import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiTags } 
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
-import { MyProfileDto } from '../../auth/api/dto.js';
+import { AvatarDecorDto, MyProfileDto } from '../../auth/api/dto.js';
 import { EncryptedPasswords } from '../../auth/api/encrypted-passwords.js';
 import { AccessErrorFilter, ZodBody, readRequestMeta } from '../../auth/api/http.js';
 import { WebSession, isWebClient } from '../../auth/api/web-session.js';
 import { AccountUseCases } from '../application/account.use-cases.js';
 import {
+  AvatarDecorSchema,
   ChangePasswordDto,
   ChangePasswordRequestSchema,
   SessionDto,
@@ -77,6 +78,21 @@ export class AccountController {
   @ApiOkResponse({ type: MyProfileDto })
   removeAvatar(@CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.account.removeAvatar(user, readRequestMeta(req));
+  }
+
+  /** Lưu khung và phụ kiện quanh ảnh đại diện (TF109), để người khác cũng thấy. Mã khung, sticker do app định nghĩa. */
+  @Put('me/avatar-decor')
+  @ApiBody({ type: AvatarDecorDto })
+  @ApiOkResponse({ type: MyProfileDto })
+  setAvatarDecor(@CurrentUser() user: AuthUser, @Body(new ZodBody(AvatarDecorSchema)) body: z.infer<typeof AvatarDecorSchema>) {
+    return this.account.setAvatarDecor(user, body);
+  }
+
+  /** Gỡ hết khung và phụ kiện quanh ảnh đại diện. */
+  @Delete('me/avatar-decor')
+  @ApiOkResponse({ type: MyProfileDto })
+  removeAvatarDecor(@CurrentUser() user: AuthUser) {
+    return this.account.setAvatarDecor(user, null);
   }
 
   /** Sai mật khẩu hiện tại: 400. Đổi xong thì các thiết bị khác bị đăng xuất, thiết bị này vẫn dùng tiếp. */

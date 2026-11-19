@@ -9,6 +9,14 @@ import {
   REGISTRATION_PASSWORD_MIN,
   TERMS_REQUIRED_MESSAGE,
 } from '../domain/registration.js';
+import {
+  AVATAR_DECOR_ID_PATTERN,
+  AVATAR_DECOR_MAX_STICKERS,
+  AVATAR_STICKER_POS_MAX,
+  AVATAR_STICKER_POS_MIN,
+  AVATAR_STICKER_SCALE_MAX,
+  AVATAR_STICKER_SCALE_MIN,
+} from '../../account/domain/avatar-decor.js';
 import { GENDERS } from '../../account/domain/personal-info.js';
 import {
   TRAVEL_BUDGET_LEVELS,
@@ -213,6 +221,33 @@ export class TravelPreferencesDto {
   updatedAt!: string;
 }
 
+/** Một phụ kiện gắn quanh ảnh đại diện (TF109). */
+export class AvatarStickerDto {
+  @ApiProperty({ maxLength: 64, example: 'sticker-1' }) instanceId!: string;
+  @ApiProperty({ pattern: AVATAR_DECOR_ID_PATTERN.source, example: 'headphones', description: 'Mã sticker do app định nghĩa' })
+  presetId!: string;
+  @ApiProperty({ minimum: AVATAR_STICKER_POS_MIN, maximum: AVATAR_STICKER_POS_MAX, description: 'Tâm theo vòng tròn avatar: 0..1 là trong vòng' })
+  x!: number;
+  @ApiProperty({ minimum: AVATAR_STICKER_POS_MIN, maximum: AVATAR_STICKER_POS_MAX }) y!: number;
+  @ApiProperty({ minimum: AVATAR_STICKER_SCALE_MIN, maximum: AVATAR_STICKER_SCALE_MAX }) scale!: number;
+  @ApiProperty({ minimum: -3600, maximum: 3600 }) rotationDeg!: number;
+  @ApiProperty() isFlipped!: boolean;
+}
+
+/** Khung và phụ kiện bọc ngoài ảnh đại diện (TF109). App gặp mã khung, sticker lạ thì bỏ qua. */
+export class AvatarDecorDto {
+  @ApiProperty({ pattern: AVATAR_DECOR_ID_PATTERN.source, example: 'fox-hat', description: "Mã khung do app định nghĩa; 'none': không khung" })
+  frameId!: string;
+  @ApiProperty({ type: AvatarStickerDto, isArray: true, maxItems: AVATAR_DECOR_MAX_STICKERS })
+  stickers!: AvatarStickerDto[];
+}
+
+/** GET /users/:id/avatar-decor (TF109). */
+export class AvatarDecorResponseDto {
+  @ApiProperty({ type: AvatarDecorDto, nullable: true, description: 'null: chưa trang trí hoặc tài khoản bị khoá' })
+  avatarDecor!: AvatarDecorDto | null;
+}
+
 /** GET/PATCH /auth/me: hồ sơ của chính mình, có thông tin cá nhân (không có ở danh sách nhân viên). */
 export class MyProfileDto extends UserDto {
   @ApiProperty({ description: 'Đã xác thực email (TF05D). false: chưa đăng bài, bình luận được; gửi lại link bằng POST /auth/email/verification' })
@@ -225,6 +260,8 @@ export class MyProfileDto extends UserDto {
   travelPreferences!: TravelPreferencesDto | null;
   @ApiProperty({ type: String, nullable: true, description: 'Ảnh đại diện (TF109). null: chưa có, app hiện chữ cái đầu của tên' })
   avatarUrl!: string | null;
+  @ApiProperty({ type: AvatarDecorDto, nullable: true, description: 'Khung và phụ kiện quanh ảnh đại diện (TF109). null: chưa trang trí' })
+  avatarDecor!: AvatarDecorDto | null;
 }
 
 export class JwksDto {
