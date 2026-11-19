@@ -49,6 +49,12 @@ const KEEP = 20;
 const TTL_SECONDS = 7 * 24 * 3600;
 const key = (job: JobKey) => `discovery:job-runs:${job}`;
 const intervalKey = (job: JobKey) => `discovery:job-interval:${job}`;
+const aliveKey = (runId: string) => `discovery:job-run-alive:${runId}`;
+// Làm mới mỗi 30 giây, hết hạn sau 2 phút: event loop nghẽn hay Redis chập chờn vài nhịp vẫn chưa bị coi là chết.
+// Lỡ coi nhầm thì lúc lượt đó chạy xong, finish ghi đè lại kết quả thật.
+const ALIVE_REFRESH_MS = 30_000;
+const ALIVE_TTL_SECONDS = 120;
+const ORPHAN_ERROR = 'Bị ngắt: tiến trình dừng giữa chừng (deploy/restart)';
 
 /** Lịch sử 20 lần chạy gần nhất của mỗi job discovery (Redis hash runId → JSON), cho trang admin theo dõi. */
 @Injectable()
@@ -60,6 +66,9 @@ export class JobRuns {
   /** Ghi "running", chạy fn, ghi kết quả. Redis lỗi chỉ log: không làm hỏng job. Lỗi của fn ném lại cho job xử lý. */
   async track(job: JobKey, trigger: JobTrigger, fn: () => Promise<JobResult>): Promise<JobResult> {
     const run: JobRun = { runId: randomUUID(), trigger, startedAt: Date.now(), finishedAt: null, outcome: 'running', durationMs: null, summary: null, error: null };
+    await this.markAlive(run.runId);
+    const heartbeat = setInterval(() => void this.markAlive(run.runId), ALIVE_REFRESH_MS);
+    heartbeat.unref();
     await this.save(job, run);
     try {
       const result = await fn();
@@ -68,6 +77,8 @@ export class JobRuns {
     } catch (error) {
       await this.finish(job, run, 'failed', null, (error instanceof Error ? error.message : String(error)).slice(0, 1000));
       throw error;
+    } finally {
+      clearInterval(heartbeat);
     }
   }
 
@@ -88,13 +99,34 @@ export class JobRuns {
     else await this.redis.set(intervalKey(job), String(intervalMs));
   }
 
-  /** Mới nhất trước. */
+  /** Mới nhất trước. Lượt "running" mà tiến trình chạy nó đã chết (hết khoá sống) được ghi lại thành failed. */
   async list(job: JobKey): Promise<JobRun[]> {
     const raw = await this.redis.hvals(key(job));
-    return raw
+    const runs = raw
       .map((v) => JSON.parse(v) as JobRun)
       .sort((a, b) => b.startedAt - a.startedAt)
       .slice(0, KEEP);
+    return Promise.all(runs.map((run) => (run.outcome === 'running' ? this.failIfOrphaned(job, run) : run)));
+  }
+
+  /**
+   * Tiến trình chết giữa track (deploy, restart) thì lượt kẹt "running" mãi. Khoá sống theo từng lượt chứ không dọn lúc
+   * khởi động: nhiều bản core-api (scale API, tách worker) có thể cùng chạy job, dọn lúc boot sẽ đè lượt của bản khác còn sống.
+   */
+  private async failIfOrphaned(job: JobKey, run: JobRun): Promise<JobRun> {
+    if (await this.redis.exists(aliveKey(run.runId))) return run;
+    const finishedAt = Date.now();
+    const orphan: JobRun = { ...run, finishedAt, outcome: 'failed', durationMs: finishedAt - run.startedAt, error: ORPHAN_ERROR };
+    await this.save(job, orphan);
+    return orphan;
+  }
+
+  private async markAlive(runId: string): Promise<void> {
+    try {
+      await this.redis.set(aliveKey(runId), '1', 'EX', ALIVE_TTL_SECONDS);
+    } catch (err) {
+      this.logger.warn({ err, runId }, 'Ghi khoá sống của job lỗi (Redis), job vẫn chạy');
+    }
   }
 
   private finish(job: JobKey, run: JobRun, outcome: JobOutcome, summary: JobSummary | null, error: string | null) {

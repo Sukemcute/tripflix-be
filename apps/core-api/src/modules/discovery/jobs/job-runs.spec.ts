@@ -11,6 +11,7 @@ function fakeRedis(opts: { isBroken?: boolean } = {}) {
     get: (k: string) => (opts.isBroken ? fail() : Promise.resolve(strings.get(k) ?? null)),
     set: (k: string, v: string) => (strings.set(k, v), Promise.resolve('OK')),
     del: (k: string) => Promise.resolve(Number(strings.delete(k))),
+    exists: (k: string) => Promise.resolve(Number(strings.has(k))),
     hvals: (k: string) => (opts.isBroken ? fail() : Promise.resolve([...hash(k).values()])),
     hdel: (k: string, ...fields: string[]) => Promise.resolve(fields.filter((f) => hash(k).delete(f)).length),
     multi: () => {
@@ -62,6 +63,27 @@ describe('JobRuns', () => {
     const list = await runs.list('suggest');
     expect(hashes.get('discovery:job-runs:suggest')!.size).toBe(20);
     expect(list[0]!.summary?.count).toBe(24);
+  });
+
+  it('lượt running của tiến trình đã chết (hết khoá sống) thành failed; lượt còn sống giữ nguyên', async () => {
+    const { redis, hashes, strings } = fakeRedis();
+    const runs = new JobRuns(redis);
+    const running = { trigger: 'schedule', finishedAt: null, outcome: 'running', durationMs: null, summary: null, error: null };
+    const hash = new Map([
+      ['dead', JSON.stringify({ ...running, runId: 'dead', startedAt: 1_000 })],
+      ['live', JSON.stringify({ ...running, runId: 'live', startedAt: 2_000 })],
+    ]);
+    hashes.set('discovery:job-runs:recommend_build', hash);
+    strings.set('discovery:job-run-alive:live', '1');
+
+    const list = await runs.list('recommend_build');
+
+    expect(list).toMatchObject([
+      { runId: 'live', outcome: 'running', finishedAt: null },
+      { runId: 'dead', outcome: 'failed', error: 'Bị ngắt: tiến trình dừng giữa chừng (deploy/restart)' },
+    ]);
+    expect(list[1]!.finishedAt).toBeGreaterThan(1_000);
+    expect(JSON.parse(hash.get('dead')!)).toMatchObject({ outcome: 'failed' });
   });
 
   it('Redis lỗi: job vẫn chạy và trả kết quả', async () => {
