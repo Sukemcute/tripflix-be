@@ -35,14 +35,15 @@ const traceRow = (userId: string): AiTraceRow => ({
 
 function queriesWith(store: Partial<AiInsightsStore>) {
   const contacts = new Map([[user, { displayName: 'An', email: 'an@example.com', createdAt: at }]]);
-  const access = { getUserContacts: vi.fn(async () => contacts) } as unknown as AccessFacade;
-  return { queries: new AiInsightsQueries(store as AiInsightsStore, access), access };
+  const getUserContacts = vi.fn(async (_ids: string[]) => contacts);
+  const access = { getUserContacts } as unknown as AccessFacade;
+  return { queries: new AiInsightsQueries(store as AiInsightsStore, access), getUserContacts };
 }
 
 describe('AiInsightsQueries', () => {
   it('xếp hạng người dùng kèm tên, email; tài khoản đã mất thì null', async () => {
     const userRanking = vi.fn(async () => ({ rows: [userRow(user), userRow(gone)], total: 2 }));
-    const { queries, access } = queriesWith({ userRanking });
+    const { queries, getUserContacts } = queriesWith({ userRanking });
 
     const { items, total } = await queries.users({ from: at, to: at, page: 3, pageSize: 10 });
 
@@ -50,7 +51,7 @@ describe('AiInsightsQueries', () => {
     expect(items[0]).toMatchObject({ displayName: 'An', email: 'an@example.com' });
     expect(items[1]).toMatchObject({ displayName: null, email: null });
     expect(userRanking).toHaveBeenCalledWith(expect.objectContaining({ limit: 10, offset: 20 }));
-    expect(access.getUserContacts).toHaveBeenCalledWith([user, gone]);
+    expect(getUserContacts).toHaveBeenCalledWith([user, gone]);
   });
 
   it('danh sách trace kèm người dùng và chuyển bộ lọc xuống store', async () => {

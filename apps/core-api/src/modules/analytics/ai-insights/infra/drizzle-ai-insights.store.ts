@@ -15,7 +15,7 @@ function rowsOf(result: unknown): Raw[] {
 const toDate = (value: unknown) => new Date(value as string | Date);
 const toNumber = (value: unknown) => Number(value ?? 0);
 const toNullableNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
-const toNullableText = (value: unknown) => (value === null || value === undefined ? null : String(value));
+const toNullableText = (value: unknown) => (typeof value === 'string' ? value : null);
 
 export function toTimePoint(row: Raw): AiTimePoint {
   return {
