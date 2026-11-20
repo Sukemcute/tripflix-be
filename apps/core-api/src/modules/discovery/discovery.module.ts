@@ -98,6 +98,7 @@ const recommendCatalog = (commerce: CommerceFacade, content: ContentFacade, feed
   },
   getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
   getReelCardsByIds: async (postIds, viewerId) => (await feed.getByIds(postIds, viewerId)).items as unknown as RecommendReelCard[],
+  listTopHotReels: (query) => feed.listTopHot({ postType: 'video', ...query }),
 });
 
 /** Khách sạn, chuyến bay cho hồ sơ gợi ý phần còn thiếu (TF39). days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */

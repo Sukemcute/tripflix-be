@@ -44,9 +44,10 @@ export class PostRecommendationsDto {
 }
 
 export const ReelRecommendationQuerySchema = z.object({
-  mode: z.enum(['for_you', 'trending', 'has_plan', 'recent']).default('trending'),
+  mode: z.enum(['for_you', 'trending', 'has_plan', 'recent', 'mixed']).default('trending'),
   limit: z.coerce.number().int().min(1).max(20).default(10),
-  cursor: z.string().max(512).optional(),
+  // mixed giữ vị trí của cả hai nguồn trong một cursor nên dài hơn.
+  cursor: z.string().max(1024).optional(),
 });
 
 export class ReelRecommendationItemDto {
@@ -119,11 +120,17 @@ export class PostRecommendationsController {
   @OptionalAuthenticated()
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Gợi ý Reels phát được (trending, for_you, has_plan hoặc recent)',
-    description:
-      'Xếp hạng video bằng discovery (gồm điểm xu hướng, lọc có lịch trình, mới đăng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.',
+    summary: 'Gợi ý Reels phát được (trending, for_you, has_plan, recent hoặc mixed)',
+    description: [
+      'Lấy thẻ phát được từ content/feed trong cùng request.',
+      '',
+      '- `trending`: đúng thứ tự Hot của feed như tab "Đang hot" (FeedFacade.listTopHot, TF111), `algo: feed_hot`.',
+      '- `for_you`, `has_plan`, `recent`: xếp hạng bằng discovery như `/recommendations/posts`.',
+      '- `mixed`: feed Reels mặc định, cứ 4 ô thì ô thứ 4 là Hot của feed (`source: hot`), 3 ô còn lại là `for_you`; một nguồn hết thì nguồn kia lấp. Khách nhận phần `for_you` là trending của discovery.',
+      '- Phân trang: gửi `nextCursor` vào `cursor`; trang sau giữ mode của trang đầu.',
+    ].join('\n'),
   })
-  @ApiQuery({ name: 'mode', required: false, enum: ['for_you', 'trending', 'has_plan', 'recent'], description: 'Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)' })
+  @ApiQuery({ name: 'mode', required: false, enum: ['for_you', 'trending', 'has_plan', 'recent', 'mixed'], description: 'Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng), mixed (Dành cho bạn trộn Hot)' })
   @ApiQuery({ name: 'limit', required: false, example: 10, description: '1–20, mặc định 10' })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiBadRequestResponse({ description: 'Tham số sai hoặc `cursor` không do server cấp' })

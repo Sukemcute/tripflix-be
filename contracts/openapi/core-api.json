@@ -5334,7 +5334,7 @@
     },
     "/api/recommendations/reels": {
       "get": {
-        "description": "Xếp hạng video bằng discovery (gồm điểm xu hướng, lọc có lịch trình, mới đăng và chống lặp cho người đăng nhập) rồi lấy thẻ phát được từ content/feed trong một request.",
+        "description": "Lấy thẻ phát được từ content/feed trong cùng request.\n\n- `trending`: đúng thứ tự Hot của feed như tab \"Đang hot\" (FeedFacade.listTopHot, TF111), `algo: feed_hot`.\n- `for_you`, `has_plan`, `recent`: xếp hạng bằng discovery như `/recommendations/posts`.\n- `mixed`: feed Reels mặc định, cứ 4 ô thì ô thứ 4 là Hot của feed (`source: hot`), 3 ô còn lại là `for_you`; một nguồn hết thì nguồn kia lấp. Khách nhận phần `for_you` là trending của discovery.\n- Phân trang: gửi `nextCursor` vào `cursor`; trang sau giữ mode của trang đầu.",
         "operationId": "PostRecommendationsController_recommendReels",
         "parameters": [
           {
@@ -5356,13 +5356,14 @@
             "name": "mode",
             "required": false,
             "in": "query",
-            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng)",
+            "description": "Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng), mixed (Dành cho bạn trộn Hot)",
             "schema": {
               "enum": [
                 "for_you",
                 "trending",
                 "has_plan",
-                "recent"
+                "recent",
+                "mixed"
               ],
               "type": "string"
             }
@@ -5388,7 +5389,7 @@
             "bearer": []
           }
         ],
-        "summary": "Gợi ý Reels phát được (trending, for_you, has_plan hoặc recent)",
+        "summary": "Gợi ý Reels phát được (trending, for_you, has_plan, recent hoặc mixed)",
         "tags": [
           "discovery"
         ]
