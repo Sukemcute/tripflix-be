@@ -233,6 +233,16 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.withLock('t', () => Promise.resolve('c'))).toBe('c');
   });
 
+  it('khoá advisory giữ kết nối riêng: suốt lượt job, pool vẫn đủ chỗ cho request', async () => {
+    const holders = await store.withLock('pool-free', async () => {
+      // Chiếm đủ max kết nối của pool trong lúc đang giữ khoá: không kết nối nào bị khoá chiếm thì không ai phải chờ.
+      const clients = await Promise.all(Array.from({ length: 5 }, () => pool.connect()));
+      clients.forEach((c) => c.release());
+      return clients.length;
+    });
+    expect(holders).toBe(5);
+  });
+
   it('dọn hạn lưu theo lô', async () => {
     const day = 24;
     await store.upsertInteractions(

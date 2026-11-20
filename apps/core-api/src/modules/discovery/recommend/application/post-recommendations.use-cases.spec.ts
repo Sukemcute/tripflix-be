@@ -416,4 +416,45 @@ describe('PostRecommendationUseCases', () => {
     const p2Again = await useCases.recommend(query({ mode: 'recent', limit: 4, cursor: p1.nextCursor, userId: U }));
     expect(p2Again.items.map((i) => i.post.id)).toEqual(['r03', 'r04', 'r05', 'r06']);
   });
+
+  describe('trang bị lọc hết sau hydrate', () => {
+    const pool = Array.from({ length: 30 }, (_, i) => cand(`r${String(i).padStart(2, '0')}`, { score: 0, source: 'explore' }));
+    const recentQuery = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>[0]> = {}) =>
+      query({ mode: 'recent', limit: 3, ...over });
+
+    it('trang đầu toàn bài ẩn: server lấy tiếp trang sau, không trả items rỗng kèm cursor', async () => {
+      const { useCases, store } = setup({ hidden: ['r00', 'r01', 'r02'] });
+      store.listExplorePool.mockResolvedValue(pool);
+      const page = await useCases.recommend(recentQuery());
+      expect(ids(page)).toEqual(['r03', 'r04', 'r05']);
+      const next = await useCases.recommend(recentQuery({ cursor: page.nextCursor }));
+      expect(ids(next)).toEqual(['r06', 'r07', 'r08']);
+    });
+
+    it('mọi trang đều bị lọc: dừng sau giới hạn, trả rỗng kèm cursor để client tự quyết', async () => {
+      const { useCases, store, catalog } = setup({ hidden: pool.map((c) => c.postId) });
+      store.listExplorePool.mockResolvedValue(pool);
+      const page = await useCases.recommend(recentQuery());
+      expect(page.items).toEqual([]);
+      expect(page.nextCursor).not.toBeNull();
+      expect(catalog.getVisiblePosts).toHaveBeenCalledTimes(4);
+    });
+
+    it('hết bài thì trả cursor null như cũ', async () => {
+      const { useCases, store } = setup({ hidden: pool.map((c) => c.postId) });
+      store.listExplorePool.mockResolvedValue(pool.slice(0, 5));
+      const page = await useCases.recommend(recentQuery());
+      expect(page).toMatchObject({ items: [], nextCursor: null });
+    });
+
+    it('recommendReels: trang đầu không có video phát được thì lấy trang sau', async () => {
+      const { useCases, store, catalog } = setup();
+      store.listExplorePool.mockResolvedValue(pool);
+      (catalog as unknown as RecommendCatalog).getReelCardsByIds = vi.fn(async (postIds: string[]) =>
+        postIds.filter((id) => id >= 'r03').map((postId) => ({ postId }) as never),
+      );
+      const page = await useCases.recommendReels({ mode: 'recent', limit: 3, cursor: null, userId: U, now: NOW });
+      expect(page.items.map((i) => i.card.postId)).toEqual(['r03', 'r04', 'r05']);
+    });
+  });
 });
