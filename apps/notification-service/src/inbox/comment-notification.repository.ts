@@ -82,6 +82,8 @@ export class CommentNotificationRepository {
             commentId: input.commentId,
             parentCommentId: input.parentCommentId,
             excerpt: toCommentExcerpt(input.commentBody),
+            // Web hiện avatar người bình luận như các thông báo khác.
+            actorIds: [input.authorId],
           }),
           input.eventId,
           input.commentId,

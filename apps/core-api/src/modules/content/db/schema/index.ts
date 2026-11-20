@@ -14,3 +14,4 @@ export * from './comment-reactions.js';
 export * from './moderation.js';
 export * from './moderation-parts.js';
 export * from './saved-itineraries.js';
+export * from './trend-signals.js';

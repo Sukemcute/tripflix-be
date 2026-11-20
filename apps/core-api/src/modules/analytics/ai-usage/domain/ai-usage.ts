@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 /** Sự kiện ai-service phát sau mỗi lần gọi LLM hoặc kiểm duyệt (hợp đồng ở tripflix-ai: app/services/usage_events.py). */
 export const AI_USAGE_EVENT = 'ai.usage.recorded';
-export const AI_FEATURES = ['chat', 'summary', 'moderation'] as const;
+export const AI_FEATURES = ['chat', 'summary', 'moderation', 'cover_ocr'] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 export const AI_USAGE_GROUPS = ['feature', 'day', 'model'] as const;
 export type AiUsageGroup = (typeof AI_USAGE_GROUPS)[number];
@@ -53,6 +53,8 @@ export interface AiUsageRow {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  /** OCR calls without provider token usage; their actual cost is unknown. */
+  unpricedCalls: number;
 }
 
 /** Sự kiện khác loại thì `null`; payload sai hợp đồng thì ném, để consumer ghi log rồi bỏ qua. */
@@ -84,7 +86,8 @@ export function sumAiUsage(rows: readonly AiUsageRow[]): Omit<AiUsageRow, 'key'>
       inputTokens: total.inputTokens + row.inputTokens,
       outputTokens: total.outputTokens + row.outputTokens,
       costUsd: total.costUsd + row.costUsd,
+      unpricedCalls: total.unpricedCalls + row.unpricedCalls,
     }),
-    { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 },
+    { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0, unpricedCalls: 0 },
   );
 }

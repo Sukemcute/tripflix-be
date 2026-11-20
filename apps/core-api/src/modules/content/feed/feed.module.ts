@@ -10,7 +10,11 @@ import { FEED_EVENT_BUS, FeedEventsUseCases } from './application/feed-events.us
 import { FeedUseCases } from './application/feed.use-cases.js';
 import type { Redis } from 'ioredis';
 import { REDIS } from '../../../platform/tokens.js';
-import { FEED_PAGE_CACHE, FEED_STORE } from './application/ports.js';
+import { FEED_PAGE_CACHE, FEED_STORE, TREND_SIGNAL_STORE } from './application/ports.js';
+import { TrendSignalsUseCases } from './application/trend-signals.use-cases.js';
+import { DrizzleTrendSignalStore } from './infra/drizzle-trend-signal.store.js';
+import { TrendSignalsConsumer } from './infra/trend-signals.consumer.js';
+import { PurgeTrendSignalsJob } from './jobs/purge-trend-signals.job.js';
 import { DrizzleFeedStore } from './infra/drizzle-feed.store.js';
 import { FeedFacade } from './feed.facade.js';
 import { RedisFeedPageCache } from './infra/redis-feed-page-cache.js';
@@ -27,6 +31,14 @@ const APP_EVENTS_MAX_LEN = 50_000;
     FeedEventsUseCases,
     FeedFacade,
     OptionalAuthGuard,
+    TrendSignalsUseCases,
+    TrendSignalsConsumer,
+    PurgeTrendSignalsJob,
+    {
+      provide: TREND_SIGNAL_STORE,
+      inject: [buildTransactionHostToken('content')],
+      useFactory: (txHost: ModuleTransactionHost) => new DrizzleTrendSignalStore(() => txHost.tx),
+    },
     {
       provide: FEED_STORE,
       inject: [buildTransactionHostToken('content')],
