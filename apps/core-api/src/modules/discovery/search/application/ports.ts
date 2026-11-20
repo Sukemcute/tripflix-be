@@ -49,6 +49,8 @@ export interface ExplorePost {
   hashtags: string[];
   mediaIds?: string[];
   coverMediaId?: string | null;
+  /** Bài video: ảnh poster 360 của video đầu tiên phát được. Không có thì kết quả tìm không có ảnh bìa. */
+  posterUrl?: string | null;
   tripAttachment: {
     destinationName?: string;
     destinationPlaceId?: string;
