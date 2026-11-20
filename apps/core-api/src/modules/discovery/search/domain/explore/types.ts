@@ -66,7 +66,7 @@ export interface CountRow {
 /** Điều kiện lấy ứng viên của một nhánh. Phải là tập cha của mọi tài liệu mà bước chấm điểm chấp nhận. */
 export interface CandidateFilter {
   vertical: string;
-  /** Không có từ tìm: lấy mọi tài liệu (chỉ lọc nơi). */
+  /** Không có từ tìm: lấy mọi tài liệu (chỉ lọc nơi), tối đa ALL_LIMIT dòng đầu theo ord. */
   isAll: boolean;
   terms: string[];
   names: string[];
@@ -90,7 +90,7 @@ export interface ExploreSource {
   typoPool(first: string, minLen: number, maxLen: number): Promise<Array<{ term: string; df: number }>>;
   /** Cụm nhiều từ (tên đường, chuỗi, cụm trong tiêu đề) bắt đầu bằng `first`; độ dài SAU KHI bỏ khoảng trắng trong [minLen, maxLen]. */
   phrasePool(first: string, minLen: number, maxLen: number): Promise<string[]>;
-  /** Tài liệu của một nhánh, theo `ord` tăng dần. */
+  /** Tài liệu của một nhánh, theo `ord` tăng dần; isAll thì chỉ ALL_LIMIT dòng đầu. */
   candidates(filter: CandidateFilter): Promise<IndexedDoc[]>;
 }
 

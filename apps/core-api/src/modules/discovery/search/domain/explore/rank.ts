@@ -286,7 +286,7 @@ async function searchVertical(
       const isRelated = missing.length < core.length || isPlace || u.intents.includes(k) || (!core.length && !u.place && !u.intents.length);
       const dist = user && o.lat != null ? km(o, user) : null;
       if (user) near = dist !== null && dist <= NEAR_KM ? 0 : dist || 1e4; // như nơi: gần người dùng xếp trước
-      out.set(k, [...(out.get(k) ?? []), { doc, vertical: vt, s, hit, cov, near, dist, rank: penalty, relaxed, missing, unmatched, isRelated, isMention, isUnknownPlace, u }]);
+      (out.get(k) ?? out.set(k, []).get(k)!).push({ doc, vertical: vt, s, hit, cov, near, dist, rank: penalty, relaxed, missing, unmatched, isRelated, isMention, isUnknownPlace, u });
     }
   }
   const isScored = qterms.length > 0 || Boolean(u.days);

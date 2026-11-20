@@ -2,6 +2,12 @@
 import { PHRASE_NS } from './stats.js';
 import type { BuiltIndex, CandidateFilter, CountRow, ExploreSource, IndexedDoc } from './types.js';
 
+/**
+ * Trần ứng viên mỗi nhánh khi câu không có từ tìm (isAll), vd 'nhậu', 'ăn gì': không lấy cả bảng search_documents.
+ * ponytail: lấy theo ord (thứ tự dựng chỉ mục), không theo chất lượng; muốn top tốt nhất thì sắp ord theo quality lúc buildIndex.
+ */
+export const ALL_LIMIT = 100;
+
 /** Tài liệu có thể được bước chấm điểm chấp nhận không (tập cha). SQL ở drizzle-explore.store.ts phải giữ đúng điều kiện này. */
 export function isCandidate(doc: IndexedDoc, f: CandidateFilter): boolean {
   if (doc.vertical !== f.vertical) return false;
@@ -50,6 +56,7 @@ export class MemoryExploreSource implements ExploreSource {
   }
 
   async candidates(filter: CandidateFilter): Promise<IndexedDoc[]> {
-    return this.index.docs.filter((d) => isCandidate(d, filter));
+    const docs = this.index.docs.filter((d) => isCandidate(d, filter));
+    return filter.isAll ? docs.slice(0, ALL_LIMIT) : docs;
   }
 }
