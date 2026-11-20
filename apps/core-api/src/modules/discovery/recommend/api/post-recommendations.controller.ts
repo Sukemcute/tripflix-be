@@ -48,6 +48,8 @@ export const ReelRecommendationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(10),
   // mixed giữ vị trí của cả hai nguồn trong một cursor nên dài hơn.
   cursor: z.string().max(1024).optional(),
+  // Enum thay cho z.coerce.boolean(): coerce đọc chuỗi "false" thành true.
+  fresh: z.enum(['true', 'false']).optional(),
 });
 
 export class ReelRecommendationItemDto {
@@ -128,11 +130,13 @@ export class PostRecommendationsController {
       '- `for_you`, `has_plan`, `recent`: xếp hạng bằng discovery như `/recommendations/posts`.',
       '- `mixed`: feed Reels mặc định, cứ 4 ô thì ô thứ 4 là Hot của feed (`source: hot`), 3 ô còn lại là `for_you`; một nguồn hết thì nguồn kia lấp. Khách nhận phần `for_you` là trending của discovery.',
       '- Phân trang: gửi `nextCursor` vào `cursor`; trang sau giữ mode của trang đầu.',
+      '- `fresh=true` (trang đầu, khi người xem tự tải lại): bài đã gợi ý cho người này, kể cả vừa gợi ý, bị đẩy xuống để tải lại không ra y hệt trang cũ. Mặc định chỉ bài gợi ý cách hơn 30 phút bị đẩy xuống. Bỏ qua khi có `cursor` hoặc khách.',
     ].join('\n'),
   })
   @ApiQuery({ name: 'mode', required: false, enum: ['for_you', 'trending', 'has_plan', 'recent', 'mixed'], description: 'Kiểu gợi ý: for_you, trending, has_plan (có lịch trình), recent (mới đăng), mixed (Dành cho bạn trộn Hot)' })
   @ApiQuery({ name: 'limit', required: false, example: 10, description: '1–20, mặc định 10' })
   @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'fresh', required: false, enum: ['true', 'false'], description: 'true khi người xem tự tải lại: mở phiên mới, đẩy xuống mọi bài đã gợi ý' })
   @ApiBadRequestResponse({ description: 'Tham số sai hoặc `cursor` không do server cấp' })
   @ApiOkResponse({ type: ReelRecommendationsDto })
   async recommendReels(@Query() query: Record<string, unknown>, @OptionalCurrentUser() user: AuthUser | undefined) {
@@ -149,6 +153,7 @@ export class PostRecommendationsController {
         limit: parsed.data.limit,
         cursor: parsed.data.cursor ?? null,
         userId: user?.userId ?? null,
+        fresh: parsed.data.fresh === 'true',
       });
     } catch (error) {
       if (error instanceof InvalidRecommendCursorError) {

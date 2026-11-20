@@ -47,6 +47,8 @@ export interface PostRecommendationQuery {
   cursor: string | null;
   userId: string | null;
   now?: Date;
+  /** Người xem tự tải lại (trang đầu): đẩy xuống cả bài vừa gợi ý trong phiên, không chỉ bài của phiên trước. */
+  fresh?: boolean;
 }
 
 export interface PostRecommendationItem {
@@ -85,6 +87,8 @@ interface Cursor {
   page: number;
   offset: number;
   seenBefore: number;
+  /** Mốc đọc bài đã gợi ý khi trang đầu là `fresh`; không có thì bằng `seenBefore`. Giữ trong cursor để trang sau đẩy xuống cùng một tập. */
+  seenUntil?: number;
   /** Reels Hot của feed (chip Thịnh hành, ô hot của mixed): cursor của FeedFacade.listTopHot; null là từ đầu. */
   hot?: string | null;
   /** mixed: vị trí đã dùng của danh sách Dành cho bạn (algo, page, offset); null là đã hết. */
@@ -102,6 +106,18 @@ const OWN_RECENT_MS = 60 * 60_000;
 
 export class InvalidRecommendCursorError extends Error {}
 
+/**
+ * Mốc đọc bài đã gợi ý. Mặc định là `seenBefore` (chỉ bài của phiên trước, để trang trong phiên không xô lệch).
+ * Trang đầu `fresh` lấy `now`, để tải lại không ra y hệt trang cũ; trang sau đọc lại từ cursor.
+ */
+function resolveSeenUntil(cursor: Cursor | null, seenBefore: number, fresh: boolean | undefined, now: Date): number {
+  if (cursor) return cursor.seenUntil ?? seenBefore;
+  return fresh ? now.getTime() : seenBefore;
+}
+
+/** Chỉ ghi `seenUntil` vào cursor khi khác `seenBefore`, cursor cũ giữ nguyên dạng. */
+const seenUntilField = (seenUntil: number, seenBefore: number) => (seenUntil === seenBefore ? {} : { seenUntil });
+
 /** Bài Hot của feed trong trang gợi ý: không qua ranker của discovery nên không có điểm, tác giả. */
 const hotItem = (postId: string): RankedItem => ({ postId, authorId: '', score: 0, source: 'hot', breakdown: {}, reason: TRENDING });
 
@@ -117,6 +133,7 @@ function decodeCursor(raw: string): Cursor {
       Number.isInteger(c.page) &&
       Number.isInteger(c.offset) &&
       Number.isInteger(c.seenBefore) &&
+      (c.seenUntil === undefined || Number.isInteger(c.seenUntil)) &&
       c.page! >= 0 &&
       c.offset! >= 0 &&
       (c.hot === undefined || c.hot === null || typeof c.hot === 'string') &&
@@ -223,12 +240,13 @@ export class PostRecommendationUseCases {
    */
   private async selectMixedPage(q: PostRecommendationQuery, c: Cursor | null, now: Date) {
     const seenBefore = c?.seenBefore ?? now.getTime() - SESSION_MS;
+    const seenUntil = resolveSeenUntil(c, seenBefore, q.fresh, now);
     const page = c?.page ?? 0;
     const isFyDone = c !== null && c.fy === null;
     const isHotDone = c?.hotDone === true;
     const hotSlots = isFyDone ? q.limit : isHotDone ? 0 : Math.max(1, Math.floor(q.limit / MIX_REELS_DEFAULT_EVERY));
     const fySlots = isFyDone ? 0 : q.limit - (isHotDone ? 0 : hotSlots);
-    const fyCursor = c?.fy ? encodeCursor({ ...c.fy, mode: 'for_you', seenBefore }) : null;
+    const fyCursor = c?.fy ? encodeCursor({ ...c.fy, mode: 'for_you', seenBefore, ...seenUntilField(seenUntil, seenBefore) }) : null;
 
     const [fy, hot] = await Promise.all([
       fySlots > 0 ? this.selectRankedPage({ ...q, mode: 'for_you', limit: fySlots, cursor: fyCursor }, now) : null,
@@ -253,7 +271,17 @@ export class PostRecommendationUseCases {
       algo: { name: MIXED_ALGO },
       nextCursor:
         mixed.ids.length > 0 && hasMore
-          ? encodeCursor({ algo: MIXED_ALGO, mode: 'mixed', page: page + 1, offset: 0, seenBefore, hot: nextHot, fy: nextFy, hotDone: nextHotDone })
+          ? encodeCursor({
+              algo: MIXED_ALGO,
+              mode: 'mixed',
+              page: page + 1,
+              offset: 0,
+              seenBefore,
+              ...seenUntilField(seenUntil, seenBefore),
+              hot: nextHot,
+              fy: nextFy,
+              hotDone: nextHotDone,
+            })
           : null,
     };
   }
@@ -291,6 +319,7 @@ export class PostRecommendationUseCases {
     const offset = cursor?.offset ?? 0;
     // Mốc "phiên trước" cố định từ trang đầu: cả phiên đẩy xuống cùng một tập bài nên trang không xô lệch.
     const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
+    const seenUntil = resolveSeenUntil(cursor, seenBefore, q.fresh, now);
     // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
     const sessionAt = seenBefore + SESSION_MS;
     const hasPlanOnly = mode === 'has_plan';
@@ -299,7 +328,7 @@ export class PostRecommendationUseCases {
     const [interacted, seenIds, longTaste, recent, rawOwnRecent] = q.userId
       ? await Promise.all([
           this.store.listInteractedPostIds(q.userId, new Date(sessionAt)),
-          this.listSeen(q.userId, new Date(seenBefore)),
+          this.listSeen(q.userId, new Date(seenUntil)),
           this.store.findUserFeatures(algo.userBuilder.key, q.userId),
           algo.userBuilder.key === 'tag_affinity@v0' ? this.listRecent(q.userId, new Date(sessionAt)) : [],
           this.store.listOwnRecentPostIds({
@@ -369,7 +398,10 @@ export class PostRecommendationUseCases {
     return {
       pageItems,
       algo,
-      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore }) : null,
+      nextCursor:
+        pageItems.length > 0 && hasMore
+          ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore, ...seenUntilField(seenUntil, seenBefore) })
+          : null,
     };
   }
 

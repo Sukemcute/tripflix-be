@@ -5360,9 +5360,22 @@
     },
     "/api/recommendations/reels": {
       "get": {
-        "description": "Lấy thẻ phát được từ content/feed trong cùng request.\n\n- `trending`: đúng thứ tự Hot của feed như tab \"Đang hot\" (FeedFacade.listTopHot, TF111), `algo: feed_hot`.\n- `for_you`, `has_plan`, `recent`: xếp hạng bằng discovery như `/recommendations/posts`.\n- `mixed`: feed Reels mặc định, cứ 4 ô thì ô thứ 4 là Hot của feed (`source: hot`), 3 ô còn lại là `for_you`; một nguồn hết thì nguồn kia lấp. Khách nhận phần `for_you` là trending của discovery.\n- Phân trang: gửi `nextCursor` vào `cursor`; trang sau giữ mode của trang đầu.",
+        "description": "Lấy thẻ phát được từ content/feed trong cùng request.\n\n- `trending`: đúng thứ tự Hot của feed như tab \"Đang hot\" (FeedFacade.listTopHot, TF111), `algo: feed_hot`.\n- `for_you`, `has_plan`, `recent`: xếp hạng bằng discovery như `/recommendations/posts`.\n- `mixed`: feed Reels mặc định, cứ 4 ô thì ô thứ 4 là Hot của feed (`source: hot`), 3 ô còn lại là `for_you`; một nguồn hết thì nguồn kia lấp. Khách nhận phần `for_you` là trending của discovery.\n- Phân trang: gửi `nextCursor` vào `cursor`; trang sau giữ mode của trang đầu.\n- `fresh=true` (trang đầu, khi người xem tự tải lại): bài đã gợi ý cho người này, kể cả vừa gợi ý, bị đẩy xuống để tải lại không ra y hệt trang cũ. Mặc định chỉ bài gợi ý cách hơn 30 phút bị đẩy xuống. Bỏ qua khi có `cursor` hoặc khách.",
         "operationId": "PostRecommendationsController_recommendReels",
         "parameters": [
+          {
+            "name": "fresh",
+            "required": false,
+            "in": "query",
+            "description": "true khi người xem tự tải lại: mở phiên mới, đẩy xuống mọi bài đã gợi ý",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
           {
             "name": "cursor",
             "required": false,
