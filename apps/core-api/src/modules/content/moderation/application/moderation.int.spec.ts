@@ -1925,6 +1925,43 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     );
   });
 
+  it('lọc mức ưu tiên cao và phân trang bình luận theo thời điểm tạo nội dung', async () => {
+    const older = await add();
+    const newer = await add();
+    await pool.query(
+      `update content.comments set created_at = case id when $1 then now() - interval '2 days' else now() end
+       where id in ($1, $2)`,
+      [older.id, newer.id],
+    );
+    for (const [comment, severity] of [[older, 55], [newer, 90]] as const) {
+      await pool.query(
+        `insert into content.moderation_cases (target_type, target_id, post_id, author_id, severity)
+         values ('comment', $1, $2, $3, $4)`,
+        [comment.id, postId, AUTHOR, severity],
+      );
+    }
+
+    const recent = await cases.repository.queue({
+      view: 'pending', targetType: 'comment', sort: 'newest', limit: 1, offset: 0,
+    });
+    expect(recent.items[0]?.targetId).toBe(newer.id);
+    expect(recent.items[0]).not.toHaveProperty('sortAt');
+    const next = await cases.repository.queue({
+      view: 'pending', targetType: 'comment', sort: 'newest', cursor: recent.nextCursor!, limit: 1, offset: 0,
+    });
+    expect(next.items[0]?.targetId).toBe(older.id);
+    expect(next.nextCursor).toBeNull();
+
+    const high = await cases.repository.queue({
+      view: 'pending', targetType: 'comment', minSeverity: 80, limit: 20, offset: 0,
+    });
+    expect(high.total).toBe(1);
+    expect(high.items[0]?.targetId).toBe(newer.id);
+    await expect(cases.repository.queue({
+      view: 'pending', targetType: 'comment', sort: 'priority', cursor: recent.nextCursor!, limit: 1, offset: 0,
+    })).rejects.toThrow('Cursor');
+  });
+
   it('bình luận tục tĩu, phản động tự ẩn dù AI lỗi, ghi đúng lý do; bình luận sạch giữ nguyên (TF88)', async () => {
     const write = (body: string) => cases.add.execute({ postId, authorId: AUTHOR, body });
     const profane = await write('đm thằng chủ homestay óc chó');

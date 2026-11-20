@@ -361,7 +361,17 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
         offset: 20,
       }),
     );
+    await http()
+      .get(url)
+      .query({ targetType: 'comment', sort: 'newest', priority: 'high' })
+      .auth(tokens.moderator!, { type: 'bearer' })
+      .expect(200);
+    expect(queue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sort: 'newest', minSeverity: 80, targetType: 'comment' }),
+    );
     await http().get(url).query({ view: 'unknown' }).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
+    await http().get(url).query({ sort: 'oldest' }).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
+    await http().get(url).query({ priority: 'urgent' }).auth(tokens.moderator!, { type: 'bearer' }).expect(400);
   });
   it('user báo cáo được, validate UUID/reason/detail, guest bị chặn', async () => {
     const url = `/api/v1/posts/${randomUUID()}/reports`;
