@@ -1,4 +1,5 @@
 import type { TripAttachmentData } from '../../db/schema/posts.js';
+import type { TrendSignal } from '../domain/trend-signal.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
 
 export const FEED_STORE = Symbol('FEED_STORE');
@@ -64,4 +65,17 @@ export interface SharedFeedPage<Card> {
 export interface FeedPageCache {
   get<Card>(key: string): Promise<SharedFeedPage<Card> | null>;
   set<Card>(key: string, page: SharedFeedPage<Card>, ttlSeconds: number): Promise<void>;
+}
+
+export const TREND_SIGNAL_STORE = Symbol('TREND_SIGNAL_STORE');
+
+/** Bảng content.trend_signals (TF111): lượt xem đủ và bấm đặt cho điểm Hot. */
+export interface TrendSignalStore {
+  /**
+   * Ghi một tín hiệu. Trả false khi không ghi: người đó đã có tín hiệu cùng loại trên bài (kể cả khi sự kiện
+   * được giao lại), hoặc bài không còn trong content.posts.
+   */
+  record(signal: TrendSignal): Promise<boolean>;
+  /** Xoá tối đa `limit` tín hiệu có occurred_at trước `before`; trả số dòng đã xoá. */
+  purgeOlderThan(before: Date, limit: number): Promise<number>;
 }

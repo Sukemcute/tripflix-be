@@ -22,6 +22,7 @@ export const CONSUMER_GROUPS = [
   'core-analytics',
   'core-media',
   'core-moderation',
+  'core-feed-trend',
 ] as const;
 
 /** Code nghiệp vụ chỉ phụ thuộc interface này, để sau đổi sang Kafka không phải sửa nghiệp vụ. */
