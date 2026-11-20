@@ -114,7 +114,7 @@ export interface OrderStore {
   /** Đơn của người dùng theo trạng thái, khoá luôn để đổi trạng thái an toàn. */
   lockOrdersOfUser(userId: string, statuses: OrderStatus[]): Promise<OrderRecord[]>;
   /** Đơn quá hạn giữ, nhả được: pending, hoặc paying có khoản đang chờ OTP / đã quá hạn trang của cổng chuyển hướng. Đọc không khoá. */
-  findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }): Promise<string[]>;
+  findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; disabledCardGateway?: string; limit: number }): Promise<string[]>;
   /** K4: các ô (từ fromDate) có held/sold khác tổng số lượng của đơn đang giữ/đã trả. Đọc trong một câu lệnh nên là một ảnh chụp nhất quán. */
   findInventoryDrift(input: { fromDate: string; limit: number }): Promise<InventoryDrift[]>;
   /** FOR UPDATE SKIP LOCKED: hàng đang bị giữ thì trả null, không chờ. */

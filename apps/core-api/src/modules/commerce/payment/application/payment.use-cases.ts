@@ -84,7 +84,7 @@ export class PaymentUseCases {
 
   constructor(
     @Inject(ORDER_STORE) private readonly orders: OrderStore,
-    @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
+    @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway | null,
     @Inject(COMMERCE_OUTBOX) private readonly outbox: OutboxWriter,
     @Inject(COMMERCE_CLOCK) private readonly now: Clock,
     @Inject(CheckoutUseCases) private readonly checkout: CheckoutUseCases,
@@ -111,7 +111,8 @@ export class PaymentUseCases {
   }
 
   private async payOnce(userId: string, orderId: string, input: PayInput): Promise<PayResult> {
-    const prepared = await this.prepareCharge(userId, orderId, input, { gatewayName: this.gateway.name, buildKey: buildChargeKey });
+    const gateway = this.requireCardGateway();
+    const prepared = await this.prepareCharge(userId, orderId, input, { gatewayName: gateway.name, buildKey: buildChargeKey });
     if (prepared.kind === 'price_changed') {
       throw new CommerceError('conflict', 'Giá đã thay đổi, vui lòng xác nhận giá mới.', 'expectedTotal', { reason: 'PRICE_CHANGED', oldTotal: prepared.oldTotal, newTotal: prepared.newTotal });
     }
@@ -119,7 +120,7 @@ export class PaymentUseCases {
 
     let result: ChargeResult;
     try {
-      result = await withTimeout(this.gateway.charge({ amount: prepared.amount, token: input.paymentToken, gatewayKey: prepared.gatewayKey }), GATEWAY_TIMEOUT_MS);
+      result = await withTimeout(gateway.charge({ amount: prepared.amount, token: input.paymentToken, gatewayKey: prepared.gatewayKey }), GATEWAY_TIMEOUT_MS);
     } catch {
       // Không rõ kết quả (mất mạng, timeout) thì KHÔNG coi là thất bại: tiền có thể đã bị trừ. Job đối soát hỏi lại.
       return { outcome: 'pending', orderId, message: 'Chưa nhận được kết quả từ cổng thanh toán, đang kiểm tra lại. Bạn chưa cần trả lại.' };
@@ -128,16 +129,22 @@ export class PaymentUseCases {
   }
 
   async confirm3ds(userId: string, orderId: string, input: { challengeId: string; otp: string }): Promise<PayResult> {
+    const gateway = this.requireCardGateway();
     const order = await this.checkout.ownOrder(userId, orderId);
     const payment = await this.orders.findPaymentByChallenge(orderId, input.challengeId);
-    if (!payment || payment.status !== 'requires_action') throw new CommerceError('not_found', 'Phiên xác thực không tồn tại.');
+    if (!payment || payment.gateway !== gateway.name || payment.status !== 'requires_action') throw new CommerceError('not_found', 'Phiên xác thực không tồn tại.');
     // Hết hạn giữ chỗ thì không cho xác nhận OTP: tránh chốt đơn mà chỗ đã có thể bị nhả.
     if (isHoldExpired(order.holdExpiresAt, this.now())) {
       await this.applyResult(payment.gatewayKey, { status: 'failed', code: '3ds_expired' });
       throw new CommerceError('gone', 'Hết thời gian giữ chỗ trước khi xác thực xong.');
     }
-    const result = await withTimeout(this.gateway.confirm3ds(payment.gatewayRef!, input.otp), GATEWAY_TIMEOUT_MS);
+    const result = await withTimeout(gateway.confirm3ds(payment.gatewayRef!, input.otp), GATEWAY_TIMEOUT_MS);
     return this.finish(userId, orderId, payment.gatewayKey, { ...result, last4: result.last4 ?? payment.cardLast4 ?? undefined });
+  }
+
+  private requireCardGateway(): PaymentGateway {
+    if (!this.gateway) throw new CommerceError('not_found', 'Thanh toán bằng token thẻ không khả dụng.');
+    return this.gateway;
   }
 
   private async finish(userId: string, orderId: string, gatewayKey: string, result: ChargeResult): Promise<PayResult> {
@@ -423,12 +430,13 @@ export class PaymentUseCases {
   }
 
   private hasRefundGateway(gateway: string): boolean {
-    return gateway === this.gateway.name || this.refundGateways.has(gateway);
+    return gateway === this.gateway?.name || this.refundGateways.has(gateway);
   }
 
   private async executeRefund(refund: RefundRecord): Promise<boolean> {
-    if (refund.gateway === this.gateway.name) {
-      const completed = await withTimeout(this.gateway.refund({ ref: refund.parentRef!, amount: refund.amount, gatewayKey: refund.gatewayKey }), GATEWAY_TIMEOUT_MS);
+    const gateway = this.gateway;
+    if (gateway && refund.gateway === gateway.name) {
+      const completed = await withTimeout(gateway.refund({ ref: refund.parentRef!, amount: refund.amount, gatewayKey: refund.gatewayKey }), GATEWAY_TIMEOUT_MS);
       await this.orders.markRefundSucceeded(refund.id, completed.ref);
       return true;
     }
@@ -486,8 +494,8 @@ export class PaymentUseCases {
   }
 
   @Transactional('commerce')
-  private claimDueCharges(olderThanSeconds: number) {
-    return this.orders.claimDueCharges({ gateway: this.gateway.name, olderThanSeconds, limit: RECONCILE_BATCH, backoffSeconds: CHECK_BACKOFF_SECONDS });
+  private claimDueCharges(gateway: string, olderThanSeconds: number) {
+    return this.orders.claimDueCharges({ gateway, olderThanSeconds, limit: RECONCILE_BATCH, backoffSeconds: CHECK_BACKOFF_SECONDS });
   }
 
   @Transactional('commerce')
@@ -510,18 +518,21 @@ export class PaymentUseCases {
       out.isPaused = true;
       return true;
     };
-    for (const payment of await this.claimDueCharges(olderThanSeconds)) {
-      try {
-        const found = await withTimeout(this.gateway.lookup(payment.gatewayKey), GATEWAY_TIMEOUT_MS);
-        const result = found.status === 'not_found' ? await withTimeout(this.gateway.voidCharge(payment.gatewayKey), GATEWAY_TIMEOUT_MS) : found;
-        streak = 0;
-        const applied = await this.applyResult(payment.gatewayKey, result);
-        if (applied.kind === 'compensated') await this.processRefunds(payment.orderId);
-        out.settled++;
-      } catch (error) {
-        if (payment.checkAttempts >= MAX_CHECKS) await this.orders.markForReview('charge', payment.id);
-        this.logger.warn({ err: error, paymentId: payment.id }, 'Đối soát khoản trừ lỗi');
-        if (onGatewayError()) return out;
+    const gateway = this.gateway;
+    if (gateway) {
+      for (const payment of await this.claimDueCharges(gateway.name, olderThanSeconds)) {
+        try {
+          const found = await withTimeout(gateway.lookup(payment.gatewayKey), GATEWAY_TIMEOUT_MS);
+          const result = found.status === 'not_found' ? await withTimeout(gateway.voidCharge(payment.gatewayKey), GATEWAY_TIMEOUT_MS) : found;
+          streak = 0;
+          const applied = await this.applyResult(payment.gatewayKey, result);
+          if (applied.kind === 'compensated') await this.processRefunds(payment.orderId);
+          out.settled++;
+        } catch (error) {
+          if (payment.checkAttempts >= MAX_CHECKS) await this.orders.markForReview('charge', payment.id);
+          this.logger.warn({ err: error, paymentId: payment.id }, 'Đối soát khoản trừ lỗi');
+          if (onGatewayError()) return out;
+        }
       }
     }
     for (const refund of await this.claimDueRefunds(olderThanSeconds)) {
