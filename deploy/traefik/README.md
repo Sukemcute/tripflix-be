@@ -12,7 +12,7 @@
 | `/notifications/*`, `/ws` | `notification-service:3001` |
 | `/ai/*` | `ai-service:8000` |
 
-`/.well-known/jwks.json` không đi qua gateway: service khác gọi thẳng `core-api` trong mạng nội bộ.
+`/.well-known/jwks.json` và `/api/auth/service-token` không đi qua gateway: service khác gọi thẳng `core-api` trong mạng nội bộ. Gateway chặn `/api/auth/service-token` từ ngoài Internet để bảo vệ cơ chế mint token nội bộ.
 
 ## Access log trên server
 
@@ -27,7 +27,7 @@
 
 | Middleware | Áp cho | Giới hạn mỗi IP |
 |---|---|---|
-| `rate-limit-auth` | `POST /api/auth/login`, `/register`, `/google`, `/password/forgot`, `/password/reset`, `/service-token` | Trung bình 30 request/phút, dồn tối đa 10 |
+| `rate-limit-auth` | `POST /api/auth/login`, `/login-code`, `/register`, `/google`, `/password/forgot`, `/password/reset` | Trung bình 30 request/phút, dồn tối đa 10 |
 | `rate-limit-chat` | `POST /ai/chat` (trợ lý Tripi) | Trung bình 20 request/phút, dồn tối đa 5 |
 | `rate-limit-api` | Mọi đường còn lại | Trung bình 50 request/giây, dồn tối đa 100 |
 

@@ -36,9 +36,8 @@ http:
   routers:
     core-api-auth:
       rule: >-
-        Host(`{{ env "API_HOST" }}`) && Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/registration-code`) ||
-        Path(`/api/auth/google`) || Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`) ||
-        Path(`/api/auth/service-token`))
+        Host(`{{ env "API_HOST" }}`) && Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/login-code`) || Path(`/api/auth/register`) || Path(`/api/auth/registration-code`) ||
+        Path(`/api/auth/google`) || Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`))
       priority: 100
       service: core-api
       entryPoints: [websecure]
@@ -46,7 +45,7 @@ http:
       tls:
         certResolver: letsencrypt
     core-api:
-      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`) && !PathPrefix(`/api/mock-gateway`)
+      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`) && !PathPrefix(`/api/mock-gateway`) && !PathPrefix(`/api/auth/service-token`)
       service: core-api
       entryPoints: [websecure]
       middlewares: [rate-limit-api]
