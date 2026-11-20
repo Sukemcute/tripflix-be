@@ -1,5 +1,5 @@
-import { Controller, Header, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Header, HttpCode, HttpStatus, Inject, Post, Query, Req, Res } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { MediaPlaybackUseCases } from '../application/media-playback.use-cases.js';
 import { PLAYBACK_SETTINGS, type PlaybackSettings } from '../application/ports.js';
@@ -22,9 +22,14 @@ export class MediaPlaybackController {
     description:
       'Web: gọi kèm credentials (có Origin), trình duyệt nhận Set-Cookie cho tên miền media. App: không nhận Set-Cookie, ghép `cookies` thành header Cookie khi phát video.',
   })
+  @ApiQuery({ name: 'resourcePath', required: false, description: 'Tiền tố đường dẫn tài nguyên cần giới hạn (ví dụ: videos/reel-123)' })
   @ApiOkResponse({ type: PlaybackSessionDto })
-  createSession(@Req() req: Request, @Res({ passthrough: true }) res: Response): PlaybackSessionDto {
-    const session = this.playback.createSession();
+  createSession(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Query('resourcePath') resourcePath?: string,
+  ): PlaybackSessionDto {
+    const session = this.playback.createSession(resourcePath);
     const { cookieDomain } = this.settings;
     // Chỉ trình duyệt (luôn gửi Origin khi gọi API khác tên miền) mới nhận Set-Cookie. fetch của app không gửi Origin
     // nhưng vẫn tự lưu Set-Cookie vào kho cookie của máy; player lại gửi thêm bản đó cạnh header Cookie app gắn,

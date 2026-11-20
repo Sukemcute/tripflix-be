@@ -28,10 +28,10 @@ export class MediaPlaybackUseCases {
     @Inject(MEDIA_CLOCK) private readonly now: MediaClock,
   ) {}
 
-  createSession(): PlaybackSession {
+  createSession(resourcePath?: string): PlaybackSession {
     if (!this.signer || !this.settings.cdnBaseUrl) return { cookies: {}, expiresAt: null };
     const expiresAt = new Date(this.now().getTime() + this.settings.ttlSec * 1000);
-    const policy = buildPlaybackPolicy(buildPlaybackResource(this.settings.cdnBaseUrl), expiresAt);
+    const policy = buildPlaybackPolicy(buildPlaybackResource(this.settings.cdnBaseUrl, resourcePath), expiresAt);
     return { cookies: this.signer.signCookies(policy), expiresAt: expiresAt.toISOString() };
   }
 }

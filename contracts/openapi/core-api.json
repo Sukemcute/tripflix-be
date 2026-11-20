@@ -3326,7 +3326,17 @@
       "post": {
         "description": "Web: gọi kèm credentials (có Origin), trình duyệt nhận Set-Cookie cho tên miền media. App: không nhận Set-Cookie, ghép `cookies` thành header Cookie khi phát video.",
         "operationId": "MediaPlaybackController_createSession",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "resourcePath",
+            "required": false,
+            "in": "query",
+            "description": "Tiền tố đường dẫn tài nguyên cần giới hạn (ví dụ: videos/reel-123)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
