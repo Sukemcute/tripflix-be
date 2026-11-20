@@ -28,7 +28,6 @@ import type { EventBus, StreamName } from '@tripflix/event-bus';
 import type { EventEnvelope } from '@tripflix/contracts';
 import { randomUUID } from 'node:crypto';
 import { encodeFeedCursor, type FeedCursor } from './domain/feed-cursor.js';
-import { calculateHotScore } from './domain/hot-score.js';
 
 // E2E chạy app Nest thật (controller, guard, jose), chỉ thay database, Redis và S3 bằng bản bộ nhớ.
 const env = { NODE_ENV: 'test', AUTH_JWT_ISSUER: 'tripflix-core', AUTH_JWT_AUDIENCE: 'tripflix' } as CoreEnv;
@@ -79,7 +78,7 @@ class FakeFeedStore implements FeedStore {
   }
 
   listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
-    const sorted = [...this.rows].sort((a, b) => calculateHotScore(b) - calculateHotScore(a));
+    const sorted = [...this.rows].sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
     const start = after ? sorted.findIndex((row) => row.id === after.id) + 1 : 0;
     return Promise.resolve(sorted.slice(start, start + limit));
   }
@@ -271,8 +270,8 @@ describe('GET /api/v1/feed E2E', () => {
   it('tab hot xếp theo điểm và sang trang bằng cursor có điểm', async () => {
     feedStore.rows = [
       buildRow(1),
-      { ...buildRow(2), shareCount: 100 },
-      { ...buildRow(3), reactionTotal: 50 },
+      { ...buildRow(2), hotScore: 1 },
+      { ...buildRow(3), hotScore: 0.4 },
     ];
 
     const first = (await http().get('/api/v1/feed?tab=hot&limit=2').expect(200)).body as FeedPageBody;
@@ -285,7 +284,7 @@ describe('GET /api/v1/feed E2E', () => {
   });
 
   const plainCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1) });
-  const hotCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 7 });
+  const hotCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 0.7 });
   const rankedCursor = encodeFeedCursor({
     at: '2026-11-05T10:00:01.000000Z',
     id: buildPostId(1),

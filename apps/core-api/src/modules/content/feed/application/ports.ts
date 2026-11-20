@@ -24,6 +24,8 @@ export interface FeedPostRow {
   cursorAt: string;
   /** Điểm xếp hạng tab Dành cho bạn (feed-rank.ts); chỉ listForYouPosts trả. */
   rank?: number;
+  /** Điểm Hot trong trend_scores (TF111); chỉ listHotPosts trả. */
+  hotScore?: number;
 }
 
 export interface FeedListQuery {
@@ -45,7 +47,7 @@ export interface FeedStore {
   listForYouPosts(query: RankedFeedListQuery & { asOf: string }): Promise<FeedPostRow[]>;
   /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước (trang tác giả, cursor cũ). */
   listPlayablePosts(query: FeedListQuery): Promise<FeedPostRow[]>;
-  /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài trong HOT_WINDOW_DAYS ngày gần đây, xếp theo điểm hot giảm dần; bằng điểm thì ngẫu nhiên theo seed. */
+  /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài có trong trend_scores, xếp theo điểm Hot giảm dần; bằng điểm thì ngẫu nhiên theo seed. */
   listHotPosts(query: RankedFeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc và thứ tự với listPlayablePosts nhưng chỉ bài người dùng đã lưu. */
   listSavedPlayablePosts(query: FeedListQuery & { userId: string }): Promise<FeedPostRow[]>;
@@ -78,4 +80,35 @@ export interface TrendSignalStore {
   record(signal: TrendSignal): Promise<boolean>;
   /** Xoá tối đa `limit` tín hiệu có occurred_at trước `before`; trả số dòng đã xoá. */
   purgeOlderThan(before: Date, limit: number): Promise<number>;
+}
+
+export const TREND_SCORE_STORE = Symbol('TREND_SCORE_STORE');
+
+/** Bài được chấm điểm Hot, kèm tổng tín hiệu sau bán rã do database cộng sẵn. */
+export interface HotCandidateRow {
+  postId: string;
+  mediaIds: string[];
+  coverMediaId: string | null;
+  body: string;
+  hashtags: string[];
+  tripAttachment: TripAttachmentData | null;
+  /** Σ trọng số × 0,5^(tuổi / 48h) của thích, bình luận, lưu, xem đủ, bấm đặt; không tính tương tác của chính tác giả. */
+  decayedSignal: number;
+}
+
+export interface TrendScoreRow {
+  postId: string;
+  score: number;
+  raw: number;
+  decayedSignal: number;
+  completeness: number;
+}
+
+/** Bảng content.trend_scores (TF111). */
+export interface TrendScoreStore {
+  /** Bài video công khai đã đăng sau `since`, tín hiệu tính bán rã tới `now`. */
+  listHotCandidates(query: { now: Date; since: Date }): Promise<HotCandidateRow[]>;
+  /** Thay cả bảng bằng `rows`: bài không có trong `rows` bị xoá điểm. Bài đã bị xoá khỏi posts thì bỏ qua. */
+  replaceScores(rows: TrendScoreRow[], computedAt: Date): Promise<void>;
+  findScores(postIds: string[]): Promise<Array<{ postId: string; score: number; computedAt: string }>>;
 }
