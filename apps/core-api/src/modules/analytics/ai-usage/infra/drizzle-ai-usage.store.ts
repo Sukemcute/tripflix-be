@@ -32,6 +32,7 @@ export class DrizzleAiUsageStore implements AiUsageStore {
         inputTokens: sql<number>`coalesce(sum(${aiUsageEvents.inputTokens}), 0)::bigint`,
         outputTokens: sql<number>`coalesce(sum(${aiUsageEvents.outputTokens}), 0)::bigint`,
         costUsd: sql<number>`coalesce(sum(${aiUsageEvents.costUsd}), 0)`,
+        unpricedCalls: sql<number>`count(*) filter (where ${aiUsageEvents.feature} = 'cover_ocr' and ${aiUsageEvents.inputTokens} is null)::int`,
       })
       .from(aiUsageEvents)
       .where(and(gte(aiUsageEvents.occurredAt, from), lt(aiUsageEvents.occurredAt, to)))
@@ -44,6 +45,7 @@ export class DrizzleAiUsageStore implements AiUsageStore {
       inputTokens: Number(r.inputTokens),
       outputTokens: Number(r.outputTokens),
       costUsd: Number(r.costUsd),
+      unpricedCalls: Number(r.unpricedCalls),
     }));
   }
 }

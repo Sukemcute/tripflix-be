@@ -40,6 +40,7 @@ class MemoryStore implements AiUsageStore {
       inputTokens: r.inputTokens ?? 0,
       outputTokens: r.outputTokens ?? 0,
       costUsd: r.costUsd,
+      unpricedCalls: r.feature === 'cover_ocr' && r.inputTokens === null ? 1 : 0,
     }));
   }
 }
@@ -70,6 +71,19 @@ describe('toAiUsageRecord', () => {
     expect(record).toMatchObject({ feature: 'moderation', inputTokens: null, outputTokens: null, step: null });
   });
 
+  it('OCR có usage và lượt thiếu usage đều được nhận, không gán nhầm chi phí chưa biết', () => {
+    const priced = toAiUsageRecord(chatEvent({
+      feature: 'cover_ocr', step: 'completed', model: 'gpt-4.1-mini',
+      inputTokens: 1000, outputTokens: 20, costUsd: 0.000372,
+    }));
+    const missing = toAiUsageRecord(chatEvent({
+      feature: 'cover_ocr', step: 'usage_missing', model: 'gpt-4.1-mini',
+      inputTokens: null, outputTokens: null, costUsd: 0,
+    }));
+    expect(priced).toMatchObject({ feature: 'cover_ocr', inputTokens: 1000, costUsd: 0.000372 });
+    expect(missing).toMatchObject({ feature: 'cover_ocr', step: 'usage_missing', inputTokens: null });
+  });
+
   it('sự kiện khác loại thì bỏ qua; payload sai thì ném', () => {
     expect(toAiUsageRecord({ ...chatEvent(), type: 'ai.summary.ready' })).toBeNull();
     expect(() => toAiUsageRecord(chatEvent({ costUsd: -1 }))).toThrow();
@@ -84,16 +98,16 @@ describe('AiUsageUseCases', () => {
     expect(await usage.record(chatEvent())).toBe(true);
     expect(await usage.record(chatEvent())).toBe(false);
     const report = await usage.report({ from: new Date(0), to: new Date(), groupBy: 'feature' });
-    expect(report.total).toEqual({ calls: 1, inputTokens: 1200, outputTokens: 80, costUsd: 0.000092 });
+    expect(report.total).toEqual({ calls: 1, inputTokens: 1200, outputTokens: 80, costUsd: 0.000092, unpricedCalls: 0 });
   });
 
   it('sumAiUsage cộng mọi nhóm', () => {
     expect(
       sumAiUsage([
-        { key: 'chat', calls: 2, inputTokens: 10, outputTokens: 1, costUsd: 0.5 },
-        { key: 'summary', calls: 1, inputTokens: 5, outputTokens: 2, costUsd: 0.25 },
+        { key: 'chat', calls: 2, inputTokens: 10, outputTokens: 1, costUsd: 0.5, unpricedCalls: 0 },
+        { key: 'cover_ocr', calls: 1, inputTokens: 5, outputTokens: 2, costUsd: 0.25, unpricedCalls: 1 },
       ]),
-    ).toEqual({ calls: 3, inputTokens: 15, outputTokens: 3, costUsd: 0.75 });
+    ).toEqual({ calls: 3, inputTokens: 15, outputTokens: 3, costUsd: 0.75, unpricedCalls: 1 });
   });
 });
 
