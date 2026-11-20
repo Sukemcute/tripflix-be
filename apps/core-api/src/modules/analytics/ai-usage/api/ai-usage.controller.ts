@@ -31,11 +31,12 @@ export const AiUsageQuerySchema = z
   });
 
 class AiUsageRowDto {
-  @ApiProperty({ example: 'chat', description: 'Tính năng (chat, summary, moderation), ngày YYYY-MM-DD hoặc tên model' }) key!: string;
+  @ApiProperty({ example: 'cover_ocr', description: 'Tính năng, ngày YYYY-MM-DD hoặc tên model' }) key!: string;
   @ApiProperty({ example: 120 }) calls!: number;
   @ApiProperty({ example: 350000 }) inputTokens!: number;
   @ApiProperty({ example: 42000 }) outputTokens!: number;
   @ApiProperty({ example: 0.0132, description: 'USD, ước tính theo bảng giá ai-service' }) costUsd!: number;
+  @ApiProperty({ example: 2, description: 'Lượt OCR không có token usage từ provider; chi phí thực chưa biết' }) unpricedCalls!: number;
 }
 
 class AiUsageTotalDto {
@@ -43,6 +44,7 @@ class AiUsageTotalDto {
   @ApiProperty({ example: 350000 }) inputTokens!: number;
   @ApiProperty({ example: 42000 }) outputTokens!: number;
   @ApiProperty({ example: 0.0132 }) costUsd!: number;
+  @ApiProperty({ example: 2 }) unpricedCalls!: number;
 }
 
 export class AiUsageResponseDto {

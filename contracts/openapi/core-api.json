@@ -7455,7 +7455,8 @@
               "enum": [
                 "chat",
                 "summary",
-                "moderation"
+                "moderation",
+                "cover_ocr"
               ],
               "type": "string"
             }
@@ -17778,8 +17779,8 @@
         "properties": {
           "key": {
             "type": "string",
-            "example": "chat",
-            "description": "Tính năng (chat, summary, moderation), ngày YYYY-MM-DD hoặc tên model"
+            "example": "cover_ocr",
+            "description": "Tính năng, ngày YYYY-MM-DD hoặc tên model"
           },
           "calls": {
             "type": "number",
@@ -17797,6 +17798,11 @@
             "type": "number",
             "example": 0.0132,
             "description": "USD, ước tính theo bảng giá ai-service"
+          },
+          "unpricedCalls": {
+            "type": "number",
+            "example": 2,
+            "description": "Lượt OCR không có token usage từ provider; chi phí thực chưa biết"
           }
         },
         "required": [
@@ -17804,7 +17810,8 @@
           "calls",
           "inputTokens",
           "outputTokens",
-          "costUsd"
+          "costUsd",
+          "unpricedCalls"
         ]
       },
       "AiUsageTotalDto": {
@@ -17825,13 +17832,18 @@
           "costUsd": {
             "type": "number",
             "example": 0.0132
+          },
+          "unpricedCalls": {
+            "type": "number",
+            "example": 2
           }
         },
         "required": [
           "calls",
           "inputTokens",
           "outputTokens",
-          "costUsd"
+          "costUsd",
+          "unpricedCalls"
         ]
       },
       "AiUsageResponseDto": {

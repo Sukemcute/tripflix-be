@@ -74,4 +74,28 @@ describe('AI usage: merged analytics migration and PostgreSQL store', () => {
       calls: 2,
     });
   });
+
+  it('records OCR calls and exposes unknown-cost attempts separately', async () => {
+    const event: EventEnvelope = {
+      eventId: randomUUID(), type: 'ai.usage.recorded', version: 1,
+      occurredAt: '2026-11-19T18:00:00.000Z', producer: 'ai-service', userId: null,
+      payload: {
+        feature: 'cover_ocr', model: 'gpt-4.1-mini', step: 'completed',
+        inputTokens: 1000, outputTokens: 20, costUsd: 0.000372, estimated: true,
+      },
+    };
+    await usage.record(event);
+    await usage.record({
+      ...event, eventId: randomUUID(),
+      payload: { ...event.payload, step: 'usage_missing', inputTokens: null, outputTokens: null, costUsd: 0 },
+    });
+    const report = await usage.report({
+      from: new Date('2026-11-19T17:00:00Z'), to: new Date('2026-11-20T17:00:00Z'), groupBy: 'feature',
+    });
+    expect(report.rows).toEqual([{
+      key: 'cover_ocr', calls: 2, inputTokens: 1000, outputTokens: 20,
+      costUsd: 0.000372, unpricedCalls: 1,
+    }]);
+    expect(report.total.unpricedCalls).toBe(1);
+  });
 });
