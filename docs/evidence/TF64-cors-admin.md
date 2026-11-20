@@ -11,12 +11,14 @@
 ## Đối chiếu "Xong khi"
 | Tiêu chí | Đạt | Bằng chứng |
 |---|---|---|
-| Origin Admin nhận header CORS cho `.m3u8`, playlist, `.ts` | Chưa | Trước khi sửa (20/11): `curl -sI -H 'Origin: https://admin.tripflix.io.vn' .../dev/thang/videos/0d24949f-.../r1/master.m3u8` ra 200, không có `access-control-allow-origin`; cùng URL với `https://tripflix.io.vn` có đủ header |
-| Origin web vẫn đúng | Chưa | Kiểm lại sau khi chạy script |
+| Origin Admin nhận header CORS cho `.m3u8`, playlist, `.ts` | Đạt | Sau khi chạy script (20/11): `master.m3u8`, `360p/index.m3u8`, `360p/seg_000.ts` với origin Admin đều 200, `access-control-allow-origin: https://admin.tripflix.io.vn`, `access-control-allow-credentials: true`. Trước khi sửa (20/11): `curl -sI -H 'Origin: https://admin.tripflix.io.vn' .../dev/thang/videos/0d24949f-.../r1/master.m3u8` ra 200, không có `access-control-allow-origin`; cùng URL với `https://tripflix.io.vn` có đủ header |
+| Origin web vẫn đúng | Đạt | Cùng 3 file với `https://tripflix.io.vn`: 200, trả đúng origin kèm credentials |
 | Chạy lại script không mất origin Admin | Đạt | Mặc định của `WEB_ORIGINS` có cả hai origin; `jq` dựng `AccessControlAllowOrigins` ra `Quantity: 2` |
 
 ## Kết quả kiểm tra
 - `bash -n deploy/aws/setup-video-cors.sh`: đạt.
+- CloudShell: `WEB_ORIGINS="https://tripflix.io.vn,https://admin.tripflix.io.vn" ./setup-video-cors.sh`, policy có 2 origin.
+- `curl -sI -H 'Origin: <origin>'` 3 file × 2 origin: 6/6 đạt.
 
 ## Cách kiểm lại
 1. CloudShell: `./setup-video-cors.sh`, in "Đã cập nhật policy tripflix-video-cors".
