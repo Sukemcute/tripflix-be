@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { MIX_REELS_DEFAULT_EVERY, mixReels } from '../../../content/index.js';
 import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domain/candidates.js';
 import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts.js';
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
 import { hotelIdOfProduct } from '../domain/place-of-post.js';
+import { TRENDING } from '../domain/rankers/rankers.js';
 import { placeStyleProfiles } from '../domain/place-topics.js';
 import { blendSessionTaste } from '../domain/session-taste.js';
 import {
@@ -19,7 +21,7 @@ import {
   type ServedStore,
 } from './ports.js';
 
-export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent';
+export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent' | 'mixed';
 
 const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 
@@ -45,6 +47,8 @@ export interface PostRecommendationQuery {
   cursor: string | null;
   userId: string | null;
   now?: Date;
+  /** Người xem tự tải lại (trang đầu): đẩy xuống cả bài vừa gợi ý trong phiên, không chỉ bài của phiên trước. */
+  fresh?: boolean;
 }
 
 export interface PostRecommendationItem {
@@ -83,14 +87,41 @@ interface Cursor {
   page: number;
   offset: number;
   seenBefore: number;
+  /** Mốc đọc bài đã gợi ý khi trang đầu là `fresh`; không có thì bằng `seenBefore`. Giữ trong cursor để trang sau đẩy xuống cùng một tập. */
+  seenUntil?: number;
+  /** Reels Hot của feed (chip Thịnh hành, ô hot của mixed): cursor của FeedFacade.listTopHot; null là từ đầu. */
+  hot?: string | null;
+  /** mixed: vị trí đã dùng của danh sách Dành cho bạn (algo, page, offset); null là đã hết. */
+  fy?: { algo: string; page: number; offset: number } | null;
+  /** mixed: danh sách Hot đã hết. */
+  hotDone?: boolean;
 }
+
+/** algo của chip Thịnh hành Reels lấy thẳng thứ tự Hot của feed (TF111), để cursor không lẫn với trending của discovery. */
+const FEED_HOT_ALGO = 'feed_hot';
+const MIXED_ALGO = 'mixed';
 
 /** Bài tự đăng trong khoảng này trước trang đầu được đưa lên đầu feed của chính người đăng. */
 const OWN_RECENT_MS = 60 * 60_000;
 
 export class InvalidRecommendCursorError extends Error {}
 
-const VALID_MODES = new Set<RecommendMode>(['for_you', 'trending', 'has_plan', 'recent']);
+/**
+ * Mốc đọc bài đã gợi ý. Mặc định là `seenBefore` (chỉ bài của phiên trước, để trang trong phiên không xô lệch).
+ * Trang đầu `fresh` lấy `now`, để tải lại không ra y hệt trang cũ; trang sau đọc lại từ cursor.
+ */
+function resolveSeenUntil(cursor: Cursor | null, seenBefore: number, fresh: boolean | undefined, now: Date): number {
+  if (cursor) return cursor.seenUntil ?? seenBefore;
+  return fresh ? now.getTime() : seenBefore;
+}
+
+/** Chỉ ghi `seenUntil` vào cursor khi khác `seenBefore`, cursor cũ giữ nguyên dạng. */
+const seenUntilField = (seenUntil: number, seenBefore: number) => (seenUntil === seenBefore ? {} : { seenUntil });
+
+/** Bài Hot của feed trong trang gợi ý: không qua ranker của discovery nên không có điểm, tác giả. */
+const hotItem = (postId: string): RankedItem => ({ postId, authorId: '', score: 0, source: 'hot', breakdown: {}, reason: TRENDING });
+
+const VALID_MODES = new Set<RecommendMode>(['for_you', 'trending', 'has_plan', 'recent', 'mixed']);
 
 const encodeCursor = (c: Cursor) => Buffer.from(JSON.stringify(c)).toString('base64url');
 function decodeCursor(raw: string): Cursor {
@@ -102,8 +133,13 @@ function decodeCursor(raw: string): Cursor {
       Number.isInteger(c.page) &&
       Number.isInteger(c.offset) &&
       Number.isInteger(c.seenBefore) &&
+      (c.seenUntil === undefined || Number.isInteger(c.seenUntil)) &&
       c.page! >= 0 &&
-      c.offset! >= 0
+      c.offset! >= 0 &&
+      (c.hot === undefined || c.hot === null || typeof c.hot === 'string') &&
+      (c.fy === undefined ||
+        c.fy === null ||
+        (typeof c.fy === 'object' && typeof c.fy.algo === 'string' && Number.isInteger(c.fy.page) && Number.isInteger(c.fy.offset)))
     ) {
       return c as Cursor;
     }
@@ -132,7 +168,7 @@ export class PostRecommendationUseCases {
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
     const now = q.now ?? new Date();
-    const { pageItems, algo, nextCursor, items } = await this.firstFilledPage(q, now, (ranked) => this.hydrate(ranked));
+    const { pageItems, algo, nextCursor, items } = await this.firstFilledPage(q.cursor, (cursor) => this.selectRankedPage({ ...q, cursor }, now), (ranked) => this.hydrate(ranked));
     if (q.userId) await this.recordSeen(q.userId, pageItems.map((i) => i.postId), now);
     for (const item of items) {
       this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.post.id }, 'recommend.served');
@@ -150,25 +186,118 @@ export class PostRecommendationUseCases {
       throw new ReelsFeedNotWiredError('FeedFacade.getByIds chưa được nối vào RecommendCatalog');
     }
     const now = q.now ?? new Date();
-    const { algo, nextCursor, items } = await this.firstFilledPage({ ...q, postType: 'video' }, now, (ranked) => this.hydrateReels(ranked, q.userId));
+    const cursor = q.cursor ? decodeCursor(q.cursor) : null;
+    const mode = cursor?.mode ?? q.mode;
+    const hydrate = (ranked: RankedItem[]) => this.hydrateReels(ranked, q.userId);
+    const vq = { ...q, postType: 'video' };
+    // Chip Thịnh hành lấy đúng thứ tự Hot của feed như tab "Đang hot" (TF111); cursor trending cũ của discovery đi tiếp đường cũ.
+    const isFeedHot = mode === 'trending' && this.catalog.listTopHotReels !== undefined &&(!cursor || cursor.algo === FEED_HOT_ALGO);
+    if (mode === 'mixed' && !this.catalog.listTopHotReels) {
+      throw new ReelsFeedNotWiredError('FeedFacade.listTopHot chưa được nối vào RecommendCatalog');
+    }
+    const { algo, nextCursor, items } =
+      mode === 'mixed'
+        ? await this.firstFilledPage(q.cursor, (c) => this.selectMixedPage(vq, c ? decodeCursor(c) : null, now), hydrate)
+        : isFeedHot
+          ? await this.firstFilledPage(q.cursor, (c) => this.selectFeedHotPage(vq, c ? decodeCursor(c) : null), hydrate)
+          : await this.firstFilledPage(q.cursor, (c) => this.selectRankedPage({ ...vq, cursor: c }, now), hydrate);
     if (q.userId && items.length) {
       await this.recordSeen(q.userId, items.map((i) => i.card.postId), now);
     }
     for (const item of items) {
-      this.logger.log({ mode: q.mode, algo: algo.name, source: item.source, postId: item.card.postId }, 'recommend.served');
+      this.logger.log({ mode, algo: algo.name, source: item.source, postId: item.card.postId }, 'recommend.served');
     }
 
     return { items, algo: algo.name, nextCursor };
+  }
+
+  /** Một trang Hot của feed. Cursor feed sai (bị sửa tay) thì báo cursor không hợp lệ thay vì lỗi 500. */
+  private async topHot(limit: number, cursor: string | null) {
+    try {
+      return await this.catalog.listTopHotReels!({ limit, cursor });
+    } catch (err) {
+      if (cursor !== null) throw new InvalidRecommendCursorError('cursor không hợp lệ');
+      throw err;
+    }
+  }
+
+  /** Chip Thịnh hành của Reels: giữ nguyên thứ tự Hot của feed, không xếp lại bằng discovery. */
+  private async selectFeedHotPage(q: PostRecommendationQuery, c: Cursor | null) {
+    const seenBefore = c?.seenBefore ?? Date.now() - SESSION_MS;
+    const page = c?.page ?? 0;
+    const hot = await this.topHot(q.limit, c?.hot ?? null);
+    return {
+      pageItems: hot.items.map((h) => hotItem(h.postId)),
+      algo: { name: FEED_HOT_ALGO },
+      nextCursor: hot.nextCursor ? encodeCursor({ algo: FEED_HOT_ALGO, mode: 'trending', page: page + 1, offset: 0, seenBefore, hot: hot.nextCursor }) : null,
+    };
+  }
+
+  /**
+   * Feed Reels trộn (TF110/TF111): cứ MIX_REELS_DEFAULT_EVERY ô thì ô cuối là Hot của feed, còn lại là Dành cho bạn, trộn bằng
+   * mixReels của content. Cursor giữ vị trí đã dùng ở cả hai nguồn; một nguồn hết thì nguồn kia lấp cả trang.
+   * ponytail: chỉ bỏ trùng trong cùng trang; bài Hot đã ra ở trang trước có thể gặp lại trong Dành cho bạn (FE đã bỏ trùng).
+   */
+  private async selectMixedPage(q: PostRecommendationQuery, c: Cursor | null, now: Date) {
+    const seenBefore = c?.seenBefore ?? now.getTime() - SESSION_MS;
+    const seenUntil = resolveSeenUntil(c, seenBefore, q.fresh, now);
+    const page = c?.page ?? 0;
+    const isFyDone = c !== null && c.fy === null;
+    const isHotDone = c?.hotDone === true;
+    const hotSlots = isFyDone ? q.limit : isHotDone ? 0 : Math.max(1, Math.floor(q.limit / MIX_REELS_DEFAULT_EVERY));
+    const fySlots = isFyDone ? 0 : q.limit - (isHotDone ? 0 : hotSlots);
+    const fyCursor = c?.fy ? encodeCursor({ ...c.fy, mode: 'for_you', seenBefore, ...seenUntilField(seenUntil, seenBefore) }) : null;
+
+    const [fy, hot] = await Promise.all([
+      fySlots > 0 ? this.selectRankedPage({ ...q, mode: 'for_you', limit: fySlots, cursor: fyCursor }, now) : null,
+      hotSlots > 0 ? this.topHot(hotSlots, c?.hot ?? null) : null,
+    ]);
+    const fyItems = fy?.pageItems ?? [];
+    const hotItems = hot?.items ?? [];
+    const mixed = mixReels({ forYou: fyItems.map((i) => i.postId), hot: hotItems.map((h) => h.postId), limit: q.limit });
+    const byId = new Map<string, RankedItem>([
+      ...hotItems.map((h) => [h.postId, hotItem(h.postId)] as const),
+      ...fyItems.map((i) => [i.postId, i] as const),
+    ]);
+
+    const fyNext = fy?.nextCursor ? decodeCursor(fy.nextCursor) : null;
+    const nextFy = fy ? (fyNext ? { algo: fyNext.algo, page: fyNext.page, offset: fyNext.offset } : null) : (c?.fy ?? null);
+    // Mỗi bài Hot có cursor riêng: đi tiếp ngay sau bài Hot cuối cùng đã dùng, bài lấy về mà chưa dùng thì trang sau gặp lại.
+    const nextHot = mixed.usedHot > 0 ? hotItems[mixed.usedHot - 1]!.cursor : (c?.hot ?? null);
+    const nextHotDone = isHotDone || (hot !== null && mixed.usedHot === hotItems.length && !hot.nextCursor);
+    const hasMore = nextFy !== null || !nextHotDone;
+    return {
+      pageItems: mixed.ids.map((id) => byId.get(id)!),
+      algo: { name: MIXED_ALGO },
+      nextCursor:
+        mixed.ids.length > 0 && hasMore
+          ? encodeCursor({
+              algo: MIXED_ALGO,
+              mode: 'mixed',
+              page: page + 1,
+              offset: 0,
+              seenBefore,
+              ...seenUntilField(seenUntil, seenBefore),
+              hot: nextHot,
+              fy: nextFy,
+              hotDone: nextHotDone,
+            })
+          : null,
+    };
   }
 
   /**
    * Trang bị lọc hết sau hydrate (bài đã ẩn, video chưa xử lý xong) mà vẫn còn trang sau: lấy tiếp ở server thay vì trả
    * `items: []` kèm cursor, để client không bắn liền nhiều request rỗng. Giới hạn số lần để một dải dài bài lỗi không treo request.
    */
-  private async firstFilledPage<T>(q: PostRecommendationQuery, now: Date, hydrate: (ranked: RankedItem[]) => Promise<T[]>) {
-    let cursor = q.cursor;
+  private async firstFilledPage<P extends { pageItems: RankedItem[]; nextCursor: string | null }, T>(
+    first: string | null,
+    select: (cursor: string | null) => Promise<P>,
+    hydrate: (ranked: RankedItem[]) => Promise<T[]>,
+  ) {
+    let cursor = first;
     for (let skipped = 0; ; skipped++) {
-      const page = await this.selectRankedPage({ ...q, cursor }, now);
+      const page = await select(cursor);
       const items = await hydrate(page.pageItems);
       if (items.length || !page.nextCursor || skipped >= MAX_EMPTY_PAGE_SKIPS) return { ...page, items };
       cursor = page.nextCursor;
@@ -190,6 +319,7 @@ export class PostRecommendationUseCases {
     const offset = cursor?.offset ?? 0;
     // Mốc "phiên trước" cố định từ trang đầu: cả phiên đẩy xuống cùng một tập bài nên trang không xô lệch.
     const seenBefore = cursor?.seenBefore ?? now.getTime() - SESSION_MS;
+    const seenUntil = resolveSeenUntil(cursor, seenBefore, q.fresh, now);
     // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
     const sessionAt = seenBefore + SESSION_MS;
     const hasPlanOnly = mode === 'has_plan';
@@ -198,7 +328,7 @@ export class PostRecommendationUseCases {
     const [interacted, seenIds, longTaste, recent, rawOwnRecent] = q.userId
       ? await Promise.all([
           this.store.listInteractedPostIds(q.userId, new Date(sessionAt)),
-          this.listSeen(q.userId, new Date(seenBefore)),
+          this.listSeen(q.userId, new Date(seenUntil)),
           this.store.findUserFeatures(algo.userBuilder.key, q.userId),
           algo.userBuilder.key === 'tag_affinity@v0' ? this.listRecent(q.userId, new Date(sessionAt)) : [],
           this.store.listOwnRecentPostIds({
@@ -268,7 +398,10 @@ export class PostRecommendationUseCases {
     return {
       pageItems,
       algo,
-      nextCursor: pageItems.length > 0 && hasMore ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore }) : null,
+      nextCursor:
+        pageItems.length > 0 && hasMore
+          ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore, ...seenUntilField(seenUntil, seenBefore) })
+          : null,
     };
   }
 

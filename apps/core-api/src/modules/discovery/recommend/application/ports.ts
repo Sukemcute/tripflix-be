@@ -45,6 +45,11 @@ export interface RecommendCatalog {
   getVisiblePosts(postIds: string[]): Promise<RecommendCardPost[]>;
   /** Trong postIds, thẻ Reels phát được theo đúng thứ tự (lọc bài ẩn/chưa transcode xong). Thật: FeedFacade.getByIds. */
   getReelCardsByIds?(postIds: string[], viewerId: string | null): Promise<RecommendReelCard[]>;
+  /**
+   * Reels Hot của feed theo đúng thứ tự tab "Đang hot" (TF111); mỗi bài có cursor riêng để đi tiếp sau bất kỳ bài nào.
+   * Cursor sai thì ném lỗi. Thật: FeedFacade.listTopHot.
+   */
+  listTopHotReels?(query: { limit: number; cursor: string | null }): Promise<{ items: Array<{ postId: string; cursor: string }>; nextCursor: string | null }>;
 }
 
 export interface RecommendReelCard {

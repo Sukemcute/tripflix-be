@@ -345,6 +345,115 @@ describe('PostRecommendationUseCases', () => {
     );
   });
 
+  describe('Reels Hot của feed (TF111)', () => {
+    const card = (postId: string) => ({
+      postId,
+      author: { id: `a-${postId}`, name: null, avatarUrl: null, isKol: false },
+      video: {},
+      title: postId,
+      caption: '',
+      region: null,
+      tags: [],
+      linkedProductIds: [],
+      tripAttachment: null,
+      counts: { likes: 0, comments: 0, saves: 0, shares: 0 },
+      viewerState: null,
+      reason: null,
+    });
+    /** Danh sách Hot của feed: X00..X{n-1}, cursor của mỗi bài là `c:<id>`, trang sau bắt đầu ngay sau bài đó. */
+    const wireFeed = (catalog: unknown, n: number, hidden: string[] = []) => {
+      const hot = Array.from({ length: n }, (_, i) => `X${String(i).padStart(2, '0')}`);
+      const c = catalog as RecommendCatalog;
+      c.getReelCardsByIds = vi.fn(async (postIds: string[]) => postIds.filter((id) => !hidden.includes(id)).map(card));
+      c.listTopHotReels = vi.fn(async ({ limit, cursor }: { limit: number; cursor: string | null }) => {
+        if (cursor !== null && !cursor.startsWith('c:')) throw new Error('cursor feed sai');
+        const start = cursor === null ? 0 : hot.indexOf(cursor.slice(2)) + 1;
+        const items = hot.slice(start, start + limit).map((postId) => ({ postId, cursor: `c:${postId}` }));
+        return { items, nextCursor: start + limit < n ? `c:${hot[start + limit - 1]}` : null };
+      });
+      return c;
+    };
+    const reelIds = (page: { items: Array<{ card: { postId: string } }> }) => page.items.map((i) => i.card.postId);
+
+    it('trending: đúng thứ tự Hot của feed, đi tiếp bằng cursor của feed, bỏ bài không phát được', async () => {
+      const { useCases, catalog } = setup();
+      wireFeed(catalog, 7, ['X01']);
+      const p1 = await useCases.recommendReels({ mode: 'trending', limit: 4, cursor: null, userId: U, now: NOW });
+      expect([p1.algo, reelIds(p1)]).toEqual(['feed_hot', ['X00', 'X02', 'X03']]);
+      expect(p1.items.every((i) => i.source === 'hot' && i.reason.code === 'trending')).toBe(true);
+      const p2 = await useCases.recommendReels({ mode: 'for_you', limit: 4, cursor: p1.nextCursor, userId: U, now: NOW });
+      expect([reelIds(p2), p2.nextCursor]).toEqual([['X04', 'X05', 'X06'], null]);
+    });
+
+    it('mixed: ô 4, 8 là Hot của feed, còn lại Dành cho bạn; trang sau đi tiếp cả hai nguồn không lặp', async () => {
+      const { useCases, catalog } = setup();
+      wireFeed(catalog, 6);
+      const p1 = await useCases.recommendReels({ mode: 'mixed', limit: 8, cursor: null, userId: U, now: NOW });
+      expect(p1.algo).toBe('mixed');
+      expect(p1.items.map((i) => (i.card.postId.startsWith('X') ? 'HOT' : 'FY'))).toEqual(['FY', 'FY', 'FY', 'HOT', 'FY', 'FY', 'FY', 'HOT']);
+      const p2 = await useCases.recommendReels({ mode: 'trending', limit: 8, cursor: p1.nextCursor, userId: U, now: NOW });
+      expect(reelIds(p2).filter((id) => id.startsWith('X'))).toEqual(['X02', 'X03']);
+      expect(reelIds(p2).filter((id) => reelIds(p1).includes(id))).toEqual([]);
+    });
+
+    it('mixed: Hot hết thì Dành cho bạn lấp cả trang; khách vẫn dùng được', async () => {
+      const { useCases, catalog } = setup();
+      wireFeed(catalog, 1);
+      const p1 = await useCases.recommendReels({ mode: 'mixed', limit: 4, cursor: null, userId: null, now: NOW });
+      expect(reelIds(p1)).toContain('X00');
+      const p2 = await useCases.recommendReels({ mode: 'mixed', limit: 4, cursor: p1.nextCursor, userId: null, now: NOW });
+      expect(p2.items).toHaveLength(4);
+      expect(p2.items.every((i) => i.source !== 'hot' || !i.card.postId.startsWith('X'))).toBe(true);
+    });
+
+    it('fresh: tải lại trong 30 phút không ra y hệt trang cũ; trang sau giữ cùng mốc đọc bài đã gợi ý', async () => {
+      const { useCases, catalog, servedList } = setup();
+      wireFeed(catalog, 6);
+      const first = await useCases.recommendReels({ mode: 'for_you', limit: 4, cursor: null, userId: U, now: NOW });
+      const later = new Date(NOW.getTime() + 60_000);
+      // Không fresh: bài vừa gợi ý 1 phút trước chưa tính là phiên trước nên trang đầu y hệt.
+      const again = await useCases.recommendReels({ mode: 'for_you', limit: 4, cursor: null, userId: U, now: later });
+      expect(reelIds(again)).toEqual(reelIds(first));
+      // Tải lại luôn tới sau lần gợi ý trước đó.
+      const reloadAt = new Date(later.getTime() + 1_000);
+      const fresh = await useCases.recommendReels({ mode: 'for_you', limit: 4, cursor: null, userId: U, now: reloadAt, fresh: true });
+      expect(reelIds(fresh).filter((id) => reelIds(first).includes(id))).toEqual([]);
+      expect(servedList.mock.calls.at(-1)![1]).toEqual(reloadAt);
+      // Trang sau tới muộn hơn vẫn đọc bài đã gợi ý theo mốc của trang đầu, nên không xô lệch.
+      await useCases.recommendReels({ mode: 'for_you', limit: 4, cursor: fresh.nextCursor, userId: U, now: new Date(reloadAt.getTime() + 5_000) });
+      expect(servedList.mock.calls.at(-1)![1]).toEqual(reloadAt);
+    });
+
+    it('fresh với mixed: phần Dành cho bạn đổi, cursor mang mốc sang trang sau; fresh kèm cursor thì bỏ qua', async () => {
+      const { useCases, catalog, servedList } = setup();
+      wireFeed(catalog, 6);
+      const forYouIds = (page: { items: Array<{ card: { postId: string } }> }) => reelIds(page).filter((id) => !id.startsWith('X'));
+      const first = await useCases.recommendReels({ mode: 'mixed', limit: 8, cursor: null, userId: U, now: NOW });
+      const later = new Date(NOW.getTime() + 60_000);
+      const fresh = await useCases.recommendReels({ mode: 'mixed', limit: 8, cursor: null, userId: U, now: later, fresh: true });
+      expect(forYouIds(fresh).filter((id) => forYouIds(first).includes(id))).toEqual([]);
+      await useCases.recommendReels({ mode: 'mixed', limit: 8, cursor: fresh.nextCursor, userId: U, now: new Date(later.getTime() + 5_000), fresh: true });
+      expect(servedList.mock.calls.at(-1)![1]).toEqual(later);
+      // Cursor không fresh giữ nguyên dạng cũ, không có seenUntil.
+      const plain = JSON.parse(Buffer.from(first.nextCursor!, 'base64url').toString()) as Record<string, unknown>;
+      expect(plain).not.toHaveProperty('seenUntil');
+    });
+
+    it('cursor Hot bị sửa → InvalidRecommendCursorError; mixed khi chưa nối listTopHot → ReelsFeedNotWiredError', async () => {
+      const { useCases, catalog } = setup();
+      wireFeed(catalog, 5);
+      const forged = Buffer.from(JSON.stringify({ algo: 'feed_hot', mode: 'trending', page: 1, offset: 0, seenBefore: 0, hot: 'rác' })).toString('base64url');
+      await expect(useCases.recommendReels({ mode: 'trending', limit: 4, cursor: forged, userId: U, now: NOW })).rejects.toBeInstanceOf(
+        InvalidRecommendCursorError,
+      );
+      const bare = setup();
+      (bare.catalog as unknown as RecommendCatalog).getReelCardsByIds = vi.fn(async () => []);
+      await expect(bare.useCases.recommendReels({ mode: 'mixed', limit: 4, cursor: null, userId: U, now: NOW })).rejects.toBeInstanceOf(
+        ReelsFeedNotWiredError,
+      );
+    });
+  });
+
   it('mode has_plan: chỉ trả bài có lịch trình (kể cả slot explore), khách dùng trending + lọc', async () => {
     const { useCases, store } = setup();
     // Gắn hasPlan cho một số bài hot, fresh và explore
