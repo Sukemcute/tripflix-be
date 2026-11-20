@@ -25,6 +25,18 @@ describe('MediaPlaybackUseCases', () => {
     });
   });
 
+  it('hỗ trợ thu hẹp phạm vi theo resourcePath/prefix cụ thể (SEC-07)', () => {
+    const signer = new RecordingSigner();
+    const session = new MediaPlaybackUseCases(signer, SETTINGS, () => NOW).createSession('videos/reel-456');
+
+    expect(session.expiresAt).toBe('2026-11-17T07:00:00.000Z');
+    expect(JSON.parse(signer.policies[0]!)).toEqual({
+      Statement: [
+        { Resource: 'https://media.test/videos/reel-456/*', Condition: { DateLessThan: { 'AWS:EpochTime': NOW.getTime() / 1000 + 3600 } } },
+      ],
+    });
+  });
+
   it('chưa cấu hình khoá thì không ký, video phát như cũ', () => {
     expect(new MediaPlaybackUseCases(null, SETTINGS, () => NOW).createSession()).toEqual({ cookies: {}, expiresAt: null });
   });
