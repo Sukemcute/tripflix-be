@@ -420,7 +420,7 @@ export class PostPartsScreeningUseCase {
             results = [
               await this.ai.ocrVideoCover(
                 part.id,
-                await this.media.readModerationVideoPoster(claim.input.assetId!),
+                await this.readOcrPoster(claim.input.assetId!, part.id, postId),
               ),
             ].filter((value): value is PartVerdict => !!value);
         } else {
@@ -434,6 +434,22 @@ export class PostPartsScreeningUseCase {
         /* saved below as retryable failure */
       }
       await this.complete(claim, results?.[0] ?? null, startedAt);
+    }
+  }
+
+  private async readOcrPoster(assetId: string, partId: string, postId: string) {
+    try {
+      return await this.media.readModerationVideoPoster(assetId);
+    } catch (error) {
+      // Do not log raw SDK errors, which may contain request headers or URLs.
+      const metadata = error && typeof error === 'object' && '$metadata' in error
+        ? error.$metadata as { httpStatusCode?: number } | undefined
+        : undefined;
+      this.logger.warn(
+        { step: 's3', assetId, partId, postId, httpStatus: metadata?.httpStatusCode },
+        'Cover OCR poster read failed',
+      );
+      throw error;
     }
   }
 

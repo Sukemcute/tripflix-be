@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import type { ModerationAiPort, ModerationItem, ModerationPartInput } from '../application/ports.js';
 import type { PartVerdict } from '../../db/schema/moderation-parts.js';
@@ -27,6 +28,7 @@ export interface AiClientConfig {
 }
 
 export class AiModerationClient implements ModerationAiPort {
+  private readonly logger = new Logger('AiModerationClient');
   private token: { value: string; expiresAt: number } | undefined;
   private pendingToken: Promise<string> | undefined;
   constructor(
@@ -46,8 +48,11 @@ export class AiModerationClient implements ModerationAiPort {
       model: z.string().nullable(),
       errorCode: z.string().nullable(),
     });
+    let step: 'token' | 'ocr' = 'token';
+    let httpStatus: number | undefined;
     try {
       let token = await this.getToken();
+      step = 'ocr';
       const call = (value: string) =>
         this.request(`${this.config.aiUrl!.replace(/\/$/, '')}/moderate/cover-ocr`, {
           method: 'POST',
@@ -56,16 +61,27 @@ export class AiModerationClient implements ModerationAiPort {
           signal: AbortSignal.timeout(Math.max(this.config.timeoutMs ?? 15_000, 25_000)),
         });
       let response = await call(token);
+      httpStatus = response.status;
       if (response.status === 401) {
         if (this.token?.value === token) this.token = undefined;
+        step = 'token';
+        httpStatus = undefined;
         token = await this.getToken();
+        step = 'ocr';
         response = await call(token);
+        httpStatus = response.status;
       }
-      if (!response.ok) return null;
+      if (!response.ok) {
+        this.logger.warn({ step, partId: id, httpStatus }, 'Cover OCR request failed');
+        return null;
+      }
       const verdict = schema.parse(await response.json());
-      if (verdict.status !== 'error' && !verdict.model) return null;
+      if (verdict.status !== 'error' && !verdict.model) throw new Error('Invalid OCR response');
+      if (verdict.status === 'error')
+        this.logger.warn({ step, partId: id, httpStatus, errorCode: verdict.errorCode }, 'Cover OCR returned an error');
       return { id, ...verdict };
     } catch {
+      this.logger.warn({ step, partId: id, httpStatus }, 'Cover OCR step failed');
       return null;
     }
   }
@@ -183,7 +199,10 @@ export class AiModerationClient implements ModerationAiPort {
       }),
       signal: AbortSignal.timeout(this.config.timeoutMs ?? 3000),
     });
-    if (!response.ok) throw new Error('Không lấy được service token kiểm duyệt');
+    if (!response.ok) {
+      this.logger.warn({ step: 'token', httpStatus: response.status }, 'Moderation service token request failed');
+      throw new Error('Moderation service token request failed');
+    }
     const token = TokenSchema.parse(await response.json());
     this.token = {
       value: token.accessToken,
