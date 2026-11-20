@@ -527,10 +527,15 @@ describe('TF30 nhả chỗ quá hạn trên Postgres thật', () => {
     await ageCharge(abandoned.orderId, 16);
 
     const now = new Date();
-    const orderIds = await store.findExpiredHoldIds({ now, redirectGateway: 'vnpay', redirectStartedBefore: new Date(now.getTime() - 15 * 60_000), limit: 500 });
+    const search = { now, redirectGateway: 'vnpay', redirectStartedBefore: new Date(now.getTime() - 15 * 60_000), limit: 500 };
+    const orderIds = await store.findExpiredHoldIds(search);
     expect(orderIds).toContain(abandoned.orderId);
     expect(orderIds).not.toContain(card.orderId);
     expect(orderIds).not.toContain(vnpay.orderId);
+    const orderIdsWithMockDisabled = await store.findExpiredHoldIds({ ...search, disabledCardGateway: 'mock' });
+    expect(orderIdsWithMockDisabled).toContain(card.orderId);
+    expect(orderIdsWithMockDisabled).toContain(abandoned.orderId);
+    expect(orderIdsWithMockDisabled).not.toContain(vnpay.orderId);
 
     // Danh sách đọc không khoá nên có thể đã cũ: job phải tự xét lại sau khi khoá, không tin danh sách.
     const before = await inventoryOf(date);

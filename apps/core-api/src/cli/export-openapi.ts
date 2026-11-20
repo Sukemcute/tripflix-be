@@ -2,8 +2,12 @@ import 'reflect-metadata';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../app.module.js';
 import { applyGlobalPrefix, buildOpenApiDocument } from '../platform/http.js';
+
+// Hợp đồng dùng chung có cả API demo. Chỉ bật mock trong tiến trình xuất tài liệu.
+process.env.NODE_ENV = 'development';
+process.env.ENABLE_MOCK_PAYMENT = 'true';
+const { AppModule } = await import('../app.module.js');
 
 // preview: chỉ đọc metadata controller, không tạo kết nối database hay Redis.
 const app = await NestFactory.create(AppModule, { preview: true, logger: false });

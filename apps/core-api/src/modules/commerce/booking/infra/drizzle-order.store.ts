@@ -149,7 +149,7 @@ export class DrizzleOrderStore implements OrderStore {
     return result.rows.map((r) => ({ productType: r.product_type, productId: r.product_id, date: r.date, held: r.held, expectedHeld: r.expected_held, sold: r.sold, expectedSold: r.expected_sold }));
   }
 
-  async findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; limit: number }) {
+  async findExpiredHoldIds(input: { now: Date; redirectGateway: string; redirectStartedBefore: Date; disabledCardGateway?: string; limit: number }) {
     // Lọc ngay trong câu truy vấn: đơn thẻ chờ đối soát có thể nằm rất lâu, không được chiếm chỗ trong lô.
     const abandonedCharges = this.db
       .select({ id: payments.id })
@@ -157,7 +157,16 @@ export class DrizzleOrderStore implements OrderStore {
       .where(
         and(
           eq(payments.orderId, orders.id),
-          or(eq(payments.status, 'requires_action'), and(eq(payments.status, 'initiated'), eq(payments.gateway, input.redirectGateway), lte(payments.createdAt, input.redirectStartedBefore))),
+          or(
+            eq(payments.status, 'requires_action'),
+            and(
+              eq(payments.status, 'initiated'),
+              or(
+                and(eq(payments.gateway, input.redirectGateway), lte(payments.createdAt, input.redirectStartedBefore)),
+                input.disabledCardGateway ? eq(payments.gateway, input.disabledCardGateway) : undefined,
+              ),
+            ),
+          ),
         ),
       );
     const rows = await this.db

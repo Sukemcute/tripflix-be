@@ -89,6 +89,7 @@ services:
     environment:
       <<: *be-env
       APP_ROLE: all
+      ENABLE_MOCK_PAYMENT: ${ENABLE_MOCK_PAYMENT:-false}
       PORT: 3000
     ports: ['3000:3000']
     depends_on:

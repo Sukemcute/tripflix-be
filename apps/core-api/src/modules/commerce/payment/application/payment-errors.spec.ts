@@ -16,7 +16,7 @@ vi.mock('@tripflix/db', async (importOriginal) => ({
 const NOW = new Date('2026-11-12T00:00:00Z');
 const payInput = { paymentToken: 'token-1', expectedTotal: 100_000, acceptedPolicyVersion: POLICY_VERSION };
 
-function setup() {
+function setup({ cardPaymentEnabled = true } = {}) {
   const order: OrderRecord = {
     id: 'order-1', userId: 'user-1', status: 'pending', total: 100_000,
     adults: 1, children: 0, infants: 0, sourcePostId: null,
@@ -46,11 +46,24 @@ function setup() {
   const outbox = { add: vi.fn<OutboxWriter['add']>() };
   const store = orders as unknown as OrderStore;
   const checkout = new CheckoutUseCases(store, new MemoryCommerceStore(), () => '2026-11-12', () => NOW);
-  const useCases = new PaymentUseCases(store, gateway, outbox as unknown as OutboxWriter, () => NOW, checkout);
+  const useCases = new PaymentUseCases(store, cardPaymentEnabled ? gateway : null, outbox as unknown as OutboxWriter, () => NOW, checkout);
   return { useCases, orders, gateway, outbox, order };
 }
 
 describe('PaymentUseCases: lỗi trước khi trừ tiền', () => {
+  it('từ chối thanh toán thẻ khi cổng demo tắt, trước khi đọc hoặc ghi đơn', async () => {
+    const { useCases, orders, outbox, order } = setup({ cardPaymentEnabled: false });
+
+    await expect(useCases.pay(order.userId, order.id, payInput)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(useCases.confirm3ds(order.userId, order.id, { challengeId: 'expired-demo', otp: '123456' }))
+      .rejects.toMatchObject({ code: 'not_found' });
+    expect(orders.lockOrder).not.toHaveBeenCalled();
+    expect(orders.findOrder).not.toHaveBeenCalled();
+    expect(orders.insertPayment).not.toHaveBeenCalled();
+    expect(orders.updateOrder).not.toHaveBeenCalled();
+    expect(outbox.add).not.toHaveBeenCalled();
+  });
+
   it('chấp nhận sai phiên bản chính sách thì báo lỗi trường, không ghi khoản trừ hay gọi cổng', async () => {
     const { useCases, orders, gateway, order } = setup();
 

@@ -8,7 +8,7 @@ import { MockGateway, TEST_CARDS } from '../infra/mock-gateway.js';
 
 /**
  * Cổng giả lập đóng vai form thẻ của cổng thật (Stripe.js): thẻ đổi lấy token, API đặt chỗ chỉ thấy token.
- * Chỉ dùng được khi PAYMENT_GATEWAY=mock; cổng thật thì 404.
+ * Chỉ đăng ký ngoài production khi ENABLE_MOCK_PAYMENT=true.
  */
 @ApiTags('mock-gateway')
 @Controller('mock-gateway')

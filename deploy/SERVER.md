@@ -379,9 +379,13 @@ Backend kiểm ID token của Google theo `GOOGLE_CLIENT_IDS`. Web gắn `NEXT_P
 
 Kiểm tra: `curl -s -X POST https://<API_HOST>/api/auth/google -H 'content-type: application/json' -d '{"idToken":"x"}'` phải trả `401` (token sai), không phải `503`. Trang `/login` phải hiện nút Google, và đăng nhập thử bằng tài khoản Google phải vào được trang tài khoản.
 
-## VNPay sandbox
+## Thanh toán VNPay và cổng demo
 
-Thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` vào `.env.server`, không commit và không gửi qua chat. Thiếu một trong hai thì các API VNPay trả 404. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web, đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
+Đặt `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_PAYMENT_URL` và `VNPAY_API_URL` theo cấu hình merchant production do VNPay cấp. Giữ mã merchant và khoá ký trong `.env.server`. Core API production chỉ bật VNPay khi đủ cấu hình, với URL HTTPS ngoài sandbox. `VNPAY_RETURN_URL` mặc định là trang kết quả trên web. Đặt IPN của merchant về `https://<API_HOST>/api/payments/vnpay/ipn`.
+
+Cổng giả lập mặc định tắt. Máy local hoặc server demo dùng `compose.yaml` có thể bật bằng `ENABLE_MOCK_PAYMENT=true` khi `NODE_ENV` khác `production`. Core API production luôn tắt cổng giả lập và Traefik trong `compose.server.yaml` chặn tiền tố `/api/mock-gateway`.
+
+Cập nhật `compose.server.yaml`, `traefik/server.yml` và cấu hình merchant trên server trước khi cập nhật image core-api. Khởi động lại Traefik để nạp cấu hình router mới.
 
 ## Observability: metric, trace cho trang `/analytics`
 

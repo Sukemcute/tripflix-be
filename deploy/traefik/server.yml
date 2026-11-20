@@ -46,7 +46,7 @@ http:
       tls:
         certResolver: letsencrypt
     core-api:
-      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`)
+      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`) && !PathPrefix(`/api/mock-gateway`)
       service: core-api
       entryPoints: [websecure]
       middlewares: [rate-limit-api]
@@ -80,7 +80,7 @@ http:
         certResolver: letsencrypt
 
     web:
-      rule: Host(`{{ env "WEB_HOST" }}`)
+      rule: Host(`{{ env "WEB_HOST" }}`) && !PathPrefix(`/api/mock-gateway`)
       service: web
       entryPoints: [websecure]
       middlewares: [rate-limit-api]
@@ -97,14 +97,14 @@ http:
       observability:
         accessLogs: false
     web-www:
-      rule: Host(`www.{{ env "WEB_HOST" }}`)
+      rule: Host(`www.{{ env "WEB_HOST" }}`) && !PathPrefix(`/api/mock-gateway`)
       service: web
       entryPoints: [websecure]
       middlewares: [redirect-to-apex]
       tls:
         certResolver: letsencrypt
     admin:
-      rule: Host(`{{ env "ADMIN_HOST" }}`)
+      rule: Host(`{{ env "ADMIN_HOST" }}`) && !PathPrefix(`/api/mock-gateway`)
       service: admin
       entryPoints: [websecure]
       middlewares: [rate-limit-api]

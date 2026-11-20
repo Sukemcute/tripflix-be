@@ -16,7 +16,7 @@ vi.mock('@tripflix/db', async (importOriginal) => ({
 const NOW = new Date('2026-11-10T03:00:00Z');
 const PAYMENT_DATE = new Date('2026-11-05T03:04:05Z');
 
-function setup(options: { gateway?: string; isConfigured?: boolean; checkAttempts?: number; gatewayRef?: string | null } = {}) {
+function setup(options: { gateway?: string; isConfigured?: boolean; checkAttempts?: number; gatewayRef?: string | null; cardPaymentEnabled?: boolean } = {}) {
   const row: RefundRecord = {
     id: 'refund-1',
     orderId: 'order-1',
@@ -145,7 +145,7 @@ function setup(options: { gateway?: string; isConfigured?: boolean; checkAttempt
   if (options.isConfigured !== false) registry.set(VNPAY_GATEWAY, client);
   const restart = () => new PaymentUseCases(
     store as unknown as OrderStore,
-    gateway,
+    options.cardPaymentEnabled === false ? null : gateway,
     outbox as unknown as OutboxWriter,
     () => NOW,
     checkout as unknown as CheckoutUseCases,
@@ -161,6 +161,15 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('PaymentUseCases: định tuyến hoàn tiền', () => {
+  it('job vẫn hoàn tiền VNPay khi cổng demo tắt', async () => {
+    const { useCases, store, client, row } = setup({ cardPaymentEnabled: false });
+
+    expect(await useCases.reconcile()).toMatchObject({ settled: 0, refunds: 1, errors: 0 });
+    expect(store.claimDueCharges).not.toHaveBeenCalled();
+    expect(client.refund).toHaveBeenCalledTimes(1);
+    expect(store.markRefundSucceeded).toHaveBeenCalledExactlyOnceWith(row.id, 'vnpay-refund-1');
+  });
+
   it('VNPay thành công: ghi mã hoàn, chuyển đúng dữ liệu khoản trả gốc và không gọi cổng giả lập', async () => {
     const { useCases, store, client, gateway, row } = setup();
 
