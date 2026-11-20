@@ -223,6 +223,7 @@ export function postToObject(p: ExplorePost): ExploreObject {
     likes: p.reactionTotal,
     n: p.commentCount,
     topics: isVideo && days ? ['plan'] : [],
+    thumbnail: p.posterUrl ?? null,
     authorId: p.authorId,
     createdAt: new Date(p.createdAt).toISOString(),
     completeness: calculateCompleteness({

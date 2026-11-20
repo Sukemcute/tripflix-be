@@ -6,8 +6,9 @@ import type { CoreEnv } from '../../platform/env.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../platform/tokens.js';
 import { AccessFacade, AccessModule } from '../access/index.js';
 import { CommerceFacade, CommerceModule, type CatalogFlight, type CatalogHotel } from '../commerce/index.js';
-import { ContentFacade, ContentModule, FeedFacade } from '../content/index.js';
+import { ContentFacade, ContentModule, FeedFacade, MediaFacade } from '../content/index.js';
 import { DiscoveryEventsConsumer } from './consumers/discovery-events.consumer.js';
+import { withVideoPosters } from './search/infra/explore-post-posters.js';
 import { HomeRecommendationsController } from './recommend/api/home-recommendations.controller.js';
 import { PostRecommendationsController } from './recommend/api/post-recommendations.controller.js';
 import { TripAddonsController } from './recommend/api/trip-addons.controller.js';
@@ -78,12 +79,18 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
 });
 
 /** Khách sạn + bài cho tìm khám phá. days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
-const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade, access: AccessFacade): ExploreCatalog => ({
+const exploreCatalog = (
+  commerce: CommerceFacade,
+  content: ContentFacade,
+  access: AccessFacade,
+  media: MediaFacade,
+): ExploreCatalog => ({
   listHotels: async (cursor) => {
     const page = await commerce.listCatalog({ type: 'hotel', cursor, limit: 200, days: 30 });
     return { items: page.items.filter((item): item is CatalogHotel => item.type === 'hotel'), nextCursor: page.nextCursor };
   },
-  listPosts: (cursor) => content.listPosts({ cursor, limit: 100 }),
+  // Gắn poster video để kết quả tìm có ảnh bìa: một lần đọc media cho mỗi trang 100 bài.
+  listPosts: async (cursor) => withVideoPosters(await content.listPosts({ cursor, limit: 100 }), (ids) => media.getPlayback(ids)),
   findVisiblePostIds: async (postIds) => new Set((await content.getVisiblePosts(postIds)).map((p) => p.id)),
   getAuthorNames: (authorIds) => access.getDisplayNames(authorIds),
 });
@@ -164,7 +171,7 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     { provide: PLACES_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzlePlacesStore(createDb(pools.discovery)) },
     PlacesUseCases,
     LoadPlacesJob,
-    { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade, AccessFacade], useFactory: exploreCatalog },
+    { provide: EXPLORE_CATALOG, inject: [CommerceFacade, ContentFacade, AccessFacade, MediaFacade], useFactory: exploreCatalog },
     { provide: SEARCH_EVENT_BUS, inject: [REDIS], useFactory: (redis: Redis) => new RedisStreamsEventBus(redis) },
     SearchEventsPublisher,
     SuggestUseCases,
