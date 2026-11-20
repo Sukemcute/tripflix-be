@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { calculateCompleteness } from '../../recommend/domain/completeness.js';
+import { calculateCompleteness } from '../../../content/index.js';
 import { RECOMMEND_STORE, type RecommendStore } from '../../recommend/application/ports.js';
 import { buildIndex } from '../domain/explore/build.js';
 import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';

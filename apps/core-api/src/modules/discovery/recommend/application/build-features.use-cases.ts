@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { captionExpOf, captionOf, EXP_DESCRIPTION_TEXTS } from '../domain/bins.js';
-import { calculateCompleteness, hasPlan } from '../domain/completeness.js';
+import { calculateCompleteness, hasPlan } from '../../../content/index.js';
 import { round4, type PostBuilder, type PostContent, type PostMeta, type RawRow, type UserBuilder } from '../domain/contracts.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
