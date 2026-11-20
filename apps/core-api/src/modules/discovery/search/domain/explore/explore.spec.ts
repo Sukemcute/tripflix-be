@@ -1,6 +1,6 @@
 // Chép các tự kiểm của prototype Python (engine.py, ngrams.py): bản TS phải cho cùng kết quả.
 import { buildIndex } from './build.js';
-import { ALL_LIMIT, MemoryExploreSource } from './memory-source.js';
+import { CANDIDATE_LIMIT, MemoryExploreSource } from './memory-source.js';
 import { budgetOf, parse, typoFix, understand, view } from './query.js';
 import { searchExplore, VERTICALS } from './rank.js';
 import { Stats } from './stats.js';
@@ -119,11 +119,11 @@ describe('tìm', () => {
     o({ id: 'p2', kind: 'plan', src: 'x', title: 'Đà Lạt 3N2Đ sang', text: 'lich trinh', place: 'Đà Lạt', cost: 6_000_000, days: 3 }),
   ];
 
-  it('câu không có từ tìm ("nhậu") không kéo cả bảng: mỗi nhánh tối đa ALL_LIMIT ứng viên', async () => {
-    const eats = Array.from({ length: ALL_LIMIT + 50 }, (_, i) => o({ id: `e${i}`, kind: 'food', title: `Quán ${i}` }));
-    const r = await searchExplore(src(eats), 'nhậu', { perSection: 1000 });
-    expect(r.understood.terms).toEqual([]);
-    expect(r.sections.find((s) => s.kind === 'food')!.total).toBe(ALL_LIMIT);
+  it('mọi câu không kéo cả bảng: mỗi nhánh tối đa CANDIDATE_LIMIT ứng viên', async () => {
+    const eats = Array.from({ length: CANDIDATE_LIMIT + 50 }, (_, i) => o({ id: `e${i}`, kind: 'food', title: `Bún bò ${i}` }));
+    const food = async (q: string) => (await searchExplore(src(eats), q, { perSection: 1000 })).sections.find((s) => s.kind === 'food')!.total;
+    expect(await food('nhậu')).toBe(CANDIDATE_LIMIT); // không có từ tìm (isAll)
+    expect(await food('bún bò')).toBe(CANDIDATE_LIMIT); // có từ tìm, khớp hết 150 bài
   });
 
   it('tên không dấu không bắt đúng dấu; có kết quả trước, rỗng sau', async () => {
