@@ -8,7 +8,8 @@ set -euo pipefail
 
 BUCKET="${S3_MEDIA_BUCKET:-tripflix-media-dev}"
 POLICY_NAME="${POLICY_NAME:-tripflix-video-cors}"
-WEB_ORIGINS="${WEB_ORIGINS:-https://tripflix.io.vn}"
+# Admin (màn kiểm duyệt) cũng phát HLS kèm cookie. Thêm origin thì sửa ở đây, chạy với WEB_ORIGINS khác sẽ ghi đè policy.
+WEB_ORIGINS="${WEB_ORIGINS:-https://tripflix.io.vn,https://admin.tripflix.io.vn}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
