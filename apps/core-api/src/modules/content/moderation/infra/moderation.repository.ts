@@ -518,6 +518,8 @@ export class ModerationRepository {
     actorId?: string;
     search?: string;
     cursor?: string;
+    sort?: 'priority' | 'newest';
+    minSeverity?: number;
   }) {
     const postJoin = and(eq(moderationCases.targetType, 'post'), eq(posts.id, moderationCases.targetId));
     const commentJoin = and(
@@ -525,6 +527,7 @@ export class ModerationRepository {
       eq(comments.id, moderationCases.targetId),
     );
     const visibility = sql`coalesce(${posts.status}, ${comments.status}, '')`;
+    const newestAt = sql<Date>`coalesce(${comments.createdAt}, ${posts.createdAt}, ${moderationCases.createdAt})`;
     const conditions = [];
     if (options.assignment && options.assignment !== 'all') {
       conditions.push(eq(moderationCases.status, 'pending'));
@@ -546,6 +549,7 @@ export class ModerationRepository {
       conditions.push(
         sql`position(lower(${options.search}) in lower(concat_ws(' ', ${moderationCases.id}::text, ${moderationCases.targetId}::text, ${moderationCases.authorId}::text, ${posts.title}, ${posts.body}, ${comments.body}))) > 0`,
       );
+    if (options.minSeverity !== undefined) conditions.push(gte(moderationCases.severity, options.minSeverity));
     if (options.view) {
       if (options.view !== 'pending') {
         conditions.push(sql`${moderationCases.id} IN (
@@ -582,14 +586,22 @@ export class ModerationRepository {
       OR EXISTS (SELECT 1 FROM ${reports} WHERE ${reports.caseId} = ${moderationCases.id} AND ${reports.reasonCode} = ${options.reasonCode})
       OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(${moderationCases.flags}->'rules', '[]'::jsonb)) AS rule WHERE rule->>'category' = ${options.reasonCode})
     )`);
-    const cursor = decodeReviewCursor(options.cursor);
+    const sort = options.sort ?? 'priority';
+    const cursor = decodeReviewCursor(options.cursor, sort);
     const cursorCondition = cursor
-      ? sql`(${moderationCases.severity} < ${cursor.severity} OR (${moderationCases.severity} = ${cursor.severity} AND ${isAfterCursor(moderationCases, moderationCases.createdAt, moderationCases.id, cursor)}))`
+      ? sort === 'newest'
+        ? sql`(${newestAt}, ${moderationCases.id}) < (coalesce((SELECT coalesce(cursor_comment.created_at, cursor_post.created_at, cursor_case.created_at)
+            FROM content.moderation_cases cursor_case
+            LEFT JOIN content.posts cursor_post ON cursor_case.target_type = 'post' AND cursor_post.id = cursor_case.target_id
+            LEFT JOIN content.comments cursor_comment ON cursor_case.target_type = 'comment' AND cursor_comment.id = cursor_case.target_id
+            WHERE cursor_case.id = ${cursor.id}), ${cursor.time}), ${cursor.id}::uuid)`
+        : sql`(${moderationCases.severity} < ${cursor.severity} OR (${moderationCases.severity} = ${cursor.severity} AND ${isAfterCursor(moderationCases, moderationCases.createdAt, moderationCases.id, cursor)}))`
       : undefined;
     const [rows, count] = await Promise.all([
       this.db
         .select({
           ...getTableColumns(moderationCases),
+          sortAt: newestAt,
           targetPreview: sql<string | null>`left(coalesce(
             nullif(btrim(${posts.title}), ''),
             nullif(btrim(${posts.body}), ''),
@@ -600,7 +612,11 @@ export class ModerationRepository {
         .leftJoin(posts, postJoin)
         .leftJoin(comments, commentJoin)
         .where(and(...conditions, cursorCondition))
-        .orderBy(desc(moderationCases.severity), asc(moderationCases.createdAt), asc(moderationCases.id))
+        .orderBy(
+          ...(sort === 'newest'
+            ? [desc(newestAt), desc(moderationCases.id)]
+            : [desc(moderationCases.severity), asc(moderationCases.createdAt), asc(moderationCases.id)]),
+        )
         .limit(options.limit + 1)
         .offset(options.offset),
       this.db
@@ -613,9 +629,9 @@ export class ModerationRepository {
     const items = rows.slice(0, options.limit);
     const last = items.at(-1);
     return {
-      items,
+      items: items.map(({ sortAt: _sortAt, ...item }) => item),
       total: count[0]?.total ?? 0,
-      nextCursor: rows.length > options.limit && last ? encodeReviewCursor(last) : null,
+      nextCursor: rows.length > options.limit && last ? encodeReviewCursor(last, sort) : null,
     };
   }
   async log(options: {

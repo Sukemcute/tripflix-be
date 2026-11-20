@@ -8,6 +8,6 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 180_000,
     // Không tải image ryuk (dọn container); afterAll tự dừng container.
-    env: { TESTCONTAINERS_RYUK_DISABLED: 'true' },
+    env: { TESTCONTAINERS_RYUK_DISABLED: 'true', ENABLE_MOCK_PAYMENT: 'true' },
   },
 });

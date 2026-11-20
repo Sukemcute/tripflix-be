@@ -4531,6 +4531,32 @@
             }
           },
           {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "priority",
+              "type": "string",
+              "enum": [
+                "priority",
+                "newest"
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "high"
+              ]
+            }
+          },
+          {
             "name": "assignment",
             "required": false,
             "in": "query",

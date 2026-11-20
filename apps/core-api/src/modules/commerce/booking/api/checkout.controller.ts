@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Put, Query, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Put, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AllowWhenRevocationUnavailable, Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import type { z } from 'zod';
 import { CommerceErrorFilter, IDEMPOTENCY_KEY_HEADER, ZodQuery } from '../../inventory/api/http.js';
+import { CardPaymentGuard } from '../../payment/api/card-payment.guard.js';
 import { PaymentUseCases } from '../../payment/application/payment.use-cases.js';
 import { CheckoutUseCases } from '../application/checkout.use-cases.js';
 import {
@@ -82,6 +83,7 @@ export class CheckoutController {
 
   /** Trả tiền. 200 paid; 200 requires_action (gửi OTP tới /3ds); 202 pending (chưa rõ kết quả, đừng trả lại). */
   @Post(':id/pay')
+  @UseGuards(CardPaymentGuard)
   @Idempotent()
   @ApiHeader(IDEMPOTENCY_KEY_HEADER)
   @HttpCode(HttpStatus.OK)
@@ -96,6 +98,7 @@ export class CheckoutController {
   }
 
   @Post(':id/3ds')
+  @UseGuards(CardPaymentGuard)
   @Idempotent()
   @ApiHeader(IDEMPOTENCY_KEY_HEADER)
   @HttpCode(HttpStatus.OK)

@@ -39,11 +39,15 @@ export class QueueQueryDto {
 }
 export const AdminQueueQuerySchema = QueueQuerySchema.extend({
   cursor: z.string().max(1024).optional(),
+  sort: z.enum(['priority', 'newest']).default('priority'),
+  priority: z.enum(['all', 'high']).default('all'),
   assignment: z.enum(['all', 'unassigned', 'mine']).optional(),
   sla: z.enum(['all', 'overdue', 'due_soon']).optional(),
   search: z.string().trim().max(160).optional(),
 });
 export class AdminQueueQueryDto extends QueueQueryDto {
+  @ApiPropertyOptional({ enum: ['priority', 'newest'], default: 'priority' }) sort?: 'priority' | 'newest';
+  @ApiPropertyOptional({ enum: ['all', 'high'], default: 'all' }) priority?: 'all' | 'high';
   @ApiPropertyOptional({ enum: ['all', 'unassigned', 'mine'] }) assignment?: 'all' | 'unassigned' | 'mine';
   @ApiPropertyOptional({ enum: ['all', 'overdue', 'due_soon'] }) sla?: 'all' | 'overdue' | 'due_soon';
   @ApiPropertyOptional({ maxLength: 160 }) search?: string;

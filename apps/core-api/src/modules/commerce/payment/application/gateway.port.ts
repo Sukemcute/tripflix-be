@@ -11,7 +11,7 @@ export interface ChargeResult {
 
 /**
  * Cổng thanh toán, hệ thống ngoài: không nằm chung transaction với commerce, nên không gọi trong @Transactional.
- * Có hai bản: MockGateway (test, demo không cần mạng) và VnpayGateway (sandbox VNPay). Đổi bằng biến môi trường.
+ * Cổng thanh toán bằng token thẻ cho môi trường demo. VNPay dùng luồng chuyển hướng và callback riêng.
  */
 export interface PaymentGateway {
   readonly name: string;
@@ -26,3 +26,4 @@ export interface PaymentGateway {
 }
 
 export const PAYMENT_GATEWAY = Symbol('COMMERCE_PAYMENT_GATEWAY');
+export const MOCK_PAYMENT_GATEWAY = 'mock';

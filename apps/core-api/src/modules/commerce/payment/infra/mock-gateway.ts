@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Db } from '@tripflix/db';
 import { eq } from 'drizzle-orm';
 import { mockGatewayOps } from '../../db/schema/index.js';
-import type { ChargeResult, PaymentGateway } from '../application/gateway.port.js';
+import { MOCK_PAYMENT_GATEWAY, type ChargeResult, type PaymentGateway } from '../application/gateway.port.js';
 
 /** Thẻ test, giống quy ước của Stripe. Chỉ các số này được chấp nhận. */
 export const TEST_CARDS = [
@@ -24,7 +24,7 @@ const newRef = (prefix: string) => `${prefix}_${randomBytes(8).toString('hex')}`
  * Không lưu số thẻ đầy đủ: chỉ kết quả của thẻ test và 4 số cuối.
  */
 export class MockGateway implements PaymentGateway {
-  readonly name = 'mock';
+  readonly name = MOCK_PAYMENT_GATEWAY;
 
   constructor(private readonly db: Db) {}
 

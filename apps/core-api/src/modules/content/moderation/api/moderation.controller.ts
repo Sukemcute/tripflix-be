@@ -235,6 +235,7 @@ export class AdminModerationController {
     const query = AdminQueueQuerySchema.parse(input);
     const page = await this.repository.queue({
       ...query,
+      minSeverity: query.priority === 'high' ? URGENT_SEVERITY : undefined,
       offset: query.cursor && /^\d+$/.test(query.cursor) ? Number(query.cursor) : 0,
       actorId: user.userId,
     });

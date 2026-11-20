@@ -39,6 +39,7 @@ import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
 import { MockGatewayController } from './payment/api/mock-gateway.controller.js';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment/application/gateway.port.js';
 import { COMMERCE_OUTBOX, PaymentUseCases } from './payment/application/payment.use-cases.js';
+import { CardPaymentGuard } from './payment/api/card-payment.guard.js';
 import { MockGateway } from './payment/infra/mock-gateway.js';
 import { PaymentJobs } from './payment/jobs/payment-jobs.js';
 import { VnpayCallbackController, VnpayCheckoutController } from './payment/api/vnpay.controller.js';
@@ -51,6 +52,7 @@ import { VNPAY_DEFAULT_API_URL, VnpayRefundClient } from './payment/infra/vnpay-
 // Tạo Intl.DateTimeFormat có múi giờ tốn khoảng 85µs mỗi lần: tạo một lần rồi dùng lại (đo tải TF29).
 const VIETNAM_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
 const todayInVietnam: Today = () => VIETNAM_DATE_FORMAT.format(new Date());
+const mockPaymentEnabled = process.env.NODE_ENV !== 'production' && process.env.ENABLE_MOCK_PAYMENT === 'true';
 
 /** Lịch hiển thị nạp lại mỗi 10 giây: trang tìm và trang khách sạn thấy số phòng cũ tối đa chừng đó. */
 const READ_CALENDAR_REFRESH_MS = 10_000;
@@ -71,19 +73,35 @@ function buildReadCalendar(store: CommerceStore, today: Today, env: CoreEnv): Re
   });
 }
 
-/** VNPay sandbox: chỉ bật khi có đủ mã merchant và khoá ký; thiếu thì các endpoint VNPay trả 404. Khoá chỉ để trong .env. */
+const VNPAY_SANDBOX_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+const OptionalVnpayUrl = z.preprocess((value) => value === '' ? undefined : value, z.url().optional());
+
 const VnpayEnvSchema = z.object({
+  NODE_ENV: z.string().optional(),
   VNPAY_TMN_CODE: z.string().optional(),
   VNPAY_HASH_SECRET: z.string().optional(),
-  VNPAY_PAYMENT_URL: z.url().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+  VNPAY_PAYMENT_URL: OptionalVnpayUrl,
   VNPAY_RETURN_URL: z.url().default('http://localhost:3000/api/payments/vnpay/return'),
-  VNPAY_API_URL: z.url().default(VNPAY_DEFAULT_API_URL),
+  VNPAY_API_URL: OptionalVnpayUrl,
 });
+
+function isLiveVnpayUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  const url = new URL(value);
+  return url.protocol === 'https:' && url.hostname.replace(/\.$/, '') !== 'sandbox.vnpayment.vn';
+}
 
 function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
   const env = VnpayEnvSchema.parse(source);
   if (!env.VNPAY_TMN_CODE || !env.VNPAY_HASH_SECRET) return null;
-  return { tmnCode: env.VNPAY_TMN_CODE, hashSecret: env.VNPAY_HASH_SECRET, paymentUrl: env.VNPAY_PAYMENT_URL, returnUrl: env.VNPAY_RETURN_URL, apiUrl: env.VNPAY_API_URL };
+  if (env.NODE_ENV === 'production' && (!isLiveVnpayUrl(env.VNPAY_PAYMENT_URL) || !isLiveVnpayUrl(env.VNPAY_API_URL))) return null;
+  return {
+    tmnCode: env.VNPAY_TMN_CODE,
+    hashSecret: env.VNPAY_HASH_SECRET,
+    paymentUrl: env.VNPAY_PAYMENT_URL ?? VNPAY_SANDBOX_PAYMENT_URL,
+    returnUrl: env.VNPAY_RETURN_URL,
+    apiUrl: env.VNPAY_API_URL ?? VNPAY_DEFAULT_API_URL,
+  };
 }
 
 /** Ảnh lưu khoá đầy đủ trên S3 (có tiền tố môi trường); web và app nhận URL CloudFront. */
@@ -107,7 +125,12 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
     }),
   ],
-  controllers: [HotelsController, FlightsController, AdminCalendarController, CheckoutController, VnpayCheckoutController, VnpayCallbackController, MockGatewayController, AdminMetricsController, AdminOrdersController],
+  controllers: [
+    HotelsController, FlightsController, AdminCalendarController, CheckoutController,
+    VnpayCheckoutController, VnpayCallbackController,
+    ...(mockPaymentEnabled ? [MockGatewayController] : []),
+    AdminMetricsController, AdminOrdersController,
+  ],
   providers: [
     AdminOrdersStore,
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
@@ -126,7 +149,8 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
       // Cổng thẻ giả lập là hệ thống ngoài: chạy trên kết nối thường, không bao giờ nằm trong transaction của commerce.
       provide: PAYMENT_GATEWAY,
       inject: [DB_POOLS],
-      useFactory: (pools: DbPools): PaymentGateway => new MockGateway(createDb(pools.commerce)),
+      useFactory: (pools: DbPools): PaymentGateway | null =>
+        mockPaymentEnabled ? new MockGateway(createDb(pools.commerce)) : null,
     },
     { provide: VNPAY_CONFIG, useFactory: () => loadVnpayConfig(process.env) },
     {
@@ -142,6 +166,7 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     CalendarUseCases,
     CalendarAdminUseCases,
     CheckoutUseCases,
+    CardPaymentGuard,
     PaymentUseCases,
     VnpayUseCases,
     ExpireHoldsUseCases,
