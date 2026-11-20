@@ -3,7 +3,6 @@ import type pg from 'pg';
 import type { InboxRow } from '../inbox/inbox.repository.js';
 import { DB } from '../tokens.js';
 import { canCreatePostInteraction, lockPostNotifications } from './post-notification.repository.js';
-import { enqueuePostWatchJob, recordPostWatcher } from './post-watch.worker.js';
 
 export type CommentNotificationType = 'comment.created' | 'comment.replied' | 'comment.mentioned';
 
@@ -109,7 +108,6 @@ export class CommentNotificationRepository {
     commentBody?: string;
     parentCommentId: string | null;
     parentCommentAuthorId?: string | null;
-    postAuthorId?: string;
     excludedUserIds: string[];
     eventId: string;
     occurredAt: string;
@@ -127,14 +125,8 @@ export class CommentNotificationRepository {
          SELECT $1, user_id, $3 FROM unnest($2::uuid[]) AS user_id ON CONFLICT DO NOTHING`,
         [rootId, joiners, input.occurredAt],
       );
-      // N1: người bình luận theo dõi bài (giữ trạng thái đã tắt); bình luận gốc thì xếp job báo người theo dõi.
-      await recordPostWatcher(client, input.postId, input.authorId, input.occurredAt);
-      if (!input.parentCommentId) {
-        if (input.postAuthorId) {
-          await enqueuePostWatchJob(client, { ...input, postAuthorId: input.postAuthorId });
-        }
-        return [];
-      }
+      // Bình luận gốc: chỉ chủ bài (đã ghi ở create) và người được nhắc tên nhận; không còn báo người "theo dõi bài".
+      if (!input.parentCommentId) return [];
 
       const recipients = await client.query<{ user_id: string }>(
         'SELECT user_id FROM thread_participants WHERE parent_comment_id = $1 AND NOT (user_id = ANY($2::uuid[]))',
