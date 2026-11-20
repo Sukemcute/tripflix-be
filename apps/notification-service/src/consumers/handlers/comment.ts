@@ -70,7 +70,6 @@ export function createCommentHandlers(options: {
             commentBody: comment.body,
             parentCommentId: comment.parentCommentId,
             parentCommentAuthorId: comment.parentCommentAuthorId,
-            postAuthorId: comment.postAuthorId,
             excludedUserIds: [...recipients.keys()],
             eventId: event.eventId,
             occurredAt: event.occurredAt,

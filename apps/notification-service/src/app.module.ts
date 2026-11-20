@@ -29,8 +29,6 @@ import { envSchema, type Env } from './env.js';
 import { ReactionNotificationRepository } from './grouping/reaction-notification.repository.js';
 import { FollowerPostWorker } from './inbox/follower-post.worker.js';
 import { InboxController } from './inbox/inbox.controller.js';
-import { PostWatchController } from './inbox/post-watch.controller.js';
-import { PostWatchWorker } from './inbox/post-watch.worker.js';
 import { PushTokenController } from './push/push-token.controller.js';
 import { WebPushController } from './web-push/web-push.controller.js';
 import { WebPushWorker } from './web-push/web-push.worker.js';
@@ -157,7 +155,7 @@ export class InfraModule {}
       }),
     }),
   ],
-  controllers: [HealthController, MeController, InboxController, PostWatchController, PushTokenController, WebPushController],
+  controllers: [HealthController, MeController, InboxController, PushTokenController, WebPushController],
   providers: [
     TelemetryLifecycle,
     NotificationConsumer,
@@ -166,7 +164,6 @@ export class InfraModule {}
     RealtimeGateway,
     InboxRepository,
     FollowerPostWorker,
-    PostWatchWorker,
     PushWorker,
     WebPushWorker,
     CommentNotificationRepository,

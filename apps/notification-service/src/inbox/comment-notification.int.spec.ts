@@ -430,4 +430,15 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
       expect(await inbox.countUnread(tagged)).toBe(0);
     });
   });
+
+  it('bình luận gốc mới không báo cho người từng bình luận bài (đã bỏ "theo dõi bài")', async () => {
+    const postId = randomUUID();
+    const postAuthorId = randomUUID();
+    const earlier = comment({ postId, postAuthorId, parentCommentId: null, parentCommentAuthorId: null, postVisibility: 'public' });
+    const later = comment({ postId, postAuthorId, parentCommentId: null, parentCommentAuthorId: null, postVisibility: 'public' });
+    await router.route(event('content.comment.created', earlier));
+    await router.route(event('content.comment.created', later));
+    const { items } = await inbox.listForUser(earlier.authorId, { limit: 20 });
+    expect(items).toEqual([]);
+  });
 });
