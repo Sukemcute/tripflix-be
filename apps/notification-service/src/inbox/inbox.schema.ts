@@ -218,6 +218,22 @@ const REACTION_ACTOR_IDS_BACKFILL = `
   WHERE i.id = latest.inbox_id AND NOT i.data ? 'actorIds';
 `;
 
+// Thông báo bình luận/trả lời/nhắc tên cũ không lưu người gửi: khớp tên ở đầu nội dung với user_directory.
+// shortcut: chỉ bù khi tên là duy nhất (trùng tên hoặc đã đổi tên thì vẫn hiện chữ cái đầu).
+export const COMMENT_ACTOR_IDS_BACKFILL = `
+  UPDATE inbox i SET data = i.data || jsonb_build_object('actorIds', jsonb_build_array(actor.user_id))
+  FROM (
+    SELECT btrim(display_name) AS name, min(user_id::text) AS user_id FROM user_directory
+    GROUP BY btrim(display_name) HAVING count(*) = 1
+  ) actor
+  WHERE i.type IN ('comment.created', 'comment.replied', 'comment.mentioned')
+    AND NOT i.data ? 'actorIds'
+    AND i.body = actor.name || CASE i.type
+      WHEN 'comment.replied' THEN ' đã trả lời bình luận của bạn.'
+      WHEN 'comment.mentioned' THEN ' đã nhắc đến bạn trong một bình luận.'
+      ELSE ' đã bình luận bài của bạn.' END;
+`;
+
 const NOTIFICATION_MIGRATIONS = [
   [1, INITIAL_NOTIFICATION_SCHEMA],
   [2, 'ALTER TABLE inbox DROP CONSTRAINT IF EXISTS uq_inbox_source_event_id'],
@@ -231,4 +247,5 @@ const NOTIFICATION_MIGRATIONS = [
   [10, PUSH_SCHEMA],
   [11, REACTION_ACTOR_IDS_BACKFILL],
   [12, WEB_PUSH_SCHEMA],
+  [13, COMMENT_ACTOR_IDS_BACKFILL],
 ] as const;

@@ -7,6 +7,7 @@ import { EventRouter, MemoryProcessedEvents } from '../consumers/event-router.js
 import { MemoryMailer } from '../outapp/mailer.js';
 import { CommentNotificationRepository } from './comment-notification.repository.js';
 import { InboxRepository } from './inbox.repository.js';
+import { COMMENT_ACTOR_IDS_BACKFILL } from './inbox.schema.js';
 
 const createdAt = '2026-11-12T09:00:00.000Z';
 const deletedAt = '2026-11-12T09:01:00.000Z';
@@ -106,6 +107,7 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
           commentId: payload.commentId,
           parentCommentId: payload.parentCommentId,
           excerpt: 'Nội dung thử',
+          actorIds: [payload.authorId],
         },
       }),
     ]);
@@ -429,5 +431,31 @@ describe('Thông báo bình luận trên PostgreSQL', () => {
       }
       expect(await inbox.countUnread(tagged)).toBe(0);
     });
+  });
+
+  it('bù người gửi cho thông báo bình luận cũ khi tên là duy nhất', async () => {
+    const [unique, twinA, twinB, recipient] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    const uniqueName = `Duy nhất ${unique.slice(0, 8)}`;
+    const twinName = `Trùng ${twinA.slice(0, 8)}`;
+    await pool.query(
+      'INSERT INTO user_directory (user_id, display_name) VALUES ($1, $2), ($3, $4), ($5, $4)',
+      [unique, uniqueName, twinA, twinName, twinB],
+    );
+    const insertOld = (type: string, body: string) =>
+      pool.query<{ id: string }>(
+        `INSERT INTO inbox (user_id, type, title, body, data, source_event_id)
+         VALUES ($1, $2, 'cũ', $3, '{"postId":"p"}', $4) RETURNING id`,
+        [recipient, type, body, randomUUID()],
+      );
+    const replied = await insertOld('comment.replied', `${uniqueName} đã trả lời bình luận của bạn.`);
+    const twin = await insertOld('comment.created', `${twinName} đã bình luận bài của bạn.`);
+    await pool.query(COMMENT_ACTOR_IDS_BACKFILL);
+    const { rows } = await pool.query<{ id: string; data: { postId: string; actorIds?: string[] } }>(
+      'SELECT id, data FROM inbox WHERE id = ANY($1)',
+      [[replied.rows[0]!.id, twin.rows[0]!.id]],
+    );
+    const dataById = new Map(rows.map((row) => [row.id, row.data]));
+    expect(dataById.get(replied.rows[0]!.id)).toEqual({ postId: 'p', actorIds: [unique] });
+    expect(dataById.get(twin.rows[0]!.id)).toEqual({ postId: 'p' });
   });
 });
