@@ -28,8 +28,10 @@ import { DrizzleMediaAssetStore } from '../../media/infra/drizzle-media-asset.st
 import { MediaFacade } from '../../media/media.facade.js';
 import { decodeFeedCursor } from '../domain/feed-cursor.js';
 import { FEED_SEED_COUNT } from '../domain/feed-rank.js';
-import { HOT_WINDOW_DAYS } from '../domain/hot-score.js';
+import { HOT_CANDIDATE_DAYS } from '../domain/hot-trend.js';
 import { DrizzleFeedStore } from '../infra/drizzle-feed.store.js';
+import { DrizzleTrendScoreStore } from '../infra/drizzle-trend-score.store.js';
+import { TrendScoresUseCases } from './trend-scores.use-cases.js';
 import { FeedUseCases } from './feed.use-cases.js';
 
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
@@ -45,6 +47,7 @@ describe('Feed trên Postgres thật', () => {
   let moduleRef: TestingModule;
   let visibility: ChangeVisibilityUseCase;
   let deleteComment: DeleteCommentUseCase;
+  let trendScores: TrendScoresUseCases;
   /** Số FeedUseCases dùng để chọn seed ở trang đầu (seed = floor(số × 16)). */
   let nextRandom = 0;
   const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -151,6 +154,7 @@ describe('Feed trên Postgres thật', () => {
       new AdminModeratePostUseCase(posts, new ModerationActionRepository(() => tx.tx), outbox),
     );
     deleteComment = new DeleteCommentUseCase(new CommentRepository(() => tx.tx), posts, outbox);
+    trendScores = new TrendScoresUseCases(new DrizzleTrendScoreStore(() => tx.tx));
     feed = new FeedUseCases(
       new DrizzleFeedStore(() => db),
       new MediaFacade(
@@ -228,6 +232,8 @@ describe('Feed trên Postgres thật', () => {
     const page = await feed.getPage({ limit: 20, after: null, viewerId: null });
 
     expect(page.items.map((item) => item.postId)).toEqual([expected]);
+    // Lượt chấm điểm Hot cũng phải chịu được media_ids sai dạng.
+    await trendScores.recompute();
     const hot = await feed.getPage({ limit: 20, after: null, viewerId: null, tab: 'hot' });
     expect(hot.items.map((item) => item.postId)).toEqual([expected]);
   });
@@ -329,19 +335,130 @@ describe('Feed trên Postgres thật', () => {
     });
   });
 
-  describe('tab hot', () => {
-    it('hai bài cùng điểm: ẩn bình luận làm đổi thứ tự hot; xoá bình luận hidden không đổi bộ đếm', async () => {
-      const asset = await insertAsset('ready', [360]);
-      const first = await insertPost([asset], { createdAt: daysAgo(1) });
-      const second = await insertPost([asset], { createdAt: daysAgo(2) });
-      // first: 1 thích + 1 bình luận = 3 điểm; second: 2 thích = 2 điểm. Ẩn bình luận làm first còn 1 điểm.
-      await setCounts(first, { likes: 1, comments: 1 });
-      await setCounts(second, { likes: 2 });
-      const commentId = randomUUID();
+  describe('tab hot (điểm trend_scores, TF111)', () => {
+    /** Mốc chấm điểm cố định để thời điểm tương tác ra đúng hệ số bán rã. */
+    const NOW = new Date();
+    const hoursAgo = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
+
+    const readHotPages = async (limit: number) => {
+      await trendScores.recompute(NOW);
+      return readAllPages(limit, null, undefined, 'hot');
+    };
+
+    async function like(postId: string, at = hoursAgo(0), userId: string = randomUUID()) {
       await pool.query(
-        "insert into content.comments (id, post_id, author_id, body) values ($1,$2,$3,'Bình luận')",
-        [commentId, first, OWNER_ID],
+        `insert into content.reactions (post_id, user_id, type, created_at) values ($1, $2, 'like', $3::timestamptz)`,
+        [postId, userId, at],
       );
+    }
+    async function comment(postId: string, at = hoursAgo(0), authorId: string = randomUUID()) {
+      const id = randomUUID();
+      await pool.query(
+        `insert into content.comments (id, post_id, author_id, body, created_at) values ($1, $2, $3, 'Bình luận', $4::timestamptz)`,
+        [id, postId, authorId, at],
+      );
+      return id;
+    }
+    async function save(postId: string, at = hoursAgo(0), userId: string = randomUUID()) {
+      await pool.query(
+        'insert into content.bookmarks (post_id, user_id, created_at) values ($1, $2, $3::timestamptz)',
+        [postId, userId, at],
+      );
+    }
+    async function signal(
+      postId: string,
+      kind: 'view' | 'booking_click',
+      options: { actorKey?: string; isGuest?: boolean; at?: string } = {},
+    ) {
+      await pool.query(
+        `insert into content.trend_signals (post_id, kind, actor_key, is_guest, occurred_at)
+         values ($1, $2, $3, $4, $5::timestamptz)`,
+        [postId, kind, options.actorKey ?? `u:${randomUUID()}`, options.isGuest ?? false, options.at ?? hoursAgo(0)],
+      );
+    }
+    async function scoreRow(postId: string) {
+      const { rows } = await pool.query<{ score: number; decayed_signal: number; completeness: number }>(
+        'select score, decayed_signal, completeness from content.trend_scores where post_id = $1',
+        [postId],
+      );
+      return rows[0];
+    }
+
+    it('xếp theo trọng số docs/10: bấm đặt 5, lưu 3, bình luận 2, thích 1, xem đủ 1', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const booking = await insertPost([asset]);
+      const saved = await insertPost([asset]);
+      const commented = await insertPost([asset]);
+      const viewed = await insertPost([asset]);
+      const nothing = await insertPost([asset]);
+      await signal(booking, 'booking_click');
+      await save(saved);
+      await comment(commented);
+      await signal(viewed, 'view');
+
+      const ids = await readHotPages(20);
+
+      expect(ids).toEqual([booking, saved, commented, viewed, nothing]);
+      expect((await scoreRow(booking))?.decayed_signal).toBeCloseTo(5, 6);
+      expect((await scoreRow(nothing))?.score).toBe(0);
+    });
+
+    it('tín hiệu cách đây 48 giờ còn một nửa: hai lượt thích cũ bằng một lượt thích mới', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const oldLikes = await insertPost([asset], { createdAt: hoursAgo(72) });
+      const freshLike = await insertPost([asset]);
+      await like(oldLikes, hoursAgo(48));
+      await like(oldLikes, hoursAgo(48));
+      await like(freshLike);
+
+      await readHotPages(20);
+
+      expect((await scoreRow(oldLikes))?.decayed_signal).toBeCloseTo(1, 6);
+      expect((await scoreRow(freshLike))?.decayed_signal).toBeCloseTo(1, 6);
+    });
+
+    it('khách xem tính một nửa; tương tác của chính tác giả không tính; mỗi người một bình luận mỗi bài', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const postId = await insertPost([asset]);
+      const commenter = randomUUID();
+      await signal(postId, 'view', { actorKey: `a:${randomUUID()}`, isGuest: true });
+      await like(postId, hoursAgo(0), OWNER_ID);
+      await save(postId, hoursAgo(0), OWNER_ID);
+      await signal(postId, 'view', { actorKey: `u:${OWNER_ID}` });
+      await comment(postId, hoursAgo(0), OWNER_ID);
+      await comment(postId, hoursAgo(0), commenter);
+      await comment(postId, hoursAgo(0), commenter);
+
+      await readHotPages(20);
+
+      // 0,5 (khách xem) + 2 (một bình luận của commenter); mọi thứ của OWNER_ID (tác giả) bị bỏ.
+      expect((await scoreRow(postId))?.decayed_signal).toBeCloseTo(2.5, 6);
+    });
+
+    it('bài hoàn thiện hơn được điểm cao hơn khi cùng tín hiệu', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const bare = await insertPost([asset]);
+      const complete = await insertPost([asset]);
+      await pool.query(`update content.posts set body = $2, hashtags = '["phuquoc"]'::jsonb where id = $1`, [
+        complete,
+        'Ba ngày ở Phú Quốc, đi cáp treo, ăn hải sản chợ đêm',
+      ]);
+      await like(bare);
+      await like(complete);
+
+      expect(await readHotPages(20)).toEqual([complete, bare]);
+      expect((await scoreRow(complete))!.completeness).toBeGreaterThan((await scoreRow(bare))!.completeness);
+    });
+
+    it('bình luận bị ẩn không còn được tính ở lượt chấm sau; xoá bình luận đã ẩn không đổi bộ đếm', async () => {
+      const asset = await insertAsset('ready', [360]);
+      const first = await insertPost([asset]);
+      const second = await insertPost([asset]);
+      // first: một bình luận = 2. second: một thích và một lượt xem từ 1 giờ trước, hơi dưới 2 sau bán rã.
+      const commentId = await comment(first, hoursAgo(0), VIEWER_ID);
+      await like(second, hoursAgo(1));
+      await signal(second, 'view', { at: hoursAgo(1) });
+
       await expect(readHotPages(20)).resolves.toEqual([first, second]);
       await visibility.execute({
         targetType: 'comment',
@@ -352,22 +469,21 @@ describe('Feed trên Postgres thật', () => {
         reasonCode: 'HARASSMENT',
       });
       await expect(readHotPages(20)).resolves.toEqual([second, first]);
-      await deleteComment.execute({ commentId, userId: OWNER_ID });
+      await deleteComment.execute({ commentId, userId: VIEWER_ID });
       expect(
-        (await pool.query('select comment_count from content.posts where id=$1', [first])).rows[0]
-          .comment_count,
+        (await pool.query('select comment_count from content.posts where id=$1', [first])).rows[0].comment_count,
       ).toBe(0);
       await expect(readHotPages(20)).resolves.toEqual([second, first]);
     });
-    it('ẩn bài loại khỏi cả for_you và hot ngay sau transaction', async () => {
+
+    it('ẩn bài loại khỏi hot ngay ở lần đọc kế tiếp, không cần chờ lượt chấm', async () => {
       const asset = await insertAsset('ready', [360]);
       const postId = await insertPost([asset]);
-      for (const tab of ['for_you', 'hot'] as const)
-        expect(
-          (await feed.getPage({ tab, limit: 20, after: null, viewerId: null })).items.map(
-            (item) => item.postId,
-          ),
-        ).toContain(postId);
+      await trendScores.recompute(NOW);
+      const readHot = async () =>
+        (await feed.getPage({ tab: 'hot', limit: 20, after: null, viewerId: null })).items.map((item) => item.postId);
+      expect(await readHot()).toContain(postId);
+
       await visibility.execute({
         targetType: 'post',
         targetId: postId,
@@ -376,32 +492,26 @@ describe('Feed trên Postgres thật', () => {
         actorType: 'staff',
         reasonCode: 'OTHER',
       });
-      for (const tab of ['for_you', 'hot'] as const)
-        expect(
-          (await feed.getPage({ tab, limit: 20, after: null, viewerId: null })).items.map(
-            (item) => item.postId,
-          ),
-        ).not.toContain(postId);
+
+      expect(await readHot()).not.toContain(postId);
+      expect(
+        (await feed.getPage({ tab: 'for_you', limit: 20, after: null, viewerId: null })).items.map((item) => item.postId),
+      ).not.toContain(postId);
+      // Lượt chấm sau xoá luôn điểm của bài đã ẩn.
+      await trendScores.recompute(NOW);
+      expect(await scoreRow(postId)).toBeUndefined();
     });
-    const readHotPages = (limit: number) => readAllPages(limit, null, undefined, 'hot');
 
-    it('xếp theo trọng số thích 1, bình luận 2, lưu 3, chia sẻ 4', async () => {
+    it(`chỉ chấm bài đăng trong ${HOT_CANDIDATE_DAYS} ngày; bài cũ hơn dù nhiều tương tác vẫn có ở for_you`, async () => {
       const asset = await insertAsset('ready', [360]);
-      const noEngagement = await insertPost([asset], { createdAt: daysAgo(1) });
-      const threeLikes = await insertPost([asset], { createdAt: daysAgo(5) });
-      const oneShare = await insertPost([asset], { createdAt: daysAgo(4) });
-      const oneSave = await insertPost([asset], { createdAt: daysAgo(3) });
-      const oneComment = await insertPost([asset], { createdAt: daysAgo(2) });
-      await setCounts(threeLikes, { likes: 3 });
-      await setCounts(oneShare, { shares: 1 });
-      await setCounts(oneSave, { saves: 1 });
-      await setCounts(oneComment, { comments: 1 });
+      const recent = await insertPost([asset], { createdAt: daysAgo(HOT_CANDIDATE_DAYS - 1) });
+      const old = await insertPost([asset], { createdAt: daysAgo(HOT_CANDIDATE_DAYS + 1) });
+      for (let i = 0; i < 5; i += 1) await like(old);
 
-      const ids = await readHotPages(20);
-      expect(ids[0]).toBe(oneShare);
-      // Một lưu và ba thích cùng 3 điểm: thứ tự giữa hai bài là ngẫu nhiên theo seed.
-      expect(ids.slice(1, 3).sort()).toEqual([oneSave, threeLikes].sort());
-      expect(ids.slice(3)).toEqual([oneComment, noEngagement]);
+      await expect(readHotPages(20)).resolves.toEqual([recent]);
+      expect(
+        (await feed.getPage({ tab: 'for_you', limit: 20, after: null, viewerId: null })).items.map((item) => item.postId),
+      ).toContain(old);
     });
 
     it('bằng điểm (kể cả 0 điểm) thì ngẫu nhiên theo seed, không còn mới nhất trước', async () => {
@@ -425,11 +535,9 @@ describe('Feed trên Postgres thật', () => {
       const asset = await insertAsset('ready', [360]);
       // Giữ phần micro-giây để thử con trỏ khi trùng thời điểm.
       const createdAt = `${daysAgo(1).slice(0, 19)}.123456Z`;
-      const sameScore = await Promise.all(
-        Array.from({ length: 5 }, () => insertPost([asset], { createdAt })),
-      );
+      const sameScore = await Promise.all(Array.from({ length: 5 }, () => insertPost([asset], { createdAt })));
       const top = await insertPost([asset], { createdAt: daysAgo(5) });
-      await setCounts(top, { likes: 10 });
+      await save(top);
 
       const ids = await readHotPages(2);
 
@@ -440,31 +548,32 @@ describe('Feed trên Postgres thật', () => {
     it('vẫn lọc bài không phát được', async () => {
       const playable = await insertPost([await insertAsset('ready', [360])]);
       const processing = await insertPost([await insertAsset('processing')]);
-      await setCounts(processing, { likes: 100 });
+      await save(processing);
 
       await expect(readHotPages(20)).resolves.toEqual([playable]);
     });
 
-    it('getHotIds (TF110): cùng thứ tự với tab hot, bỏ bài không phát được; đi tiếp từ cursor của bài đã dùng thì không lặp không rớt', async () => {
+    it('getHotIds: cùng thứ tự với tab hot, kèm điểm, bỏ bài không phát được; đi tiếp từ cursor của bài đã dùng thì không lặp không rớt', async () => {
       const asset = await insertAsset('ready', [360]);
-      const scored = await Promise.all(
-        Array.from({ length: 6 }, async (_, i) => {
-          const id = await insertPost([asset], { createdAt: daysAgo(1) });
-          await setCounts(id, { likes: 10 - i });
-          return id;
-        }),
-      );
+      const scored: string[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const id = await insertPost([asset]);
+        for (let n = 0; n < 6 - i; n += 1) await like(id);
+        scored.push(id);
+      }
       const processing = await insertPost([await insertAsset('processing')]);
-      await setCounts(processing, { likes: 100 });
+      for (let n = 0; n < 10; n += 1) await like(processing);
 
       const tabOrder = await readHotPages(20);
       // Mỗi lần lấy 3 bài nhưng chỉ dùng 2 bài đầu, như discovery khi trộn 1/4 ô là hot.
       const ids: string[] = [];
+      const scores: number[] = [];
       let cursor: string | null = null;
       for (;;) {
         const page = await feed.getHotIds({ limit: 3, cursor });
         const used = page.items.slice(0, 2);
         ids.push(...used.map((item) => item.postId));
+        scores.push(...used.map((item) => item.score));
         if (used.length === 0) break;
         cursor = used.at(-1)!.cursor;
       }
@@ -472,20 +581,21 @@ describe('Feed trên Postgres thật', () => {
       expect(tabOrder).toEqual(scored);
       expect(ids).toEqual(scored);
       expect(ids).not.toContain(processing);
+      expect(scores).toEqual([...scores].sort((a, b) => b - a));
+      expect(scores.every((score) => score >= 0 && score <= 1)).toBe(true);
     });
 
-    it(`chỉ xếp hạng bài trong ${HOT_WINDOW_DAYS} ngày gần đây; bài cũ hơn dù nhiều tương tác vẫn có ở for_you`, async () => {
+    it('getScores trả điểm đã chấm; bài chưa chấm thì không có', async () => {
       const asset = await insertAsset('ready', [360]);
-      const recent = await insertPost([asset], { createdAt: daysAgo(HOT_WINDOW_DAYS - 1) });
-      const old = await insertPost([asset], { createdAt: daysAgo(HOT_WINDOW_DAYS + 1) });
-      await setCounts(old, { likes: 1_000 });
+      const scoredPost = await insertPost([asset]);
+      await like(scoredPost);
+      await trendScores.recompute(NOW);
+      const lateComer = await insertPost([asset]);
 
-      await expect(readHotPages(20)).resolves.toEqual([recent]);
-      expect(
-        (await feed.getPage({ tab: 'for_you', limit: 20, after: null, viewerId: null })).items.map(
-          (item) => item.postId,
-        ),
-      ).toContain(old);
+      const scores = await trendScores.getScores([scoredPost, lateComer]);
+
+      expect(scores.get(scoredPost)).toEqual({ score: expect.any(Number), computedAt: NOW.toISOString() });
+      expect(scores.has(lateComer)).toBe(false);
     });
   });
 
@@ -539,6 +649,7 @@ describe('Feed trên Postgres thật', () => {
     const reel = await insertPost([asset]);
     await insertPost([asset], { postType: 'vlog' });
 
+    await trendScores.recompute();
     const forYou = await feed.getPage({ limit: 20, after: null, viewerId: null });
     const hot = await feed.getPage({ tab: 'hot', limit: 20, after: null, viewerId: null });
 

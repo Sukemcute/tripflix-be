@@ -4,7 +4,6 @@ import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { decodeFeedCursor, encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 import { pickFeedSeed } from '../domain/feed-rank.js';
-import { calculateHotScore } from '../domain/hot-score.js';
 import {
   FEED_PAGE_CACHE,
   FEED_RANDOM,
@@ -43,6 +42,8 @@ export interface FeedPage {
 /** Một bài trong danh sách Hot cho module khác, kèm cursor để trang sau bắt đầu ngay sau bài này. */
 export interface HotFeedEntry {
   postId: string;
+  /** Điểm Hot trong [0, 1] (trend_scores, TF111), cùng thang với getHotScores. */
+  score: number;
   cursor: string;
 }
 
@@ -61,8 +62,8 @@ export class InvalidHotCursorError extends Error {}
 export const FEED_FIRST_PAGE_TTL_SECONDS = 10;
 
 /**
- * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo bộ đếm tương tác,
- * bằng điểm thì ngẫu nhiên (domain/feed-rank.ts). Trang tác giả và Reels đã lưu vẫn mới nhất trước.
+ * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo điểm job chấm sẵn
+ * trong trend_scores (TF111), bằng điểm thì ngẫu nhiên (domain/feed-rank.ts). Trang tác giả và Reels đã lưu vẫn mới nhất trước.
  * Trending, snapshot, tab following thuộc các phần sau (docs/09 mục 3 đến 5).
  */
 @Injectable()
@@ -130,13 +131,13 @@ export class FeedUseCases {
     const pageRows = rows.slice(0, query.limit);
     const playback = pageRows.length > 0 ? await this.media.getPlayback(pageRows.flatMap((row) => row.mediaIds)) : {};
     const cursorAfter = (row: FeedPostRow) =>
-      encodeFeedCursor({ at: row.cursorAt, id: row.id, score: calculateHotScore(row), seed });
+      encodeFeedCursor({ at: row.cursorAt, id: row.id, score: row.hotScore ?? 0, seed });
 
     const last = pageRows.at(-1);
     return {
       items: pageRows
         .filter((row) => row.mediaIds.some((id) => playback[id]))
-        .map((row) => ({ postId: row.id, cursor: cursorAfter(row) })),
+        .map((row) => ({ postId: row.id, score: row.hotScore ?? 0, cursor: cursorAfter(row) })),
       nextCursor: rows.length > query.limit && last ? cursorAfter(last) : null,
     };
   }
@@ -218,7 +219,7 @@ export class FeedUseCases {
           ? encodeFeedCursor({
               at: last.cursorAt,
               id: last.id,
-              ...(isHot ? { score: calculateHotScore(last), seed } : {}),
+              ...(isHot ? { score: last.hotScore ?? 0, seed } : {}),
               ...(isRankedForYou && last.rank !== undefined ? { rank: last.rank, seed, asOf } : {}),
             })
           : null,

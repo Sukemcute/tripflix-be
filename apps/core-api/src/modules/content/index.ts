@@ -10,7 +10,8 @@ export {
   type ListPostsFacadeResult,
 } from './content.facade.js';
 export { MediaFacade, type PlaybackInfo } from './media/media.facade.js';
-export { FeedFacade } from './feed/feed.facade.js';
+export { FeedFacade, TOP_HOT_POST_TYPES, type TopHotPostType } from './feed/feed.facade.js';
+export type { HotScore } from './feed/application/trend-scores.use-cases.js';
 export type { FeedCard, FeedPage, HotFeedEntry, HotFeedIdPage } from './feed/application/feed.use-cases.js';
 export { HOT_IDS_MAX_LIMIT, InvalidHotCursorError } from './feed/application/feed.use-cases.js';
 export {

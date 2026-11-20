@@ -31,7 +31,7 @@ function setup(cache?: FeedPageCache) {
   const store = {
     listPlayablePosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
     listForYouPosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
-    listHotPosts: vi.fn(() => Promise.resolve([row('p2'), row('p1')])),
+    listHotPosts: vi.fn(() => Promise.resolve<FeedPostRow[]>([{ ...row('p2'), hotScore: 0.8 }, { ...row('p1'), hotScore: 0.2 }])),
     listSavedPlayablePosts: vi.fn(() => Promise.resolve([row('p2')])),
     findPlayablePostsByIds: vi.fn((ids: string[]) => Promise.resolve(ids.filter((id) => id !== 'hidden').map(row))),
     findLikedPostIds: vi.fn((userId: string) => Promise.resolve(userId === 'u1' ? ['p1'] : [])),
@@ -239,9 +239,10 @@ describe('FeedUseCases.getHotIds (TF110)', () => {
     const page = await feed.getHotIds({ limit: 10, cursor: null });
 
     expect(page.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(page.items.map((item) => item.score)).toEqual([0.8, 0.2]);
     expect(page.nextCursor).toBeNull();
     expect(store.listHotPosts).toHaveBeenCalledWith({ limit: 11, after: null, seed: 0 });
-    expect(peekCursor(page.items[0]!.cursor)).toMatchObject({ id: 'p2', score: 1, seed: 0 });
+    expect(peekCursor(page.items[0]!.cursor)).toMatchObject({ id: 'p2', score: 0.8, seed: 0 });
   });
 
   it('bỏ bài chưa có video phát được nhưng cursor vẫn đi qua bài đó', async () => {
@@ -257,11 +258,11 @@ describe('FeedUseCases.getHotIds (TF110)', () => {
 
   it('trang sau dùng cursor của bài đã dùng cuối cùng và giữ seed', async () => {
     const { store, feed } = setup();
-    const cursor = encodeFeedCursor({ at: '2026-11-11T00:00:00.000000Z', id: '11111111-1111-4111-8111-111111111111', score: 3, seed: 5 });
+    const cursor = encodeFeedCursor({ at: '2026-11-11T00:00:00.000000Z', id: '11111111-1111-4111-8111-111111111111', score: 0.3, seed: 5 });
 
     await feed.getHotIds({ limit: 5, cursor });
 
-    expect(store.listHotPosts).toHaveBeenCalledWith({ limit: 6, after: expect.objectContaining({ score: 3, seed: 5 }), seed: 5 });
+    expect(store.listHotPosts).toHaveBeenCalledWith({ limit: 6, after: expect.objectContaining({ score: 0.3, seed: 5 }), seed: 5 });
   });
 
   it('cursor hỏng hoặc của tab Dành cho bạn thì báo InvalidHotCursorError, limit sai thì RangeError', async () => {

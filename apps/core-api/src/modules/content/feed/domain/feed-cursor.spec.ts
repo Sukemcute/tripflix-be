@@ -11,6 +11,8 @@ describe('feed cursor', () => {
 
   it('giữ điểm của tab Đang hot, kể cả điểm 0', () => {
     expect(decodeFeedCursor(encodeFeedCursor({ ...VALID, score: 0 }))).toEqual({ ...VALID, score: 0 });
+    // Điểm trend_scores (TF111) là số lẻ trong [0, 1].
+    expect(decodeFeedCursor(encodeFeedCursor({ ...VALID, score: 0.421337 }))).toEqual({ ...VALID, score: 0.421337 });
     expect(decodeFeedCursor(encodeRaw({ ...VALID, score: -1 }))).toBeNull();
     expect(decodeFeedCursor(encodeRaw({ ...VALID, score: 1.5 }))).toBeNull();
   });

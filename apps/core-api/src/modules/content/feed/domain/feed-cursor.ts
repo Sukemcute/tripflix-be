@@ -5,7 +5,7 @@ import { FEED_SEED_COUNT } from './feed-rank.js';
 export interface FeedCursor {
   at: string;
   id: string;
-  /** Chỉ tab Đang hot có điểm, vì tab này xếp theo điểm trước rồi mới tới thứ tự ngẫu nhiên. */
+  /** Chỉ tab Đang hot có điểm (trend_scores, 0 tới 1), vì tab này xếp theo điểm trước rồi mới tới thứ tự ngẫu nhiên. */
   score?: number;
   /** Seed của thứ tự ngẫu nhiên (feed-rank.ts), chọn ở trang đầu và giữ suốt các trang sau. */
   seed?: number;
@@ -29,7 +29,7 @@ const AS_OF_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const feedCursorSchema = z.object({
   at: z.string().refine(isRealTimestamp),
   id: z.guid(),
-  score: z.number().int().nonnegative().optional(),
+  score: z.number().min(0).max(1).optional(),
   seed: z.number().int().min(0).max(FEED_SEED_COUNT - 1).optional(),
   rank: z.number().nonnegative().finite().optional(),
   asOf: z
