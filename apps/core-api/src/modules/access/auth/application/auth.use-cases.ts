@@ -387,8 +387,9 @@ export class AuthUseCases {
     if (decision === 'invalid') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
 
     if (decision === 'reuse') {
-      await this.revokeReusedSession(session, meta);
-      await this.blocklist.block(session.id, ACCESS_TOKEN_TTL_SECONDS);
+      const revokedSids = await this.revokeReusedSession(session, meta);
+      const sidsToBlock = revokedSids.length ? revokedSids : [session.id];
+      await Promise.all(sidsToBlock.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
       throw new AccessError('session_revoked', SESSION_REVOKED_MESSAGE);
     }
 
@@ -570,17 +571,19 @@ export class AuthUseCases {
   }
 
   @Transactional('access')
-  private async revokeReusedSession(session: SessionRecord, meta: RequestMeta): Promise<void> {
+  private async revokeReusedSession(session: SessionRecord, meta: RequestMeta): Promise<string[]> {
+    // Thu hồi toàn bộ phiên của người dùng khi phát hiện dùng lại refresh token (RFC 6819 / Security BCP).
     // Hai request dùng lại cùng lúc: chỉ request xoá được phiên mới ghi audit và báo email, tránh gửi hai thư.
-    if (!(await this.store.sessions.delete(session.id))) return;
+    const revokedSids = await this.store.sessions.deleteByUser(session.userId);
+    if (!revokedSids.length) return [];
     await this.store.audit.record({
       action: 'auth.refresh_reused',
       actorUserId: session.userId,
       ...meta,
-      meta: { sid: session.id },
+      meta: { sid: session.id, revokedSessions: revokedSids.length },
     });
     const user = await this.store.users.findById(session.userId);
-    if (!user) return;
+    if (!user) return revokedSids;
     const payload: AccessSessionReuseDetectedV1 = {
       userId: user.id,
       email: user.email,
@@ -588,6 +591,7 @@ export class AuthUseCases {
       deviceName: session.deviceName,
     };
     await this.store.outbox.add({ type: 'access.session_reuse_detected', userId: user.id, payload });
+    return revokedSids;
   }
 
   /**

@@ -112,6 +112,33 @@ describe('AuthUseCases.refresh', () => {
     await expect(auth.refresh(second.refreshToken, meta)).rejects.toBeInstanceOf(AccessError);
   });
 
+  it('dùng lại token cũ sau 10 giây thu hồi TOÀN BỘ phiên của người dùng (RFC 6819)', async () => {
+    const { auth, store, blocklist, first, sid, advance } = await setup();
+    // Tạo phiên thứ 2 cho cùng người dùng (đăng nhập trên thiết bị khác)
+    const device2 = await auth.login({ email: 'an@example.com', password: 'mat-khau-1' }, { ip: '10.0.0.2', userAgent: 'mobile' });
+    const allSids = [...store.sessionRows.keys()];
+    const sid2 = allSids.find((id) => id !== sid)!;
+    expect(sid2).toBeDefined();
+
+    // Xoay vòng phiên 1
+    await auth.refresh(first.refreshToken, meta);
+    advance(REFRESH_GRACE_MS + 1_000);
+
+    // Dùng lại token cũ của phiên 1 -> phát hiện reuse
+    await expect(auth.refresh(first.refreshToken, meta)).rejects.toMatchObject({ code: 'session_revoked' });
+
+    // CẢ HAI phiên đều phải bị xoá khỏi store
+    expect(store.sessionRows.has(sid)).toBe(false);
+    expect(store.sessionRows.has(sid2)).toBe(false);
+
+    // CẢ HAI phiên đều phải bị chặn trong Redis blocklist
+    expect(await blocklist.isBlocked(sid)).toBe(true);
+    expect(await blocklist.isBlocked(sid2)).toBe(true);
+
+    // Phiên thứ 2 cũng không refresh được nữa
+    await expect(auth.refresh(device2.refreshToken, { ip: '10.0.0.2', userAgent: 'mobile' })).rejects.toMatchObject({ code: 'invalid_refresh' });
+  });
+
   it('từ chối refresh token lạ hoặc phiên hết hạn', async () => {
     const { auth, first, advance } = await setup();
     await expect(auth.refresh('khong-co-that', meta)).rejects.toMatchObject({ code: 'invalid_refresh' });

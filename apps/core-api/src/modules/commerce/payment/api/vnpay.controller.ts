@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Query, Req, UseFilters } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiOkResponse, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { AllowWhenRevocationUnavailable, Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -43,7 +43,6 @@ class CancelVnpayResultDto {
 @Controller('checkout')
 @UseFilters(CommerceErrorFilter)
 @Authenticated()
-@AllowWhenRevocationUnavailable()
 export class VnpayCheckoutController {
   constructor(@Inject(VnpayUseCases) private readonly vnpay: VnpayUseCases) {}
 
