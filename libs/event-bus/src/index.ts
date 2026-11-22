@@ -6,6 +6,7 @@ export const STREAMS = {
   access: 'stream:core.access',
   content: 'stream:core.content',
   commerce: 'stream:core.commerce',
+  discovery: 'stream:core.discovery',
   media: 'stream:media',
   ai: 'stream:ai',
   appEvents: 'stream:app-events',
@@ -14,7 +15,15 @@ export const STREAMS = {
 export type StreamName = (typeof STREAMS)[keyof typeof STREAMS];
 
 /** Consumer group: một sự kiện đến được mọi group, mỗi group tự XACK. */
-export const CONSUMER_GROUPS = ['notification', 'video-worker', 'core-discovery', 'core-analytics'] as const;
+export const CONSUMER_GROUPS = [
+  'notification',
+  'video-worker',
+  'core-discovery',
+  'core-analytics',
+  'core-media',
+  'core-moderation',
+  'core-feed-trend',
+] as const;
 
 /** Code nghiệp vụ chỉ phụ thuộc interface này, để sau đổi sang Kafka không phải sửa nghiệp vụ. */
 export interface EventBus {
@@ -41,3 +50,11 @@ export class RedisStreamsEventBus implements EventBus {
     return id;
   }
 }
+
+export {
+  RedisStreamsConsumer,
+  type ConsumerGroup,
+  type DeliveryInfo,
+  type EventHandler,
+  type RedisStreamsConsumerOptions,
+} from './consumer.js';

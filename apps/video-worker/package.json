@@ -10,17 +10,20 @@
     "start": "node dist/main.js",
     "lint": "oxlint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config vitest.int.config.ts"
   },
   "dependencies": {
     "@tripflix/config": "workspace:*",
     "@tripflix/contracts": "workspace:*",
     "@tripflix/event-bus": "workspace:*",
     "@tripflix/observability": "workspace:*",
+    "@tripflix/storage": "workspace:*",
     "ioredis": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@tripflix/testing": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "tsx": "catalog:",

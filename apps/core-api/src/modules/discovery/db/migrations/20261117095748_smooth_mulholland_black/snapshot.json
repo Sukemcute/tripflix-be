@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "8e875cda-752f-4c4e-bb87-1c9bcac5ce6f",
+  "prevIds": [
+    "86aa9086-8d6e-49e4-875f-ad78e20b8cf4"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "discovery",
+        "search_entities",
+        "slug"
+      ],
+      "writes": [
+        "s|col|discovery.search_entities.slug",
+        "n|col|discovery.search_entities.slug",
+        "e|col|discovery.search_entities.slug"
+      ],
+      "reads": [
+        "n|tbl|discovery.search_entities",
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_entities",
+        "name": "slug",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "access"."users" ADD COLUMN "travel_preferences" jsonb;

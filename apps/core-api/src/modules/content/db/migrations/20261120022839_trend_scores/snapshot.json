@@ -1,0 +1,314 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "298fda19-cb64-4ce1-8806-f8a4e08c3fae",
+  "prevIds": [
+    "3b786f9d-1c44-4160-b0a5-df9ac0e5171c"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "trend_scores"
+      ],
+      "writes": [
+        "s|tbl|content.trend_scores",
+        "n|tbl|content.trend_scores",
+        "e|tbl|content.trend_scores",
+        "n|rel|content.trend_scores",
+        "n|type|content.trend_scores",
+        "n|rel|content.trend_scores_pkey"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "trend_scores",
+        "uq_trend_scores_post_id"
+      ],
+      "writes": [
+        "s|idx|content.uq_trend_scores_post_id",
+        "n|idx|content.uq_trend_scores_post_id",
+        "e|idx|content.uq_trend_scores_post_id",
+        "n|rel|content.uq_trend_scores_post_id"
+      ],
+      "reads": [
+        "n|tbl|content.trend_scores",
+        "n|sch|content",
+        "n|col|content.trend_scores.post_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "trend_scores",
+        "idx_trend_scores_score"
+      ],
+      "writes": [
+        "s|idx|content.idx_trend_scores_score",
+        "n|idx|content.idx_trend_scores_score",
+        "e|idx|content.idx_trend_scores_score",
+        "n|rel|content.idx_trend_scores_score"
+      ],
+      "reads": [
+        "n|tbl|content.trend_scores",
+        "n|sch|content",
+        "n|col|content.trend_scores.score",
+        "n|col|content.trend_scores.post_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "content",
+        "trend_scores"
+      ],
+      "writes": [
+        "s|fk|content.trend_scores.trend_scores_post_id_posts_id_fkey",
+        "n|fk|content.trend_scores.trend_scores_post_id_posts_id_fkey",
+        "e|fk|content.trend_scores.trend_scores_post_id_posts_id_fkey",
+        "n|con|content.trend_scores.trend_scores_post_id_posts_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|content.trend_scores",
+        "n|sch|content",
+        "n|tbl|content.posts",
+        "n|sch|content",
+        "n|col|content.trend_scores.post_id",
+        "n|col|content.posts.id",
+        "e|uniqueness|content.posts.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "name": "trend_scores",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "id",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": {
+          "type": "always",
+          "name": "trend_scores_id_seq",
+          "increment": "1",
+          "startWith": "1",
+          "minValue": "1",
+          "maxValue": "9223372036854775807",
+          "cache": 1,
+          "cycle": false
+        },
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "post_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "score",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "raw",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "decayed_signal",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "completeness",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "uq_trend_scores_post_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "post_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "idx_trend_scores_score",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "score",
+            "isExpression": false,
+            "asc": false,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "post_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "trend_scores_post_id_posts_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "post_id"
+        ],
+        "schemaTo": "content",
+        "tableTo": "posts",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "trend_scores",
+        "name": "trend_scores_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

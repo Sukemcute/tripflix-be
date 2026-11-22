@@ -1,15 +1,20 @@
+import { randomUUID } from 'node:crypto';
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { loadEnv } from '@tripflix/config';
-import { DEFAULT_POOL_SIZE, MODULES, createPool } from '@tripflix/db';
+import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, DEFAULT_POOL_SIZE, MODULES, buildDrizzleToken, createDb, createPool, createTransactionalPlugins } from '@tripflix/db';
 import { Redis } from 'ioredis';
+import { ClsModule } from 'nestjs-cls';
 import { coreEnvSchema, dbUrlOf, type CoreEnv } from './env.js';
 import { HealthController } from './health.controller.js';
+import { TRACE_SOURCE_KEY } from './trace.js';
+import { TelemetryLifecycle } from './telemetry.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from './tokens.js';
 
-/** Hạ tầng dùng chung cho cả core-api: cấu hình, pool database theo module, Redis, /health. */
+const DRIZZLE_TOKENS = MODULES.map((m) => buildDrizzleToken(m));
+
+/** Cấu hình, pool database và instance Drizzle theo module, Redis. Tách riêng để ClsModule import được. */
 @Global()
 @Module({
-  controllers: [HealthController],
   providers: [
     { provide: CORE_ENV, useFactory: () => loadEnv(coreEnvSchema) },
     {
@@ -19,19 +24,25 @@ import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from './tokens.js';
         Object.fromEntries(
           MODULES.map((m) => [
             m,
-            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}` }),
+            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}`, statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS }),
           ]),
         ) as DbPools,
     },
+    // Mỗi module một instance Drizzle trên pool (user Postgres) riêng; @Transactional('<module>') dùng instance này.
+    ...MODULES.map((m) => ({
+      provide: buildDrizzleToken(m),
+      inject: [DB_POOLS],
+      useFactory: (pools: DbPools) => createDb(pools[m]),
+    })),
     {
       provide: REDIS,
       inject: [CORE_ENV],
       useFactory: (env: CoreEnv) => new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 }),
     },
   ],
-  exports: [CORE_ENV, DB_POOLS, REDIS],
+  exports: [CORE_ENV, DB_POOLS, REDIS, ...DRIZZLE_TOKENS],
 })
-export class PlatformModule implements OnApplicationShutdown {
+export class PlatformCoreModule implements OnApplicationShutdown {
   constructor(
     @Inject(DB_POOLS) private readonly pools: DbPools,
     @Inject(REDIS) private readonly redis: Redis,
@@ -42,3 +53,45 @@ export class PlatformModule implements OnApplicationShutdown {
     this.redis.disconnect();
   }
 }
+
+interface TracedRequest {
+  id?: unknown;
+  method?: string;
+  url?: string;
+  originalUrl?: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+
+/**
+ * Mã request dùng chung cho log và CLS: pino gán req.id nếu chạy trước; không thì lấy header hoặc tạo mới rồi ghi vào
+ * header để pino (genReqId đọc x-request-id) dùng đúng mã này.
+ */
+export function resolveRequestId(req: TracedRequest): string {
+  const header = req.headers['x-request-id'];
+  const id = typeof req.id === 'string' && req.id ? req.id : typeof header === 'string' && header ? header : randomUUID();
+  req.headers['x-request-id'] = id;
+  return id;
+}
+
+/** Hạ tầng dùng chung cho cả core-api: PlatformCoreModule, @Transactional theo module, /health. */
+@Global()
+@Module({
+  imports: [
+    PlatformCoreModule,
+    ClsModule.forRoot({
+      global: true,
+      plugins: createTransactionalPlugins([PlatformCoreModule]),
+      // Mỗi request một ngữ cảnh, mã trùng x-request-id của log HTTP (nestjs-pino), để sự kiện và lịch sử đơn nối về log.
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req: TracedRequest) => resolveRequestId(req),
+        setup: (cls, req: TracedRequest) => cls.set(TRACE_SOURCE_KEY, `${req.method} ${(req.originalUrl ?? req.url ?? '').split('?')[0]}`),
+      },
+    }),
+  ],
+  controllers: [HealthController],
+  providers: [TelemetryLifecycle],
+  exports: [PlatformCoreModule],
+})
+export class PlatformModule {}

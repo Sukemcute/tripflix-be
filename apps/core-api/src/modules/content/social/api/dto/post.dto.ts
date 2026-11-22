@@ -1,0 +1,186 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import type {
+  PostRecord,
+  PostStatus,
+  PostType,
+  PostVisibility,
+  TripAttachmentData,
+  TripItineraryItem,
+} from '../../../db/schema/index.js';
+import { LIST_POST_TYPE_FILTERS, type ListPostTypeFilter } from './post-type-filter.dto.js';
+
+export class TripTransportDto implements NonNullable<TripItineraryItem['transport']> {
+  @ApiProperty({ enum: ['flight', 'bus', 'train', 'car', 'other'] })
+  mode!: NonNullable<TripItineraryItem['transport']>['mode'];
+
+  @ApiPropertyOptional({ example: 'SGN' })
+  fromAirport?: string;
+
+  @ApiPropertyOptional({ example: 'DLI' })
+  toAirport?: string;
+}
+
+export class TripItemHotelDto implements NonNullable<TripItineraryItem['hotel']> {
+  @ApiProperty({ example: 'P-vn-h-da-lat-1', description: 'ID khách sạn' })
+  hotelId!: string;
+
+  @ApiPropertyOptional({ example: 'P-vn-h-da-lat-1--DLX', description: 'Loại phòng người đăng chọn' })
+  productId?: string;
+
+  @ApiPropertyOptional({ example: 'RO', description: 'Gói giá người đăng chọn' })
+  ratePlanCode?: string;
+}
+
+export class TripItineraryItemDto implements TripItineraryItem {
+  @ApiProperty({ example: 1, description: 'Số ngày trong lộ trình' })
+  day!: number;
+
+  @ApiProperty({ example: 'Check-in khách sạn & ngắm hoàng hôn', description: 'Tiêu đề hoạt động' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Bãi Dài, Phú Quốc', description: 'Địa điểm' })
+  location?: string;
+
+  @ApiPropertyOptional({ example: 'Nên đi tầm 16:30 để đón hoàng hôn đẹp nhất', description: 'Ghi chú' })
+  notes?: string;
+
+  @ApiPropertyOptional({ example: '16:30', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: 'Giờ trong ngày (HH:mm)' })
+  time?: string;
+
+  @ApiPropertyOptional({ enum: ['cafe', 'food', 'fun', 'other'], example: 'food', description: 'Loại điểm gợi ý để app chọn icon: cà phê, ăn uống, vui chơi, khác' })
+  category?: TripItineraryItem['category'];
+
+  @ApiPropertyOptional({ type: TripItemHotelDto, description: 'Khách sạn của điểm này (một chuyến có thể nhiều khách sạn)' })
+  hotel?: TripItemHotelDto;
+
+  @ApiPropertyOptional({ type: TripTransportDto, description: 'Phương tiện được chọn khi soạn lộ trình' })
+  transport?: TripTransportDto;
+}
+
+export class TripAttachmentDto implements TripAttachmentData {
+  @ApiPropertyOptional({ example: '018d9f10-book-7000-8000-000000000099', description: 'ID đơn đặt chỗ đã đi' })
+  bookingId?: string;
+
+  @ApiPropertyOptional({ example: 'Vinpearl Resort & Spa Phú Quốc', description: 'Tên khách sạn' })
+  hotelName?: string;
+
+  @ApiPropertyOptional({ example: '018d9f10-prop-7000-8000-000000000010', description: 'ID khách sạn' })
+  hotelId?: string;
+
+  @ApiPropertyOptional({ example: 'Phú Quốc, Kiên Giang', description: 'Điểm đến' })
+  destinationName?: string;
+
+  @ApiPropertyOptional({ example: 'phu-quoc', description: 'refId điểm đến lấy từ /api/suggest' })
+  destinationPlaceId?: string;
+
+  @ApiPropertyOptional({ example: 'P-h-pq-01--DLX', description: 'Loại phòng người đăng chọn (productId)' })
+  hotelProductId?: string;
+
+  @ApiPropertyOptional({ example: 'RO', description: 'Gói giá của loại phòng người đăng chọn' })
+  hotelRatePlanCode?: string;
+
+  @ApiPropertyOptional({ example: 3, description: 'Số ngày' })
+  daysCount?: number;
+
+  @ApiPropertyOptional({ example: 3500000, description: 'Chi phí ước tính / người' })
+  estimatedCostPerPerson?: number;
+
+  @ApiPropertyOptional({ example: 'Giá chỉ mang tính chất tham khảo', description: 'Lưu ý giá tham khảo' })
+  priceDisclaimer?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Ảnh poster riêng của lộ trình (asset ảnh đã tải lên); bỏ trống thì dùng poster video' })
+  posterMediaId?: string;
+
+  @ApiPropertyOptional({ description: 'Chỉ có trong phản hồi: link ảnh poster của lộ trình' })
+  posterUrl?: string;
+
+  @ApiPropertyOptional({ type: [TripItineraryItemDto], description: 'Các mục trong lịch trình' })
+  items?: TripItineraryItemDto[];
+}
+
+export class CreatePostDto {
+  @ApiProperty({ enum: ['video', 'vlog'], example: 'video', description: 'Loại bài đăng' })
+  post_type!: PostType;
+
+  @ApiProperty({ example: 'Khám phá Phú Quốc 3N2Đ cực chất', description: 'Tiêu đề bài viết' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Chia sẻ toàn bộ kinh nghiệm ăn chơi...', description: 'Nội dung chi tiết' })
+  body?: string;
+
+  @ApiPropertyOptional({ example: ['phuquoc', 'travel', 'vinpearl'], type: [String], description: 'Hashtags' })
+  hashtags?: string[];
+
+  @ApiPropertyOptional({ enum: ['public', 'private'], default: 'public', description: 'Quyền riêng tư' })
+  visibility?: PostVisibility;
+
+  @ApiPropertyOptional({ example: ['018d9f10-1234-7000-8000-000000000001'], type: [String], description: 'Danh sách ID media' })
+  media_ids?: string[];
+
+  @ApiPropertyOptional({ example: '018d9f10-1234-7000-8000-000000000001', description: 'ID media làm ảnh bìa' })
+  cover_media_id?: string;
+
+  @ApiPropertyOptional({ type: TripAttachmentDto, description: 'Lộ trình chuyến đi đính kèm' })
+  trip_attachment?: TripAttachmentDto;
+}
+
+export class UpdatePostDto {
+  @ApiPropertyOptional({ example: 'Tiêu đề cập nhật...', description: 'Tiêu đề mới' })
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Nội dung sửa đổi...', description: 'Nội dung mới' })
+  body?: string;
+
+  @ApiPropertyOptional({ example: ['phuquoc2026'], type: [String], description: 'Hashtags mới' })
+  hashtags?: string[];
+
+  @ApiPropertyOptional({ enum: ['public', 'private'], description: 'Quyền riêng tư' })
+  visibility?: PostVisibility;
+
+  @ApiPropertyOptional({ type: [String], description: 'Danh sách ID media' })
+  media_ids?: string[];
+
+  @ApiPropertyOptional({ description: 'ID ảnh bìa' })
+  cover_media_id?: string;
+
+  @ApiPropertyOptional({ type: TripAttachmentDto, description: 'Lộ trình đính kèm' })
+  trip_attachment?: TripAttachmentDto;
+}
+
+export class ListPostsQueryDto {
+  @ApiPropertyOptional({ default: 20, description: 'Số lượng bài lấy mỗi trang (1-50)' })
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Keyset cursor lấy từ trang trước' })
+  cursor?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo tác giả' })
+  author_id?: string;
+
+  @ApiPropertyOptional({
+    enum: ['vlog'],
+    description:
+      'Lọc theo loại bài. Không truyền thì trả mọi loại (AI service đang dùng). Reels lấy qua /v1/feed; giá trị video vẫn được chấp nhận để client cũ không lỗi nhưng không còn trong hợp đồng',
+  })
+  post_type?: PostType;
+
+  @ApiPropertyOptional({ description: 'Lọc theo hashtag' })
+  hashtag?: string;
+}
+
+export class ListUserPostsQueryDto {
+  @ApiPropertyOptional({ default: 20, description: 'Số lượng bài lấy mỗi trang' })
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Keyset cursor' })
+  cursor?: string;
+
+  @ApiPropertyOptional({ enum: ['all', 'draft', 'published', 'held'], default: 'all', description: 'Trạng thái bài' })
+  status?: PostStatus | 'all';
+
+  @ApiPropertyOptional({
+    enum: LIST_POST_TYPE_FILTERS,
+    description: 'Lọc theo loại bài. Không truyền thì trả mọi loại',
+  })
+  post_type?: ListPostTypeFilter;
+}

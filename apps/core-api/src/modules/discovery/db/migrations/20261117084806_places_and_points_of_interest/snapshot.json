@@ -1,0 +1,617 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "86aa9086-8d6e-49e4-875f-ad78e20b8cf4",
+  "prevIds": [
+    "a3478c3e-f05a-446f-a8e0-7d96f42ae98c"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "places"
+      ],
+      "writes": [
+        "s|tbl|discovery.places",
+        "n|tbl|discovery.places",
+        "e|tbl|discovery.places",
+        "n|rel|discovery.places",
+        "n|type|discovery.places",
+        "n|rel|discovery.places_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "points_of_interest"
+      ],
+      "writes": [
+        "s|tbl|discovery.points_of_interest",
+        "n|tbl|discovery.points_of_interest",
+        "e|tbl|discovery.points_of_interest",
+        "n|rel|discovery.points_of_interest",
+        "n|type|discovery.points_of_interest",
+        "n|rel|discovery.points_of_interest_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "places",
+        "idx_places_parent_id"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_places_parent_id",
+        "n|idx|discovery.idx_places_parent_id",
+        "e|idx|discovery.idx_places_parent_id",
+        "n|rel|discovery.idx_places_parent_id"
+      ],
+      "reads": [
+        "n|tbl|discovery.places",
+        "n|sch|discovery",
+        "n|col|discovery.places.parent_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "points_of_interest",
+        "idx_points_of_interest_place_id_kind"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_points_of_interest_place_id_kind",
+        "n|idx|discovery.idx_points_of_interest_place_id_kind",
+        "e|idx|discovery.idx_points_of_interest_place_id_kind",
+        "n|rel|discovery.idx_points_of_interest_place_id_kind"
+      ],
+      "reads": [
+        "n|tbl|discovery.points_of_interest",
+        "n|sch|discovery",
+        "n|col|discovery.points_of_interest.place_id",
+        "n|col|discovery.points_of_interest.kind"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "places"
+      ],
+      "writes": [
+        "s|fk|discovery.places.fk_places_parent_id",
+        "n|fk|discovery.places.fk_places_parent_id",
+        "e|fk|discovery.places.fk_places_parent_id",
+        "n|con|discovery.places.fk_places_parent_id"
+      ],
+      "reads": [
+        "n|tbl|discovery.places",
+        "n|sch|discovery",
+        "n|tbl|discovery.places",
+        "n|sch|discovery",
+        "n|col|discovery.places.parent_id",
+        "n|col|discovery.places.id",
+        "e|uniqueness|discovery.places.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "points_of_interest"
+      ],
+      "writes": [
+        "s|fk|discovery.points_of_interest.fk_points_of_interest_place_id",
+        "n|fk|discovery.points_of_interest.fk_points_of_interest_place_id",
+        "e|fk|discovery.points_of_interest.fk_points_of_interest_place_id",
+        "n|con|discovery.points_of_interest.fk_points_of_interest_place_id"
+      ],
+      "reads": [
+        "n|tbl|discovery.points_of_interest",
+        "n|sch|discovery",
+        "n|tbl|discovery.places",
+        "n|sch|discovery",
+        "n|col|discovery.points_of_interest.place_id",
+        "n|col|discovery.places.id",
+        "e|uniqueness|discovery.places.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "places",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "points_of_interest",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "parent_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "aliases",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "lat",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "lng",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "place_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "lat",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "lng",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "tags",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "popularity",
+        "type": "real",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "details",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "is_hidden",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "idx_places_parent_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "parent_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "idx_points_of_interest_place_id_kind",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "place_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "kind",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "fk_places_parent_id",
+        "nameExplicit": true,
+        "columns": [
+          "parent_id"
+        ],
+        "schemaTo": "discovery",
+        "tableTo": "places",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "fk_points_of_interest_place_id",
+        "nameExplicit": true,
+        "columns": [
+          "place_id"
+        ],
+        "schemaTo": "discovery",
+        "tableTo": "places",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "places_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "points_of_interest_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "places",
+        "name": "ck_places_kind",
+        "value": "\"kind\" in ('province', 'destination')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "points_of_interest",
+        "name": "ck_points_of_interest_kind",
+        "value": "\"kind\" in ('see', 'food', 'cafe', 'lodging')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

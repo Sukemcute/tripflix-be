@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "fdc4c541-eab3-40c6-a4c7-d4bd14cf7842",
+  "prevIds": [
+    "f59cfa5e-89ea-49a3-b6fd-4dc5ffbf54b4"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_actions",
+        "policy_version"
+      ],
+      "writes": [
+        "s|col|content.moderation_actions.policy_version",
+        "n|col|content.moderation_actions.policy_version",
+        "e|col|content.moderation_actions.policy_version"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_actions",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "moderation_actions",
+        "evidence_snapshot"
+      ],
+      "writes": [
+        "s|col|content.moderation_actions.evidence_snapshot",
+        "n|col|content.moderation_actions.evidence_snapshot",
+        "e|col|content.moderation_actions.evidence_snapshot"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_actions",
+        "n|sch|content"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_actions",
+        "name": "policy_version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_actions",
+        "name": "evidence_snapshot",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

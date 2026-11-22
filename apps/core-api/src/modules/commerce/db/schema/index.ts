@@ -1,4 +1,6 @@
-import { pgSchema } from 'drizzle-orm/pg-core';
-
-/** Mọi bảng của module commerce khai báo trong schema này. */
-export const commerceSchema = pgSchema('commerce');
+export { commerceSchema } from './commerce-schema.js';
+export * from './catalog.js';
+export * from './audit.js';
+export * from './orders.js';
+export * from './payments.js';
+export * from './reviews.js';

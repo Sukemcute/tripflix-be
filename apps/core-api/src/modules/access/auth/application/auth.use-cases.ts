@@ -1,0 +1,641 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import type { AuthUser, SidBlocklist } from '@tripflix/auth';
+import type {
+  AccessUserGuestMergedV1,
+  AccessRegistrationAttemptedExistingV1,
+  AccessRegistrationCodeRequestedV1,
+  AccessSessionReuseDetectedV1,
+  AccessUserProfileUpdatedV1,
+  AccessUserRegisteredV1,
+  AccessUserWelcomeEmailRequestedV1,
+} from '@tripflix/contracts';
+import { Transactional } from '@tripflix/db';
+import type { CoreEnv } from '../../../../platform/env.js';
+import { CORE_ENV } from '../../../../platform/tokens.js';
+import {
+  DEFAULT_REGISTER_MAX_PER_IP,
+  REGISTER_WINDOW_SECONDS,
+  TOO_MANY_SIGNUPS_MESSAGE,
+} from '../../account/domain/email-verification.js';
+import {
+  EMAIL_TAKEN_MESSAGE,
+  GOOGLE_LOGIN_FAILED_MESSAGE,
+  INVALID_CREDENTIALS_MESSAGE,
+  INVALID_REFRESH_MESSAGE,
+  SESSION_REVOKED_MESSAGE,
+  TOO_MANY_ATTEMPTS_MESSAGE,
+  buildDisplayName,
+  normalizeEmail,
+} from '../domain/credentials.js';
+import { AccessError } from '../domain/errors.js';
+import {
+  INVALID_REGISTRATION_CODE,
+  REGISTRATION_CODE_COOLDOWN_MESSAGE,
+  REGISTRATION_CODE_COOLDOWN_SECONDS,
+  REGISTRATION_CODE_TTL_MS,
+  TERMS_VERSION,
+} from '../domain/registration.js';
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TTL_MS,
+  decideRefresh,
+  nextRefreshExpiry,
+  type RefreshDecision,
+} from '../domain/refresh-rotation.js';
+import {
+  ACCESS_SID_BLOCKLIST,
+  ACCESS_STORE,
+  ACTION_RATE_LIMITER,
+  CLOCK,
+  GOOGLE_VERIFIER,
+  LOGIN_RATE_LIMITER,
+  PASSWORD_HASHER,
+  TOKEN_ISSUER,
+  type AccessStore,
+  type ActionRateLimiter,
+  type Clock,
+  type GoogleIdentity,
+  type GoogleIdTokenVerifier,
+  type LoginRateLimiter,
+  type NewUser,
+  type PasswordHasher,
+  type RequestMeta,
+  type SessionRecord,
+  type TokenIssuer,
+  type UserRecord,
+} from './ports.js';
+import { mapMyProfile, mapPublicUser, type MyProfile, type PublicUser } from './public-user.js';
+import { BROWSER_PROOF_TTL_SECONDS, verifyBrowserProof, type BrowserProof, type BrowserProofPurpose } from './browser-session-proof.js';
+import { createRefreshToken, getRefreshBrowserKey, hashRefreshToken } from './refresh-token.js';
+import type { Gender } from '../../account/domain/personal-info.js';
+
+/** Đăng ký bằng mật khẩu, đã qua RegisterRequestSchema (thông tin cá nhân bắt buộc, đã đồng ý điều khoản). */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  displayName: string;
+  registrationId: string;
+  code: string;
+  dateOfBirth: string;
+  gender: Gender;
+  nationality: string;
+}
+
+export const ADMIN_HANDOFF_TTL_SECONDS = 60;
+export const ADMIN_HANDOFF_FORBIDDEN_MESSAGE = 'Tài khoản không có quyền vào trang quản trị';
+const STAFF_ROLES: ReadonlySet<string> = new Set(['moderator', 'superadmin']);
+/** <userId>.<challengeId>.<secret 256 bit base64url> */
+const ADMIN_HANDOFF_CODE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/;
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+}
+
+/**
+ * Use case đăng ký, đăng nhập, làm mới, đăng xuất.
+ * Chỉ các bước ghi database (cùng audit_logs, outbox) nằm trong @Transactional('access'); băm argon2,
+ * Redis (chặn sid, đếm đăng nhập sai) và ký token chạy ngoài transaction để không giữ khoá lâu.
+ */
+@Injectable()
+export class AuthUseCases {
+  private dummyHash?: Promise<string>;
+  private readonly registerMaxPerIp: number;
+
+  constructor(
+    @Inject(ACCESS_STORE) private readonly store: AccessStore,
+    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    @Inject(TOKEN_ISSUER) private readonly tokens: TokenIssuer,
+    @Inject(LOGIN_RATE_LIMITER) private readonly limiter: LoginRateLimiter,
+    @Inject(ACCESS_SID_BLOCKLIST) private readonly blocklist: SidBlocklist,
+    @Inject(CLOCK) private readonly now: Clock,
+    @Inject(GOOGLE_VERIFIER) private readonly google: GoogleIdTokenVerifier,
+    @Inject(ACTION_RATE_LIMITER) private readonly actionLimiter: ActionRateLimiter,
+    @Inject(CORE_ENV) env: CoreEnv,
+  ) {
+    // E2E dựng env tay có thể thiếu biến này: dùng mặc định như khi parse env.
+    this.registerMaxPerIp = (env.AUTH_REGISTER_MAX_PER_IP_HOUR as number | undefined) ?? DEFAULT_REGISTER_MAX_PER_IP;
+  }
+
+  async requestRegistrationCode(address: string, meta: RequestMeta): Promise<string> {
+    const email = normalizeEmail(address);
+    // Đợi giữa hai lần xin mã: kiểm trước để lần bấm quá sớm không ăn vào hạn mức theo giờ.
+    const cooldown = await this.actionLimiter.consume(`register:cooldown:${email}`, 1, REGISTRATION_CODE_COOLDOWN_SECONDS);
+    if (cooldown.isBlocked) {
+      throw new AccessError('too_many_attempts', REGISTRATION_CODE_COOLDOWN_MESSAGE, cooldown.retryAfterSeconds);
+    }
+    await this.checkRegistrationLimit(
+      [`register:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
+      [`register:email:${email}`, 3, REGISTER_WINDOW_SECONDS],
+    );
+    const id = randomUUID();
+    // Băm cả khi email đã có tài khoản để thời gian trả lời như nhau, không dò được email nào đã đăng ký.
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    const codeHash = await this.hasher.hash(code);
+    const existing = await this.store.users.findByEmail(email);
+    if (existing) {
+      if (existing.status === 'active') await this.notifyExistingAccount(existing);
+      return id;
+    }
+
+    await this.saveRegistrationCode(email, id, code, codeHash);
+    return id;
+  }
+
+  /** API vẫn trả như email mới; chủ email nhận thư báo đã có tài khoản và cách đăng nhập. */
+  @Transactional('access')
+  private async notifyExistingAccount(user: UserRecord): Promise<void> {
+    const payload: AccessRegistrationAttemptedExistingV1 = {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      hasPassword: user.passwordHash !== null,
+    };
+    await this.store.outbox.add({ type: 'access.registration_attempted_existing', userId: user.id, payload });
+  }
+
+  @Transactional('access')
+  private async saveRegistrationCode(email: string, id: string, code: string, codeHash: string): Promise<void> {
+    const expiresAt = new Date(this.now().getTime() + REGISTRATION_CODE_TTL_MS);
+    await this.store.registrationChallenges.save({ email, id, codeHash, expiresAt });
+    const payload: AccessRegistrationCodeRequestedV1 = { email, code, expiresAt: expiresAt.toISOString() };
+    await this.store.outbox.add({ type: 'access.registration_code_requested', userId: id, payload });
+  }
+
+  async register(input: RegisterInput, meta: RequestMeta): Promise<PublicUser> {
+    const email = normalizeEmail(input.email);
+    await this.checkRegistrationLimit(
+      [`register-code:ip:${meta.ip}`, 30, 600],
+      [`register-code:id:${input.registrationId}`, 5, 600],
+    );
+    const challenge = await this.store.registrationChallenges.findUsable(email, input.registrationId, this.now());
+    if (!challenge || !(await this.hasher.verify(challenge.codeHash, input.code))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
+    const passwordHash = await this.hasher.hash(input.password);
+    const user = await this.createVerifiedMember(
+      {
+        email,
+        passwordHash,
+        displayName: input.displayName.trim(),
+        registrationId: input.registrationId,
+        personal: { dateOfBirth: input.dateOfBirth, gender: input.gender, nationality: input.nationality },
+        terms: { version: TERMS_VERSION, acceptedAt: this.now() },
+      },
+      meta,
+    );
+    return mapPublicUser(user);
+  }
+
+  private async checkRegistrationLimit(...keys: [key: string, max: number, seconds: number][]): Promise<void> {
+    const results = await Promise.all(keys.map(([key, max, seconds]) => this.actionLimiter.consume(key, max, seconds)));
+    const blocked = results.find((result) => result.isBlocked);
+    if (blocked) throw new AccessError('too_many_attempts', TOO_MANY_SIGNUPS_MESSAGE, blocked.retryAfterSeconds);
+  }
+
+  async requestLoginCode(input: { email: string; password: string }, meta: RequestMeta): Promise<string> {
+    const { email, user } = await this.verifyPasswordCredentials(input, meta);
+    const cooldown = await this.actionLimiter.consume(`login-code:cooldown:${email}`, 1, REGISTRATION_CODE_COOLDOWN_SECONDS);
+    if (cooldown.isBlocked) {
+      throw new AccessError('too_many_attempts', REGISTRATION_CODE_COOLDOWN_MESSAGE, cooldown.retryAfterSeconds);
+    }
+    await this.checkRegistrationLimit(
+      [`login-code:ip:${meta.ip}`, this.registerMaxPerIp, REGISTER_WINDOW_SECONDS],
+      [`login-code:email:${email}`, 5, REGISTER_WINDOW_SECONDS],
+    );
+    const id = randomUUID();
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    const codeHash = await this.hasher.hash(code);
+    await this.saveLoginCode(user, id, code, codeHash);
+    return id;
+  }
+
+  @Transactional('access')
+  private async saveLoginCode(user: UserRecord, id: string, code: string, codeHash: string): Promise<void> {
+    const expiresAt = new Date(this.now().getTime() + REGISTRATION_CODE_TTL_MS);
+    await this.store.registrationChallenges.save({ email: `login:${user.email}`, id, codeHash, expiresAt });
+    const payload: AccessRegistrationCodeRequestedV1 = {
+      email: user.email,
+      code,
+      expiresAt: expiresAt.toISOString(),
+      purpose: 'login',
+    };
+    await this.store.outbox.add({ type: 'access.registration_code_requested', userId: user.id, payload });
+  }
+
+  private async verifyPasswordCredentials(
+    input: { email: string; password: string },
+    meta: RequestMeta,
+  ): Promise<{ email: string; user: UserRecord }> {
+    const email = normalizeEmail(input.email);
+    const limit = await this.limiter.check(email, meta.ip);
+    if (limit.isBlocked) throw new AccessError('too_many_attempts', TOO_MANY_ATTEMPTS_MESSAGE, limit.retryAfterSeconds);
+
+    const user = await this.store.users.findByEmail(email);
+    // Email không tồn tại hoặc tài khoản chỉ có Google (chưa đặt mật khẩu) vẫn chạy argon2,
+    // để thời gian phản hồi không lộ email nào có tài khoản.
+    const isPasswordValid = user?.passwordHash
+      ? await this.hasher.verify(user.passwordHash, input.password)
+      : await this.hasher.verify(await this.getDummyHash(), input.password).then(() => false);
+
+    if (!user || !isPasswordValid || user.status !== 'active') {
+      await this.limiter.recordFailure(email, meta.ip);
+      await this.store.audit.record({
+        action: 'auth.login_failed',
+        actorUserId: user?.id ?? null,
+        ...meta,
+        meta: { email },
+      });
+      throw new AccessError('invalid_credentials', INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    return { email, user };
+  }
+
+  async login(
+    input: {
+      email: string;
+      password: string;
+      deviceName?: string | undefined;
+      loginChallengeId?: string | undefined;
+      code?: string | undefined;
+    },
+    meta: RequestMeta,
+    browserProof?: BrowserProof,
+  ): Promise<TokenPair> {
+    const { email, user } = await this.verifyPasswordCredentials(input, meta);
+
+    if (input.loginChallengeId !== undefined || input.code !== undefined) {
+      if (!input.loginChallengeId || !input.code) {
+        throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+      }
+      await this.checkRegistrationLimit(
+        [`login-code-verify:ip:${meta.ip}`, 30, 600],
+        [`login-code-verify:id:${input.loginChallengeId}`, 5, 600],
+      );
+      const challenge = await this.store.registrationChallenges.findUsable(`login:${email}`, input.loginChallengeId, this.now());
+      if (!challenge || !(await this.hasher.verify(challenge.codeHash, input.code))) {
+        throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+      }
+    }
+
+    await this.limiter.reset(email);
+    const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'login') : undefined;
+    const refreshToken = createRefreshToken(browserKey);
+    const session = await this.openSession(
+      user,
+      hashRefreshToken(refreshToken),
+      input.deviceName ?? null,
+      meta,
+      'password',
+      input.loginChallengeId,
+    );
+    return this.issueTokenPair(user, session.id, refreshToken);
+  }
+
+  /**
+   * Đăng nhập bằng Google ID token. Đã liên kết: vào đúng tài khoản đó. Chưa liên kết nhưng trùng email (Google đã
+   * xác minh): liên kết vào tài khoản đó. Chưa có tài khoản: tạo member không có mật khẩu. Bị khoá: 401.
+   */
+  async loginWithGoogle(input: { idToken: string; deviceName?: string | undefined }, meta: RequestMeta, browserProof?: BrowserProof): Promise<TokenPair> {
+    const identity = await this.google.verify(input.idToken);
+    const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'google') : undefined;
+    const { user, revokedSids } = await this.resolveGoogleUser(identity, meta);
+    await Promise.all(revokedSids.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
+    if (user.status !== 'active') {
+      await this.store.audit.record({ action: 'auth.login_failed', actorUserId: user.id, ...meta, meta: { provider: 'google' } });
+      throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
+    }
+    const refreshToken = createRefreshToken(browserKey);
+    const session = await this.openSession(user, hashRefreshToken(refreshToken), input.deviceName ?? null, meta, 'google');
+    return this.issueTokenPair(user, session.id, refreshToken);
+  }
+
+  /**
+   * Web tạo mã dùng một lần để mở trang quản trị bằng đúng tài khoản đang đăng nhập. Không dùng chung refresh token
+   * vì token web gắn với khoá trình duyệt của origin web; admin đổi mã lấy phiên mới gắn khoá của admin.
+   */
+  async createAdminHandoff(user: AuthUser): Promise<{ code: string; expiresIn: number }> {
+    const record = await this.store.users.findById(user.userId);
+    if (!record || record.status !== 'active' || !STAFF_ROLES.has(record.role)) {
+      throw new AccessError('forbidden', ADMIN_HANDOFF_FORBIDDEN_MESSAGE);
+    }
+    const id = randomUUID();
+    const secret = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(this.now().getTime() + ADMIN_HANDOFF_TTL_SECONDS * 1000);
+    // Mỗi người chỉ một mã chưa dùng: tạo mã mới thì mã cũ hết hiệu lực (khoá chính là email).
+    await this.store.registrationChallenges.save({ email: `admin-handoff:${record.id}`, id, codeHash: hashRefreshToken(secret), expiresAt });
+    return { code: `${record.id}.${id}.${secret}`, expiresIn: ADMIN_HANDOFF_TTL_SECONDS };
+  }
+
+  /** Admin đổi mã lấy phiên mới. Mã sai, hết hạn, đã dùng hoặc người không còn là nhân viên: 401. */
+  async exchangeAdminHandoff(code: string, meta: RequestMeta, browserProof: BrowserProof): Promise<TokenPair> {
+    const match = ADMIN_HANDOFF_CODE_PATTERN.exec(code);
+    if (!match) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    const [, userId, id, secret] = match as unknown as [string, string, string, string];
+    const key = `admin-handoff:${userId}`;
+    const challenge = await this.store.registrationChallenges.findUsable(key, id, this.now());
+    const expected = Buffer.from(challenge?.codeHash ?? '', 'hex');
+    const presented = Buffer.from(hashRefreshToken(secret), 'hex');
+    if (!challenge || expected.length !== presented.length || !timingSafeEqual(expected, presented)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const browserKey = await this.authenticateBrowser(browserProof, 'login');
+    if (!(await this.store.registrationChallenges.consume(key, id, this.now()))) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const user = await this.store.users.findById(userId);
+    if (!user || user.status !== 'active' || !STAFF_ROLES.has(user.role)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const refreshToken = createRefreshToken(browserKey);
+    const session = await this.openSession(user, hashRefreshToken(refreshToken), null, meta, 'admin_handoff');
+    return this.issueTokenPair(user, session.id, refreshToken);
+  }
+
+  private async authenticateBrowser(proof: BrowserProof, purpose: BrowserProofPurpose, expectedKey?: string): Promise<string> {
+    const verified = await verifyBrowserProof(proof, purpose, this.now());
+    if (!verified || (expectedKey !== undefined && verified.thumbprint !== expectedKey)) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const replay = await this.actionLimiter.consume(
+      `browser-proof:${verified.thumbprint}:${verified.nonce}`, 1, BROWSER_PROOF_TTL_SECONDS,
+    );
+    if (replay.isBlocked) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    return verified.thumbprint;
+  }
+
+  async refresh(refreshToken: string, meta: RequestMeta, browserProof?: BrowserProof): Promise<TokenPair> {
+    const presented = hashRefreshToken(refreshToken);
+    const session = await this.store.sessions.findByTokenHash(presented);
+    if (!session) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+
+    const browserKey = getRefreshBrowserKey(refreshToken);
+    if (browserKey) {
+      if (!browserProof) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+      await this.authenticateBrowser(browserProof, 'refresh', browserKey);
+    } else if (browserProof) {
+      // Phiên web cũ phải đăng nhập lại để đăng ký khóa.
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    const now = this.now();
+    const decision = decideRefresh(session, presented, now);
+    if (decision === 'invalid') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+
+    if (decision === 'reuse') {
+      const revokedSids = await this.revokeReusedSession(session, meta);
+      const sidsToBlock = revokedSids.length ? revokedSids : [session.id];
+      await Promise.all(sidsToBlock.map((sid) => this.blocklist.block(sid, ACCESS_TOKEN_TTL_SECONDS)));
+      throw new AccessError('session_revoked', SESSION_REVOKED_MESSAGE);
+    }
+
+    const user = await this.store.users.findById(session.userId);
+    if (!user || user.status !== 'active') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+
+    const next = createRefreshToken(browserKey);
+    const hasRotated = await this.rotateSession(session, { presented, nextHash: hashRefreshToken(next), decision, now });
+    if (!hasRotated) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    return this.issueTokenPair(user, session.id, next);
+  }
+
+  async logout(user: AuthUser, meta: RequestMeta): Promise<void> {
+    await this.closeSession(user, meta);
+    // Chặn sid tới khi access token hiện tại hết hạn, để token cũ bị từ chối ngay.
+    const remaining = user.exp - Math.floor(this.now().getTime() / 1000);
+    await this.blocklist.block(user.sid, Math.max(remaining, 1));
+  }
+
+  async getMe(userId: string): Promise<MyProfile> {
+    const user = await this.store.users.findById(userId);
+    if (!user) throw new AccessError('not_found', 'Không tìm thấy người dùng');
+    return mapMyProfile(user);
+  }
+
+  /** Tiêu mã và tạo tài khoản trong cùng transaction. */
+  @Transactional('access')
+  private async createVerifiedMember(
+    input: Omit<NewUser, 'role' | 'emailVerifiedAt'> & { passwordHash: string; registrationId: string },
+    meta: RequestMeta,
+  ): Promise<UserRecord> {
+    const { registrationId, ...credentials } = input;
+    if (!(await this.store.registrationChallenges.consume(input.email, registrationId, this.now()))) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
+    const created = await this.insertMember(credentials, meta, 'password');
+    if (!created) throw new AccessError('email_taken', EMAIL_TAKEN_MESSAGE);
+    await this.addGuestMerged(created.id, meta);
+    return created;
+  }
+
+  /**
+   * Thêm member, phát access.user.registered và yêu cầu gửi email; gọi trong transaction đang mở,
+   * nên tài khoản không tạo được (email trùng, rollback) thì không có email.
+   * Chỉ gọi sau khi xác thực email bằng mã đăng ký hoặc danh tính Google.
+   */
+  private async insertMember(
+    input: Omit<NewUser, 'role' | 'emailVerifiedAt'>,
+    meta: RequestMeta,
+    provider: 'password' | 'google',
+  ): Promise<UserRecord | null> {
+    const created = await this.store.users.insert({
+      ...input,
+      role: 'member',
+      emailVerifiedAt: this.now(),
+    });
+    if (!created) return null;
+    await this.store.audit.record({ action: 'auth.register', actorUserId: created.id, ...meta, meta: { provider } });
+    const payload: AccessUserRegisteredV1 = { userId: created.id, displayName: created.displayName, avatarUrl: created.avatarUrl };
+    await this.store.outbox.add({ type: 'access.user.registered', userId: created.id, payload });
+    const welcome: AccessUserWelcomeEmailRequestedV1 = {
+      userId: created.id,
+      email: created.email,
+      displayName: created.displayName,
+      provider,
+    };
+    await this.store.outbox.add({ type: 'access.user.welcome_email_requested', userId: created.id, payload: welcome });
+    return created;
+  }
+
+  /**
+   * Tìm hoặc tạo tài khoản cho danh tính Google; không liên kết vào tài khoản đang bị khoá. Google đã xác minh
+   * email, nên tài khoản đi qua đây được đánh dấu đã xác thực (TF05D).
+   *
+   * Liên kết vào tài khoản mật khẩu CHƯA xác thực: mật khẩu đó có thể do người khác đặt trước bằng email của
+   * chủ thật (chiếm tài khoản trước, pre-account hijacking). Khi đó xoá mật khẩu và mọi phiên cũ; chủ thật
+   * muốn dùng mật khẩu thì đặt lại qua email.
+   */
+  @Transactional('access')
+  private async resolveGoogleUser(
+    identity: GoogleIdentity,
+    meta: RequestMeta,
+  ): Promise<{ user: UserRecord; revokedSids: string[] }> {
+    const linkedUserId = await this.store.identities.findUserId('google', identity.subject);
+    if (linkedUserId) {
+      const linked = await this.store.users.findById(linkedUserId);
+      if (linked) return { user: await this.syncGoogleAvatar(await this.ensureVerified(linked, meta), identity.picture), revokedSids: [] };
+    }
+    const email = normalizeEmail(identity.email);
+    const link = { provider: 'google' as const, subject: identity.subject, email };
+    const existing = await this.store.users.findByEmail(email);
+    if (existing) {
+      if (existing.status !== 'active') return { user: existing, revokedSids: [] };
+      await this.linkIdentity({ ...link, userId: existing.id });
+      const isTakeoverRisk = existing.emailVerifiedAt === null && existing.passwordHash !== null;
+      const revokedSids = isTakeoverRisk ? await this.store.sessions.deleteByUser(existing.id) : [];
+      if (isTakeoverRisk) await this.store.users.updatePasswordHash(existing.id, null);
+      await this.store.audit.record({
+        action: 'auth.google_linked',
+        actorUserId: existing.id,
+        ...meta,
+        meta: { email, ...(isTakeoverRisk ? { clearedUnverifiedPassword: true, revokedSessions: revokedSids.length } : {}) },
+      });
+      const current = (await this.store.users.findById(existing.id)) ?? existing;
+      return { user: await this.syncGoogleAvatar(await this.ensureVerified(current, meta), identity.picture), revokedSids };
+    }
+    const avatar = identity.picture ? { avatarUrl: identity.picture, avatarSource: 'google' as const } : undefined;
+    const created = await this.insertMember(
+      { email, passwordHash: null, displayName: buildDisplayName(identity.name, email), ...(avatar ? { avatar } : {}) },
+      meta,
+      'google',
+    );
+    // Request khác vừa tạo cùng email: lỗi để client thử lại, lần sau sẽ vào nhánh liên kết ở trên.
+    if (!created) throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
+    await this.linkIdentity({ ...link, userId: created.id });
+    return { user: created, revokedSids: [] };
+  }
+
+  /**
+   * Gọi trong transaction đang mở. Ảnh Google chỉ ghi khi người dùng chưa tự tải hay tự xoá ảnh (TF109); mỗi lần
+   * đăng nhập ghi lại vì link Google đổi khi họ đổi ảnh, nên không copy ảnh về kho của mình.
+   */
+  private async syncGoogleAvatar(user: UserRecord, picture: string | null): Promise<UserRecord> {
+    const isGoogleOwned = user.avatarSource === null || user.avatarSource === 'google';
+    if (!picture || !isGoogleOwned || user.avatarUrl === picture) return user;
+    const updated = (await this.store.users.updateAvatar(user.id, { avatarUrl: picture, avatarSource: 'google' })) ?? user;
+    const payload: AccessUserProfileUpdatedV1 = { userId: user.id, displayName: updated.displayName, avatarUrl: picture };
+    await this.store.outbox.add({ type: 'access.user.profile_updated', userId: user.id, payload });
+    return updated;
+  }
+
+  /** Gọi trong transaction đang mở: đăng nhập bằng Google chứng minh sở hữu email, đánh dấu đã xác thực nếu chưa. */
+  private async ensureVerified(user: UserRecord, meta: RequestMeta): Promise<UserRecord> {
+    if (user.emailVerifiedAt) return user;
+    const verified = (await this.store.users.markEmailVerified(user.id, this.now())) ?? user;
+    await this.store.audit.record({ action: 'auth.email_verified', actorUserId: user.id, ...meta, meta: { via: 'google' } });
+    return verified;
+  }
+
+  /** Hai request đăng nhập Google lần đầu cùng lúc: request thua thì ném lỗi để transaction của nó rollback. */
+  private async linkIdentity(identity: { provider: 'google'; subject: string; userId: string; email: string }): Promise<void> {
+    if (!(await this.store.identities.insert(identity))) throw new AccessError('google_invalid', GOOGLE_LOGIN_FAILED_MESSAGE);
+  }
+
+  /** Mở phiên đăng nhập; có X-Anon-Id thì phát access.user.guest_merged trong cùng transaction. */
+  @Transactional('access')
+  private async openSession(
+    user: UserRecord,
+    refreshTokenHash: string,
+    deviceName: string | null,
+    meta: RequestMeta,
+    provider: 'password' | 'google' | 'admin_handoff' = 'password',
+    loginChallengeId?: string,
+  ): Promise<SessionRecord> {
+    if (
+      loginChallengeId &&
+      !(await this.store.registrationChallenges.consume(`login:${user.email}`, loginChallengeId, this.now()))
+    ) {
+      throw new AccessError('invalid_registration_code', INVALID_REGISTRATION_CODE);
+    }
+    const created = await this.store.sessions.insert({
+      userId: user.id,
+      refreshTokenHash,
+      expiresAt: new Date(this.now().getTime() + REFRESH_TTL_MS),
+      deviceName,
+      userAgent: meta.userAgent,
+      ip: meta.ip,
+    });
+    await this.store.audit.record({ action: 'auth.login', actorUserId: user.id, ...meta, meta: { sid: created.id, provider } });
+    await this.addGuestMerged(user.id, meta);
+    return created;
+  }
+
+  /** Gọi trong transaction đang mở: đăng ký hoặc đăng nhập thành công mới có sự kiện. */
+  private async addGuestMerged(userId: string, meta: RequestMeta): Promise<void> {
+    if (!meta.anonId) return;
+    const payload: AccessUserGuestMergedV1 = { anonId: meta.anonId, userId };
+    await this.store.outbox.add({ type: 'access.user.guest_merged', userId, payload });
+  }
+
+  @Transactional('access')
+  private async revokeReusedSession(session: SessionRecord, meta: RequestMeta): Promise<string[]> {
+    // Thu hồi toàn bộ phiên của người dùng khi phát hiện dùng lại refresh token (RFC 6819 / Security BCP).
+    // Hai request dùng lại cùng lúc: chỉ request xoá được phiên mới ghi audit và báo email, tránh gửi hai thư.
+    const revokedSids = await this.store.sessions.deleteByUser(session.userId);
+    if (!revokedSids.length) return [];
+    await this.store.audit.record({
+      action: 'auth.refresh_reused',
+      actorUserId: session.userId,
+      ...meta,
+      meta: { sid: session.id, revokedSessions: revokedSids.length },
+    });
+    const user = await this.store.users.findById(session.userId);
+    if (!user) return revokedSids;
+    const payload: AccessSessionReuseDetectedV1 = {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      deviceName: session.deviceName,
+    };
+    await this.store.outbox.add({ type: 'access.session_reuse_detected', userId: user.id, payload });
+    return revokedSids;
+  }
+
+  /**
+   * Cập nhật có điều kiện: trả false khi request khác đã xoay trước.
+   * Không ghi audit: mỗi người dùng refresh 15 phút một lần nên audit_logs phình theo số người; lần dùng cuối đã có ở last_used_at.
+   */
+  @Transactional('access')
+  private async rotateSession(
+    session: SessionRecord,
+    rotation: { presented: string; nextHash: string; decision: Exclude<RefreshDecision, 'invalid' | 'reuse'>; now: Date },
+  ): Promise<boolean> {
+    const { presented, nextHash, decision, now } = rotation;
+    const expiresAt = nextRefreshExpiry(session.createdAt, now);
+    // grace: giữ nguyên token liền trước và mốc xoay, để khoảng 10 giây không bị kéo dài.
+    return decision === 'rotate'
+        ? await this.store.sessions.rotate(session.id, presented, {
+            refreshTokenHash: nextHash,
+            previousTokenHash: presented,
+            rotatedAt: now,
+            expiresAt,
+            lastUsedAt: now,
+          })
+        : await this.store.sessions.rotate(session.id, session.refreshTokenHash, {
+            refreshTokenHash: nextHash,
+            previousTokenHash: session.previousTokenHash,
+            rotatedAt: session.rotatedAt,
+            expiresAt,
+            lastUsedAt: now,
+          });
+  }
+
+  @Transactional('access')
+  private async closeSession(user: AuthUser, meta: RequestMeta): Promise<void> {
+    await this.store.sessions.delete(user.sid);
+    await this.store.audit.record({ action: 'auth.logout', actorUserId: user.userId, ...meta, meta: { sid: user.sid } });
+  }
+
+  private async issueTokenPair(user: UserRecord, sid: string, refreshToken: string): Promise<TokenPair> {
+    const access = await this.tokens.issue({ userId: user.id, role: user.role, sid, emailVerified: user.emailVerifiedAt !== null });
+    return { accessToken: access.token, refreshToken, tokenType: 'Bearer', expiresIn: access.expiresIn };
+  }
+
+  private getDummyHash(): Promise<string> {
+    this.dummyHash ??= this.hasher.hash('tripflix-dummy-password-for-timing');
+    return this.dummyHash;
+  }
+}

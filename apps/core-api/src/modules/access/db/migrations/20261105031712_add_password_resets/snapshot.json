@@ -1,0 +1,296 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "44c685c9-225c-4577-b06a-01651becb864",
+  "prevIds": [
+    "04c75bf7-28af-4408-a88f-281cc4b4c198"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "access",
+        "password_resets"
+      ],
+      "writes": [
+        "s|tbl|access.password_resets",
+        "n|tbl|access.password_resets",
+        "e|tbl|access.password_resets",
+        "n|rel|access.password_resets",
+        "n|type|access.password_resets",
+        "n|rel|access.password_resets_pkey",
+        "n|rel|access.uq_password_resets_token_hash"
+      ],
+      "reads": [
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "password_resets",
+        "idx_password_resets_user_id"
+      ],
+      "writes": [
+        "s|idx|access.idx_password_resets_user_id",
+        "n|idx|access.idx_password_resets_user_id",
+        "e|idx|access.idx_password_resets_user_id",
+        "n|rel|access.idx_password_resets_user_id"
+      ],
+      "reads": [
+        "n|tbl|access.password_resets",
+        "n|sch|access",
+        "n|col|access.password_resets.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "access",
+        "password_resets",
+        "idx_password_resets_expires_at"
+      ],
+      "writes": [
+        "s|idx|access.idx_password_resets_expires_at",
+        "n|idx|access.idx_password_resets_expires_at",
+        "e|idx|access.idx_password_resets_expires_at",
+        "n|rel|access.idx_password_resets_expires_at"
+      ],
+      "reads": [
+        "n|tbl|access.password_resets",
+        "n|sch|access",
+        "n|col|access.password_resets.expires_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "access",
+        "password_resets"
+      ],
+      "writes": [
+        "s|fk|access.password_resets.fk_password_resets_user_id",
+        "n|fk|access.password_resets.fk_password_resets_user_id",
+        "e|fk|access.password_resets.fk_password_resets_user_id",
+        "n|con|access.password_resets.fk_password_resets_user_id"
+      ],
+      "reads": [
+        "n|tbl|access.password_resets",
+        "n|sch|access",
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.password_resets.user_id",
+        "n|col|access.users.id",
+        "e|uniqueness|access.users.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "name": "password_resets",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "gen_random_uuid()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "token_hash",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "used_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "idx_password_resets_user_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "idx_password_resets_expires_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "expires_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "fk_password_resets_user_id",
+        "nameExplicit": true,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "access",
+        "tableTo": "users",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "password_resets_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "password_resets",
+        "name": "uq_password_resets_token_hash",
+        "nameExplicit": true,
+        "columns": [
+          "token_hash"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    }
+  ]
+}

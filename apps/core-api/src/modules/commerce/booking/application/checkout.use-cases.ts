@@ -1,0 +1,550 @@
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { CommerceMetrics, type HoldOutcome } from '../../metrics/commerce-metrics.js';
+import { Transactional } from '@tripflix/db';
+import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type RoomTypeRecord, type Today } from '../../inventory/application/ports.js';
+import { CommerceError } from '../../inventory/domain/errors.js';
+import { summarizeRefunds, type RefundSummary } from '../domain/refund-summary.js';
+import { MAX_NIGHTS, addDays, calculatePassengerFares, countNights, countSeats, findPassengerMixError, isIsoDate, quoteFlight, quoteStay, calculateChildStayDiscount, countRoomsForGuests, type FlightDay, type PassengerMix, type PricePlan, type RoomDay } from '../../inventory/domain/sales-rules.js';
+import {
+  HOLD_MINUTES,
+  HOLDS_PER_HOUR,
+  MAX_ITEMS_PER_ORDER,
+  POLICY_VERSION,
+  hasCompleteGuests,
+  isHoldExpired,
+  listGuestFieldErrors,
+  listPassengerTypes,
+  type ContactInput,
+  type PassengerType,
+  type OrderStatus,
+  type GuestInput,
+} from '../domain/order-rules.js';
+import { CellGate } from './cell-gate.js';
+import { computeTripStatus, findEndDate, type TripStatus } from '../domain/trip-status.js';
+import { COMMERCE_CLOCK, ORDER_STORE, type Clock, type InventoryCell, type NewOrderItem, type OrderItemRecord, type OrderRecord, type OrderStore, type RefundRecord } from './ports.js';
+
+export interface CheckoutItemInput {
+  /** Mã loại phòng hoặc mã hạng ghế (productId trong danh mục). */
+  productId: string;
+  checkIn: string;
+  /** Bắt buộc với phòng. */
+  checkOut?: string;
+  /** Số phòng; vé bay luôn bằng số ghế (người lớn + trẻ em). */
+  qty?: number;
+  ratePlanCode?: string;
+}
+
+export interface CheckoutInput {
+  adults: number;
+  /** Chỉ dùng cho vé bay: trẻ em chiếm ghế, giá 75%; em bé ngồi lòng người lớn, giá 10%. */
+  children?: number;
+  infants?: number;
+  items: CheckoutItemInput[];
+  sourcePostId?: string | null;
+}
+
+export interface CheckoutView {
+  orderId: string;
+  status: OrderRecord['status'];
+  holdExpiresAt: string;
+  total: number;
+  adults: number;
+  children: number;
+  infants: number;
+  confirmationCode: string | null;
+  cancelReason: string | null;
+  cancelledAt?: string | null;
+  refund?: RefundSummary | null;
+  items: (Omit<OrderItemRecord, 'orderId'> & { dateTo: string })[];
+  isGuestInfoComplete: boolean;
+  passengersRequired: number;
+  /** Loại của từng hành khách cần nhập, đúng thứ tự gửi guests; rỗng khi không có vé bay. */
+  passengerTypes: PassengerType[];
+  policyVersion: string;
+  /** TF37: chỉ đơn đã trả mới có; completed = đã qua ngày kết thúc chuyến theo giờ Việt Nam. Optional để các bản dựng view có sẵn không phải đổi. */
+  tripStatus?: TripStatus | null;
+}
+
+export interface TripView {
+  orderId: string;
+  status: OrderRecord['status'];
+  total: number;
+  adults: number;
+  children: number;
+  infants: number;
+  confirmationCode: string | null;
+  cancelReason: string | null;
+  holdExpiresAt: string;
+  createdAt: string;
+  paidAt: string | null;
+  /** Ngày sớm nhất / muộn nhất của các mục (nhận phòng, bay; trả phòng). */
+  startDate: string | null;
+  endDate: string | null;
+  tripStatus: TripStatus | null;
+  items: CheckoutView['items'];
+}
+
+export interface TripPage {
+  trips: TripView[];
+  nextCursor: string | null;
+}
+
+export interface ListTripsQuery {
+  statuses?: OrderStatus[];
+  cursor?: string | null;
+  limit?: number;
+}
+
+export const TRIPS_DEFAULT_LIMIT = 20;
+export const TRIPS_MAX_LIMIT = 50;
+
+/** Con trỏ trang: (createdAt, id) của đơn cuối trang trước, base64url để client coi là chuỗi mờ. */
+export const encodeTripCursor = (order: { createdAt: Date; id: string }) => Buffer.from(JSON.stringify([order.createdAt.toISOString(), order.id])).toString('base64url');
+export const decodeTripCursor = (cursor: string): { createdAt: Date; id: string } => {
+  try {
+    const [createdAt, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown[];
+    const date = new Date(String(createdAt));
+    if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) && !Number.isNaN(date.getTime())) return { createdAt: date, id };
+  } catch {
+    // Rơi xuống lỗi bên dưới.
+  }
+  throw new CommerceError('invalid_query', 'Con trỏ trang không hợp lệ.');
+};
+
+/** Nhóm hành khách đã lưu của đơn. */
+export const passengerMixOf = (order: Pick<OrderRecord, 'adults' | 'children' | 'infants'>): PassengerMix => ({ adults: order.adults, children: order.children, infants: order.infants });
+
+/** Hành khách phải nhập: có vé bay thì mọi người; chỉ có phòng thì trẻ em, em bé để kiểm tuổi tính phụ thu. */
+export const listRequiredPassengers = (order: Pick<OrderRecord, 'adults' | 'children' | 'infants'>, items: Pick<OrderItemRecord, 'productType'>[]): PassengerType[] =>
+  items.some((i) => i.productType === 'flight') ? listPassengerTypes(passengerMixOf(order)) : listPassengerTypes({ ...passengerMixOf(order), adults: 0 });
+
+/** Ngày bay đầu và cuối của đơn: tuổi từng loại khách xét theo cả chuyến (khứ hồi có thể qua sinh nhật). */
+function findTravelDates(items: Pick<OrderItemRecord, 'productType' | 'date'>[]): { first: string; last: string } | undefined {
+  const dates = items.filter((i) => i.productType === 'flight').map((i) => i.date).sort();
+  return dates.length ? { first: dates[0]!, last: dates.at(-1)! } : undefined;
+}
+
+/** Ngày nhận phòng sớm nhất của đơn, để xét tuổi trẻ em ở khách sạn. */
+const findStayDate = (items: Pick<OrderItemRecord, 'productType' | 'date'>[]): string | undefined =>
+  items.filter((i) => i.productType === 'room').map((i) => i.date).sort()[0];
+
+const toItemViews = (items: OrderItemRecord[]): CheckoutView['items'] =>
+  items.map(({ orderId: _orderId, ...i }) => ({ ...i, propertyId: i.propertyId ?? null, propertyName: i.propertyName ?? null, fromAirport: i.fromAirport ?? null, toAirport: i.toAirport ?? null, dateTo: i.productType === 'room' ? addDays(i.date, i.nights) : i.date }));
+
+/** Giá hiện tại của một mục, đọc từ lịch trống (không tin giá client gửi). */
+export interface PricedItem extends NewOrderItem {
+  cells: InventoryCell[];
+}
+
+/** Transaction chờ khoá vẫn giữ một kết nối: chờ quá lâu thì nhiều người tranh một phòng sẽ làm hết pool của commerce. */
+const HOLD_LOCK_WAIT_MS = 2_000;
+
+/**
+ * Số lượt giữ chỗ cùng một phòng, cùng ngày nhận được chạy cùng lúc trên một tiến trình (pool commerce có 10 kết nối).
+ * Lượt dư xếp hàng trong bộ nhớ tối đa bằng thời gian chờ khoá, quá thì 409 LOCK_BUSY; quá 200 lượt chờ thì 409 ngay.
+ */
+const MAX_CONCURRENT_HOLDS_PER_CELL = 3;
+const MAX_WAITING_HOLDS = 200;
+
+const cellsOf = (item: { productType: 'room' | 'flight'; productId: string; date: string; nights: number; qty: number }): InventoryCell[] =>
+  Array.from({ length: item.nights }, (_, i) => ({ productType: item.productType, productId: item.productId, date: addDays(item.date, i), qty: item.qty }));
+
+/** Sắp xếp ô theo (sản phẩm, ngày) trước khi giữ: hai giỏ chạy cùng lúc khoá theo cùng thứ tự nên không deadlock. */
+const sortCells = (cells: InventoryCell[]) => [...cells].sort((a, b) => a.productId.localeCompare(b.productId) || a.date.localeCompare(b.date));
+
+/** Lý do giữ chỗ thất bại, để đếm (D1): hết chỗ, đông người, quá lượt, đầu vào sai, hay lỗi hệ thống. */
+function classifyHoldError(error: unknown): HoldOutcome {
+  if (!(error instanceof CommerceError)) return 'error';
+  const reason = error.details?.reason;
+  if (reason === 'SOLD_OUT') return 'sold_out';
+  if (reason === 'LOCK_BUSY' || reason === 'LOCK_TIMEOUT') return 'lock_busy';
+  if (error.code === 'rate_limited') return 'rate_limited';
+  return 'rejected';
+}
+
+/**
+ * Thứ tự chạm ô khi vừa nhả giỏ cũ vừa giữ giỏ mới: một danh sách sắp theo (sản phẩm, ngày), cùng ô thì nhả trước
+ * để chỗ vừa trả dùng lại được ngay. Mọi transaction khoá ô theo cùng thứ tự nên không chờ vòng nhau.
+ */
+export const listCellLockOrder = (releases: InventoryCell[], holds: InventoryCell[]) =>
+  [...releases.map((cell) => ({ cell, isRelease: true })), ...holds.map((cell) => ({ cell, isRelease: false }))].sort(
+    (a, b) => a.cell.productId.localeCompare(b.cell.productId) || a.cell.date.localeCompare(b.cell.date) || Number(b.isRelease) - Number(a.isRelease),
+  );
+
+/** Mọi ô của đơn, đúng thứ tự khoá ở trên: giữ, nhả và bán chạy cùng lúc đều không deadlock. */
+export const listSortedCells = (items: OrderItemRecord[]) => sortCells(items.flatMap(cellsOf));
+
+/**
+ * Giữ chỗ và tạo đơn (TF29, docs/10 §3.4, không saga): giữ mọi mục + tạo đơn pending trong một transaction,
+ * thiếu một ô thì rollback cả giỏ. Hết hạn sau 30 phút, ExpireHoldsJob nhả chỗ.
+ */
+@Injectable()
+export class CheckoutUseCases {
+  constructor(
+    @Inject(ORDER_STORE) private readonly orders: OrderStore,
+    @Inject(COMMERCE_STORE) private readonly catalog: CommerceStore,
+    @Inject(TODAY) private readonly today: Today,
+    @Inject(COMMERCE_CLOCK) private readonly now: Clock,
+    // Không có (test dựng tay) thì không đếm.
+    @Optional() @Inject(CommerceMetrics) private readonly metrics?: CommerceMetrics,
+  ) {}
+
+  private readonly holdGate = new CellGate({ maxPerKey: MAX_CONCURRENT_HOLDS_PER_CELL, maxWaiting: MAX_WAITING_HOLDS, waitMs: HOLD_LOCK_WAIT_MS });
+
+  async checkout(userId: string, input: CheckoutInput): Promise<CheckoutView> {
+    try {
+      const view = await this.holdAndView(userId, input);
+      this.metrics?.countHold('created');
+      return view;
+    } catch (error) {
+      this.metrics?.countHold(classifyHoldError(error));
+      throw error;
+    }
+  }
+
+  private async holdAndView(userId: string, input: CheckoutInput): Promise<CheckoutView> {
+    const cells = [...new Set(input.items.map((i) => `${i.productId}|${i.checkIn}`))];
+    if (!(await this.holdGate.acquire(cells))) {
+      throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
+    }
+    const orderId = await this.holdAndCreateOrder(userId, input)
+      // Deadlock (K2): Postgres huỷ một bên, transaction đã rollback sạch nên chạy lại một lần là đủ an toàn.
+      .catch((error: unknown) => (this.orders.isDeadlock(error) ? this.holdAndCreateOrder(userId, input) : Promise.reject(error)))
+      .catch((error: unknown) => {
+        if (this.orders.isLockWaitTimeout(error)) throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_TIMEOUT' });
+        throw error;
+      })
+      .finally(() => this.holdGate.release(cells));
+    // Đơn vừa tạo chưa có hoàn tiền, chưa có khách: bỏ 2 truy vấn chắc chắn trả rỗng.
+    return this.getCheckout(userId, orderId, { isNewOrder: true });
+  }
+
+  @Transactional('commerce')
+  private async holdAndCreateOrder(userId: string, input: CheckoutInput): Promise<string> {
+    const mix = { adults: input.adults, children: input.children ?? 0, infants: input.infants ?? 0 };
+    const mixError = findPassengerMixError(mix);
+    // Luật mỗi em bé một người lớn chỉ dành cho vé bay; ở phòng em bé tính vào sức chứa.
+    const ids = input.items.map((i) => i.productId);
+    // Đọc loại phòng, vé bay một lần: dùng để xét luật em bé rồi dùng lại khi tính giá.
+    const [roomTypes, flights] = await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
+    if (mixError && (flights.length > 0 || mixError.field !== 'infants')) throw new CommerceError('invalid_query', mixError.message, mixError.field);
+    if (!input.items.length || input.items.length > MAX_ITEMS_PER_ORDER) throw new CommerceError('invalid_query', `Giỏ có từ 1 đến ${MAX_ITEMS_PER_ORDER} mục.`, 'items');
+    const priced = await this.priceItems(input.items, mix, { roomTypes, flights });
+
+    await this.orders.limitLockWait(HOLD_LOCK_WAIT_MS);
+    await this.orders.lockUser(userId);
+    const now = this.now();
+    if ((await this.orders.countOrdersCreatedSince(userId, new Date(now.getTime() - 3_600_000))) >= HOLDS_PER_HOUR) {
+      throw new CommerceError('rate_limited', 'Bạn giữ chỗ quá nhiều lần, vui lòng thử lại sau.');
+    }
+    const active = await this.orders.lockOrdersOfUser(userId, ['pending', 'paying']);
+    // Đơn đang chờ cổng trả kết quả thì chưa cho giữ giỏ mới: nếu thẻ bị từ chối, đơn đó phải quay về pending được.
+    if (active.some((o) => o.status === 'paying' && !isHoldExpired(o.holdExpiresAt, now))) {
+      throw new CommerceError('conflict', 'Bạn có một đơn đang thanh toán, vui lòng chờ kết quả trước khi giữ giỏ mới.');
+    }
+    // Mỗi tài khoản một giỏ đang giữ: giữ giỏ mới thì nhả giỏ cũ.
+    // K2: ô nhả và ô giữ khoá chung một thứ tự (sản phẩm, ngày). Trước đây nhả hết giỏ cũ rồi mới giữ giỏ mới nên thứ tự
+    // khoá bị phá, đụng người đặt khác là deadlock và trả 500 (tái hiện 19/20 lượt ngày 13/11).
+    const oldOrders = active.filter((o) => o.status === 'pending');
+    const releases = (await Promise.all(oldOrders.map((o) => this.orders.findItems(o.id)))).flatMap((items) => items.flatMap(cellsOf));
+    for (const { cell, isRelease } of listCellLockOrder(releases, priced.flatMap((p) => p.cells))) {
+      if (isRelease) {
+        await this.orders.releaseCell(cell);
+      } else if (!(await this.orders.holdCell(cell))) {
+        const item = priced.find((p) => p.productId === cell.productId)!;
+        throw new CommerceError('conflict', `${item.productName} ngày ${cell.date} không đủ chỗ.`, 'items', { reason: 'SOLD_OUT', productId: cell.productId, date: cell.date });
+      }
+    }
+    for (const old of oldOrders) await this.orders.updateOrder(old.id, { status: 'cancelled', cancelReason: 'Đã giữ giỏ mới', cancelledAt: now });
+    const total = priced.reduce((sum, p) => sum + p.lineTotal, 0);
+    const orderId = await this.orders.insertOrder({
+      userId,
+      total,
+      ...mix,
+      sourcePostId: input.sourcePostId ?? null,
+      holdExpiresAt: new Date(now.getTime() + HOLD_MINUTES * 60_000),
+    });
+    await this.orders.insertItems(orderId, priced.map(({ cells: _cells, ...item }) => item));
+    return orderId;
+  }
+
+  findRoomTypes(ids: string[]): Promise<RoomTypeRecord[]> {
+    return this.catalog.catalog.findRoomTypesByIds(ids);
+  }
+
+  findFlights(ids: string[]): Promise<FlightRecord[]> {
+    return this.catalog.catalog.findFlightsByIds(ids);
+  }
+
+  /** Hành trình của các chuyến bay trong đơn, theo mã sản phẩm. */
+  async findFlightRoutes(productIds: string[]) {
+    if (!productIds.length) return new Map<string, { fromAirport: string; toAirport: string; departTime: string | null; arriveTime: string | null }>();
+    const flights = await this.catalog.catalog.findFlightsByIds(productIds);
+    return new Map(flights.map((f) => [f.id, { fromAirport: f.fromAirport, toAirport: f.toAirport, departTime: f.departTime, arriveTime: f.arriveTime }]));
+  }
+
+  /**
+   * Tính giá và kiểm luật bán từng mục từ lịch trống; một mục không đặt được thì báo lý do, chưa giữ gì.
+   * Phòng tính theo người lớn như trước; vé bay giữ ghế cho người lớn + trẻ em và tính giá cả em bé.
+   */
+  async priceItems(items: CheckoutItemInput[], mix: PassengerMix, products?: { roomTypes: RoomTypeRecord[]; flights: FlightRecord[] }): Promise<PricedItem[]> {
+    const { adults, children } = mix;
+    const guests = adults + children + mix.infants;
+    const ids = items.map((i) => i.productId);
+    const [roomTypes, flights] = products
+      ? [products.roomTypes, products.flights]
+      : await Promise.all([this.catalog.catalog.findRoomTypesByIds(ids), this.catalog.catalog.findFlightsByIds(ids)]);
+    const today = this.today();
+    // (b) Lịch của mọi mục đọc một lần thay vì mỗi mục một truy vấn; mỗi mục chỉ lấy đúng khoảng ngày của nó bên dưới.
+    const { roomDays, flightDays } = await this.loadCalendarOf(items, roomTypes, flights);
+    const out: PricedItem[] = [];
+    // Đoàn có thể chia nhiều loại phòng: sức chứa tính gộp theo một khách sạn trong cùng kỳ ở.
+    const stays = new Map<string, { capacity: number; lines: number; roomId: string; roomName: string; maxGuests: number; rooms: number; total: number; lineIndexes: number[] }>();
+    for (const item of items) {
+      if (!isIsoDate(item.checkIn) || item.checkIn < today) throw new CommerceError('invalid_query', 'Ngày nhận phòng / ngày bay phải từ hôm nay trở đi.', 'checkIn');
+      const room = roomTypes.find((r) => r.id === item.productId);
+      const flight = flights.find((f) => f.id === item.productId);
+      if (room) {
+        if (!isIsoDate(item.checkOut) || item.checkOut <= item.checkIn || countNights(item.checkIn, item.checkOut) > MAX_NIGHTS) {
+          throw new CommerceError('invalid_query', `Ngày trả phòng phải sau ngày nhận phòng, ở tối đa ${MAX_NIGHTS} đêm.`, 'checkOut');
+        }
+        const qty = item.qty ?? countRoomsForGuests({ guests, maxGuests: room.maxGuests });
+        if (!Number.isInteger(qty) || qty < 1 || qty > 9) throw new CommerceError('invalid_query', 'Số phòng từ 1 đến 9.', 'qty');
+        const stayKey = `${room.propertyId}|${item.checkIn}|${item.checkOut}`;
+        const stay = stays.get(stayKey);
+        stays.set(stayKey, { capacity: (stay?.capacity ?? 0) + qty * room.maxGuests, lines: (stay?.lines ?? 0) + 1, roomId: room.id, roomName: room.name, maxGuests: room.maxGuests, rooms: (stay?.rooms ?? 0) + qty, total: stay?.total ?? 0, lineIndexes: [...(stay?.lineIndexes ?? []), out.length] });
+        const plan = this.findPlan(room.ratePlans, item.ratePlanCode);
+        const days = (roomDays.get(room.id) ?? []).filter((d) => d.date >= item.checkIn && d.date <= item.checkOut!);
+        const quote = quoteStay({ days, checkIn: item.checkIn, checkOut: item.checkOut, rooms: qty, plan });
+        if (!quote.isAvailable) throw new CommerceError('conflict', `${room.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: room.id });
+        const nights = countNights(item.checkIn, item.checkOut);
+        stays.get(stayKey)!.total += quote.totalPrice;
+        out.push(this.toPriced({ productType: 'room', productId: room.id, productName: room.name, date: item.checkIn, nights, qty, lineTotal: quote.totalPrice, unitPrice: Math.round(quote.totalPrice / qty / nights), plan }));
+      } else if (flight) {
+        const plan = this.findPlan(flight.farePlans, item.ratePlanCode);
+        const day = (flightDays.get(flight.id) ?? []).find((d) => d.date === item.checkIn);
+        const quote = quoteFlight({ day, passengers: adults, children: mix.children, infants: mix.infants, plan });
+        if (!quote.isAvailable) throw new CommerceError('conflict', `${flight.name}: không đặt được (${quote.reason}).`, 'items', { reason: quote.reason, productId: flight.id });
+        // Đơn giá vé bay là giá người lớn, kèm giá trẻ em, em bé: lineTotal / qty không phải giá của loại khách nào.
+        const fares = calculatePassengerFares(quote.pricePerNight);
+        out.push(
+          this.toPriced({
+            productType: 'flight',
+            productId: flight.id,
+            productName: `${flight.name} · ${flight.cabinName}`,
+            date: item.checkIn,
+            nights: 1,
+            qty: countSeats(mix),
+            lineTotal: quote.totalPrice,
+            unitPrice: fares.adult,
+            childUnitPrice: fares.child,
+            infantUnitPrice: fares.infant,
+            plan,
+          }),
+        );
+      } else {
+        throw new CommerceError('not_found', `Không có sản phẩm ${item.productId}.`, 'items');
+      }
+    }
+    for (const stay of stays.values()) {
+      if (adults < stay.rooms) throw new CommerceError('conflict', 'Mỗi phòng cần ít nhất một người lớn.', 'qty', { reason: 'NOT_ENOUGH_ADULTS', productId: stay.roomId });
+      if (guests > stay.capacity) {
+        const message = stay.lines === 1 ? `${stay.roomName}: ${guests} khách cần ít nhất ${countRoomsForGuests({ guests, maxGuests: stay.maxGuests })} phòng.` : `Các phòng đã chọn chỉ đủ cho ${stay.capacity} khách, đoàn có ${guests} khách.`;
+        throw new CommerceError('conflict', message, 'qty', { reason: 'NOT_ENOUGH_ROOMS', productId: stay.roomId });
+      }
+      // Giảm giá chia theo tỷ lệ tiền từng dòng của kỳ ở; dòng cuối nhận phần lẻ để tổng khớp.
+      let remaining = calculateChildStayDiscount({ stayTotal: stay.total, capacity: stay.capacity, children });
+      const fullDiscount = remaining;
+      for (const [position, index] of stay.lineIndexes.entries()) {
+        const line = out[index]!;
+        const cut = position === stay.lineIndexes.length - 1 ? remaining : Math.round((fullDiscount * line.lineTotal) / stay.total);
+        remaining -= cut;
+        const lineTotal = line.lineTotal - cut;
+        out[index] = { ...line, lineTotal, unitPrice: Math.round(lineTotal / line.qty / line.nights) };
+      }
+    }
+    return out;
+  }
+
+  /** Lịch của các mục có ngày hợp lệ, một truy vấn cho phòng và một cho vé bay. Ngày sai để vòng kiểm tra báo lỗi như cũ. */
+  private async loadCalendarOf(items: CheckoutItemInput[], roomTypes: RoomTypeRecord[], flights: FlightRecord[]) {
+    const roomIds = new Set(roomTypes.map((r) => r.id));
+    const flightIds = new Set(flights.map((f) => f.id));
+    const roomItems = items.filter((i) => roomIds.has(i.productId) && isIsoDate(i.checkIn) && isIsoDate(i.checkOut) && i.checkOut > i.checkIn);
+    const flightItems = items.filter((i) => flightIds.has(i.productId) && isIsoDate(i.checkIn));
+    const span = (dates: string[]) => [dates.reduce((a, b) => (b < a ? b : a)), dates.reduce((a, b) => (b > a ? b : a))] as const;
+    const [roomDays, flightDays] = await Promise.all([
+      roomItems.length
+        ? this.catalog.calendar.loadRoomDays([...new Set(roomItems.map((i) => i.productId))], ...span([...roomItems.map((i) => i.checkIn), ...roomItems.map((i) => i.checkOut!)]))
+        : new Map<string, RoomDay[]>(),
+      flightItems.length ? this.catalog.calendar.loadFlightDays([...new Set(flightItems.map((i) => i.productId))], ...span(flightItems.map((i) => i.checkIn))) : new Map<string, FlightDay[]>(),
+    ]);
+    return { roomDays, flightDays };
+  }
+
+  private findPlan(plans: PricePlan[], code: string | undefined): PricePlan {
+    const plan = code ? plans.find((p) => p.code === code) : plans[0];
+    if (!plan) throw new CommerceError('invalid_query', `Không có gói giá ${code}.`, 'ratePlanCode');
+    return plan;
+  }
+
+  private toPriced(i: {
+    productType: 'room' | 'flight';
+    productId: string;
+    productName: string;
+    date: string;
+    nights: number;
+    qty: number;
+    lineTotal: number;
+    unitPrice: number;
+    childUnitPrice?: number;
+    infantUnitPrice?: number;
+    plan: PricePlan;
+  }): PricedItem {
+    const item = {
+      productType: i.productType,
+      productId: i.productId,
+      productName: i.productName,
+      date: i.date,
+      nights: i.nights,
+      qty: i.qty,
+      unitPrice: i.unitPrice,
+      childUnitPrice: i.childUnitPrice ?? null,
+      infantUnitPrice: i.infantUnitPrice ?? null,
+      lineTotal: i.lineTotal,
+      ratePlanCode: i.plan.code,
+      ratePlanName: i.plan.name,
+      isRefundable: i.plan.refundable,
+      freeCancelUntil: i.plan.refundable ? addDays(i.date, -i.plan.freeCancelDays) : null,
+    };
+    return { ...item, cells: cellsOf(item) };
+  }
+
+  /** Trả chỗ của cả đơn về kho và đổi trạng thái. Dùng trong transaction đang mở. */
+  async releaseOrder(orderId: string, status: 'cancelled' | 'expired', reason: string): Promise<void> {
+    for (const cell of listSortedCells(await this.orders.findItems(orderId))) await this.orders.releaseCell(cell);
+    await this.orders.updateOrder(orderId, { status, cancelReason: reason, cancelledAt: this.now() });
+  }
+
+  @Transactional('commerce')
+  async setGuests(userId: string, orderId: string, input: { contact: ContactInput; guests: GuestInput[] }): Promise<{ orderId: string; isGuestInfoComplete: true }> {
+    const order = await this.ownOrder(userId, orderId, { lock: true });
+    if (order.status === 'paying') throw new CommerceError('conflict', 'Đơn đang được thanh toán, không sửa thông tin khách được.');
+    this.assertPending(order);
+    const items = await this.orders.findItems(orderId);
+    const passengerTypes = listRequiredPassengers(order, items);
+    const passengersRequired = passengerTypes.length;
+    const errors = listGuestFieldErrors({ ...input, passengersRequired, today: this.today(), passengerTypes, travelDates: findTravelDates(items), stayDate: findStayDate(items) });
+    // Trả mọi trường sai kèm câu cụ thể để client báo đúng ô, không chỉ một câu chung.
+    if (errors.length)
+      throw new CommerceError('invalid_query', 'Thông tin khách chưa đủ hoặc chưa đúng.', errors[0]!.field, { errors, fields: errors.map((e) => e.field), passengersRequired });
+    await this.orders.updateOrder(orderId, { contactName: input.contact.fullName.trim(), contactPhone: input.contact.phone.replace(/\s/g, ''), contactEmail: input.contact.email?.trim() || null });
+    // Lưu loại khách cùng từng người, để xuất vé, email, chuyến đi của tôi không phải dựa vào thứ tự.
+    await this.orders.replaceGuests(
+      orderId,
+      input.guests
+        .map((g, i) => ({ fullName: g.fullName.trim(), birthdate: g.birthdate, passengerType: passengerTypes[i] ?? null }))
+        .filter((g) => g.fullName),
+    );
+    return { orderId, isGuestInfoComplete: true };
+  }
+
+  @Transactional('commerce')
+  async cancelHold(userId: string, orderId: string): Promise<{ orderId: string; status: 'cancelled' }> {
+    const order = await this.ownOrder(userId, orderId, { lock: true });
+    if (order.status === 'pending') await this.releaseOrder(orderId, 'cancelled', 'Người dùng huỷ');
+    else if (order.status !== 'cancelled') throw new CommerceError('conflict', 'Chỉ huỷ được giỏ đang giữ chỗ.');
+    return { orderId, status: 'cancelled' };
+  }
+
+  /**
+   * `known`: dữ liệu transaction vừa ghi đã có trong tay (trả tiền xong), dựng luôn không đọc lại database.
+   * Đo tải 16/11: đọc lại tốn 4 lượt gọi nối tiếp, khi Node quá tải mỗi lượt phải xếp hàng.
+   */
+  async getCheckout(
+    userId: string,
+    orderId: string,
+    options: { isNewOrder?: boolean; known?: { order: OrderRecord; items: OrderItemRecord[]; refunds: RefundRecord[]; guestBirthdates: (string | null)[] } } = {},
+  ): Promise<CheckoutView> {
+    const known = options.known?.order.id === orderId && options.known.order.userId === userId ? options.known : undefined;
+    const order = known?.order ?? (await this.ownOrder(userId, orderId));
+    const items = known?.items ?? (await this.orders.findItems(orderId));
+    const [refunds, guestBirthdates] = known
+      ? [known.refunds, known.guestBirthdates]
+      : options.isNewOrder
+        ? [[], []]
+        : await Promise.all([this.orders.findRefundsOfOrder(orderId), this.orders.findGuestBirthdates(orderId)]);
+    const passengerTypes = listRequiredPassengers(order, items);
+    const passengersRequired = passengerTypes.length;
+    const itemViews = toItemViews(items);
+    return {
+      orderId: order.id,
+      status: order.status,
+      holdExpiresAt: order.holdExpiresAt.toISOString(),
+      total: order.total,
+      adults: order.adults,
+      children: order.children,
+      infants: order.infants,
+      confirmationCode: order.confirmationCode,
+      cancelReason: order.cancelReason,
+      cancelledAt: order.cancelledAt?.toISOString() ?? null,
+      refund: summarizeRefunds(order, refunds),
+      items: itemViews,
+      isGuestInfoComplete: hasCompleteGuests({ contactName: order.contactName, contactPhone: order.contactPhone, guestBirthdates, passengersRequired }),
+      passengersRequired,
+      passengerTypes,
+      policyVersion: POLICY_VERSION,
+      tripStatus: computeTripStatus({ status: order.status, endDate: findEndDate(itemViews) }, this.today()),
+    };
+  }
+
+  /** Chuyến đi của tôi (TF37): mọi đơn của người gọi, mới nhất trước; web và app đọc cùng một nguồn nên đặt xong là thấy. */
+  async listTrips(userId: string, query: ListTripsQuery = {}): Promise<TripPage> {
+    const limit = Math.min(Math.max(query.limit ?? TRIPS_DEFAULT_LIMIT, 1), TRIPS_MAX_LIMIT);
+    const after = query.cursor ? decodeTripCursor(query.cursor) : undefined;
+    const rows = await this.orders.listOrdersOfUser({ userId, statuses: query.statuses, after, limit: limit + 1, hidesUnpaidClosed: true });
+    const page = rows.slice(0, limit);
+    const itemsByOrder = new Map<string, OrderItemRecord[]>();
+    for (const item of await this.orders.findItemsOfOrders(page.map((o) => o.id))) {
+      itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
+    }
+    const today = this.today();
+    const trips = page.map((order): TripView => {
+      const items = toItemViews(itemsByOrder.get(order.id) ?? []);
+      const endDate = findEndDate(items);
+      return {
+        orderId: order.id,
+        status: order.status,
+        total: order.total,
+        adults: order.adults,
+        children: order.children,
+        infants: order.infants,
+        confirmationCode: order.confirmationCode,
+        cancelReason: order.cancelReason,
+        holdExpiresAt: order.holdExpiresAt.toISOString(),
+        createdAt: order.createdAt.toISOString(),
+        paidAt: order.paidAt?.toISOString() ?? null,
+        startDate: items.reduce<string | null>((min, i) => (min === null || i.date < min ? i.date : min), null),
+        endDate,
+        tripStatus: computeTripStatus({ status: order.status, endDate }, today),
+        items,
+      };
+    });
+    const last = page.at(-1);
+    return { trips, nextCursor: rows.length > limit && last ? encodeTripCursor(last) : null };
+  }
+
+  /** Đơn của đúng người dùng; đơn của người khác trả 404 như không tồn tại, không lộ là có. */
+  async ownOrder(userId: string, orderId: string, options: { lock?: boolean } = {}): Promise<OrderRecord> {
+    const order = options.lock ? await this.orders.lockOrder(orderId) : await this.orders.findOrder(orderId);
+    if (!order || order.userId !== userId) throw new CommerceError('not_found', 'Không có đơn này.');
+    return order;
+  }
+
+  /** Còn giữ chỗ (pending, chưa hết hạn) không; không thì ném lỗi rõ vì sao. */
+  assertPending(order: OrderRecord): void {
+    if (order.status === 'cancelled') throw new CommerceError('gone', order.cancelReason ? `Giỏ đã huỷ: ${order.cancelReason}.` : 'Giỏ đã huỷ.');
+    if (order.status === 'expired' || (order.status === 'pending' && isHoldExpired(order.holdExpiresAt, this.now()))) throw new CommerceError('gone', 'Hết thời gian giữ chỗ.');
+    if (order.status !== 'pending') throw new CommerceError('conflict', 'Đơn không còn ở trạng thái chờ thanh toán.');
+  }
+}

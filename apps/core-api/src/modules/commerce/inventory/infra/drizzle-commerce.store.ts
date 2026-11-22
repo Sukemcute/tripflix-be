@@ -1,0 +1,523 @@
+import { Injectable } from '@nestjs/common';
+import { InjectTransactionHost, type Db } from '@tripflix/db';
+import { and, asc, desc, eq, gt, gte, inArray, lte, max, or, sql, type SQL } from 'drizzle-orm';
+import { auditLogs, flightInventory, flights, properties, reviews, roomInventory, roomRates, roomTypes, type FlightRow, type PropertyRow, type ReviewRow, type RoomTypeRow } from '../../db/schema/index.js';
+import type {
+  CalendarAdminRepository,
+  CalendarRepository,
+  CatalogRepository,
+  CommerceStore,
+  FlightCalendarPatch,
+  FlightRecord,
+  NewFlightDay,
+  NewRoomDay,
+  PropertyRecord,
+  ReviewFilter,
+  ReviewRecord,
+  ReviewRepository,
+  ReviewStats,
+  RoomCalendarPatch,
+  RoomTypeRecord,
+} from '../application/ports.js';
+
+/** Nguồn kết nối: TransactionHost của commerce (có .tx) hoặc { tx: db } khi chạy ngoài Nest. */
+export interface DbHost {
+  readonly tx: Db;
+}
+import type { FlightDay, RoomDay } from '../domain/sales-rules.js';
+
+const mapProperty = (row: PropertyRow): PropertyRecord => ({
+  id: row.id,
+  slug: row.slug,
+  name: row.name,
+  provinceSlug: row.provinceSlug,
+  provinceName: row.provinceName,
+  city: row.city,
+  stars: row.stars,
+  brand: row.brand,
+  style: row.style,
+  thumbnail: row.thumbnail,
+  images: row.images,
+  address: row.address,
+  lat: row.lat,
+  lng: row.lng,
+  ratingAvg: row.ratingAvg,
+  reviewCount: row.reviewCount,
+  ratingSource: row.ratingSource,
+  checkInTime: row.checkInTime,
+  checkOutTime: row.checkOutTime,
+  details: row.details,
+});
+
+const mapRoomType = (row: RoomTypeRow): RoomTypeRecord => ({
+  id: row.id,
+  propertyId: row.propertyId,
+  name: row.name,
+  maxGuests: row.maxGuests,
+  defaultTotal: row.defaultTotal,
+  defaultPrice: row.defaultPrice,
+  ratePlans: row.ratePlans,
+  details: row.details,
+});
+
+const mapFlight = (row: FlightRow): FlightRecord => ({
+  id: row.id,
+  flightKey: row.flightKey,
+  name: row.name,
+  airline: row.airline,
+  airlineCode: row.airlineCode,
+  flightNumber: row.flightNumber,
+  stops: row.stops,
+  cabinCode: row.cabinCode,
+  fromAirport: row.fromAirport,
+  toAirport: row.toAirport,
+  departTime: row.departTime,
+  arriveTime: row.arriveTime,
+  destinationSlug: row.destinationSlug,
+  destinationName: row.destinationName,
+  cabinName: row.cabinName,
+  defaultSeats: row.defaultSeats,
+  defaultPrice: row.defaultPrice,
+  farePlans: row.farePlans,
+});
+
+function groupBy<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const list = groups.get(key);
+    if (list) list.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+class DrizzleCatalogRepository implements CatalogRepository {
+  constructor(private readonly host: DbHost) {}
+
+  private get db(): Db {
+    return this.host.tx;
+  }
+
+  async listProperties(filter: { provinceSlug?: string; afterId?: string; limit: number }) {
+    const rows = await this.db
+      .select()
+      .from(properties)
+      .where(and(filter.provinceSlug ? eq(properties.provinceSlug, filter.provinceSlug) : undefined, filter.afterId ? gt(properties.id, filter.afterId) : undefined))
+      .orderBy(asc(properties.id))
+      .limit(filter.limit);
+    return rows.map(mapProperty);
+  }
+
+  async findPropertyById(id: string) {
+    const [row] = await this.db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    return row ? mapProperty(row) : null;
+  }
+
+  async findPropertyBySlugOrId(slugOrId: string) {
+    const [row] = await this.db.select().from(properties).where(or(eq(properties.slug, slugOrId), eq(properties.id, slugOrId))).limit(1);
+    return row ? mapProperty(row) : null;
+  }
+
+  async findRoomTypesByPropertyIds(propertyIds: string[]) {
+    if (!propertyIds.length) return [];
+    const rows = await this.db.select().from(roomTypes).where(inArray(roomTypes.propertyId, propertyIds)).orderBy(asc(roomTypes.defaultPrice), asc(roomTypes.id));
+    return rows.map(mapRoomType);
+  }
+
+  async findRoomTypesByIds(ids: string[]) {
+    if (!ids.length) return [];
+    return (await this.db.select().from(roomTypes).where(inArray(roomTypes.id, ids))).map(mapRoomType);
+  }
+
+  async listFlights(filter: { destinationSlug?: string; afterKey?: string; limit: number }) {
+    const keys = await this.db
+      .selectDistinct({ flightKey: flights.flightKey })
+      .from(flights)
+      .where(and(filter.destinationSlug ? eq(flights.destinationSlug, filter.destinationSlug) : undefined, filter.afterKey ? gt(flights.flightKey, filter.afterKey) : undefined))
+      .orderBy(asc(flights.flightKey))
+      .limit(filter.limit);
+    return this.findFlightsByKeys(keys.map((k) => k.flightKey));
+  }
+
+  async findFlightsByIds(ids: string[]) {
+    if (!ids.length) return [];
+    return (await this.db.select().from(flights).where(inArray(flights.id, ids))).map(mapFlight);
+  }
+
+  async findFlightsByKeys(flightKeys: string[]) {
+    if (!flightKeys.length) return [];
+    const rows = await this.db.select().from(flights).where(inArray(flights.flightKey, flightKeys)).orderBy(asc(flights.flightKey), asc(flights.defaultPrice));
+    return rows.map(mapFlight);
+  }
+
+  async findFlightsByRoute(fromAirport: string, toAirport: string) {
+    const rows = await this.db
+      .select()
+      .from(flights)
+      .where(and(eq(flights.fromAirport, fromAirport), eq(flights.toAirport, toAirport)))
+      .orderBy(asc(flights.departTime), asc(flights.flightKey), asc(flights.defaultPrice));
+    return rows.map(mapFlight);
+  }
+
+  async listFlightRoutes() {
+    return this.db
+      .select({
+        fromAirport: flights.fromAirport,
+        toAirport: flights.toAirport,
+        destinationSlug: flights.destinationSlug,
+        destinationName: flights.destinationName,
+        flightCount: sql<number>`count(distinct ${flights.flightKey})::int`,
+      })
+      .from(flights)
+      .groupBy(flights.fromAirport, flights.toAirport, flights.destinationSlug, flights.destinationName)
+      .orderBy(asc(flights.fromAirport), asc(flights.toAirport));
+  }
+}
+
+/** Số loại phòng / hạng ghế mỗi lần nạp khi dựng lịch trong bộ nhớ: khoảng vài nghìn dòng, vài ms mỗi nhóm. */
+const BULK_CHUNK_SIZE = 25;
+const LAST_DATE = '9999-12-31';
+
+class DrizzleCalendarRepository implements CalendarRepository {
+  constructor(private readonly host: DbHost) {}
+
+  private get db(): Db {
+    return this.host.tx;
+  }
+
+  async loadRoomDays(roomTypeIds: string[], from: string, toInclusive: string) {
+    if (!roomTypeIds.length) return new Map<string, RoomDay[]>();
+    return this.selectRoomDays(and(inArray(roomInventory.roomTypeId, roomTypeIds), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive)));
+  }
+
+  /**
+   * Mọi ngày từ `from` trở đi của mọi loại phòng, cho CalendarSnapshot. Nạp theo từng nhóm nhỏ và nhường event loop
+   * giữa các nhóm: đọc cả trăm nghìn dòng một lần làm tiến trình đứng hàng trăm ms, request khác bị treo (đo tải TF29).
+   */
+  async loadAllRoomDays(from: string) {
+    const ids = (await this.db.select({ id: roomTypes.id }).from(roomTypes)).map((r) => r.id);
+    return this.loadInChunks(ids, (chunk) => this.loadRoomDays(chunk, from, LAST_DATE));
+  }
+
+  async loadAllFlightDays(from: string) {
+    const ids = (await this.db.select({ id: flights.id }).from(flights)).map((r) => r.id);
+    return this.loadInChunks(ids, (chunk) => this.loadFlightDays(chunk, from, LAST_DATE));
+  }
+
+  /** Giờ hiện tại của database: mốc cho lượt nạp phần thay đổi, không phụ thuộc đồng hồ máy chạy API. */
+  async databaseNow(): Promise<string> {
+    const result = await this.db.execute<{ now: string }>(sql`select clock_timestamp()::text as now`);
+    return result.rows[0]!.now;
+  }
+
+  /** Các ngày (từ `from`) có lịch hoặc giá ghi sau `since`. Đọc theo index changed_at nên chỉ chạm số dòng vừa đổi (L1). */
+  async loadChangedRoomDays(from: string, since: string) {
+    const changed = sql`(${roomInventory.roomTypeId}, ${roomInventory.date}) in (
+      select room_type_id, date from commerce.room_inventory where changed_at > ${since}::timestamptz
+      union select room_type_id, date from commerce.room_rates where changed_at > ${since}::timestamptz)`;
+    return this.selectRoomDays(and(gte(roomInventory.date, from), changed));
+  }
+
+  async loadChangedFlightDays(from: string, since: string) {
+    return this.selectFlightDays(and(gte(flightInventory.date, from), sql`${flightInventory.changedAt} > ${since}::timestamptz`));
+  }
+
+  private async loadInChunks<T>(ids: string[], load: (chunk: string[]) => Promise<Map<string, T[]>>) {
+    const out = new Map<string, T[]>();
+    for (let i = 0; i < ids.length; i += BULK_CHUNK_SIZE) {
+      for (const [id, days] of await load(ids.slice(i, i + BULK_CHUNK_SIZE))) out.set(id, days);
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    return out;
+  }
+
+  private async selectRoomDays(where: SQL | undefined) {
+    const rows = await this.db
+      .select({
+        roomTypeId: roomInventory.roomTypeId,
+        date: roomInventory.date,
+        total: roomInventory.total,
+        held: roomInventory.held,
+        sold: roomInventory.sold,
+        price: roomRates.price,
+        isStopSell: roomInventory.stopSell,
+        isClosedToArrival: roomInventory.cta,
+        isClosedToDeparture: roomInventory.ctd,
+        minLos: roomInventory.minLos,
+        maxLos: roomInventory.maxLos,
+      })
+      .from(roomInventory)
+      .innerJoin(roomRates, and(eq(roomRates.roomTypeId, roomInventory.roomTypeId), eq(roomRates.date, roomInventory.date)))
+      .where(where)
+      .orderBy(asc(roomInventory.date));
+    const grouped = groupBy(rows, (r) => r.roomTypeId);
+    return new Map([...grouped].map(([id, list]) => [id, list.map(({ roomTypeId: _id, ...day }) => day)]));
+  }
+
+  async loadFlightDays(flightIds: string[], from: string, toInclusive: string) {
+    if (!flightIds.length) return new Map<string, FlightDay[]>();
+    return this.selectFlightDays(and(inArray(flightInventory.flightId, flightIds), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive)));
+  }
+
+  private async selectFlightDays(where: SQL | undefined) {
+    const rows = await this.db
+      .select({
+        flightId: flightInventory.flightId,
+        date: flightInventory.date,
+        total: flightInventory.total,
+        held: flightInventory.held,
+        sold: flightInventory.sold,
+        price: flightInventory.price,
+        isStopSell: flightInventory.stopSell,
+      })
+      .from(flightInventory)
+      .where(where)
+      .orderBy(asc(flightInventory.date));
+    const grouped = groupBy(rows, (r) => r.flightId);
+    return new Map([...grouped].map(([id, list]) => [id, list.map(({ flightId: _id, ...day }) => day)]));
+  }
+
+  async findLastOpenedRoomDates() {
+    const rows = await this.db.select({ id: roomInventory.roomTypeId, last: max(roomInventory.date) }).from(roomInventory).groupBy(roomInventory.roomTypeId);
+    return new Map(rows.flatMap((r) => (r.last ? [[r.id, r.last] as const] : [])));
+  }
+
+  async findLastOpenedFlightDates() {
+    const rows = await this.db.select({ id: flightInventory.flightId, last: max(flightInventory.date) }).from(flightInventory).groupBy(flightInventory.flightId);
+    return new Map(rows.flatMap((r) => (r.last ? [[r.id, r.last] as const] : [])));
+  }
+
+  // Lịch phòng và giá chèn trong một câu lệnh (CTE): không có ngày có phòng mà thiếu giá, không cần mở transaction ở infra.
+  async insertRoomDays(days: NewRoomDay[]) {
+    if (!days.length) return 0;
+    const rows = JSON.stringify(
+      days.map((d) => ({
+        room_type_id: d.roomTypeId,
+        date: d.date,
+        total: d.total,
+        price: d.price,
+        stop_sell: d.isStopSell,
+        cta: d.isClosedToArrival,
+        ctd: d.isClosedToDeparture,
+        min_los: d.minLos,
+        max_los: d.maxLos,
+      })),
+    );
+    const result = await this.db.execute<{ inserted: number }>(sql`
+      with input as (
+        select * from jsonb_to_recordset(${rows}::jsonb) as x(room_type_id text, date date, total int, price bigint, stop_sell boolean, cta boolean, ctd boolean, min_los smallint, max_los smallint)
+      ),
+      inserted as (
+        insert into commerce.room_inventory (room_type_id, date, total, stop_sell, cta, ctd, min_los, max_los)
+        select room_type_id, date, total, stop_sell, cta, ctd, min_los, max_los from input
+        on conflict do nothing
+        returning room_type_id, date
+      ),
+      rates as (
+        insert into commerce.room_rates (room_type_id, date, price)
+        select room_type_id, date, price from input
+        on conflict do nothing
+      )
+      select count(*)::int as inserted from inserted`);
+    return result.rows[0]?.inserted ?? 0;
+  }
+
+  async insertFlightDays(days: NewFlightDay[]) {
+    if (!days.length) return 0;
+    const inserted = await this.db
+      .insert(flightInventory)
+      .values(days.map((d) => ({ flightId: d.flightId, date: d.date, total: d.total, price: d.price, stopSell: d.isStopSell })))
+      .onConflictDoNothing()
+      .returning({ flightId: flightInventory.flightId });
+    return inserted.length;
+  }
+
+  async listAllRoomTypes() {
+    const rows = await this.db.select({ roomType: roomTypes, stars: properties.stars }).from(roomTypes).innerJoin(properties, eq(properties.id, roomTypes.propertyId));
+    return rows.map((r) => ({ ...mapRoomType(r.roomType), stars: r.stars }));
+  }
+
+  async listAllFlights() {
+    return (await this.db.select().from(flights)).map(mapFlight);
+  }
+}
+
+class DrizzleCalendarAdminRepository implements CalendarAdminRepository {
+  constructor(private readonly host: DbHost) {}
+
+  private get db(): Db {
+    return this.host.tx;
+  }
+
+  async countRoomDays(roomTypeId: string, from: string, toInclusive: string) {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(roomInventory)
+      .where(and(eq(roomInventory.roomTypeId, roomTypeId), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive)));
+    return row?.count ?? 0;
+  }
+
+  async countFlightDays(flightId: string, from: string, toInclusive: string) {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(flightInventory)
+      .where(and(eq(flightInventory.flightId, flightId), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive)));
+    return row?.count ?? 0;
+  }
+
+  async updateRoomDays(roomTypeId: string, from: string, toInclusive: string, patch: RoomCalendarPatch) {
+    const range = and(eq(roomInventory.roomTypeId, roomTypeId), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive));
+    const set = {
+      ...(patch.total !== undefined && { total: patch.total }),
+      ...(patch.isStopSell !== undefined && { stopSell: patch.isStopSell }),
+      ...(patch.isClosedToArrival !== undefined && { cta: patch.isClosedToArrival }),
+      ...(patch.isClosedToDeparture !== undefined && { ctd: patch.isClosedToDeparture }),
+      ...(patch.minLos !== undefined && { minLos: patch.minLos }),
+      ...(patch.maxLos !== undefined && { maxLos: patch.maxLos }),
+    };
+    let updated = await this.countRoomDays(roomTypeId, from, toInclusive);
+    if (Object.keys(set).length) {
+      // Điều kiện nằm trong UPDATE: hai admin sửa cùng lúc, hay có người vừa giữ chỗ, vẫn không giảm được dưới held + sold.
+      const where = patch.total !== undefined ? and(range, sql`${roomInventory.held} + ${roomInventory.sold} <= ${patch.total}`) : range;
+      updated = (await this.db.update(roomInventory).set(set).where(where).returning({ date: roomInventory.date })).length;
+    }
+    if (patch.price !== undefined) {
+      await this.db
+        .update(roomRates)
+        .set({ price: patch.price })
+        .where(and(eq(roomRates.roomTypeId, roomTypeId), gte(roomRates.date, from), lte(roomRates.date, toInclusive)));
+    }
+    return updated;
+  }
+
+  async updateFlightDays(flightId: string, from: string, toInclusive: string, patch: FlightCalendarPatch) {
+    const range = and(eq(flightInventory.flightId, flightId), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive));
+    const set = {
+      ...(patch.total !== undefined && { total: patch.total }),
+      ...(patch.price !== undefined && { price: patch.price }),
+      ...(patch.isStopSell !== undefined && { stopSell: patch.isStopSell }),
+    };
+    if (!Object.keys(set).length) return this.countFlightDays(flightId, from, toInclusive);
+    const where = patch.total !== undefined ? and(range, sql`${flightInventory.held} + ${flightInventory.sold} <= ${patch.total}`) : range;
+    return (await this.db.update(flightInventory).set(set).where(where).returning({ date: flightInventory.date })).length;
+  }
+
+  async findOverbookedRoomDates(roomTypeId: string, from: string, toInclusive: string, total: number) {
+    const rows = await this.db
+      .select({ date: roomInventory.date })
+      .from(roomInventory)
+      .where(and(eq(roomInventory.roomTypeId, roomTypeId), gte(roomInventory.date, from), lte(roomInventory.date, toInclusive), sql`${roomInventory.held} + ${roomInventory.sold} > ${total}`))
+      .orderBy(asc(roomInventory.date));
+    return rows.map((r) => r.date);
+  }
+
+  async findOverbookedFlightDates(flightId: string, from: string, toInclusive: string, total: number) {
+    const rows = await this.db
+      .select({ date: flightInventory.date })
+      .from(flightInventory)
+      .where(and(eq(flightInventory.flightId, flightId), gte(flightInventory.date, from), lte(flightInventory.date, toInclusive), sql`${flightInventory.held} + ${flightInventory.sold} > ${total}`))
+      .orderBy(asc(flightInventory.date));
+    return rows.map((r) => r.date);
+  }
+
+  async insertAuditLog(entry: { actorUserId: string; action: string; entityType: 'room_type' | 'flight'; entityId: string; changes: Record<string, unknown> }) {
+    await this.db.insert(auditLogs).values(entry);
+  }
+}
+
+const mapReview = (row: ReviewRow): ReviewRecord => ({
+  id: row.id,
+  propertyId: row.propertyId,
+  roomTypeId: row.roomTypeId,
+  authorName: row.authorName,
+  rating: row.rating,
+  title: row.title,
+  body: row.body,
+  tags: row.tags,
+  images: row.images,
+  travelerType: row.travelerType,
+  stayMonth: row.stayMonth,
+  helpfulCount: row.helpfulCount,
+  createdAt: row.createdAt.toISOString(),
+});
+
+class DrizzleReviewRepository implements ReviewRepository {
+  constructor(private readonly host: DbHost) {}
+
+  private get db(): Db {
+    return this.host.tx;
+  }
+
+  async listReviews(filter: ReviewFilter) {
+    const where = and(
+      eq(reviews.propertyId, filter.propertyId),
+      eq(reviews.status, 'published'),
+      filter.rating !== undefined ? eq(reviews.rating, filter.rating) : undefined,
+      filter.travelerType ? eq(reviews.travelerType, filter.travelerType) : undefined,
+      filter.tag ? sql`${reviews.tags} @> ${JSON.stringify([filter.tag])}::jsonb` : undefined,
+    );
+    const order = {
+      newest: [desc(reviews.createdAt)],
+      highest: [desc(reviews.rating), desc(reviews.createdAt)],
+      lowest: [asc(reviews.rating), desc(reviews.createdAt)],
+      helpful: [desc(reviews.helpfulCount), desc(reviews.createdAt)],
+    }[filter.sort];
+    const rows = await this.db
+      .select()
+      .from(reviews)
+      .where(where)
+      .orderBy(...order, asc(reviews.id))
+      .offset(filter.offset)
+      .limit(filter.limit);
+    const [counted] = await this.db.select({ total: sql<number>`count(*)::int` }).from(reviews).where(where);
+    return { items: rows.map(mapReview), total: counted?.total ?? 0 };
+  }
+
+  async getReviewStats(propertyId: string, tagLimit: number): Promise<ReviewStats> {
+    const published = and(eq(reviews.propertyId, propertyId), eq(reviews.status, 'published'));
+    const [agg] = await this.db
+      .select({
+        count: sql<number>`count(*)::int`,
+        average: sql<number | null>`avg(${reviews.rating})::float8`,
+        r1: sql<number>`count(*) filter (where ${reviews.rating} = 1)::int`,
+        r2: sql<number>`count(*) filter (where ${reviews.rating} = 2)::int`,
+        r3: sql<number>`count(*) filter (where ${reviews.rating} = 3)::int`,
+        r4: sql<number>`count(*) filter (where ${reviews.rating} = 4)::int`,
+        r5: sql<number>`count(*) filter (where ${reviews.rating} = 5)::int`,
+      })
+      .from(reviews)
+      .where(published);
+    const tag = sql<string>`t.tag`;
+    const tagRows = await this.db
+      .select({ tag, count: sql<number>`count(*)::int` })
+      .from(sql`${reviews} cross join lateral jsonb_array_elements_text(${reviews.tags}) as t(tag)`)
+      .where(published)
+      .groupBy(tag)
+      .orderBy(sql`count(*) desc`, tag)
+      .limit(tagLimit);
+    return {
+      count: agg?.count ?? 0,
+      average: agg?.average ?? null,
+      distribution: agg ? [agg.r1, agg.r2, agg.r3, agg.r4, agg.r5] : [0, 0, 0, 0, 0],
+      tags: tagRows,
+    };
+  }
+}
+
+@Injectable()
+export class DrizzleCommerceStore implements CommerceStore {
+  readonly catalog: CatalogRepository;
+  readonly calendar: CalendarRepository;
+  readonly reviews: ReviewRepository;
+
+  readonly admin: CalendarAdminRepository;
+
+  /** host.tx là transaction đang mở của commerce (@Transactional), hoặc kết nối thường; script CLI truyền { tx: db }. */
+  constructor(@InjectTransactionHost('commerce') host: DbHost) {
+    this.catalog = new DrizzleCatalogRepository(host);
+    this.calendar = new DrizzleCalendarRepository(host);
+    this.reviews = new DrizzleReviewRepository(host);
+    this.admin = new DrizzleCalendarAdminRepository(host);
+  }
+}

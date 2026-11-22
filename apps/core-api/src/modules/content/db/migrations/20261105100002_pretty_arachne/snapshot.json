@@ -1,0 +1,277 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "402f83e6-fdb6-48f9-8d32-d75144099869",
+  "prevIds": [
+    "e82652b1-8129-4059-8ea6-524d9c78255a"
+  ],
+  "footprints": [
+    {
+      "statementType": "rename_constraint",
+      "statementTarget": [
+        "table",
+        "content",
+        "post_summaries"
+      ],
+      "writes": [
+        "s|fk|content.post_summaries.post_summaries_post_id_posts_id_fkey",
+        "n|fk|content.post_summaries.post_summaries_post_id_posts_id_fkey",
+        "n|con|content.post_summaries.post_summaries_post_id_posts_id_fkey",
+        "s|fk|content.post_summaries.fk_post_summaries_post_id",
+        "n|fk|content.post_summaries.fk_post_summaries_post_id",
+        "n|con|content.post_summaries.fk_post_summaries_post_id"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content",
+        "e|col|content.post_summaries.post_id"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "status"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.status",
+        "n|col|content.post_summaries.status",
+        "e|col|content.post_summaries.status"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "content"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.content",
+        "n|col|content.post_summaries.content",
+        "e|col|content.post_summaries.content"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "safety"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.safety",
+        "n|col|content.post_summaries.safety",
+        "e|col|content.post_summaries.safety"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "prompt_version"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.prompt_version",
+        "n|col|content.post_summaries.prompt_version",
+        "e|col|content.post_summaries.prompt_version"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "model_name"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.model_name",
+        "n|col|content.post_summaries.model_name",
+        "e|col|content.post_summaries.model_name"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "generated_at"
+      ],
+      "writes": [
+        "s|col|content.post_summaries.generated_at",
+        "n|col|content.post_summaries.generated_at",
+        "e|col|content.post_summaries.generated_at"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "post_summaries",
+        "summary"
+      ],
+      "writes": [
+        "s|colprop|content.post_summaries.summary.notNull"
+      ],
+      "reads": [
+        "n|tbl|content.post_summaries",
+        "n|sch|content",
+        "n|col|content.post_summaries.summary"
+      ],
+      "sqlHash": "df9c79e9c9a9af85"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "rename",
+      "key": "fks\u0000[\"content\",\"post_summaries\",\"post_summaries_post_id_posts_id_fkey\"]",
+      "set": {
+        "name": "fk_post_summaries_post_id"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "status",
+        "type": "varchar(32)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'ready'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "content",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "safety",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "prompt_version",
+        "type": "varchar(32)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "model_name",
+        "type": "varchar(64)",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_summaries",
+        "name": "generated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"content\",\"post_summaries\",\"summary\"]",
+      "set": {
+        "notNull": false
+      }
+    },
+    {
+      "op": "alter",
+      "key": "fks\u0000[\"content\",\"post_summaries\",\"fk_post_summaries_post_id\"]",
+      "set": {
+        "nameExplicit": true
+      }
+    }
+  ]
+}

@@ -1,4 +1,18 @@
-import { pgSchema } from 'drizzle-orm/pg-core';
-
-/** Mọi bảng của module content khai báo trong schema này. */
-export const contentSchema = pgSchema('content');
+export { contentSchema } from './content-schema.js';
+export * from './media.js';
+export * from './media-frames.js';
+export * from './posts.js';
+export * from './comments.js';
+export * from './post-counter-deltas.js';
+export * from './reactions.js';
+export * from './bookmarks.js';
+export * from './follows.js';
+export * from './moderation-actions.js';
+export * from './outbox.js';
+export * from './post-summaries.js';
+export * from './comment-reactions.js';
+export * from './moderation.js';
+export * from './moderation-parts.js';
+export * from './saved-itineraries.js';
+export * from './trend-signals.js';
+export * from './trend-scores.js';

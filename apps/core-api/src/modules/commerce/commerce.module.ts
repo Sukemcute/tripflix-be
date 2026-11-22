@@ -1,8 +1,186 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
+import { buildDrizzleToken, buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
+import { DrizzleIdempotencyStore, IdempotencyModule } from '@tripflix/idempotency';
+import { OutboxWriter } from '@tripflix/outbox';
+import { z } from 'zod';
+import type { CoreEnv } from '../../platform/env.js';
+import { CORE_ENV, DB_POOLS, type DbPools } from '../../platform/tokens.js';
+import { CheckoutController } from './booking/api/checkout.controller.js';
+import { CheckoutUseCases } from './booking/application/checkout.use-cases.js';
+import { ExpireHoldsUseCases } from './booking/application/expire-holds.use-cases.js';
+import { COMMERCE_CLOCK, ORDER_STORE, type Clock } from './booking/application/ports.js';
+import { DrizzleOrderStore } from './booking/infra/drizzle-order.store.js';
+import { TraceContext } from './trace-context.js';
+import { CommerceMetrics } from './metrics/commerce-metrics.js';
+import { AdminOrdersController } from './admin/admin-orders.controller.js';
+import { AdminOrdersStore } from './admin/admin-orders.store.js';
+import { AdminMetricsController } from './metrics/admin-metrics.controller.js';
+import { CommerceCleanupJob } from './booking/jobs/commerce-cleanup.job.js';
+import { ExpireHoldsJob } from './booking/jobs/expire-holds.job.js';
+import { DepartureReminderJob } from './booking/jobs/departure-reminder.job.js';
+import { DepartureReminderUseCases } from './booking/application/departure-reminder.use-cases.js';
+import { ReconcileInventoryJob } from './booking/jobs/reconcile-inventory.job.js';
+import { ReconcileInventoryUseCases } from './booking/application/reconcile-inventory.use-cases.js';
+import { CommerceFacade } from './commerce.facade.js';
+import { commerceIdempotencyKeys, commerceOutboxEvents } from './db/schema/index.js';
+import { AdminCalendarController } from './inventory/api/admin-calendar.controller.js';
+import { FlightsController } from './inventory/api/flights.controller.js';
+import { HotelsController } from './inventory/api/hotels.controller.js';
+import { CalendarAdminUseCases } from './inventory/application/calendar-admin.use-cases.js';
+import { CalendarUseCases } from './inventory/application/calendar.use-cases.js';
+import { CatalogUseCases } from './inventory/application/catalog.use-cases.js';
+import { FlightSearchUseCases } from './inventory/application/flight-search.use-cases.js';
+import { HotelDetailUseCases } from './inventory/application/hotel-detail.use-cases.js';
+import { ReviewUseCases } from './inventory/application/review.use-cases.js';
+import { CalendarSnapshot, hasBulkLoad } from './inventory/application/calendar-snapshot.js';
+import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type MediaUrl, type ReadCalendar, type Today } from './inventory/application/ports.js';
+import { DrizzleCommerceStore } from './inventory/infra/drizzle-commerce.store.js';
+import { OpenCalendarJob } from './inventory/jobs/open-calendar.job.js';
+import { MockGatewayController } from './payment/api/mock-gateway.controller.js';
+import { PAYMENT_GATEWAY, type PaymentGateway } from './payment/application/gateway.port.js';
+import { COMMERCE_OUTBOX, PaymentUseCases } from './payment/application/payment.use-cases.js';
+import { CardPaymentGuard } from './payment/api/card-payment.guard.js';
+import { MockGateway } from './payment/infra/mock-gateway.js';
+import { PaymentJobs } from './payment/jobs/payment-jobs.js';
+import { VnpayCallbackController, VnpayCheckoutController } from './payment/api/vnpay.controller.js';
+import { VNPAY_CONFIG, VnpayUseCases, type VnpayConfig } from './payment/application/vnpay.use-cases.js';
+import { REFUND_GATEWAYS, type RefundGateways } from './payment/application/refund-gateways.port.js';
+import { VNPAY_GATEWAY } from './payment/domain/vnpay-signature.js';
+import { VNPAY_DEFAULT_API_URL, VnpayRefundClient } from './payment/infra/vnpay-refund-gateway.js';
+
+/** Ngày theo giờ Việt Nam: lịch trống và luật bán tính theo ngày địa phương, không theo UTC. */
+// Tạo Intl.DateTimeFormat có múi giờ tốn khoảng 85µs mỗi lần: tạo một lần rồi dùng lại (đo tải TF29).
+const VIETNAM_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+const todayInVietnam: Today = () => VIETNAM_DATE_FORMAT.format(new Date());
+const mockPaymentEnabled = process.env.NODE_ENV !== 'production' && process.env.ENABLE_MOCK_PAYMENT === 'true';
+
+/** Lịch hiển thị nạp lại mỗi 10 giây: trang tìm và trang khách sạn thấy số phòng cũ tối đa chừng đó. */
+const READ_CALENDAR_REFRESH_MS = 10_000;
+
+/**
+ * Trang chỉ đọc lấy lịch từ bộ nhớ (đo tải TF29: lịch là phần đọc database nhiều nhất của trang tìm).
+ * Tiến trình chỉ chạy job (APP_ROLE=worker) và test đọc thẳng database: test cần thấy ngay thay đổi vừa ghi.
+ */
+function buildReadCalendar(store: CommerceStore, today: Today, env: CoreEnv): ReadCalendar {
+  if (process.env.NODE_ENV === 'test' || env.APP_ROLE === 'worker' || !hasBulkLoad(store.calendar)) return store.calendar;
+  const logger = new Logger('CommerceCalendarSnapshot');
+  return new CalendarSnapshot({
+    fallback: store.calendar,
+    source: store.calendar,
+    today,
+    refreshMs: READ_CALENDAR_REFRESH_MS,
+    onError: (error) => logger.warn({ err: error }, 'Nạp lịch vào bộ nhớ lỗi, dùng bản cũ'),
+  });
+}
+
+const VNPAY_SANDBOX_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+const OptionalVnpayUrl = z.preprocess((value) => value === '' ? undefined : value, z.url().optional());
+
+const VnpayEnvSchema = z.object({
+  NODE_ENV: z.string().optional(),
+  VNPAY_TMN_CODE: z.string().optional(),
+  VNPAY_HASH_SECRET: z.string().optional(),
+  VNPAY_PAYMENT_URL: OptionalVnpayUrl,
+  VNPAY_RETURN_URL: z.url().default('http://localhost:3000/api/payments/vnpay/return'),
+  VNPAY_API_URL: OptionalVnpayUrl,
+});
+
+function isLiveVnpayUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  const url = new URL(value);
+  return url.protocol === 'https:' && url.hostname.replace(/\.$/, '') !== 'sandbox.vnpayment.vn';
+}
+
+function loadVnpayConfig(source: Record<string, unknown>): VnpayConfig | null {
+  const env = VnpayEnvSchema.parse(source);
+  if (!env.VNPAY_TMN_CODE || !env.VNPAY_HASH_SECRET) return null;
+  if (env.NODE_ENV === 'production' && (!isLiveVnpayUrl(env.VNPAY_PAYMENT_URL) || !isLiveVnpayUrl(env.VNPAY_API_URL))) return null;
+  return {
+    tmnCode: env.VNPAY_TMN_CODE,
+    hashSecret: env.VNPAY_HASH_SECRET,
+    paymentUrl: env.VNPAY_PAYMENT_URL ?? VNPAY_SANDBOX_PAYMENT_URL,
+    returnUrl: env.VNPAY_RETURN_URL,
+    apiUrl: env.VNPAY_API_URL ?? VNPAY_DEFAULT_API_URL,
+  };
+}
+
+/** Ảnh lưu khoá đầy đủ trên S3 (có tiền tố môi trường); web và app nhận URL CloudFront. */
+function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
+  if (!cdnBaseUrl) return keepMediaKey;
+  const base = cdnBaseUrl.replace(/\/+$/, '');
+  return (key) => (/^https?:\/\//.test(key) ? key : `${base}/${key.replace(/^\/+/, '')}`);
+}
 
 /**
  * Module commerce. Chủ: Thắng (backup Bảo). Xem README.md cùng thư mục.
- * Module khác chỉ dùng những gì được export trong index.ts.
+ * Module khác chỉ dùng những gì được export trong index.ts: CommerceModule và CommerceFacade.
+ * Schema commerce trong database core, user Postgres tf_commerce.
+ * Store đọc kết nối qua TransactionHost của commerce, nên use case có @Transactional('commerce') ghi mọi thứ
+ * trong cùng một transaction. Test thay store / cổng bằng overrideProvider.
  */
-@Module({})
+@Module({
+  imports: [
+    IdempotencyModule.forFeature({
+      inject: [buildDrizzleToken('commerce')],
+      useFactory: (db: Db) => new DrizzleIdempotencyStore(db, commerceIdempotencyKeys),
+    }),
+  ],
+  controllers: [
+    HotelsController, FlightsController, AdminCalendarController, CheckoutController,
+    VnpayCheckoutController, VnpayCallbackController,
+    ...(mockPaymentEnabled ? [MockGatewayController] : []),
+    AdminMetricsController, AdminOrdersController,
+  ],
+  providers: [
+    AdminOrdersStore,
+    { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
+    TraceContext,
+    CommerceMetrics,
+    { provide: ORDER_STORE, useClass: DrizzleOrderStore },
+    { provide: TODAY, useValue: todayInVietnam },
+    { provide: READ_CALENDAR, inject: [COMMERCE_STORE, TODAY, CORE_ENV], useFactory: buildReadCalendar },
+    { provide: COMMERCE_CLOCK, useValue: (() => new Date()) satisfies Clock },
+    {
+      provide: COMMERCE_OUTBOX,
+      inject: [buildTransactionHostToken('commerce')],
+      useFactory: (txHost: ModuleTransactionHost) => new OutboxWriter(() => txHost.tx, commerceOutboxEvents, 'core-api/commerce'),
+    },
+    {
+      // Cổng thẻ giả lập là hệ thống ngoài: chạy trên kết nối thường, không bao giờ nằm trong transaction của commerce.
+      provide: PAYMENT_GATEWAY,
+      inject: [DB_POOLS],
+      useFactory: (pools: DbPools): PaymentGateway | null =>
+        mockPaymentEnabled ? new MockGateway(createDb(pools.commerce)) : null,
+    },
+    { provide: VNPAY_CONFIG, useFactory: () => loadVnpayConfig(process.env) },
+    {
+      provide: REFUND_GATEWAYS,
+      inject: [VNPAY_CONFIG],
+      useFactory: (config: VnpayConfig | null): RefundGateways => new Map(config ? [[VNPAY_GATEWAY, new VnpayRefundClient(config)]] : []),
+    },
+    { provide: MEDIA_URL, inject: [CORE_ENV], useFactory: (env: CoreEnv) => buildMediaUrl(env.MEDIA_CDN_URL) },
+    CatalogUseCases,
+    HotelDetailUseCases,
+    FlightSearchUseCases,
+    ReviewUseCases,
+    CalendarUseCases,
+    CalendarAdminUseCases,
+    CheckoutUseCases,
+    CardPaymentGuard,
+    PaymentUseCases,
+    VnpayUseCases,
+    ExpireHoldsUseCases,
+    DepartureReminderUseCases,
+    ReconcileInventoryUseCases,
+    OpenCalendarJob,
+    ExpireHoldsJob,
+    DepartureReminderJob,
+    ReconcileInventoryJob,
+    CommerceCleanupJob,
+    PaymentJobs,
+    CommerceFacade,
+  ],
+  exports: [CommerceFacade],
+})
 export class CommerceModule {}
+

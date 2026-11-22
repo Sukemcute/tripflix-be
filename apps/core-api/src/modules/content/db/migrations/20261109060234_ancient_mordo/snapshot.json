@@ -1,0 +1,193 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3f9f40e4-d8b5-40b9-a2bf-40c61774b69a",
+  "prevIds": [
+    "ad4d1f90-3928-4ca1-ac5e-5852a52c9a07"
+  ],
+  "footprints": [
+    {
+      "statementType": "rename_constraint",
+      "statementTarget": [
+        "table",
+        "content",
+        "reports"
+      ],
+      "writes": [
+        "s|fk|content.reports.reports_case_id_moderation_cases_id_fkey",
+        "n|fk|content.reports.reports_case_id_moderation_cases_id_fkey",
+        "n|con|content.reports.reports_case_id_moderation_cases_id_fkey",
+        "s|fk|content.reports.fk_reports_case_id",
+        "n|fk|content.reports.fk_reports_case_id",
+        "n|con|content.reports.fk_reports_case_id"
+      ],
+      "reads": [
+        "n|tbl|content.reports",
+        "n|sch|content",
+        "e|col|content.reports.case_id"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "comments"
+      ],
+      "writes": [
+        "s|ck|content.comments.ck_comments_status",
+        "n|ck|content.comments.ck_comments_status",
+        "e|ck|content.comments.ck_comments_status",
+        "n|con|content.comments.ck_comments_status"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comments.status"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_cases"
+      ],
+      "writes": [
+        "s|ck|content.moderation_cases.ck_moderation_cases_target_type",
+        "n|ck|content.moderation_cases.ck_moderation_cases_target_type",
+        "e|ck|content.moderation_cases.ck_moderation_cases_target_type",
+        "n|con|content.moderation_cases.ck_moderation_cases_target_type"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_cases",
+        "n|sch|content",
+        "n|col|content.moderation_cases.target_type"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_cases"
+      ],
+      "writes": [
+        "s|ck|content.moderation_cases.ck_moderation_cases_status",
+        "n|ck|content.moderation_cases.ck_moderation_cases_status",
+        "e|ck|content.moderation_cases.ck_moderation_cases_status",
+        "n|con|content.moderation_cases.ck_moderation_cases_status"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_cases",
+        "n|sch|content",
+        "n|col|content.moderation_cases.status"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_cases"
+      ],
+      "writes": [
+        "s|ck|content.moderation_cases.ck_moderation_cases_severity",
+        "n|ck|content.moderation_cases.ck_moderation_cases_severity",
+        "e|ck|content.moderation_cases.ck_moderation_cases_severity",
+        "n|con|content.moderation_cases.ck_moderation_cases_severity"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_cases",
+        "n|sch|content",
+        "n|col|content.moderation_cases.severity"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "reports"
+      ],
+      "writes": [
+        "s|ck|content.reports.ck_reports_target_type",
+        "n|ck|content.reports.ck_reports_target_type",
+        "e|ck|content.reports.ck_reports_target_type",
+        "n|con|content.reports.ck_reports_target_type"
+      ],
+      "reads": [
+        "n|tbl|content.reports",
+        "n|sch|content",
+        "n|col|content.reports.target_type"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "rename",
+      "key": "fks\u0000[\"content\",\"reports\",\"reports_case_id_moderation_cases_id_fkey\"]",
+      "set": {
+        "name": "fk_reports_case_id"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "ck_comments_status",
+        "value": "\"status\" IN ('visible', 'hidden', 'removed')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_cases",
+        "name": "ck_moderation_cases_target_type",
+        "value": "\"target_type\" IN ('post', 'comment')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_cases",
+        "name": "ck_moderation_cases_status",
+        "value": "\"status\" IN ('pending', 'resolved')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_cases",
+        "name": "ck_moderation_cases_severity",
+        "value": "\"severity\" BETWEEN 0 AND 100",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "reports",
+        "name": "ck_reports_target_type",
+        "value": "\"target_type\" IN ('post', 'comment')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "fks\u0000[\"content\",\"reports\",\"fk_reports_case_id\"]",
+      "set": {
+        "nameExplicit": true
+      }
+    }
+  ]
+}

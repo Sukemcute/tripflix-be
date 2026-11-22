@@ -17,10 +17,15 @@
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "lint": "oxlint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config vitest.int.config.ts"
   },
-  "dependencies": { "@tripflix/contracts": "workspace:*", "ioredis": "catalog:" },
+  "dependencies": {
+    "@tripflix/contracts": "workspace:*",
+    "ioredis": "catalog:"
+  },
   "devDependencies": {
+    "@tripflix/testing": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "typescript": "catalog:",

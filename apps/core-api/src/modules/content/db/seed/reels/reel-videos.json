@@ -1,0 +1,1682 @@
+[
+  {
+    "id": "01_dalat_cafe_review",
+    "destinationKey": "da-lat",
+    "title": "Top 3 góc săn mây & cafe chill nhất Đà Lạt",
+    "location": "Đà Lạt, Lâm Đồng",
+    "category": "REVIEW",
+    "script": [
+      "Nếu cuối tuần này bạn lên Đà Lạt mà chưa biết đi đâu, lưu ngay 3 tọa độ săn mây cực đỉnh này nhé!",
+      "Đầu tiên là đồi chè Cầu Đất, chỉ cần dậy sớm trước 5 giờ rưỡi sáng là bạn đã có ngay biển mây bồng bềnh trước mắt.",
+      "Tiếp theo là các quán cafe gỗ view thung lũng ở khu Trại Mát, vừa nhâm nhi ly cacao nóng vừa ngắm nắng lên cực kỳ chill.",
+      "Cuối cùng đừng quên ghé hồ Xuân Hương lúc hoàng hôn để dạo bộ và thưởng thức bánh tráng nướng nóng hổi. Chi phí cả ngày chỉ khoảng 800 nghìn thôi!"
+    ],
+    "tip": "Đi săn mây trước 5h30 sáng, mang áo khoác dày vì nhiệt độ khoảng 14°C.",
+    "budget": "~800k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 18044613,
+      "sourceKey": "dev/thang/uploads/45f3c92d-a106-4bcc-aa51-7544f017a878/original.mp4",
+      "hlsPrefix": "dev/thang/videos/45f3c92d-a106-4bcc-aa51-7544f017a878/r1",
+      "durationSec": 37,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "02_hoian_food_guide",
+    "destinationKey": "hoi-an",
+    "title": "Ăn sập phố cổ Hội An chỉ với 300k",
+    "location": "Hội An, Quảng Nam",
+    "category": "FOOD TOUR",
+    "script": [
+      "Cầm đúng 300 nghìn trong tay, liệu có ăn sập được phố cổ Hội An không? Cùng mình kiểm chứng ngay nhé!",
+      "Mở đầu buổi sáng bằng một tô cao lầu chuẩn vị giá 40 nghìn, sợi mì dai giòn ăn kèm thịt xá xíu đậm đà.",
+      "Buổi trưa nhất định phải thử bánh mì Phượng hoặc cơm gà bà Buội, vừa ngon vừa no căng bụng.",
+      "Chiều tối dạo quanh sông Hoài ngắm đèn lồng lung linh, làm thêm ly nước mót thảo mộc mát lạnh chỉ 15 nghìn. Quá xứng đáng cho một chuyến đi!"
+    ],
+    "tip": "Nên đi bộ phố cổ sau 17h30 để ngắm đèn lồng lên đèn và tránh nắng gắt.",
+    "budget": "~300k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4535432,
+      "sourceKey": "dev/thang/uploads/c82e205c-eea9-42b5-8d2e-cb205c0aab8c/original.mp4",
+      "hlsPrefix": "dev/thang/videos/c82e205c-eea9-42b5-8d2e-cb205c0aab8c/r1",
+      "durationSec": 35,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "03_phuquoc_budget",
+    "destinationKey": "phu-quoc",
+    "title": "Kinh nghiệm đi Phú Quốc tự túc tiết kiệm",
+    "location": "Phú Quốc, Kiên Giang",
+    "category": "HƯỚNG DẪN",
+    "script": [
+      "Đi Phú Quốc tự túc sao cho vừa vui vừa không bị đau ví? Đây là bí kíp mình đúc kết sau 3 lần quay lại đảo ngọc.",
+      "Thay vì đi taxi, bạn hãy thuê xe máy với giá khoảng 150 nghìn một ngày để chủ động chạy dọc từ Bắc Đảo xuống Nam Đảo.",
+      "Buổi chiều nhớ ghé bãi Trường hoặc Sunset Sanato để bắt trọn khoảnh khắc hoàng hôn tím rực trên mặt biển.",
+      "Tối đến ra chợ đêm ăn hải sản tươi sống, hỏi giá trước khi gọi món là yên tâm trải nghiệm trọn vẹn mà vẫn tiết kiệm."
+    ],
+    "tip": "Thuê xe máy 150k/ngày để tự do khám phá Bắc Đảo và Nam Đảo.",
+    "budget": "~1.2tr / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 9995902,
+      "sourceKey": "dev/thang/uploads/c90ac389-6bad-4e2e-a701-cba519af14d5/original.mp4",
+      "hlsPrefix": "dev/thang/videos/c90ac389-6bad-4e2e-a701-cba519af14d5/r1",
+      "durationSec": 32,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "04_hagiang_loop_tips",
+    "destinationKey": "ha-giang",
+    "title": "Lưu ý sống còn khi phượt cung đèo Hà Giang",
+    "location": "Đồng Văn, Hà Giang",
+    "category": "MẸO PHƯỢT",
+    "script": [
+      "Hà Giang đẹp như tranh vẽ, nhưng trước khi xách ba lô lên và đi, bạn nhất định phải nhớ 3 lưu ý an toàn này!",
+      "Thứ nhất, luôn kiểm tra kỹ phanh xe và lốp xe trước khi đổ đèo Mã Pí Lèng vì đường có nhiều khúc cua tay áo rất gắt.",
+      "Thứ hai, gặp cây xăng ở thị trấn nào là phải đổ đầy bình ngay, tránh tình trạng hết xăng giữa núi đá.",
+      "Cuối cùng, hãy căn giờ về homestay trước 5 giờ chiều để tránh sương mù dày đặc lúc trời tối nhé!"
+    ],
+    "tip": "Kiểm tra phanh xe, đổ đầy xăng ở mỗi thị trấn và không chạy đèo khi trời tối.",
+    "budget": "~700k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5337928,
+      "sourceKey": "dev/thang/uploads/a61e7b29-5854-4f7a-a73e-187477199235/original.mp4",
+      "hlsPrefix": "dev/thang/videos/a61e7b29-5854-4f7a-a73e-187477199235/r1",
+      "durationSec": 31,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "05_sapa_cloud_hunting",
+    "destinationKey": "sa-pa",
+    "title": "Review homestay săn mây & đỉnh Fansipan Sa Pa",
+    "location": "Sa Pa, Lào Cai",
+    "category": "REVIEW",
+    "script": [
+      "Mùa này đi Sa Pa săn mây có đẹp không? Câu trả lời là cực kỳ xuất sắc nếu bạn chọn đúng khu vực lưu trú!",
+      "Mình chọn ở bản Tả Van, sáng mở cửa sổ ra là thấy ngay thung lũng ruộng bậc thang ẩn hiện trong làn sương sớm.",
+      "Sau đó di chuyển lên đỉnh Fansipan bằng cáp treo, cảm giác chạm tay vào cột mốc nóc nhà Đông Dương thực sự rất choáng ngợp.",
+      "Buổi tối đừng quên làm một nồi lẩu cá hồi nóng hổi giữa tiết trời se lạnh vùng cao nhé!"
+    ],
+    "tip": "Đặt vé cáp treo Fansipan online trước để không phải xếp hàng lâu cuối tuần.",
+    "budget": "~950k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 12006893,
+      "sourceKey": "dev/thang/uploads/cfb0663a-52fd-4021-b9c2-ee9b1024d872/original.mp4",
+      "hlsPrefix": "dev/thang/videos/cfb0663a-52fd-4021-b9c2-ee9b1024d872/r1",
+      "durationSec": 33,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "06_halong_cruise",
+    "destinationKey": "ha-long",
+    "title": "Trải nghiệm du thuyền vịnh Hạ Long trong ngày",
+    "location": "Vịnh Hạ Long, Quảng Ninh",
+    "category": "REVIEW",
+    "script": [
+      "Nếu bạn chỉ có một ngày ở Quảng Ninh thì tour du thuyền thăm vịnh Hạ Long là lựa chọn không thể bỏ qua.",
+      "Tàu đưa bạn len lỏi qua hàng nghìn đảo đá vôi kỳ vĩ, dừng chân khám phá hang Sửng Sốt rộng lớn và tráng lệ.",
+      "Hoạt động mình thích nhất là tự tay chèo kayak qua hang Luồn, nước biển xanh ngọc bích và không khí cực kỳ trong lành.",
+      "Chiều muộn ngồi trên boong tàu ngắm hoàng hôn buông xuống mặt vịnh, mọi mệt mỏi đều tan biến hết."
+    ],
+    "tip": "Chọn tour khởi hành buổi sáng để kịp chèo kayak ở hang Luồn và ngắm hoàng hôn trên vịnh.",
+    "budget": "~1.5tr / tour",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5275294,
+      "sourceKey": "dev/thang/uploads/a63014a6-4bee-4724-9301-92d649938d16/original.mp4",
+      "hlsPrefix": "dev/thang/videos/a63014a6-4bee-4724-9301-92d649938d16/r1",
+      "durationSec": 32,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "07_ninhbinh_guide",
+    "destinationKey": "ninh-binh",
+    "title": "Lịch trình 1 ngày khám phá Tràng An - Hang Múa",
+    "location": "Tràng An, Ninh Bình",
+    "category": "HƯỚNG DẪN",
+    "script": [
+      "Cách Hà Nội chỉ hơn một tiếng rưỡi chạy xe, Ninh Bình là điểm đến cuối tuần lý tưởng bậc nhất miền Bắc.",
+      "Buổi sáng bạn đi thuyền nan tham quan khu du lịch Tràng An, lướt nhẹ qua các hang động xuyên thủy mát rượi.",
+      "Buổi chiều tầm 4 giờ hãy leo lên đỉnh Hang Múa, phóng tầm mắt ngắm trọn cánh đồng Tam Cốc vàng ươm từ trên cao.",
+      "Trước khi về nhớ thưởng thức đặc sản cơm cháy thịt dê nóng giòn để nạp lại năng lượng nhé!"
+    ],
+    "tip": "Đi Hang Múa tầm 16h để leo 500 bậc đá không bị nắng gắt và đón hoàng hôn.",
+    "budget": "~650k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 7846486,
+      "sourceKey": "dev/thang/uploads/89900ab8-b0e9-48a9-9c9a-209e8217fa48/original.mp4",
+      "hlsPrefix": "dev/thang/videos/89900ab8-b0e9-48a9-9c9a-209e8217fa48/r1",
+      "durationSec": 32,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "08_hue_heritage",
+    "destinationKey": "hue",
+    "title": "Dạo bước cố đô Huế & nghe ca Huế sông Hương",
+    "location": "TP. Huế, Thừa Thiên Huế",
+    "category": "REVIEW",
+    "script": [
+      "Huế luôn mang một vẻ đẹp trầm mặc và dịu dàng khiến bất kỳ ai từng ghé qua cũng phải thương nhớ.",
+      "Buổi sáng hãy dành thời gian dạo bước trong Đại Nội Kinh Thành Huế, chiêm ngưỡng kiến trúc cung đình cổ kính.",
+      "Trưa ghé quán nhỏ ăn tô bún bò Huế đậm vị sả ớt rồi ra chùa Thiên Mụ hóng gió sông Hương lồng lộng.",
+      "Tối đến thả đèn hoa đăng và nghe ca Huế trên thuyền rồng, trải nghiệm văn hóa cực kỳ đáng nhớ."
+    ],
+    "tip": "Mua vé gộp Đại Nội và các lăng tẩm sẽ tiết kiệm hơn 20% so với mua lẻ.",
+    "budget": "~600k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6993847,
+      "sourceKey": "dev/thang/uploads/e1c0e130-6c38-4efd-b038-70a4194cc081/original.mp4",
+      "hlsPrefix": "dev/thang/videos/e1c0e130-6c38-4efd-b038-70a4194cc081/r1",
+      "durationSec": 30,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "09_nhatrang_island",
+    "destinationKey": "nha-trang",
+    "title": "Khám phá biển đảo Nha Trang & lặn ngắm san hô",
+    "location": "Nha Trang, Khánh Hòa",
+    "category": "HƯỚNG DẪN",
+    "script": [
+      "Mùa hè này mà đi biển Nha Trang thì nhất định phải thử ngay tour lặn ngắm san hô ngoài đảo nhé mọi người!",
+      "Nước biển ở khu vực Hòn Mun trong vắt, chỉ cần úp mặt xuống là thấy từng đàn cá đầy màu sắc bơi lội.",
+      "Buổi chiều quay về đất liền ghé thăm tháp bà Ponagar cổ kính và chụp vài tấm hình check-in cực nghệ.",
+      "Tối đi dạo đường Trần Phú hóng gió biển và thưởng thức nem nướng Ninh Hòa trứ danh."
+    ],
+    "tip": "Thoa kem chống nắng thân thiện với san hô và mang theo túi chống nước cho điện thoại.",
+    "budget": "~900k / ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4419353,
+      "sourceKey": "dev/thang/uploads/ce4a0411-1d6e-434d-83d5-6a7f40f0503c/original.mp4",
+      "hlsPrefix": "dev/thang/videos/ce4a0411-1d6e-434d-83d5-6a7f40f0503c/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "10_danang_weekend",
+    "destinationKey": "da-nang",
+    "title": "Lịch trình Đà Nẵng 2 ngày 1 đêm cực chất",
+    "location": "Đà Nẵng",
+    "category": "HƯỚNG DẪN",
+    "script": [
+      "Chỉ có 2 ngày 1 đêm cuối tuần tại Đà Nẵng thì đi đâu cho hết các điểm hot nhất? Lưu ngay lịch trình này!",
+      "Ngày đầu tiên đón bình minh tại bãi biển Mỹ Khê, sau đó chạy xe lên bán đảo Sơn Trà ngắm toàn cảnh thành phố.",
+      "Tối thứ 7 nhớ đứng ở đầu cầu Rồng lúc 9 giờ tối để xem màn trình diễn phun lửa và phun nước cực kỳ mãn nhãn.",
+      "Ngày thứ hai lên Bà Nà Hills check-in Cầu Vàng giữa biển mây, vừa đẹp vừa tiện cho một chuyến nghỉ dưỡng ngắn ngày!"
+    ],
+    "tip": "Xem cầu Rồng phun lửa và nước vào 21h tối thứ 6, thứ 7 và Chủ nhật hàng tuần.",
+    "budget": "~1.1tr / chuyến",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3844592,
+      "sourceKey": "dev/thang/uploads/bf48bd80-7f38-428e-b266-29f385d5f1a7/original.mp4",
+      "hlsPrefix": "dev/thang/videos/bf48bd80-7f38-428e-b266-29f385d5f1a7/r1",
+      "durationSec": 34,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "11_mocchau_tea_hills",
+    "destinationKey": "moc-chau",
+    "title": "Top 3 điểm check-in Mộc Châu mùa hoa cải",
+    "location": "Mộc Châu, Sơn La",
+    "category": "TOP_LIST",
+    "script": [
+      "Mộc Châu mùa này đẹp điên đảo luôn mọi người ơi! Lưu ngay 3 tọa độ sống ảo không góc chết này.",
+      "Số 1 là đồi chè Trái Tim xanh mướt mắt, chụp góc nào cũng ra ảnh bìa tạp chí.",
+      "Số 2 là rừng thông Bản Áng, sáng sớm có sương nhẹ và nắng xuyên qua tán cây cực thơ.",
+      "Số 3 nhớ ghé thác Dải Yếm rồi tối làm nồi bê chao nóng hổi là chuẩn bài!"
+    ],
+    "tip": "Đi vào tháng 11-12 để ngắm hoa cải trắng nở rộ khắp thung lũng.",
+    "budget": "~700k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3606747,
+      "sourceKey": "dev/thang/uploads/e9e3cfee-44bf-4c6a-8650-8dcfae3a8d51/original.mp4",
+      "hlsPrefix": "dev/thang/videos/e9e3cfee-44bf-4c6a-8650-8dcfae3a8d51/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "12_caobang_bangioc",
+    "destinationKey": "cao-bang",
+    "title": "Thác Bản Giốc mùa nước đổ đẹp như tiên cảnh",
+    "location": "Trùng Khánh, Cao Bằng",
+    "category": "REVIEW",
+    "script": [
+      "Nếu phải chọn một thác nước hùng vĩ nhất Việt Nam, mình vote 100 điểm cho thác Bản Giốc!",
+      "Đứng từ xa đã nghe tiếng nước đổ ầm ầm, bọt tung trắng xóa giữa núi non trùng điệp.",
+      "Mua vé đi bè tre tiến sát chân thác chỉ 50 nghìn, cảm giác choáng ngợp thực sự.",
+      "Chiều nhớ ghé động Ngườm Ngao ngay gần đó, thạch nhũ bên trong đẹp như cung điện!"
+    ],
+    "tip": "Nên đi bè tre sát chân thác (50k/người) để cảm nhận hơi nước mát lạnh.",
+    "budget": "~850k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4089057,
+      "sourceKey": "dev/thang/uploads/aff13c0e-d337-4b97-b367-2e1c1dcfb9a4/original.mp4",
+      "hlsPrefix": "dev/thang/videos/aff13c0e-d337-4b97-b367-2e1c1dcfb9a4/r1",
+      "durationSec": 23,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "13_quynhon_kyco",
+    "destinationKey": "quy-nhon",
+    "title": "Đi Kỳ Co - Eo Gió Quy Nhơn hết bao nhiêu tiền?",
+    "location": "Quy Nhơn, Bình Định",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Quy Nhơn nước biển xanh trong chẳng kém gì Maldives mà chi phí lại siêu hạt dẻ!",
+      "Buổi sáng đi cano ra bãi Kỳ Co, cát trắng mịn và nước trong vắt nhìn thấy tận đáy.",
+      "Chiều qua Eo Gió đón gió biển lồng lộng, đi bộ trên con đường ven vách đá cực kỳ chill.",
+      "Tối về trung tâm ăn bánh xèo tôm nhảy và bún chả cá, tổng thiệt hại chưa tới 900 nghìn!"
+    ],
+    "tip": "Đặt combo cano Kỳ Co + lặn san hô Bãi Dứa sẽ rẻ hơn mua lẻ nhiều.",
+    "budget": "~900k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6294285,
+      "sourceKey": "dev/thang/uploads/f2d00ad4-25a5-4bbb-b078-3bebadcef2b0/original.mp4",
+      "hlsPrefix": "dev/thang/videos/f2d00ad4-25a5-4bbb-b078-3bebadcef2b0/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "14_phuyen_ghenhdadia",
+    "destinationKey": "phu-yen",
+    "title": "24h khám phá xứ hoa vàng trên cỏ xanh Phú Yên",
+    "location": "Tuy Hòa, Phú Yên",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Cùng mình trải qua 24 giờ trọn vẹn tại Phú Yên - vùng đất bình yên bậc nhất miền Trung!",
+      "6 giờ sáng đón bình minh tại Mũi Điện, ánh nắng đầu ngày rọi xuống biển đẹp nghẹt thở.",
+      "10 giờ trưa ghé Ghềnh Đá Đĩa check-in những khối đá bazan xếp chồng kỳ vĩ hiếm có.",
+      "Chiều dạo Bãi Xép ngắm biển, tối thưởng thức mắt cá ngừ đại dương hầm thuốc bắc siêu bổ!"
+    ],
+    "tip": "Dậy sớm đón bình minh ở Mũi Điện - nơi đón ánh mặt trời đầu tiên trên đất liền.",
+    "budget": "~750k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4685184,
+      "sourceKey": "dev/thang/uploads/3854d301-daca-4727-a60d-9e46c5a7f3d2/original.mp4",
+      "hlsPrefix": "dev/thang/videos/3854d301-daca-4727-a60d-9e46c5a7f3d2/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "15_condao_paradise",
+    "destinationKey": "con-dao",
+    "title": "Côn Đảo mùa biển êm: Tự túc hay đi Tour?",
+    "location": "Côn Đảo, Bà Rịa - Vũng Tàu",
+    "category": "VS_COMPARE",
+    "script": [
+      "Đi Côn Đảo nên tự túc hay đặt tour trọn gói? So sánh nhanh trong 30 giây nhé!",
+      "Nếu đi tự túc, bạn tự do thuê xe máy chạy cung đường ven biển Bãi Nhát đẹp mê hồn.",
+      "Còn nếu đi lần đầu muốn tìm hiểu lịch sử và lặn san hô Hòn Bảy Cạnh thì tour ghép tiện hơn.",
+      "Dù chọn cách nào, nhớ giữ gìn vệ sinh biển đảo và thử món kem dừa Côn Đảo nhé!"
+    ],
+    "tip": "Tháng 3 đến tháng 9 là mùa biển êm nhất, thích hợp đi tàu cao tốc hoặc bay thẳng.",
+    "budget": "~1.8tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3222806,
+      "sourceKey": "dev/thang/uploads/bd8cf3b0-af15-46a2-8edb-032e097f8e5c/original.mp4",
+      "hlsPrefix": "dev/thang/videos/bd8cf3b0-af15-46a2-8edb-032e097f8e5c/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "16_cantho_floating_market",
+    "destinationKey": "can-tho",
+    "title": "Đi chợ nổi Cái Răng lúc 5h sáng có gì vui?",
+    "location": "Cần Thơ",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Trải nghiệm ăn sáng lênh đênh trên sông ở chợ nổi Cái Răng, bạn đã thử bao giờ chưa?",
+      "5 giờ sáng lên ghe xuôi dòng sông Hậu, không khí mua bán trên ghe thuyền nhộn nhịp cực kỳ.",
+      "Gọi ngay một tô hủ tiếu nóng hổi và ly cà phê sữa đá chuyền từ ghe bên cạnh sang, vừa ăn vừa lắc lư.",
+      "Thêm vài trái khóm gọt sẵn ngọt lịm nữa, chi phí cả buổi sáng chỉ hơn 200 nghìn thôi!"
+    ],
+    "tip": "Thuê ghe nhỏ đi từ bến Ninh Kiều lúc 5h15 sáng để kịp lúc chợ đông đúc nhất.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4831304,
+      "sourceKey": "dev/thang/uploads/7aa3788f-8e71-4dbb-90e4-e72712d4c9ea/original.mp4",
+      "hlsPrefix": "dev/thang/videos/7aa3788f-8e71-4dbb-90e4-e72712d4c9ea/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "17_tamdao_weekend",
+    "destinationKey": "tam-dao",
+    "title": "Trốn nóng cuối tuần ở Tam Đảo chỉ với 600k",
+    "location": "Tam Đảo, Vĩnh Phúc",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Cuối tuần chán phố thị ồn ào? Lên ngay Tam Đảo cách Hà Nội chỉ hơn 1 tiếng chạy xe!",
+      "Không khí trên thị trấn mát lạnh quanh năm, sáng thức dậy là thấy mây bay ngang ban công.",
+      "Check-in Nhà Thờ Đá cổ kính, cầu Mây rồi ghé quán cafe lưng chừng núi ngắm thung lũng.",
+      "Lưu ý nhỏ: nên đặt phòng trước 1 tuần và kiểm tra phanh xe kỹ trước khi đổ đèo nhé!"
+    ],
+    "tip": "Cuối tuần đường dốc hay kẹt xe, nên xuất phát từ Hà Nội trước 7h sáng.",
+    "budget": "~600k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5633231,
+      "sourceKey": "dev/thang/uploads/b5d01182-7d5c-482b-8435-c37c5a2d96d0/original.mp4",
+      "hlsPrefix": "dev/thang/videos/b5d01182-7d5c-482b-8435-c37c5a2d96d0/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "18_mucangchai_rice",
+    "destinationKey": "mu-cang-chai",
+    "title": "Mùa lúa chín Mù Cang Chải: Đẹp rụng rời!",
+    "location": "Mù Cang Chải, Yên Bái",
+    "category": "REVIEW",
+    "script": [
+      "Mỗi năm chỉ có một mùa lúa chín, và Mù Cang Chải thực sự khiến ai đến cũng phải trầm trồ.",
+      "Những thửa ruộng bậc thang vàng óng trải dài tít tắp ôm lấy sườn núi đồi Mâm Xôi.",
+      "Chạy xe qua đèo Khau Phạ ngắm các vận động viên dù lượn bay giữa thung lũng Tú Lệ.",
+      "Tối nghỉ ở bản Thái, ăn xôi nếp Tú Lệ thơm dẻo, quá xứng đáng cho chuyến đi thanh xuân!"
+    ],
+    "tip": "Thời điểm lúa chín vàng rực rỡ nhất thường rơi vào cuối tháng 9 đến giữa tháng 10.",
+    "budget": "~800k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6853904,
+      "sourceKey": "dev/thang/uploads/118a1a54-e594-418a-9d59-3963c3312ee9/original.mp4",
+      "hlsPrefix": "dev/thang/videos/118a1a54-e594-418a-9d59-3963c3312ee9/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "19_lyson_island",
+    "destinationKey": "ly-son",
+    "title": "Đảo Lý Sơn: Vương quốc tỏi & nước biển xanh ngắt",
+    "location": "Lý Sơn, Quảng Ngãi",
+    "category": "TOP_LIST",
+    "script": [
+      "3 lý do khiến đảo Lý Sơn luôn nằm trong danh sách phải đi ít nhất một lần trong đời!",
+      "Đầu tiên là Cổng Tò Vò bằng đá núi lửa tự nhiên, đón hoàng hôn ở đây đẹp không tì vết.",
+      "Thứ hai là Đảo Bé với bãi tắm nước xanh như ngọc, lặn ngắm san hô cực kỳ dễ dàng.",
+      "Thứ ba là hải sản tươi roi rói cùng gỏi tỏi Lý Sơn đặc sản ăn một lần nhớ mãi!"
+    ],
+    "tip": "Nhớ qua Đảo Bé bằng cano 15 phút, nước ở đây trong nhất khu vực miền Trung.",
+    "budget": "~850k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4713787,
+      "sourceKey": "dev/thang/uploads/6d353189-fc30-4d68-85fc-c09283ea28a1/original.mp4",
+      "hlsPrefix": "dev/thang/videos/6d353189-fc30-4d68-85fc-c09283ea28a1/r1",
+      "durationSec": 25,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "20_vungtau_24h",
+    "destinationKey": "vung-tau",
+    "title": "Food tour Vũng Tàu 24h cho team mê ăn vặt",
+    "location": "Vũng Tàu",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Sáng ở Sài Gòn thèm gió biển? Phóng xuống Vũng Tàu làm ngay food tour 24 giờ cực đã!",
+      "Sáng ăn bánh khọt giòn rụm chấm nước mắm chua ngọt, uống thêm ly rau má đậu xanh mát rượi.",
+      "Trưa leo tượng Chúa Kitô đón gió biển từ trên cao, chiều ra Bãi Sau hóng hoàng hôn.",
+      "Tối làm phần lẩu cá đuối nóng hổi và yaourt Cô Tiên trên ngọn Hải Đăng là hết nước chấm!"
+    ],
+    "tip": "Bánh khọt Gốc Vú Sữa đông vào cuối tuần, nên đi tầm 10h sáng hoặc 14h chiều cho đỡ chờ.",
+    "budget": "~650k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4148285,
+      "sourceKey": "dev/thang/uploads/e38a7fee-2664-4770-9360-f88bd667274b/original.mp4",
+      "hlsPrefix": "dev/thang/videos/e38a7fee-2664-4770-9360-f88bd667274b/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "21_catba_lanha",
+    "destinationKey": "cat-ba",
+    "title": "Vịnh Lan Hạ Cát Bà: Đẹp ngang Hạ Long nhưng vắng hơn!",
+    "location": "Cát Bà, Hải Phòng",
+    "category": "VS_COMPARE",
+    "script": [
+      "Nên đi Vịnh Hạ Long hay Vịnh Lan Hạ? Nếu bạn thích sự yên tĩnh, hãy chọn Lan Hạ!",
+      "Vẫn là hàng trăm đảo đá vôi kỳ vĩ, nhưng Lan Hạ ít tàu lớn và giữ được nét hoang sơ.",
+      "Bạn có thể thuê xe đạp chạy xuyên vườn quốc gia Cát Bà hoặc chèo kayak quanh làng chài Cái Bèo.",
+      "Chi phí ăn nghỉ trên đảo cũng mềm hơn đáng kể, rất hợp cho nhóm bạn trẻ đi cuối tuần!"
+    ],
+    "tip": "Thuê kayak chèo từ bến Bèo ra khu vực Hang Sáng - Hang Tối cực kỳ yên tĩnh.",
+    "budget": "~1.1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4533772,
+      "sourceKey": "dev/thang/uploads/db466a29-8be0-40f1-9fc3-81e622d23f7d/original.mp4",
+      "hlsPrefix": "dev/thang/videos/db466a29-8be0-40f1-9fc3-81e622d23f7d/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "22_buonmathuot_coffee",
+    "destinationKey": "buon-ma-thuot",
+    "title": "Về thủ phủ cà phê Buôn Ma Thuột chill hết nấc",
+    "location": "Buôn Ma Thuột, Đắk Lắk",
+    "category": "REVIEW",
+    "script": [
+      "Dân nghiện cà phê nhất định phải làm một chuyến về thủ phủ Buôn Ma Thuột ngay nhé!",
+      "Điểm dừng chân đầu tiên là Bảo tàng Thế giới Cà phê với kiến trúc nhà dài Tây Nguyên độc đáo.",
+      "Chiều chạy ra thác Dray Nur hùng vĩ nghe tiếng nước đổ vang dội giữa đại ngàn.",
+      "Tối thưởng thức gà nướng Bản Đôn ăn kèm cơm lam và nhâm nhi ly cà phê rang xay tại chỗ!"
+    ],
+    "tip": "Ghé Bảo tàng Thế giới Cà phê vào buổi sáng sớm để chụp ảnh không dính người.",
+    "budget": "~700k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3963622,
+      "sourceKey": "dev/thang/uploads/c4375f06-af17-46ef-9f52-3a4123884224/original.mp4",
+      "hlsPrefix": "dev/thang/videos/c4375f06-af17-46ef-9f52-3a4123884224/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "23_angiang_trausu",
+    "destinationKey": "an-giang",
+    "title": "Rừng tràm Trà Sư An Giang mùa nước nổi xanh mướt",
+    "location": "Tịnh Biên, An Giang",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Mùa nước nổi miền Tây có gì đẹp? Hãy đến ngay rừng tràm Trà Sư ở An Giang!",
+      "Ngồi trên chiếc xuồng ba lá lướt nhẹ qua thảm bèo xanh mướt dưới tán tràm rợp bóng mát.",
+      "Mẹo nhỏ cho bạn: đi buổi sáng từ 7h đến 9h để nghe tiếng chim hót ríu rít khắp khu rừng.",
+      "Ra khỏi rừng nhớ ăn thử bánh xèo rau rừng và uống ly thốt nốt đá lạnh giải nhiệt nhé!"
+    ],
+    "tip": "Nên đi vào tháng 9-11 mùa nước nổi để thấy thảm bèo cám phủ xanh kín mặt nước.",
+    "budget": "~550k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5488992,
+      "sourceKey": "dev/thang/uploads/91a9e088-4356-48c4-b9da-8be24d8a8318/original.mp4",
+      "hlsPrefix": "dev/thang/videos/91a9e088-4356-48c4-b9da-8be24d8a8318/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "24_phanthiet_muine",
+    "destinationKey": "phan-thiet",
+    "title": "Mũi Né Phan Thiết: Đồi cát bay & cung đường biển đẹp nhất",
+    "location": "Phan Thiết, Bình Thuận",
+    "category": "TOP_LIST",
+    "script": [
+      "3 trải nghiệm không thể thiếu khi chạy cung đường biển Phan Thiết - Mũi Né!",
+      "Một là thuê xe Jeep leo Đồi Cát Trắng Bàu Trắng đón bình minh siêu ảo diệu.",
+      "Hai là lội bộ dọc Suối Tiên với những vách đá cát đỏ cam độc đáo có một không hai.",
+      "Ba là ngồi ở làng chài Mũi Né ngắm hàng trăm thuyền thúng và ăn hải sản nướng tại bãi!"
+    ],
+    "tip": "Thuê xe Jeep đón bình minh ở Đồi Cát Trắng (Bàu Trắng) tầm 5h sáng để tránh nắng.",
+    "budget": "~850k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3268294,
+      "sourceKey": "dev/thang/uploads/cbe1105f-29d1-405f-9886-c309d0a2233a/original.mp4",
+      "hlsPrefix": "dev/thang/videos/cbe1105f-29d1-405f-9886-c309d0a2233a/r1",
+      "durationSec": 24,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "25_bangkok_streetfood",
+    "destinationKey": null,
+    "title": "Food tour Bangkok 24h: Ăn gì ở chợ đêm Jodd Fairs?",
+    "location": "Bangkok, Thái Lan",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Đi Bangkok mà chưa ghé chợ đêm Jodd Fairs ăn sườn cay khổng lồ là thiếu sót lớn lắm nha!",
+      "Buổi sáng viếng chùa Wat Arun bên bờ sông Chao Phraya, nhớ thuê bộ đồ Thái chụp ảnh cực sang.",
+      "Chiều dạo khu Siam uống trà sữa Thái đậm vị, tối lên thẳng chợ đêm Jodd Fairs.",
+      "Nào là gỏi đu đủ Somtum, xôi xoài béo ngậy, pad Thái nóng hổi, ăn no nê mà giá cực mềm!"
+    ],
+    "tip": "Dùng tàu điện BTS/MRT để tránh kẹt xe giờ cao điểm ở trung tâm Bangkok.",
+    "budget": "~1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 12092595,
+      "sourceKey": "dev/thang/uploads/d0d6e1cc-0f16-440f-a633-57849d44f8cb/original.mp4",
+      "hlsPrefix": "dev/thang/videos/d0d6e1cc-0f16-440f-a633-57849d44f8cb/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "26_chiangmai_chill",
+    "destinationKey": null,
+    "title": "Chiang Mai: Thành phố chậm rãi cho dân mê cafe",
+    "location": "Chiang Mai, Thái Lan",
+    "category": "REVIEW",
+    "script": [
+      "Nếu Bangkok quá ồn ào, hãy thử bay lên Chiang Mai để sống chậm lại vài ngày!",
+      "Khu phố Nimman tập trung hàng chục quán cafe thiết kế siêu nghệ và đồ uống cực ngon.",
+      "Buổi sáng lên chùa Doi Suthep trên đỉnh núi ngắm toàn cảnh thành phố trong sương.",
+      "Cuối tuần nhất định phải đi chợ đêm Sunday Walking Street mua đồ thủ công xinh xắn!"
+    ],
+    "tip": "Thuê xe songthaew đỏ hoặc Grab bike di chuyển giữa khu Phố Cổ và Nimman.",
+    "budget": "~900k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 7225722,
+      "sourceKey": "dev/thang/uploads/232b83bd-b22d-4fe6-aa1f-ae4f28e37606/original.mp4",
+      "hlsPrefix": "dev/thang/videos/232b83bd-b22d-4fe6-aa1f-ae4f28e37606/r1",
+      "durationSec": 25,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "27_singapore_budget",
+    "destinationKey": null,
+    "title": "Mẹo đi Singapore 3 ngày không bị 'cháy ví'",
+    "location": "Singapore",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Ai bảo đi Singapore đắt đỏ? Áp dụng ngay 3 mẹo này để tiết kiệm nửa tiền ăn ở nhé!",
+      "Thứ nhất, ăn uống tại các khu Hawker Centre như Maxwell hay Lau Pa Sat, ngon bổ rẻ chỉ 5-7 đô.",
+      "Thứ hai, dùng thẻ thanh toán chạm thẳng ở cổng MRT và xe buýt, không cần mua vé lẻ.",
+      "Thứ ba, ngắm show nhạc nước ở Marina Bay Sands và Gardens by the Bay hoàn toàn miễn phí!"
+    ],
+    "tip": "Mang theo chai nước rỗng để hứng nước uống miễn phí tại các điểm tham quan, tiết kiệm khối tiền!",
+    "budget": "~2.2tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3847073,
+      "sourceKey": "dev/thang/uploads/d169582c-1d22-427f-94b9-4207dde39eb0/original.mp4",
+      "hlsPrefix": "dev/thang/videos/d169582c-1d22-427f-94b9-4207dde39eb0/r1",
+      "durationSec": 30,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "28_tokyo_first_time",
+    "destinationKey": null,
+    "title": "Lần đầu đi Tokyo: Nên ở khu Shinjuku hay Asakusa?",
+    "location": "Tokyo, Nhật Bản",
+    "category": "VS_COMPARE",
+    "script": [
+      "Lần đầu tới Tokyo nên chọn khách sạn ở khu Shinjuku náo nhiệt hay Asakusa cổ kính?",
+      "Shinjuku tiện di chuyển đi núi Phú Sĩ, shopping xuyên đêm và gần ngã tư Shibuya sầm uất.",
+      "Ngược lại, Asakusa có giá phòng mềm hơn, yên tĩnh và đi bộ ra chùa Senso-ji cực gần.",
+      "Kinh nghiệm của mình: đi nhóm bạn trẻ chọn Shinjuku, đi gia đình thì chọn Asakusa là chuẩn nhất!"
+    ],
+    "tip": "Mua thẻ Suica/Pasmo trên Apple Wallet hoặc Google Wallet để đi tàu điện cực nhanh.",
+    "budget": "~2.5tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 9079475,
+      "sourceKey": "dev/thang/uploads/5693c99f-172f-46bd-80aa-0d88c39573fe/original.mp4",
+      "hlsPrefix": "dev/thang/videos/5693c99f-172f-46bd-80aa-0d88c39573fe/r1",
+      "durationSec": 30,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "29_kyoto_autumn",
+    "destinationKey": null,
+    "title": "Kyoto mùa lá đỏ: Lịch trình 1 ngày chuẩn không cần chỉnh",
+    "location": "Kyoto, Nhật Bản",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Mùa thu Kyoto đẹp như một bức tranh thủy mặc! Đây là lịch trình 1 ngày tối ưu nhất cho bạn.",
+      "6 giờ rưỡi sáng có mặt tại cổng Torii ngàn cột Fushimi Inari, ánh nắng sớm lên hình cực phẩm.",
+      "Trưa ghé chợ Nishiki thưởng thức xiên bạch tuộc, matcha kem tươi và đậu hũ Kyoto.",
+      "Chiều ngắm lá đỏ rực rỡ tại chùa Kiyomizu-dera rồi dạo phố cổ Gion lúc lên đèn!"
+    ],
+    "tip": "Đến Fushimi Inari và rừng trúc Arashiyama trước 7h sáng để tránh biển người.",
+    "budget": "~2.2tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 10887374,
+      "sourceKey": "dev/thang/uploads/30148162-5b5b-4582-92cc-cddf45df80b6/original.mp4",
+      "hlsPrefix": "dev/thang/videos/30148162-5b5b-4582-92cc-cddf45df80b6/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "30_seoul_food",
+    "destinationKey": null,
+    "title": "Food tour Seoul: Chợ Gwangjang & phố đêm Myeongdong",
+    "location": "Seoul, Hàn Quốc",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Đến Seoul mà không dành một buổi tối càn quét chợ Gwangjang thì phí cả chuyến đi!",
+      "Ngồi ngay quầy bà cô gọi bánh kếp đậu xanh nóng giòn, kimbap mini và chả cá xiên bốc khói.",
+      "Buổi chiều mặc Hanbok miễn phí vé vào cung Gyeongbokgung chụp ảnh sống ảo cực chất.",
+      "Tối lượn phố Myeongdong mua mỹ phẩm và ăn gà rán phô mai chuẩn vị Hàn Quốc!"
+    ],
+    "tip": "Đổi sẵn ít tiền mặt Won để ăn vặt ở các sạp chợ truyền thống vì nhiều quầy không nhận thẻ.",
+    "budget": "~1.8tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 9463860,
+      "sourceKey": "dev/thang/uploads/d9f54b64-63ba-44f8-873b-3f026cdb3219/original.mp4",
+      "hlsPrefix": "dev/thang/videos/d9f54b64-63ba-44f8-873b-3f026cdb3219/r1",
+      "durationSec": 25,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "31_taipei_nightmarket",
+    "destinationKey": null,
+    "title": "Đài Bắc 3N2Đ: Trà sữa, phố cổ Cửu Phần & chợ đêm",
+    "location": "Đài Bắc, Đài Loan",
+    "category": "TOP_LIST",
+    "script": [
+      "Đài Loan vừa gần vừa rẻ lại siêu nhiều đồ ăn ngon! Check ngay 3 điểm hot nhất Đài Bắc.",
+      "Số 1 là làng cổ Cửu Phần lung linh đèn lồng đỏ trên sườn núi nhìn y hệt phim hoạt hình Ghibli.",
+      "Số 2 là tháp Taipei 101 và khu Xinyi hiện đại với hàng loạt quán trà sữa trứ danh.",
+      "Số 3 là chợ đêm Sĩ Lâm với món gà chiên khổng lồ và đậu hũ thối trứ danh!"
+    ],
+    "tip": "Mua EasyCard ngay tại sân bay Đào Viên để đi tàu MRT, tàu hỏa và mua đồ ở 7-Eleven.",
+    "budget": "~1.5tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 17512439,
+      "sourceKey": "dev/thang/uploads/c811546d-c77c-4c23-9a38-742f213ef8d9/original.mp4",
+      "hlsPrefix": "dev/thang/videos/c811546d-c77c-4c23-9a38-742f213ef8d9/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "32_bali_ubud",
+    "destinationKey": null,
+    "title": "Bali không chỉ có biển: Khám phá rừng xanh Ubud",
+    "location": "Ubud, Bali",
+    "category": "REVIEW",
+    "script": [
+      "Nhiều người đến Bali chỉ nằm ở biển, nhưng trái tim thực sự của Bali nằm ở vùng núi Ubud!",
+      "Buổi sáng ngồi xích đu giữa ruộng bậc thang Tegalalang ngắm mặt trời mọc cực kỳ thư giãn.",
+      "Trưa ghé một quán cafe view rừng nhiệt đới ăn smoothie bowl tươi mát.",
+      "Chiều xem múa lửa Kecak trên vách đá đền Uluwatu đón hoàng hôn Ấn Độ Dương huyền ảo!"
+    ],
+    "tip": "Thuê tài xế riêng cả ngày ở Bali giá rất rẻ (khoảng 700-900k/xe) và đỡ lo lạc đường.",
+    "budget": "~1.3tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4218742,
+      "sourceKey": "dev/thang/uploads/07968e66-ade5-432c-ab89-c238878770d2/original.mp4",
+      "hlsPrefix": "dev/thang/videos/07968e66-ade5-432c-ab89-c238878770d2/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "33_kualalumpur_budget",
+    "destinationKey": null,
+    "title": "Kuala Lumpur: Check-in tháp đôi Petronas & động Batu",
+    "location": "Kuala Lumpur, Malaysia",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Một ngày dạo quanh Kuala Lumpur hết bao nhiêu? Cực kỳ hạt dẻ luôn mọi người ơi!",
+      "Sáng sớm đi tàu tới động Batu leo 272 bậc thang cầu vồng rực rỡ sắc màu.",
+      "Trưa về phố Bukit Bintang ăn cơm gà Hải Nam và trà kéo Teh Tarik béo thơm.",
+      "Tối đứng dưới chân tháp đôi Petronas xem nhạc nước và chụp ảnh lung linh miễn phí!"
+    ],
+    "tip": "Đi tàu KTM Komuter thẳng tới cửa động Batu cực rẻ, không lo bị kẹt xe.",
+    "budget": "~1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 14286702,
+      "sourceKey": "dev/thang/uploads/5b84a9d6-0e30-421d-b1d5-cdb3bd3e02bd/original.mp4",
+      "hlsPrefix": "dev/thang/videos/5b84a9d6-0e30-421d-b1d5-cdb3bd3e02bd/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "34_dalat_rainy_vs_dry",
+    "destinationKey": "da-lat",
+    "title": "Đà Lạt mùa mưa vs mùa khô: Nên đi lúc nào?",
+    "location": "Đà Lạt, Lâm Đồng",
+    "category": "VS_COMPARE",
+    "script": [
+      "Đi Đà Lạt mùa mưa hay mùa khô thích hơn? Mỗi mùa lại có một cái hay riêng đấy!",
+      "Mùa khô từ tháng 11 đến tháng 3 trời nắng đẹp, cực kỳ hợp để săn mây và chụp ảnh hoa mai anh đào.",
+      "Còn mùa mưa tầm tháng 7-8 lại mang vẻ buồn lãng mạn, ngồi quán cafe gỗ nghe mưa và ăn lẩu gà lá é.",
+      "Nếu lần đầu đi, mình khuyên bạn chọn mùa khô để lịch trình ngoài trời không bị gián đoạn nhé!"
+    ],
+    "tip": "Tháng 11 đến tháng 3 là mùa khô, trời xanh ngắt, có hoa dã quỳ và mai anh đào.",
+    "budget": "~800k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6465381,
+      "sourceKey": "dev/thang/uploads/e6ee2415-a037-4027-976c-a22ffa122533/original.mp4",
+      "hlsPrefix": "dev/thang/videos/e6ee2415-a037-4027-976c-a22ffa122533/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "35_hanoi_old_quarter",
+    "destinationKey": "ha-noi",
+    "title": "36 phố phường Hà Nội: Ăn sáng như người bản địa",
+    "location": "Hà Nội",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Sáng ở phố cổ Hà Nội ăn gì cho chuẩn gu người bản địa? Theo chân mình ngay nhé!",
+      "7 giờ sáng làm một tô phở bò tái lăn nóng hổi, nước dùng ngọt thanh thơm mùi gừng nướng.",
+      "8 giờ rẽ vào ngõ nhỏ phố Nguyễn Hữu Huân gọi ly cà phê trứng béo ngậy phủ lớp kem mịn.",
+      "Trưa ăn bún chả nướng than hoa thơm lừng rồi dạo hồ Hoàn Kiếm hóng gió thu mát rượi!"
+    ],
+    "tip": "Đi bộ quanh Hồ Gươm vào cuối tuần khi có phố đi bộ để cảm nhận nhịp sống Thủ đô.",
+    "budget": "~400k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4837296,
+      "sourceKey": "dev/thang/uploads/04108f5f-bbac-400c-9dd6-72f9048ec3f7/original.mp4",
+      "hlsPrefix": "dev/thang/videos/04108f5f-bbac-400c-9dd6-72f9048ec3f7/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "36_saigon_night",
+    "destinationKey": "sai-gon",
+    "title": "Sài Gòn về đêm: Ăn gì chơi gì không ngủ?",
+    "location": "TP. Hồ Chí Minh",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Sài Gòn ban ngày năng động nhưng về đêm mới thực sự bung xõa hết cỡ!",
+      "6 giờ tối lên xe buýt 2 tầng chạy dọc phố đi bộ Nguyễn Huệ và nhà hát Thành phố.",
+      "8 giờ tối ghé phố ẩm thực Vĩnh Khánh làm vài đĩa ốc xào bơ tỏi thơm nức mũi.",
+      "10 giờ đêm ra công viên bến Bạch Đằng ngồi uống trà đào ngắm tòa Landmark 81 rực sáng!"
+    ],
+    "tip": "Trải nghiệm xe buýt 2 tầng ngắm thành phố về đêm cực chill với giá từ 150k.",
+    "budget": "~700k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 2216990,
+      "sourceKey": "dev/thang/uploads/52358309-7bca-4e7d-a30d-51fd71e3076c/original.mp4",
+      "hlsPrefix": "dev/thang/videos/52358309-7bca-4e7d-a30d-51fd71e3076c/r1",
+      "durationSec": 24,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "37_phuquoc_north_vs_south",
+    "destinationKey": "phu-quoc",
+    "title": "Phú Quốc: Chọn Bắc Đảo hay Nam Đảo?",
+    "location": "Phú Quốc, Kiên Giang",
+    "category": "VS_COMPARE",
+    "script": [
+      "Đi Phú Quốc nên đặt phòng ở Bắc Đảo hay Nam Đảo? Đừng chọn nhầm kẻo đi lại mệt lắm nha!",
+      "Bắc Đảo hợp với gia đình có trẻ nhỏ nhờ có VinWonders, Safari và thành phố không ngủ Grand World.",
+      "Nam Đảo lại là thiên đường biển đẹp như Bãi Sao, cáp treo Hòn Thơm và thị trấn Hoàng Hôn.",
+      "Tip nhỏ: chia nửa chuyến đi ở mỗi khu sẽ giúp bạn tiết kiệm cả tiếng đồng hồ chạy xe mỗi ngày!"
+    ],
+    "tip": "Nếu đi 4 ngày 3 đêm, hãy chia 2 đêm ở Bắc Đảo và 2 đêm ở Nam Đảo cho tiện di chuyển.",
+    "budget": "~1.3tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6892266,
+      "sourceKey": "dev/thang/uploads/8b4b7d8b-d337-4c17-bf9b-e1d4e0235e66/original.mp4",
+      "hlsPrefix": "dev/thang/videos/8b4b7d8b-d337-4c17-bf9b-e1d4e0235e66/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "38_ninhbinh_2days",
+    "destinationKey": "ninh-binh",
+    "title": "Mẹo chụp ảnh Ninh Bình không dính đám đông",
+    "location": "Ninh Bình",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Tại sao người ta đi Ninh Bình chụp ảnh vắng tanh còn mình đi toàn thấy người? Xem ngay bí kíp!",
+      "Thứ nhất, ở bến thuyền Tràng An hãy chọn tuyến số 3 thay vì tuyến số 1 truyền thống.",
+      "Thứ hai, ghé chùa Bích Động vào lúc 7 giờ rưỡi sáng khi các đoàn xe du lịch chưa tới.",
+      "Thứ ba, đạp xe dọc đầm Vân Long buổi chiều vừa yên bình vừa dễ bắt được đàn cò trắng bay về tổ!"
+    ],
+    "tip": "Chọn tuyến 2 hoặc tuyến 3 ở Tràng An sẽ ít thuyền hơn tuyến 1 mà cảnh vẫn cực đẹp.",
+    "budget": "~650k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 7877275,
+      "sourceKey": "dev/thang/uploads/b79cef1f-1361-4ac1-9732-fef071dffc12/original.mp4",
+      "hlsPrefix": "dev/thang/videos/b79cef1f-1361-4ac1-9732-fef071dffc12/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "39_hoian_lanterns",
+    "destinationKey": "hoi-an",
+    "title": "Trải nghiệm tự làm đèn lồng & thả hoa đăng Hội An",
+    "location": "Hội An, Quảng Nam",
+    "category": "REVIEW",
+    "script": [
+      "Đến Hội An ngoài chụp ảnh phố cổ, bạn nhất định phải thử tự tay làm một chiếc đèn lồng nhé!",
+      "Chỉ với khoảng 150 nghìn, nghệ nhân sẽ hướng dẫn bạn uốn khung tre và bọc vải lụa nhiều màu.",
+      "Tối đến ra bến sông Hoài đi thuyền gỗ, thả chiếc hoa đăng nhỏ và ước một điều bình an.",
+      "Ánh đèn phản chiếu trên mặt nước tạo nên khung cảnh lãng mạn không nơi nào có được!"
+    ],
+    "tip": "Lớp học làm đèn lồng chỉ mất khoảng 1 tiếng và có thể mang thành phẩm về làm kỷ niệm.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3544244,
+      "sourceKey": "dev/thang/uploads/43643712-3a3b-461b-8167-b8e335c943b5/original.mp4",
+      "hlsPrefix": "dev/thang/videos/43643712-3a3b-461b-8167-b8e335c943b5/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "40_sapa_fansipan_tips",
+    "destinationKey": "sa-pa",
+    "title": "5 lưu ý khi lên đỉnh Fansipan để không bị sốc lạnh",
+    "location": "Sa Pa, Lào Cai",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Lên đỉnh Fansipan đừng chủ quan mặc mỏng nhé, nhiệt độ trên đỉnh có thể tụt xuống rất nhanh!",
+      "Thứ nhất, luôn mang theo áo gió chống nước, mũ len và miếng dán giữ nhiệt bỏ túi.",
+      "Thứ hai, đi tàu hỏa leo núi kết hợp cáp treo và nhớ mang theo chút kẹo ngọt tránh tụt đường huyết.",
+      "Thứ ba, check dự báo thời tiết trước trên app để săn đúng hôm trời quang mây tạnh nhé!"
+    ],
+    "tip": "Đỉnh Fansipan cao 3143m thường lạnh hơn thị trấn Sa Pa từ 8 đến 10 độ C.",
+    "budget": "~1.1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 2957486,
+      "sourceKey": "dev/thang/uploads/305e1f84-f5c6-4dae-a64d-263b3f45f8f1/original.mp4",
+      "hlsPrefix": "dev/thang/videos/305e1f84-f5c6-4dae-a64d-263b3f45f8f1/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "41_danang_cafes",
+    "destinationKey": "da-nang",
+    "title": "Top 3 quán cafe view biển đẹp nhất Đà Nẵng",
+    "location": "Đà Nẵng",
+    "category": "TOP_LIST",
+    "script": [
+      "Team mê cafe sống ảo ở Đà Nẵng lưu ngay 3 quán view biển đỉnh của chóp này lại!",
+      "Đầu tiên là khu vực bán đảo Sơn Trà, nơi có những quán cafe thiết kế phong cách Địa Trung Hải trắng muốt.",
+      "Tiếp theo là dọc đường Võ Nguyên Giáp nhìn thẳng ra bãi biển Mỹ Khê rì rào sóng vỗ.",
+      "Gọi một ly sinh tố xoài mát lạnh ngồi ngắm hoàng hôn buông xuống, chill hết nấc luôn!"
+    ],
+    "tip": "Ngồi cafe ven biển Sơn Trà lúc 16h30 là đẹp nhất vì nắng dịu và biển xanh ngắt.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5509268,
+      "sourceKey": "dev/thang/uploads/5dc6775d-6511-46b9-b1fc-048a0c110b75/original.mp4",
+      "hlsPrefix": "dev/thang/videos/5dc6775d-6511-46b9-b1fc-048a0c110b75/r1",
+      "durationSec": 25,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "42_hue_royal_food",
+    "destinationKey": "hue",
+    "title": "Đặc sản cung đình Huế giá bình dân cực dễ tìm",
+    "location": "TP. Huế",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Nhiều bạn nghĩ ẩm thực Huế đắt đỏ, nhưng thực ra chỉ 400 nghìn là ăn no cả ngày rồi!",
+      "Buổi sáng ăn bánh bèo, bánh nậm, bánh lọc gói lá chuối dẻo thơm chỉ 25 nghìn một đĩa.",
+      "Trưa làm tô cơm hến cay nồng giòn rụm tóp mỡ, thêm ly chè bột lọc heo quay độc lạ.",
+      "Chiều tối ghé quán bánh ép Thuận An ăn nóng tại lò, vị ngon khó cưỡng luôn!"
+    ],
+    "tip": "Ghé chợ Đông Ba hoặc các hẻm đường Nguyễn Công Trứ để ăn đủ món Huế chuẩn vị gốc.",
+    "budget": "~450k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5454139,
+      "sourceKey": "dev/thang/uploads/9f8e3b10-d13b-4b16-a904-fdfa78f14b0e/original.mp4",
+      "hlsPrefix": "dev/thang/videos/9f8e3b10-d13b-4b16-a904-fdfa78f14b0e/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "43_nhatrang_mudbath",
+    "destinationKey": "nha-trang",
+    "title": "Tắm bùn khoáng Nha Trang: Có đáng tiền không?",
+    "location": "Nha Trang, Khánh Hòa",
+    "category": "REVIEW",
+    "script": [
+      "Đi Nha Trang nghe nói nhiều về tắm bùn khoáng, liệu trải nghiệm này có thực sự đáng tiền?",
+      "Sau một buổi sáng bơi lội ngoài đảo, ngâm mình trong bồn bùn khoáng ấm giúp cơ thể thư giãn tức thì.",
+      "Bùn ở đây mịn, không bị mùi khó chịu, tắm xong da dẻ cảm giác mịn màng hơn hẳn.",
+      "Thêm phần ngâm hồ khoáng nóng và thác nước ôn tuyền nữa, quá hợp để hồi sức cho cả nhà!"
+    ],
+    "tip": "Nên đi tắm bùn vào buổi chiều sau khi đã đi biển hoặc lặn san hô buổi sáng.",
+    "budget": "~750k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3354661,
+      "sourceKey": "dev/thang/uploads/2ff5c1df-0dfc-43bc-b09c-eb80d7581c67/original.mp4",
+      "hlsPrefix": "dev/thang/videos/2ff5c1df-0dfc-43bc-b09c-eb80d7581c67/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "44_halong_museum",
+    "destinationKey": "ha-long",
+    "title": "Góc check-in Bảo tàng Quảng Ninh cực chất ở Hạ Long",
+    "location": "Hạ Long, Quảng Ninh",
+    "category": "REVIEW",
+    "script": [
+      "Đến Hạ Long đừng chỉ đi vịnh, hãy ghé ngay Bảo tàng Quảng Ninh với mặt kính đen siêu ngầu!",
+      "Chỉ cần đứng ở bậc thang ngoài trời thôi là đã có ngay bộ ảnh kiến trúc tối giản cực nghệ.",
+      "Bên trong trưng bày bộ xương cá voi khổng lồ và mô hình mỏ than sống động như thật.",
+      "Vé vào cửa chỉ 40 nghìn, quá hời cho một buổi sáng vừa học vừa sống ảo!"
+    ],
+    "tip": "Bảo tàng đóng cửa vào thứ 2 hàng tuần, nhớ sắp xếp lịch đi từ thứ 3 đến Chủ nhật.",
+    "budget": "~400k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4105469,
+      "sourceKey": "dev/thang/uploads/a7e25ff7-778a-47a3-9aa8-5c1a31daa96a/original.mp4",
+      "hlsPrefix": "dev/thang/videos/a7e25ff7-778a-47a3-9aa8-5c1a31daa96a/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "45_phanthiet_winery",
+    "destinationKey": "phan-thiet",
+    "title": "Khám phá lâu đài rượu vang & làng chài Mũi Né",
+    "location": "Phan Thiết, Bình Thuận",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Lịch trình 1 ngày vừa sang chảnh vừa dân dã tại Phan Thiết dành cho bạn nè!",
+      "Sáng sớm ra làng chài Mũi Né xem ngư dân kéo lưới và mua ghẹ tươi hấp tại chỗ.",
+      "Đầu giờ chiều ghé Lâu đài Rượu vang kiến trúc châu Âu cổ điển, thử rượu vang dưới hầm mát lạnh.",
+      "Tối dạo bờ kè ăn lẩu thả đặc sản Phan Thiết với hương vị thanh mát cực kỳ lạ miệng!"
+    ],
+    "tip": "Nên ghé Lâu đài Rượu vang vào đầu giờ chiều để tránh nắng gắt ngoài trời.",
+    "budget": "~900k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6820654,
+      "sourceKey": "dev/thang/uploads/56361894-f0dc-4a2d-bedc-a179507df42f/original.mp4",
+      "hlsPrefix": "dev/thang/videos/56361894-f0dc-4a2d-bedc-a179507df42f/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "46_phuquoc_sunset_town",
+    "destinationKey": "phu-quoc",
+    "title": "Thị trấn Hoàng Hôn Phú Quốc: Châu Âu thu nhỏ giữa biển",
+    "location": "An Thới, Phú Quốc",
+    "category": "REVIEW",
+    "script": [
+      "Không cần bay sang Ý, ngay tại Nam Đảo Phú Quốc đã có một thị trấn Địa Trung Hải rực rỡ!",
+      "Những dãy nhà nhiều màu sắc xếp tầng dọc sườn đồi hướng thẳng ra biển xanh bao la.",
+      "Điểm nhấn ấn tượng nhất là Cầu Hôn với hai nhánh cầu gần như chạm nhau giữa hoàng hôn đỏ rực.",
+      "Tối ở lại xem show pháo hoa nghệ thuật trên mặt biển nữa là trọn vẹn một ngày đáng nhớ!"
+    ],
+    "tip": "Đứng tại Cầu Hôn (Kiss Bridge) lúc 17h45 để chụp ảnh mặt trời lặn ngay giữa hai nhịp cầu.",
+    "budget": "~1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 8414124,
+      "sourceKey": "dev/thang/uploads/8fa2a27f-e973-4f63-b161-d99e79534add/original.mp4",
+      "hlsPrefix": "dev/thang/videos/8fa2a27f-e973-4f63-b161-d99e79534add/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "47_hagiang_lo_lo_chai",
+    "destinationKey": "ha-giang",
+    "title": "Lô Lô Chải: Ngôi làng cổ tích dưới chân cột cờ Lũng Cú",
+    "location": "Lũng Cú, Hà Giang",
+    "category": "REVIEW",
+    "script": [
+      "Nếu đến Hà Giang, nhất định bạn phải ngủ lại một đêm ở bản Lô Lô Chải ngay dưới cột cờ Lũng Cú!",
+      "Cả ngôi làng bình yên với những căn nhà trình tường đất vàng mái ngói âm dương cổ kính.",
+      "Ngồi nhâm nhi ly cà phê Cực Bắc giữa không gian tĩnh lặng, cảm giác thời gian như ngừng trôi.",
+      "Sáng hôm sau leo lên cột cờ Lũng Cú ngắm lá cờ đỏ sao vàng tung bay giữa trời biên giới!"
+    ],
+    "tip": "Đặt phòng homestay nhà trình tường ở Lô Lô Chải trước ít nhất 2 tuần vào mùa cao điểm.",
+    "budget": "~700k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 5141239,
+      "sourceKey": "dev/thang/uploads/838fced1-d1cd-4e00-ba5a-705d45af6744/original.mp4",
+      "hlsPrefix": "dev/thang/videos/838fced1-d1cd-4e00-ba5a-705d45af6744/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "48_camau_cape",
+    "destinationKey": "ca-mau",
+    "title": "Chạm tay vào cột mốc Đất Mũi Cà Mau cực Nam Tổ quốc",
+    "location": "Đất Mũi, Cà Mau",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Hành trình về cực Nam Tổ quốc - Đất Mũi Cà Mau có gì đặc biệt? Theo chân mình khám phá nhé!",
+      "Sáng sớm chạy xe xuyên qua những cánh rừng đước bạt ngàn xanh mướt của khu dự trữ sinh quyển.",
+      "Trưa đứng check-in tại biểu tượng con tàu hướng ra biển Đông và cột mốc tọa độ quốc gia.",
+      "Tối thưởng thức cua Cà Mau gạch son chắc thịt và cá thòi lòi nướng muối ớt thơm lừng!"
+    ],
+    "tip": "Mang theo thuốc xịt chống muỗi khi đi xuyên rừng ngập mặn Vườn quốc gia Mũi Cà Mau.",
+    "budget": "~800k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4530127,
+      "sourceKey": "dev/thang/uploads/0d24949f-aa16-44ab-bfb7-b01072e966c7/original.mp4",
+      "hlsPrefix": "dev/thang/videos/0d24949f-aa16-44ab-bfb7-b01072e966c7/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "49_dalat_night_market",
+    "destinationKey": "da-lat",
+    "title": "Đi chợ đêm Đà Lạt: Nên ăn gì và tránh gì?",
+    "location": "Đà Lạt, Lâm Đồng",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Chợ đêm Đà Lạt vui thật đấy, nhưng đi sao cho ngon mà không bị hớ? Lưu ngay 3 mẹo này!",
+      "Thứ nhất, nhất định phải thử sữa đậu nành nóng, bánh tráng nướng và dâu lắc muối ớt.",
+      "Thứ hai, với các hàng đồ nướng hải sản tự chọn, hãy hỏi kỹ giá từng xiên hoặc đĩa trước khi ăn.",
+      "Thứ ba, gửi xe ở bãi có niêm yết giá rõ ràng bên ngoài để tránh bị thu phí cao cuối tuần nhé!"
+    ],
+    "tip": "Luôn hỏi giá rõ ràng trước khi ngồi xuống các quán hải sản nướng vỉa hè ở chợ đêm.",
+    "budget": "~400k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 6824904,
+      "sourceKey": "dev/thang/uploads/ce4035cf-c27a-46dc-9b81-d3b63c94470b/original.mp4",
+      "hlsPrefix": "dev/thang/videos/ce4035cf-c27a-46dc-9b81-d3b63c94470b/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "50_sapa_vs_dalat",
+    "destinationKey": "sa-pa",
+    "title": "Chọn Sa Pa hay Đà Lạt cho kỳ nghỉ 3 ngày?",
+    "location": "Việt Nam",
+    "category": "VS_COMPARE",
+    "script": [
+      "Đứng giữa hai lựa chọn Sa Pa và Đà Lạt, bạn nên chốt kèo đi đâu cho kỳ nghỉ 3 ngày sắp tới?",
+      "Đà Lạt ghi điểm với hàng trăm quán cafe đẹp, đường phố thơ mộng và đồ ăn vặt siêu đa dạng.",
+      "Sa Pa lại mang vẻ hùng vĩ của núi rừng Tây Bắc, ruộng bậc thang và trải nghiệm văn hóa bản địa đậm nét.",
+      "Tóm lại: thích chill nhẹ nhàng chọn Đà Lạt, thích thiên nhiên choáng ngợp hãy chọn Sa Pa!"
+    ],
+    "tip": "Miền Bắc nên chọn Đà Lạt nếu muốn đổi gió cao nguyên; miền Nam ra Sa Pa để săn tuyết/mây.",
+    "budget": "~900k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 11836962,
+      "sourceKey": "dev/thang/uploads/0f75512a-50d8-4c98-86be-919b8913345b/original.mp4",
+      "hlsPrefix": "dev/thang/videos/0f75512a-50d8-4c98-86be-919b8913345b/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "51_danang_marble_mountains",
+    "destinationKey": "da-nang",
+    "title": "Ngũ Hành Sơn Đà Nẵng: Leo núi khám phá hang động huyền bí",
+    "location": "Ngũ Hành Sơn, Đà Nẵng",
+    "category": "REVIEW",
+    "script": [
+      "Ngay giữa Đà Nẵng và Hội An có một quần thể núi đá cẩm thạch cực kỳ ấn tượng là Ngũ Hành Sơn!",
+      "Điểm thú vị nhất là động Huyền Không với giếng trời tự nhiên chiếu thẳng ánh nắng xuống tượng Phật.",
+      "Nếu ngại leo bậc thang, bạn có thể đi thang máy kính ngắm toàn cảnh bãi biển Non Nước từ trên cao.",
+      "Vé tham quan chỉ 40 nghìn, rất hợp cho một buổi sáng khám phá thiên nhiên và tâm linh!"
+    ],
+    "tip": "Có thang máy kính lên núi Thủy Sơn (15k/lượt) dành cho ai không muốn leo bộ bậc đá.",
+    "budget": "~450k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4997210,
+      "sourceKey": "dev/thang/uploads/5b36df95-5f47-4c29-9f5c-c1fea5889b89/original.mp4",
+      "hlsPrefix": "dev/thang/videos/5b36df95-5f47-4c29-9f5c-c1fea5889b89/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "52_hoian_coconut_forest",
+    "destinationKey": "hoi-an",
+    "title": "Quẩy tung rừng dừa Bảy Mẫu Hội An trên thuyền thúng",
+    "location": "Cẩm Thanh, Hội An",
+    "category": "REVIEW",
+    "script": [
+      "Về Hội An mà chưa ngồi thuyền thúng xoay vòng ở rừng dừa Bảy Mẫu thì hơi bị tiếc luôn!",
+      "Các bác chèo thuyền cực kỳ vui tính, vừa chèo vừa hát và làm tặng du khách nhẫn lá dừa xinh xắn.",
+      "Không khí giữa rừng dừa nước xanh mát rượi, tách biệt hoàn toàn với cái nắng miền Trung.",
+      "Chi phí thuê thuyền rất rẻ, đi nhóm 2 người một thúng chụp ảnh bao đẹp luôn!"
+    ],
+    "tip": "Nên đi từ 15h30 trở đi để trời dịu mát và có ánh nắng vàng đẹp trên rặng dừa nước.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3618755,
+      "sourceKey": "dev/thang/uploads/50f44420-5222-4044-b7c2-158c309758df/original.mp4",
+      "hlsPrefix": "dev/thang/videos/50f44420-5222-4044-b7c2-158c309758df/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "53_hagiang_nhoque",
+    "destinationKey": "ha-giang",
+    "title": "Du thuyền trên hẻm vực Tu Sản - Sông Nho Quế xanh ngọc",
+    "location": "Mèo Vạc, Hà Giang",
+    "category": "TOP_LIST",
+    "script": [
+      "Sông Nho Quế và hẻm vực Tu Sản - kỳ quan xanh ngọc bích giữa lòng cao nguyên đá Hà Giang!",
+      "Từ trên đèo Mã Pí Lèng nhìn xuống, dòng sông uốn lượn như một dải lụa mềm vắt qua vách núi.",
+      "Ngồi thuyền đi sâu vào lòng hẻm vực Tu Sản sâu nhất Đông Nam Á, vách đá dựng đứng hai bên cực choáng ngợp.",
+      "Đừng quên thuê một bộ váy dân tộc chụp ảnh trên mũi thuyền để có bức hình để đời nhé!"
+    ],
+    "tip": "Đi thuyền buổi trưa từ 11h đến 14h là lúc nắng chiếu thẳng xuống mặt sông xanh đẹp nhất.",
+    "budget": "~650k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3306162,
+      "sourceKey": "dev/thang/uploads/2dbdc217-a7ee-44ad-be1e-169ed41005da/original.mp4",
+      "hlsPrefix": "dev/thang/videos/2dbdc217-a7ee-44ad-be1e-169ed41005da/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "54_tokyo_food_konbini",
+    "destinationKey": null,
+    "title": "Thử thách ăn 3 bữa trong cửa hàng tiện lợi Nhật Bản",
+    "location": "Tokyo, Nhật Bản",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Đi Nhật Bản mà muốn tiết kiệm tối đa tiền ăn? Hãy thử ngay thực đơn 3 bữa tại cửa hàng tiện lợi!",
+      "Bữa sáng làm một chiếc bánh mì kẹp trứng mềm mịn và hộp sữa tươi Hokkaido béo ngậy.",
+      "Bữa trưa chọn hộp cơm bento hâm nóng tại chỗ hoặc mì udon đóng hộp chất lượng như ngoài tiệm.",
+      "Tối chốt đơn miếng gà rán giòn tan cùng lon nước đào mát lạnh, tổng cả ngày chỉ khoảng 300-400 nghìn!"
+    ],
+    "tip": "Cơm nắm Onigiri, bánh mì kẹp trứng và gà rán Famichiki là 3 món ngon-bổ-rẻ nhất tại Konbini.",
+    "budget": "~400k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 7027882,
+      "sourceKey": "dev/thang/uploads/a2c191d3-08ed-4522-afe8-01db0887bd94/original.mp4",
+      "hlsPrefix": "dev/thang/videos/a2c191d3-08ed-4522-afe8-01db0887bd94/r1",
+      "durationSec": 31,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "55_bangkok_temple_tips",
+    "destinationKey": null,
+    "title": "3 quy tắc trang phục khi đi chùa ở Thái Lan",
+    "location": "Bangkok, Thái Lan",
+    "category": "TRAVEL_HACK",
+    "script": [
+      "Đi du lịch Thái Lan đừng để bị chặn ngay cổng chùa chỉ vì lỗi trang phục cơ bản này nha!",
+      "Thứ nhất, không mặc áo sát nách, áo hở vai hoặc quần đùi ngắn trên đầu gối vào khu vực Hoàng cung.",
+      "Thứ hai, tránh mặc quần legging bó sát hoặc quần jean rách gối vì bảo vệ sẽ yêu cầu thuê xà rông.",
+      "Thứ ba, nhớ cởi giày dép gọn gàng đúng nơi quy định trước khi bước vào chánh điện nhé!"
+    ],
+    "tip": "Luôn mang theo một chiếc khăn choàng mỏng hoặc quần dài trong ba lô khi tham quan Hoàng cung.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 10630914,
+      "sourceKey": "dev/thang/uploads/c850e5dd-1fd1-4096-8ec7-14182630737a/original.mp4",
+      "hlsPrefix": "dev/thang/videos/c850e5dd-1fd1-4096-8ec7-14182630737a/r1",
+      "durationSec": 29,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "56_phuquoc_night_market",
+    "destinationKey": "phu-quoc",
+    "title": "Phá đảo chợ đêm Phú Quốc: Ăn gì không lo chặt chém?",
+    "location": "Dương Đông, Phú Quốc",
+    "category": "FOOD_TOUR",
+    "script": [
+      "Tối ở Phú Quốc đi chợ đêm Dương Đông ăn gì cho vừa ngon vừa đúng giá? Xem ngay kinh nghiệm này!",
+      "Mở màn bằng bánh tráng nướng, đậu phộng Chou Chou rang đủ vị miễn phí ăn thử cực vui.",
+      "Muốn ăn hải sản như nhum nướng mỡ hành, ghẹ hấp hay mực nướng thì cứ chọn quán niêm yết giá rõ ràng.",
+      "Tráng miệng bằng ly kem cuộn Thái Lan hoặc nước mía thốt nốt mát lạnh là quá tròn vị!"
+    ],
+    "tip": "Chọn các quán có bảng giá niêm yết công khai theo lạng/kg trước khi gọi hải sản.",
+    "budget": "~600k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 8547713,
+      "sourceKey": "dev/thang/uploads/1f6705ec-8822-40bc-bf91-a0b4b4056dfd/original.mp4",
+      "hlsPrefix": "dev/thang/videos/1f6705ec-8822-40bc-bf91-a0b4b4056dfd/r1",
+      "durationSec": 27,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "57_ninhbinh_cucphuong",
+    "destinationKey": "ninh-binh",
+    "title": "Săn mùa bướm bay rợp trời ở rừng Cúc Phương",
+    "location": "Nho Quan, Ninh Bình",
+    "category": "REVIEW",
+    "script": [
+      "Mỗi độ tháng 4 tháng 5, vườn quốc gia Cúc Phương lại biến thành khu rừng cổ tích với hàng triệu cánh bướm!",
+      "Chỉ cần chạy xe hoặc đi bộ dọc con đường rợp bóng cây cổ thụ là từng đàn bướm trắng bay vây quanh.",
+      "Bạn có thể kết hợp thăm Trung tâm cứu hộ linh trưởng và cây chò ngàn năm tuổi cực kỳ ấn tượng.",
+      "Vé vào rừng chỉ 60 nghìn, nhớ đi vào ngày có nắng đẹp để ngắm bướm rực rỡ nhất nhé!"
+    ],
+    "tip": "Mùa bướm nở rộ đẹp nhất từ cuối tháng 4 đến hết tháng 5, đi ngày nắng sẽ thấy nhiều bướm nhất.",
+    "budget": "~500k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4281228,
+      "sourceKey": "dev/thang/uploads/b9993985-468c-440c-aedf-383c291348c4/original.mp4",
+      "hlsPrefix": "dev/thang/videos/b9993985-468c-440c-aedf-383c291348c4/r1",
+      "durationSec": 30,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "58_danang_hoian_combo",
+    "destinationKey": "da-nang",
+    "title": "Lịch trình kết hợp Đà Nẵng - Hội An 3N2Đ tối ưu nhất",
+    "location": "Đà Nẵng - Hội An",
+    "category": "TIMELINE_24H",
+    "script": [
+      "Chỉ có 3 ngày 2 đêm cho cả Đà Nẵng và Hội An thì sắp xếp sao cho đỡ tốn thời gian di chuyển?",
+      "Ngày 1 nhận phòng Đà Nẵng, chiều tắm biển Mỹ Khê, tối ăn hải sản và ngắm cầu Rồng.",
+      "Ngày 2 đi Bà Nà Hills hoặc Ngũ Hành Sơn rồi chạy thẳng xuống Hội An ngủ lại một đêm.",
+      "Ngày 3 dậy sớm đạp xe ra biển An Bàng, trưa mua quà lưu niệm rồi ra sân bay Đà Nẵng là đẹp!"
+    ],
+    "tip": "Nên ở 2 đêm Đà Nẵng và 1 đêm Hội An để vừa tắm biển vừa tận hưởng phố cổ về đêm.",
+    "budget": "~1.1tr/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 3751689,
+      "sourceKey": "dev/thang/uploads/48e39baa-9c4c-430e-a5c9-c91380315976/original.mp4",
+      "hlsPrefix": "dev/thang/videos/48e39baa-9c4c-430e-a5c9-c91380315976/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "59_hanoi_autumn",
+    "destinationKey": "ha-noi",
+    "title": "Mùa thu Hà Nội: Làm gì cho hết chất thơ?",
+    "location": "Hà Nội",
+    "category": "TOP_LIST",
+    "script": [
+      "Người ta bảo Hà Nội đẹp nhất là vào mùa thu, và đây là 3 việc bạn nhất định phải làm!",
+      "Đầu tiên là mua một gói cốm làng Vòng bọc lá sen thơm nức, ngồi nhâm nhi bên Hồ Tây lộng gió.",
+      "Thứ hai là đạp xe dọc đường Phan Đình Phùng rợp lá vàng rơi chụp ảnh với xe hoa rực rỡ.",
+      "Thứ ba là đứng trên cầu Long Biên ngắm hoàng hôn buông xuống bãi giữa sông Hồng cực kỳ bình yên!"
+    ],
+    "tip": "Tháng 10-11 là thời điểm mùa thu Hà Nội đẹp nhất với nắng vàng nhẹ và hương hoa sữa.",
+    "budget": "~450k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4905865,
+      "sourceKey": "dev/thang/uploads/b5783e5e-e1be-4594-b829-d4b023be2ca5/original.mp4",
+      "hlsPrefix": "dev/thang/videos/b5783e5e-e1be-4594-b829-d4b023be2ca5/r1",
+      "durationSec": 26,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  },
+  {
+    "id": "60_saigon_coffee_guide",
+    "destinationKey": "sai-gon",
+    "title": "Top 3 phong cách cafe chỉ có ở Sài Gòn",
+    "location": "TP. Hồ Chí Minh",
+    "category": "TOP_LIST",
+    "script": [
+      "Văn hóa cafe Sài Gòn đa dạng tới mức bạn có thể uống cả tháng không trùng phong cách!",
+      "Kiểu 1 là cafe vợt cổ truyền tồn tại hơn nửa thế kỷ, thơm đậm vị rang mộc khó quên.",
+      "Kiểu 2 là cafe bệt công viên sáng sớm, chỉ cần ly bạc xỉu đá ngồi ngắm phố xá qua lại.",
+      "Kiểu 3 là các quán cafe chung cư cũ trên đường Nguyễn Huệ, vừa uống nước vừa ngắm phố đi bộ từ trên cao!"
+    ],
+    "tip": "Thử ngồi cafe bệt Nhà Thờ Đức Bà vào sáng Chủ nhật để cảm nhận rõ nhất nhịp sống Sài Gòn.",
+    "budget": "~300k/ngày",
+    "media": {
+      "mimeType": "video/mp4",
+      "fileSizeBytes": 4338009,
+      "sourceKey": "dev/thang/uploads/5d0af710-0be8-41ff-b0c7-9561e6d2c8e9/original.mp4",
+      "hlsPrefix": "dev/thang/videos/5d0af710-0be8-41ff-b0c7-9561e6d2c8e9/r1",
+      "durationSec": 28,
+      "aspect": "9:16",
+      "levels": [
+        360,
+        540,
+        720
+      ]
+    }
+  }
+]

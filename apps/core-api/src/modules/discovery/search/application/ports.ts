@@ -1,0 +1,102 @@
+import type { BuiltIndex, ExploreSource } from '../domain/explore/types.js';
+import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
+import type { PointOfInterestSeed, PoiPlace } from '../domain/points-of-interest.js';
+import type { HotelSummary, SuggestEntity, SuggestType } from '../domain/suggest-entity.js';
+
+export const SUGGEST_STORE = Symbol('SUGGEST_STORE');
+export const HOTEL_CATALOG = Symbol('HOTEL_CATALOG');
+export const EXPLORE_STORE = Symbol('EXPLORE_STORE');
+export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
+export const PLACES_STORE = Symbol('PLACES_STORE');
+
+/** Chỉ mục tìm khám phá trên Postgres. */
+export interface ExploreStore extends ExploreSource {
+  /** Thay toàn bộ chỉ mục trong một transaction. false = worker khác đang dựng, bỏ lượt này. */
+  replaceAll(index: BuiltIndex): Promise<boolean>;
+  /** Xoá tài liệu theo id (`post:<uuid>`), trả số dòng đã xoá. Id không có trong chỉ mục thì bỏ qua. */
+  deleteDocuments(ids: string[]): Promise<number>;
+  /** Cộng dồn n-gram của một câu tìm vào ngày `day` (YYYY-MM-DD): `hits` cộng thêm, `samples` thêm câu mới khi còn chỗ. */
+  recordQueryGrams(day: string, rows: QueryGramRow[]): Promise<void>;
+  /** N-gram từ ngày `since` có tổng `hits` >= minCount (nhiều nhất trước), cộng các khoá tổng `#...`. */
+  listQueryGrams(since: string, minCount: number): Promise<QueryGramRow[]>;
+  /** Xoá đếm câu tìm của các ngày trước `before`, trả số dòng đã xoá. */
+  purgeQueryGrams(before: string): Promise<number>;
+}
+
+/** Khách sạn cho tìm khám phá. Thật: CommerceFacade.listCatalog (CatalogHotel). */
+export interface ExploreHotel {
+  id: string;
+  /** Mã trên URL trang chi tiết (TF66). Optional như CatalogHotel.slug. */
+  slug?: string;
+  name: string;
+  province: { slug: string; name: string };
+  city: string | null;
+  stars: number | null;
+  brand: string | null;
+  style: string | null;
+  thumbnail: string | null;
+  priceFrom: number | null;
+  address: string | null;
+  location: { lat: number; lng: number } | null;
+}
+
+/** Bài công khai cho tìm khám phá. Thật: ContentFacade.listPosts (VisiblePostSummary). */
+export interface ExplorePost {
+  id: string;
+  postType: string;
+  title: string;
+  body: string;
+  hashtags: string[];
+  mediaIds?: string[];
+  coverMediaId?: string | null;
+  /** Bài video: ảnh poster 360 của video đầu tiên phát được. Không có thì kết quả tìm không có ảnh bìa. */
+  posterUrl?: string | null;
+  tripAttachment: {
+    destinationName?: string;
+    destinationPlaceId?: string;
+    daysCount?: number;
+    estimatedCostPerPerson?: number;
+    items?: unknown[];
+  } | null;
+  reactionTotal: number;
+  commentCount: number;
+  authorId: string;
+  createdAt: Date;
+}
+
+type Page<T> = { items: T[]; nextCursor: string | null };
+
+/** Nguồn dữ liệu module khác cho tìm khám phá, đọc theo trang. */
+export interface ExploreCatalog {
+  listHotels(cursor: string | null): Promise<Page<ExploreHotel>>;
+  listPosts(cursor: string | null): Promise<Page<ExplorePost>>;
+  /** Trong postIds, những bài còn hiện công khai. */
+  findVisiblePostIds(postIds: string[]): Promise<Set<string>>;
+  /** Tên hiển thị theo id tác giả. Thật: AccessFacade.getDisplayNames. Id không có thì không có trong Map. */
+  getAuthorNames(authorIds: string[]): Promise<Map<string, string>>;
+}
+
+export interface SuggestStore {
+  /** Ứng viên khớp `normalizedQuery`, xếp sẵn: khớp đầu từ trước, rồi độ giống, rồi độ nổi tiếng. */
+  findCandidates(normalizedQuery: string, types: readonly SuggestType[], limit: number): Promise<SuggestEntity[]>;
+  /** Thay toàn bộ chỉ mục trong một transaction, người đang tìm không thấy bảng rỗng. */
+  replaceAll(entities: readonly SuggestEntity[]): Promise<void>;
+}
+
+/** Nguồn danh mục khách sạn, đọc theo trang. Thật: CommerceFacade.listCatalog. */
+export interface HotelCatalog {
+  listHotels(cursor: string | null): Promise<{ items: HotelSummary[]; nextCursor: string | null }>;
+}
+
+/** Cây nơi và địa điểm ngoài OTA (bảng discovery.places, discovery.points_of_interest). */
+export interface PlacesStore {
+  listPlaces(): Promise<PoiPlace[]>;
+  /** Mọi điểm chưa bị ẩn. */
+  listPoints(): Promise<PointOfInterestSeed[]>;
+  /** Ghi đè từ nguồn nạp trong một transaction: thêm, sửa, xoá điểm của `source` không còn trong nguồn; giữ `is_hidden`. */
+  upsertSeed(
+    places: ReadonlyArray<PoiPlace & { kind: 'province' | 'destination' }>,
+    points: readonly PointOfInterestSeed[],
+    source: string,
+  ): Promise<{ places: number; points: number }>;
+}

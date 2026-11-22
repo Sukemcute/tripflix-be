@@ -4,21 +4,48 @@ packages:
 
 # Mọi package dùng "catalog:" để cả repo chung một phiên bản.
 catalog:
+  '@aws-sdk/client-s3': ^3.1161.0
+  '@aws-sdk/cloudfront-signer': ^3.1161.0
+  '@aws-sdk/s3-request-presigner': ^3.1161.0
+  '@nestjs-cls/transactional': ^4.0.2
+  '@nestjs-cls/transactional-adapter-drizzle-orm': ^2.0.2
   '@nestjs/cli': ^12.0.11
   '@nestjs/common': ^12.3.2
   '@nestjs/core': ^12.3.2
   '@nestjs/platform-express': ^12.3.2
+  # Cùng bản với @nestjs/core đang khoá trong lockfile.
+  '@nestjs/platform-socket.io': 12.3.2
   '@nestjs/schematics': ^12.0.12
   '@nestjs/swagger': ^12.1.0
   '@nestjs/testing': ^12.3.2
+  '@nestjs/websockets': 12.3.2
+  '@opentelemetry/api': ^1.10.0
+  '@opentelemetry/exporter-metrics-otlp-http': ^0.301.2
+  '@opentelemetry/exporter-trace-otlp-http': ^0.301.2
+  # Đo pg, ioredis (TF99): chỉ hoạt động khi nạp qua --import @tripflix/observability/register.
+  '@opentelemetry/instrumentation': ^0.301.2
+  '@opentelemetry/instrumentation-ioredis': ^0.73.0
+  '@opentelemetry/instrumentation-pg': ^0.78.0
+  '@opentelemetry/instrumentation-undici': ^0.35.1
+  '@opentelemetry/resources': ^3.1.1
+  '@opentelemetry/sdk-metrics': ^3.1.1
+  '@opentelemetry/sdk-node': ^0.301.2
+  '@socket.io/redis-adapter': ^8.3.0
+  '@testcontainers/postgresql': ^12.2.1
+  '@testcontainers/redis': ^12.2.1
   '@types/express': ^5.0.6
   '@types/node': ^24.0.0
+  '@types/nodemailer': ^8.0.2
   '@types/pg': ^8.23.1
   '@types/supertest': ^7.2.1
+  argon2: ^0.45.2
   drizzle-kit: 1.0.0-rc.5
   drizzle-orm: 1.0.0-rc.5
   ioredis: ^6.0.0
+  jose: ^6.2.15
+  nestjs-cls: ^7.0.2
   nestjs-pino: ^5.3.1
+  nodemailer: ^10.3.1
   oxlint: ^1.91.0
   oxlint-tsgolint: ^7.0.2005
   pg: ^8.23.1
@@ -28,7 +55,10 @@ catalog:
   prettier: ^3.9.10
   reflect-metadata: ^0.2.2
   rxjs: ^7.8.2
+  socket.io: ^4.8.3
+  socket.io-client: ^4.8.3
   supertest: ^7.3.1
+  testcontainers: ^12.2.1
   tsx: ^4.23.15
   turbo: ^2.11.10
   typescript: 6.0.3

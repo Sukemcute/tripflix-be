@@ -1,0 +1,264 @@
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { createDb, createPool } from '@tripflix/db';
+import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/testing';
+import type pg from 'pg';
+import type { RawRow } from '../domain/contracts.js';
+import { resolveAlgo } from '../domain/registry.js';
+import { DrizzleRecommendStore } from './drizzle-recommend.store.js';
+
+const U = randomUUID();
+const NOW = new Date('2026-11-12T12:00:00Z');
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
+
+const row = (over: Partial<RawRow>): RawRow => ({
+  actorType: 'user',
+  actorId: U,
+  kind: 'reaction',
+  refId: 'r',
+  targetType: 'post',
+  targetId: null,
+  value: null,
+  isRemoved: false,
+  detail: null,
+  occurredAt: hoursAgo(1).toISOString(),
+  ...over,
+});
+
+/** Câu SQL của store gợi ý trên Postgres thật: upsert chỉ ghi đè khi mới hơn, huỷ đơn, đếm, ứng viên, dọn hạn lưu. */
+describe('DrizzleRecommendStore trên Postgres thật', () => {
+  let postgres: PostgresFixture;
+  let pool: pg.Pool;
+  let store: DrizzleRecommendStore;
+  const meta = () => ({ source: 'test', eventId: randomUUID() });
+
+  beforeAll(async () => {
+    postgres = await startPostgres();
+    const url = postgres.buildModuleUrl('discovery');
+    await migrateModule({ url, module: 'discovery', migrationsFolder: fileURLToPath(new URL('../../db/migrations', import.meta.url)) });
+    pool = createPool({ url, max: 5, applicationName: 'discovery-recommend-int-test' });
+    store = new DrizzleRecommendStore(createDb(pool));
+  });
+
+  afterAll(async () => {
+    await pool?.end();
+    await postgres?.stop();
+  });
+
+  beforeEach(async () => {
+    await pool.query('truncate discovery.recommend_interactions, discovery.recommend_posts, discovery.recommend_post_scores, discovery.recommend_user_features');
+  });
+
+  it('migration seed for_you và trending, bộ ba hợp lệ', async () => {
+    const algos = await store.listActiveAlgos();
+    expect(algos.map((a) => a.name).sort()).toEqual(['for_you', 'trending']);
+    for (const a of algos) expect(resolveAlgo(a).ok).toBe(true);
+  });
+
+  it('giao lại không ghi đôi; sự kiện cũ đến sau không đè dòng mới', async () => {
+    const postId = randomUUID();
+    const newer = row({ refId: postId, targetId: postId, detail: { type: 'love' }, occurredAt: hoursAgo(1).toISOString() });
+    await store.upsertInteractions([newer], meta());
+    await store.upsertInteractions([newer], meta());
+    await store.upsertInteractions([{ ...newer, isRemoved: true, detail: { type: null }, occurredAt: hoursAgo(5).toISOString() }], meta());
+    const { rows } = await pool.query('select is_removed, detail from discovery.recommend_interactions');
+    expect(rows).toEqual([{ is_removed: false, detail: { type: 'love' } }]);
+
+    // Gỡ mới hơn thì ghi đè.
+    await store.upsertInteractions([{ ...newer, isRemoved: true, occurredAt: hoursAgo(0).toISOString() }], meta());
+    expect((await pool.query('select is_removed from discovery.recommend_interactions')).rows).toEqual([{ is_removed: true }]);
+  });
+
+  it('huỷ đơn: gỡ mọi order_item của đơn xảy ra trước lúc huỷ, không đụng đơn khác', async () => {
+    const orderId = randomUUID();
+    const other = randomUUID();
+    await store.upsertInteractions(
+      [
+        row({ kind: 'order_item', refId: `${orderId}:0`, targetType: 'room' }),
+        row({ kind: 'order_item', refId: `${orderId}:1`, targetType: 'room' }),
+        row({ kind: 'order_item', refId: `${other}:0`, targetType: 'room' }),
+      ],
+      meta(),
+    );
+    expect(await store.cancelOrderItems({ userId: U, orderId, occurredAt: NOW.toISOString() })).toBe(2);
+    const { rows } = await pool.query('select ref_id from discovery.recommend_interactions where is_removed order by ref_id');
+    expect(rows.map((r: { ref_id: string }) => r.ref_id)).toEqual([`${orderId}:0`, `${orderId}:1`]);
+  });
+
+  it('đếm tương tác theo bài: bỏ is_removed, bỏ dòng sau now, tách 24 giờ', async () => {
+    const p = randomUUID();
+    await store.upsertInteractions(
+      [
+        row({ refId: 'a', targetId: p, occurredAt: hoursAgo(2).toISOString() }),
+        row({ actorId: randomUUID(), refId: 'a', targetId: p, occurredAt: hoursAgo(48).toISOString() }),
+        row({ actorId: randomUUID(), refId: 'a', targetId: p, isRemoved: true }),
+        row({ actorId: randomUUID(), refId: 'a', targetId: p, occurredAt: hoursAgo(-1).toISOString() }),
+        row({ kind: 'comment', refId: 'c', targetId: p }),
+      ],
+      meta(),
+    );
+    expect((await store.countPostInteractions(NOW)).get(p)).toEqual({ d30: { reaction: 2, comment: 1 }, h24: { reaction: 1, comment: 1 } });
+  });
+
+  it('listPostInteractionSamples: lấy cả order_item theo sourcePostId và tính tuổi tài khoản từ registered', async () => {
+    const p = randomUUID();
+    const youngUser = randomUUID();
+    const oldUser = randomUUID();
+    await store.upsertInteractions(
+      [
+        row({ actorId: youngUser, kind: 'registered', refId: youngUser, targetType: null, targetId: null, occurredAt: hoursAgo(48).toISOString() }),
+        row({ actorId: youngUser, refId: p, targetId: p, occurredAt: hoursAgo(2).toISOString() }),
+        row({
+          actorId: oldUser,
+          kind: 'order_item',
+          refId: `${randomUUID()}:0`,
+          targetType: 'room',
+          targetId: randomUUID(),
+          detail: { sourcePostId: p },
+          occurredAt: hoursAgo(3).toISOString(),
+        }),
+        row({ actorId: oldUser, refId: 'removed', targetId: p, isRemoved: true }),
+        row({ actorId: oldUser, refId: 'future', targetId: p, occurredAt: hoursAgo(-1).toISOString() }),
+      ],
+      meta(),
+    );
+
+    const samples = (await store.listPostInteractionSamples(NOW)).get(p) ?? [];
+    expect(samples).toHaveLength(2);
+    expect(samples).toEqual(
+      expect.arrayContaining([
+        { kind: 'reaction', actorAgeDays: 2, count: 1 },
+        { kind: 'order_item', actorAgeDays: null, count: 1 },
+      ]),
+    );
+  });
+
+  it('ứng viên hot phá hoà cố định; fresh gồm bài chưa có điểm; bỏ bài loại trừ', async () => {
+    const author = randomUUID();
+    const ids = [randomUUID(), randomUUID(), randomUUID()].sort();
+    await store.replacePosts(
+      ids.map((postId, i) => ({
+        postId,
+        authorId: author,
+        postType: 'video',
+        tags: ['dalat'],
+        placeId: 'da-lat',
+        isVerified: false,
+        hasPlan: i === 0,
+        publishedAt: hoursAgo(i === 2 ? 1 : 100),
+      })),
+    );
+    // Hai bài đầu cùng điểm 1, cùng giờ đăng → phá hoà bằng post_id desc. Bài 3 chưa có điểm.
+    await store.replacePostScores('hot@v0', ids.slice(0, 2).map((postId) => ({ postId, postType: 'video', score: 1, features: {} })));
+    const q = { postBuilder: 'hot@v0', postType: 'video', excludePostIds: [], limit: 10, now: NOW };
+    expect((await store.listHotCandidates(q)).map((c) => c.postId)).toEqual([ids[1], ids[0]]);
+    const fresh = await store.listFreshCandidates({ ...q, hours: 48 });
+    expect(fresh).toEqual([expect.objectContaining({ postId: ids[2], score: 0, source: 'fresh', tags: ['dalat'] })]);
+    expect((await store.listHotCandidates({ ...q, excludePostIds: [ids[1]!] })).map((c) => c.postId)).toEqual([ids[0]]);
+
+    // post_type của hot đọc ở bảng điểm (index); đổi loại ở bảng điểm thì lọc theo đó.
+    await pool.query(`update discovery.recommend_post_scores set post_type = 'vlog' where post_id = $1`, [ids[0]]);
+    expect((await store.listHotCandidates({ ...q, postType: 'vlog' })).map((c) => c.postId)).toEqual([ids[0]]);
+
+    // content tạm rỗng: không xoá sạch metadata.
+    expect(await store.replacePosts([])).toBe(false);
+    expect(await store.listExplorePool({ ...q, days: 30 })).toHaveLength(3);
+  });
+
+  it('dòng của người dùng, bài đã tương tác, đặc trưng người dùng', async () => {
+    const p = randomUUID();
+    await store.upsertInteractions([row({ refId: p, targetId: p }), row({ kind: 'search', refId: 'e', targetType: 'place', targetId: 'da-lat' })], meta());
+    expect(await store.listActiveUserIds(NOW)).toEqual([U]);
+    expect(await store.listDirtyUserIds(hoursAgo(-1000))).toEqual([]);
+    expect((await store.listUserRows([U], NOW)).map((r) => r.kind).sort()).toEqual(['reaction', 'search']);
+    expect(await store.listInteractedPostIds(U, NOW)).toEqual([p]);
+    // Dòng sau now không tính (đánh giá cuốn theo ngày).
+    await store.upsertInteractions([row({ refId: 'later', targetId: randomUUID(), occurredAt: hoursAgo(-1).toISOString() })], meta());
+    expect(await store.listInteractedPostIds(U, NOW)).toEqual([p]);
+    await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { dalat: 1 } } }]);
+    await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { bien: 1 } } }]);
+    expect(await store.findUserFeatures('tag_affinity@v0', U)).toEqual({ tags: { bien: 1 } });
+  });
+
+  it('bài tự đăng gần đây: chỉ dòng publish của người đó trong (since, until], mới nhất trước, lọc theo loại bài', async () => {
+    const [older, newer, vlog, tooOld, removed] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
+    const publish = (postId: string, h: number, over: Partial<RawRow> = {}) =>
+      row({ kind: 'publish', refId: postId, targetId: postId, detail: { postType: 'video' }, occurredAt: hoursAgo(h).toISOString(), ...over });
+    await store.upsertInteractions(
+      [
+        publish(older, 0.5),
+        publish(newer, 0.1),
+        publish(vlog, 0.2, { detail: { postType: 'vlog' } }),
+        publish(tooOld, 2),
+        publish(removed, 0.3, { isRemoved: true }),
+        publish(randomUUID(), 0.1, { actorId: randomUUID() }),
+        row({ refId: 'r', targetId: randomUUID(), occurredAt: hoursAgo(0.1).toISOString() }),
+      ],
+      meta(),
+    );
+    const q = { userId: U, since: hoursAgo(1), until: NOW, postType: null };
+    expect(await store.listOwnRecentPostIds(q)).toEqual([newer, vlog, older]);
+    expect(await store.listOwnRecentPostIds({ ...q, postType: 'video' })).toEqual([newer, older]);
+    expect(await store.listOwnRecentPostIds({ ...q, until: hoursAgo(0.15) })).toEqual([vlog, older]);
+  });
+
+  it('số liệu admin: dòng nạp 10 phút/24 giờ, bài, người có gu, mốc builder; tra tag/nơi bài', async () => {
+    const p = randomUUID();
+    await store.replacePosts([{ postId: p, authorId: randomUUID(), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', isVerified: false, hasPlan: false, publishedAt: hoursAgo(2) }]);
+    await store.upsertInteractions([row({ refId: 'a', targetId: p }), row({ refId: 'b', targetId: randomUUID() })], meta());
+    await store.upsertUserFeatures('tag_affinity@v0', [{ userId: U, features: { tags: { dalat: 1 } } }]);
+    await store.setJobState('hot@v0', { lastRunAt: NOW, lastError: 'boom' });
+    const stats = await store.getAdminStats(new Date());
+    expect(stats).toMatchObject({ interactionsLast10m: 2, interactionsLast24h: 2, posts: 1, usersWithFeatures: 1 });
+    expect(stats.jobStates).toContainEqual({ name: 'hot@v0', lastRunAt: NOW, lastError: 'boom' });
+    expect(await store.findPostMetas([p, randomUUID()])).toEqual([{ postId: p, authorId: expect.any(String), postType: 'vlog', tags: ['dalat'], placeId: 'da-lat', hasPlan: false }]);
+  });
+
+  it('cache vector theo (mô hình, sha256): đọc đúng mô hình, ghi trùng khoá giữ dòng cũ', async () => {
+    await store.insertTextVectors('e5@1', [{ textHash: 'h1', vector: [0.5, -0.25] }]);
+    await store.insertTextVectors('e5@1', [{ textHash: 'h1', vector: [9, 9] }, { textHash: 'h2', vector: [1, 0] }]);
+    await store.insertTextVectors('other@1', [{ textHash: 'h3', vector: [1, 1] }]);
+    const found = await store.findTextVectors('e5@1', ['h1', 'h2', 'h3']);
+    expect(found).toEqual(new Map([['h1', [0.5, -0.25]], ['h2', [1, 0]]]));
+    expect(await store.findTextVectors('e5@1', [])).toEqual(new Map());
+  });
+
+  it('khoá advisory: lượt thứ hai cùng lúc bỏ lượt', async () => {
+    let release!: () => void;
+    const first = store.withLock('t', () => new Promise<string>((r) => (release = () => r('a'))));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await store.withLock('t', () => Promise.resolve('b'))).toBeNull();
+    release();
+    expect(await first).toBe('a');
+    expect(await store.withLock('t', () => Promise.resolve('c'))).toBe('c');
+  });
+
+  it('khoá advisory giữ kết nối riêng: suốt lượt job, pool vẫn đủ chỗ cho request', async () => {
+    const holders = await store.withLock('pool-free', async () => {
+      // Chiếm đủ max kết nối của pool trong lúc đang giữ khoá: không kết nối nào bị khoá chiếm thì không ai phải chờ.
+      const clients = await Promise.all(Array.from({ length: 5 }, () => pool.connect()));
+      clients.forEach((c) => c.release());
+      return clients.length;
+    });
+    expect(holders).toBe(5);
+  });
+
+  it('dọn hạn lưu theo lô', async () => {
+    const day = 24;
+    await store.upsertInteractions(
+      [
+        row({ refId: 'removed-old', isRemoved: true, occurredAt: hoursAgo(8 * day).toISOString() }),
+        row({ refId: 'removed-new', isRemoved: true, occurredAt: hoursAgo(6 * day).toISOString() }),
+        row({ kind: 'search', refId: 'search-old', occurredAt: hoursAgo(91 * day).toISOString() }),
+        row({ refId: 'reaction-91d', occurredAt: hoursAgo(91 * day).toISOString() }),
+        row({ refId: 'reaction-old', occurredAt: hoursAgo(181 * day).toISOString() }),
+      ],
+      meta(),
+    );
+    expect(await store.purgeExpired(NOW, 2)).toBe(2);
+    expect(await store.purgeExpired(NOW, 2)).toBe(1);
+    expect(await store.purgeExpired(NOW, 2)).toBe(0);
+    const { rows } = await pool.query('select ref_id from discovery.recommend_interactions order by ref_id');
+    expect(rows.map((r: { ref_id: string }) => r.ref_id)).toEqual(['reaction-91d', 'removed-new']);
+  });
+});

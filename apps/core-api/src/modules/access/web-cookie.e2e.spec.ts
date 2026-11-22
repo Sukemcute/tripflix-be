@@ -1,0 +1,350 @@
+import { ACTION_RATE_LIMITER, MemoryActionRateLimiter } from './index.js';
+import { registerTestAccount } from '../../platform/registration.fixture.js';
+import 'reflect-metadata';
+import { Global, type INestApplication, Module } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { MemorySidBlocklist } from '@tripflix/auth';
+import { createNoOpTransactionalPlugins } from '@tripflix/db';
+import { ClsModule } from 'nestjs-cls';
+import request from 'supertest';
+import type { CoreEnv } from '../../platform/env.js';
+import { applyCors, applyGlobalPrefix } from '../../platform/http.js';
+import { CORE_ENV, DB_POOLS, REDIS } from '../../platform/tokens.js';
+import { AccessModule } from './access.module.js';
+import { UNTRUSTED_ORIGIN_MESSAGE } from './auth/api/web-session.js';
+import { ACCESS_SID_BLOCKLIST, ACCESS_STORE, LOGIN_RATE_LIMITER, PASSWORD_HASHER } from './auth/application/ports.js';
+import { createTestPasswordHasher } from './auth/infra/test-password-hasher.js';
+import { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
+import { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
+
+const WEB_ORIGIN = 'http://localhost:3100';
+const ADMIN_ORIGIN = 'http://localhost:3200';
+const env = {
+  NODE_ENV: 'test',
+  AUTH_JWT_ISSUER: 'tripflix-core',
+  AUTH_JWT_AUDIENCE: 'tripflix',
+  AUTH_WEB_ORIGINS: [WEB_ORIGIN, ADMIN_ORIGIN],
+} as CoreEnv;
+
+@Global()
+@Module({
+  providers: [
+    { provide: CORE_ENV, useValue: env },
+    { provide: DB_POOLS, useValue: {} },
+    { provide: REDIS, useValue: {} },
+  ],
+  exports: [CORE_ENV, DB_POOLS, REDIS],
+})
+class FakePlatformModule {}
+
+import { createTestBrowserProof } from './auth/infra/test-browser-proof.js';
+
+const PASSWORD = 'mat-khau-an-toan';
+const WEB = { 'X-Tripflix-Client': 'web', Origin: WEB_ORIGIN };
+
+/** Lấy giá trị cookie tripflix_refresh và các thuộc tính từ Set-Cookie. */
+function readSetCookie(res: request.Response) {
+  const raw = ([] as string[]).concat(res.headers['set-cookie'] ?? []).find((c) => c.startsWith('tripflix_refresh='));
+  if (!raw) return undefined;
+  const [pair, ...attrs] = raw.split(';').map((p) => p.trim());
+  return { value: pair!.slice('tripflix_refresh='.length), attrs: attrs.map((a) => a.toLowerCase()), raw };
+}
+
+describe('TF056: refresh token trong cookie cho web, admin', () => {
+  let app: INestApplication;
+  let store: MemoryAccessStore;
+  const http = () => request(app.getHttpServer());
+
+  beforeAll(async () => {
+    store = new MemoryAccessStore();
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        FakePlatformModule,
+        ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() }),
+        AccessModule,
+      ],
+    })
+      .overrideProvider(ACCESS_STORE)
+      .useValue(store)
+      .overrideProvider(ACTION_RATE_LIMITER)
+      .useValue(new MemoryActionRateLimiter())
+      .overrideProvider(PASSWORD_HASHER)
+      .useValue(createTestPasswordHasher())
+      .overrideProvider(LOGIN_RATE_LIMITER)
+      .useValue(new MemoryLoginRateLimiter())
+      .overrideProvider(ACCESS_SID_BLOCKLIST)
+      .useValue(new MemorySidBlocklist())
+      .compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    applyGlobalPrefix(app);
+    applyCors(app, env.AUTH_WEB_ORIGINS);
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function register(email: string) {
+    return registerTestAccount(app, { email, password: PASSWORD, displayName: 'Web' });
+  }
+
+  async function webLogin(email: string) {
+    const proof = await createTestBrowserProof();
+    const res = await http().post('/api/auth/login').set(WEB)
+      .set(await proof('login', WEB_ORIGIN)).send({ email, password: PASSWORD }).expect(200);
+    return { res, cookie: readSetCookie(res)!, proof };
+  }
+
+  it('đăng nhập web: cookie HttpOnly, SameSite=Lax, Path=/api/auth, 30 ngày; body không có refreshToken', async () => {
+    await register('web-login@example.com');
+    const { res, cookie } = await webLogin('web-login@example.com');
+
+    expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(cookie.value.length).toBeGreaterThan(20);
+    expect(cookie.attrs).toEqual(expect.arrayContaining(['httponly', 'samesite=lax', 'path=/api/auth', 'max-age=2592000']));
+    // Môi trường test chạy http: không bật Secure (production bật, xem web-session.spec.ts).
+    expect(cookie.attrs).not.toContain('secure');
+  });
+
+  it('đăng nhập đồng thời hai tài khoản bằng hai phiên web độc lập', async () => {
+    const emails = ['first-session@example.com', 'second-session@example.com'];
+    for (const email of emails) {
+      const registration = await register(email);
+      expect(registration.body).toEqual({
+        id: expect.any(String),
+        email,
+        displayName: 'Web',
+        role: 'member',
+        createdAt: expect.any(String),
+      });
+    }
+
+    const anonymous = await http().get('/api/auth/me').expect(401);
+    expect(anonymous.body).not.toHaveProperty('email');
+
+    const sessions = await Promise.all(emails.map(webLogin));
+    expect(sessions[0]?.cookie.value).not.toBe(sessions[1]?.cookie.value);
+
+    for (const [index, { res }] of sessions.entries()) {
+      const profile = await http()
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${res.body.accessToken}`)
+        .expect(200);
+      expect(profile.headers['cache-control']).toBe('no-store');
+      expect(profile.body).toEqual({
+        id: expect.any(String),
+        email: emails[index],
+        displayName: 'Web',
+        role: 'member',
+        createdAt: expect.any(String),
+        emailVerified: true,
+        phone: null,
+        dateOfBirth: expect.any(String),
+        gender: expect.any(String),
+        nationality: expect.any(String),
+        travelPreferences: null,
+        avatarUrl: null,
+        avatarDecor: null,
+      });
+    }
+  });
+
+  it('đăng nhập web với Origin lạ hoặc thiếu Origin: 403, không tạo phiên', async () => {
+    await register('web-evil@example.com');
+    const before = store.sessionRows.size;
+    const evil = await http()
+      .post('/api/auth/login')
+      .set({ 'X-Tripflix-Client': 'web', Origin: 'https://evil.example' })
+      .send({ email: 'web-evil@example.com', password: PASSWORD })
+      .expect(403);
+    expect(evil.body.message).toBe(UNTRUSTED_ORIGIN_MESSAGE);
+    await http()
+      .post('/api/auth/login')
+      .set({ 'X-Tripflix-Client': 'web' })
+      .send({ email: 'web-evil@example.com', password: PASSWORD })
+      .expect(403);
+    expect(store.sessionRows.size).toBe(before);
+  });
+
+  it('làm mới bằng cookie cần đúng khóa, chống gửi lại chữ ký và tách cookie admin', async () => {
+    await register('web-refresh@example.com');
+    const { cookie, proof } = await webLogin('web-refresh@example.com');
+
+    const signed = await proof('refresh', WEB_ORIGIN);
+    const copied = await createTestBrowserProof();
+    const refresh = () => http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`);
+    await refresh().expect(401);
+    await refresh().set(await copied('refresh', WEB_ORIGIN)).expect(401);
+    await http().post('/api/auth/refresh').send({ refreshToken: cookie.value }).expect(401);
+    const res = await refresh().set(signed).expect(200);
+    await refresh().set(signed).expect(401);
+    const next = readSetCookie(res)!;
+    expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(next.value).not.toBe(cookie.value);
+
+    await http().post('/api/auth/refresh').set(WEB)
+      .set(await proof('refresh', WEB_ORIGIN)).set('Cookie', `tripflix_refresh=${next.value}`).expect(200);
+
+    const adminProof = await createTestBrowserProof();
+    const adminLogin = await http().post('/api/auth/login').set({ ...WEB, Origin: ADMIN_ORIGIN })
+      .set(await adminProof('login', ADMIN_ORIGIN))
+      .send({ email: 'web-refresh@example.com', password: PASSWORD }).expect(200);
+    const adminCookie = ([] as string[]).concat(adminLogin.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    expect(adminCookie).toMatch(/^tripflix_refresh_[a-f0-9]+=w1\./);
+    await http().post('/api/auth/refresh').set({ ...WEB, Origin: ADMIN_ORIGIN, Cookie: adminCookie })
+      .set(await adminProof('refresh', ADMIN_ORIGIN)).expect(200);
+  });
+
+  it('CSRF: trang lạ khiến trình duyệt gửi cookie thì nhận 403, cookie vẫn dùng được từ web thật', async () => {
+    await register('web-csrf@example.com');
+    const { cookie, proof } = await webLogin('web-csrf@example.com');
+
+    const evil = await http()
+      .post('/api/auth/refresh')
+      .set({ Origin: 'https://evil.example', Cookie: `tripflix_refresh=${cookie.value}` })
+      .expect(403);
+    expect(readSetCookie(evil)).toBeUndefined();
+    await http().post('/api/auth/refresh').set({ Cookie: `tripflix_refresh=${cookie.value}` }).expect(403);
+
+    await http().post('/api/auth/refresh').set(WEB).set(await proof('refresh', WEB_ORIGIN))
+      .set('Cookie', `tripflix_refresh=${cookie.value}`).expect(200);
+  });
+
+  it('làm mới web lỗi (không có cookie, cookie hỏng): 401 và xoá cookie', async () => {
+    const none = await http().post('/api/auth/refresh').set(WEB).expect(401);
+    expect(readSetCookie(none)?.raw).toMatch(/Expires=Thu, 01 Jan 1970/);
+
+    const broken = await http().post('/api/auth/refresh').set(WEB).set('Cookie', 'tripflix_refresh=khong-hop-le').expect(401);
+    expect(readSetCookie(broken)?.raw).toMatch(/Expires=Thu, 01 Jan 1970/);
+  });
+
+  it('đăng xuất web xoá cookie; cookie cũ gửi lại nhận 401', async () => {
+    await register('web-logout@example.com');
+    const { res, cookie } = await webLogin('web-logout@example.com');
+
+    const out = await http()
+      .post('/api/auth/logout')
+      .set(WEB)
+      .set({ Authorization: `Bearer ${res.body.accessToken}`, Cookie: `tripflix_refresh=${cookie.value}` })
+      .expect(204);
+    expect(readSetCookie(out)).toMatchObject({ value: '' });
+    await http().post('/api/auth/refresh').set(WEB).set('Cookie', `tripflix_refresh=${cookie.value}`).expect(401);
+  });
+
+  it('logout-all từ web cũng xoá cookie', async () => {
+    await register('web-all@example.com');
+    const { res, cookie } = await webLogin('web-all@example.com');
+    const out = await http()
+      .post('/api/auth/logout-all')
+      .set(WEB)
+      .set({ Authorization: `Bearer ${res.body.accessToken}`, Cookie: `tripflix_refresh=${cookie.value}` })
+      .expect(204);
+    expect(readSetCookie(out)).toMatchObject({ value: '' });
+  });
+
+  it('app mobile không đổi: refreshToken trong body, không có Set-Cookie, không cần Origin', async () => {
+    await register('mobile@example.com');
+    const login = await http().post('/api/auth/login').send({ email: 'mobile@example.com', password: PASSWORD }).expect(200);
+    expect(login.body.refreshToken).toEqual(expect.any(String));
+    expect(login.headers['set-cookie']).toBeUndefined();
+
+    const refreshed = await http().post('/api/auth/refresh').send({ refreshToken: login.body.refreshToken }).expect(200);
+    expect(refreshed.body.refreshToken).toEqual(expect.any(String));
+    expect(refreshed.headers['set-cookie']).toBeUndefined();
+
+    // Không gửi token nào: 401 như token sai.
+    await http().post('/api/auth/refresh').send({}).expect(401);
+  });
+
+  it('CORS: origin tin cậy được phép kèm cookie; origin lạ không có Access-Control-Allow-Origin', async () => {
+    const ok = await http()
+      .options('/api/auth/refresh')
+      .set({ Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'x-tripflix-client,content-type' })
+      .expect(204);
+    expect(ok.headers['access-control-allow-origin']).toBe(WEB_ORIGIN);
+    expect(ok.headers['access-control-allow-credentials']).toBe('true');
+    expect(ok.headers['access-control-allow-headers']).toMatch(/x-tripflix-client/);
+
+    const evil = await http()
+      .options('/api/auth/refresh')
+      .set({ Origin: 'https://evil.example', 'Access-Control-Request-Method': 'POST' });
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined();
+  });
+  describe('mở trang quản trị bằng phiên web (mã chuyển phiên một lần)', () => {
+    const ADMIN = { ...WEB, Origin: ADMIN_ORIGIN };
+
+    async function staffWebLogin(email: string, role: 'member' | 'moderator' | 'superadmin') {
+      const reg = await register(email);
+      store.userRows.set(reg.body.id, { ...store.userRows.get(reg.body.id)!, role });
+      const { res } = await webLogin(email);
+      return { id: reg.body.id as string, accessToken: res.body.accessToken as string };
+    }
+    const createCode = (accessToken: string) =>
+      http().post('/api/auth/admin-handoff').set('Authorization', `Bearer ${accessToken}`);
+    async function exchange(code: string, status: number, origin = ADMIN_ORIGIN) {
+      const proof = await createTestBrowserProof();
+      return http().post('/api/auth/admin-handoff/exchange').set({ ...WEB, Origin: origin })
+        .set(await proof('login', origin)).send({ code }).expect(status);
+    }
+
+    it('nhân viên đổi mã lấy phiên admin riêng, cookie admin, vào được /admin/me', async () => {
+      const staff = await staffWebLogin('handoff-mod@example.com', 'moderator');
+      const created = await createCode(staff.accessToken).expect(200);
+      expect(created.headers['cache-control']).toBe('no-store');
+      expect(created.body).toEqual({ code: expect.any(String), expiresIn: 60 });
+
+      const proof = await createTestBrowserProof();
+      const res = await http().post('/api/auth/admin-handoff/exchange').set(ADMIN)
+        .set(await proof('login', ADMIN_ORIGIN)).send({ code: created.body.code }).expect(200);
+      expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
+      const adminCookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      expect(adminCookie).toMatch(/^tripflix_refresh_[a-f0-9]+=w1\./);
+
+      const me = await http().get('/api/admin/me').set('Authorization', `Bearer ${res.body.accessToken}`).expect(200);
+      expect(me.body.id).toBe(staff.id);
+      // Phiên admin gắn khoá trình duyệt của admin: làm mới được bằng khoá đó.
+      await http().post('/api/auth/refresh').set({ ...ADMIN, Cookie: adminCookie })
+        .set(await proof('refresh', ADMIN_ORIGIN)).expect(200);
+    });
+
+    it('mã chỉ dùng một lần; tạo mã mới thì mã cũ hết hiệu lực', async () => {
+      const staff = await staffWebLogin('handoff-once@example.com', 'superadmin');
+      const first = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      const second = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      await exchange(first, 401);
+      await exchange(second, 200);
+      await exchange(second, 401);
+    });
+
+    it('thành viên thường không tạo được mã: 403; chưa đăng nhập: 401', async () => {
+      const member = await staffWebLogin('handoff-member@example.com', 'member');
+      await createCode(member.accessToken).expect(403);
+      await http().post('/api/auth/admin-handoff').expect(401);
+    });
+
+    it('bị hạ quyền sau khi tạo mã thì không đổi được', async () => {
+      const staff = await staffWebLogin('handoff-demoted@example.com', 'moderator');
+      const code = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      store.userRows.set(staff.id, { ...store.userRows.get(staff.id)!, role: 'member' });
+      await exchange(code, 401);
+    });
+
+    it('đổi mã cần Origin tin cậy, chế độ web và chữ ký khoá trình duyệt; mã sai dạng: 401', async () => {
+      const staff = await staffWebLogin('handoff-origin@example.com', 'moderator');
+      const code = (await createCode(staff.accessToken).expect(200)).body.code as string;
+      const before = store.sessionRows.size;
+      await exchange(code, 403, 'https://evil.example');
+      await http().post('/api/auth/admin-handoff/exchange').set(ADMIN).send({ code }).expect(401);
+      const proof = await createTestBrowserProof();
+      await http().post('/api/auth/admin-handoff/exchange').set({ Origin: ADMIN_ORIGIN })
+        .set(await proof('login', ADMIN_ORIGIN)).send({ code }).expect(401);
+      await exchange('khong-phai-ma', 401);
+      expect(store.sessionRows.size).toBe(before);
+      // Các lần trên không tiêu mã: lần đúng vẫn đổi được.
+      await exchange(code, 200);
+    });
+  });
+});

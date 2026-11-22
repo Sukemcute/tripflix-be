@@ -1,0 +1,1162 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0424a665-c706-48d5-95e2-c1dc1ee235a9",
+  "prevIds": [
+    "b197c97f-7e7b-486e-bd78-d65beba4f7cd"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_algos"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_algos",
+        "n|tbl|discovery.recommend_algos",
+        "e|tbl|discovery.recommend_algos",
+        "n|rel|discovery.recommend_algos",
+        "n|type|discovery.recommend_algos",
+        "n|rel|discovery.recommend_algos_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_interactions"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_interactions",
+        "n|tbl|discovery.recommend_interactions",
+        "e|tbl|discovery.recommend_interactions",
+        "n|rel|discovery.recommend_interactions",
+        "n|type|discovery.recommend_interactions",
+        "n|rel|discovery.recommend_interactions_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_job_state"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_job_state",
+        "n|tbl|discovery.recommend_job_state",
+        "e|tbl|discovery.recommend_job_state",
+        "n|rel|discovery.recommend_job_state",
+        "n|type|discovery.recommend_job_state",
+        "n|rel|discovery.recommend_job_state_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_post_scores"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_post_scores",
+        "n|tbl|discovery.recommend_post_scores",
+        "e|tbl|discovery.recommend_post_scores",
+        "n|rel|discovery.recommend_post_scores",
+        "n|type|discovery.recommend_post_scores",
+        "n|rel|discovery.recommend_post_scores_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_posts"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_posts",
+        "n|tbl|discovery.recommend_posts",
+        "e|tbl|discovery.recommend_posts",
+        "n|rel|discovery.recommend_posts",
+        "n|type|discovery.recommend_posts",
+        "n|rel|discovery.recommend_posts_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "recommend_user_features"
+      ],
+      "writes": [
+        "s|tbl|discovery.recommend_user_features",
+        "n|tbl|discovery.recommend_user_features",
+        "e|tbl|discovery.recommend_user_features",
+        "n|rel|discovery.recommend_user_features",
+        "n|type|discovery.recommend_user_features",
+        "n|rel|discovery.recommend_user_features_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "recommend_interactions",
+        "idx_recommend_interactions_ingested_at"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_recommend_interactions_ingested_at",
+        "n|idx|discovery.idx_recommend_interactions_ingested_at",
+        "e|idx|discovery.idx_recommend_interactions_ingested_at",
+        "n|rel|discovery.idx_recommend_interactions_ingested_at"
+      ],
+      "reads": [
+        "n|tbl|discovery.recommend_interactions",
+        "n|sch|discovery",
+        "n|col|discovery.recommend_interactions.ingested_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "recommend_interactions",
+        "idx_recommend_interactions_kind_occurred_at"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_recommend_interactions_kind_occurred_at",
+        "n|idx|discovery.idx_recommend_interactions_kind_occurred_at",
+        "e|idx|discovery.idx_recommend_interactions_kind_occurred_at",
+        "n|rel|discovery.idx_recommend_interactions_kind_occurred_at"
+      ],
+      "reads": [
+        "n|tbl|discovery.recommend_interactions",
+        "n|sch|discovery",
+        "n|col|discovery.recommend_interactions.kind",
+        "n|col|discovery.recommend_interactions.occurred_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "recommend_post_scores",
+        "idx_recommend_post_scores_builder_version_post_type_score"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_recommend_post_scores_builder_version_post_type_score",
+        "n|idx|discovery.idx_recommend_post_scores_builder_version_post_type_score",
+        "e|idx|discovery.idx_recommend_post_scores_builder_version_post_type_score",
+        "n|rel|discovery.idx_recommend_post_scores_builder_version_post_type_score"
+      ],
+      "reads": [
+        "n|tbl|discovery.recommend_post_scores",
+        "n|sch|discovery",
+        "n|col|discovery.recommend_post_scores.builder",
+        "n|col|discovery.recommend_post_scores.version",
+        "n|col|discovery.recommend_post_scores.post_type",
+        "n|col|discovery.recommend_post_scores.score"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "recommend_posts",
+        "idx_recommend_posts_published_at"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_recommend_posts_published_at",
+        "n|idx|discovery.idx_recommend_posts_published_at",
+        "e|idx|discovery.idx_recommend_posts_published_at",
+        "n|rel|discovery.idx_recommend_posts_published_at"
+      ],
+      "reads": [
+        "n|tbl|discovery.recommend_posts",
+        "n|sch|discovery",
+        "n|col|discovery.recommend_posts.published_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_algos",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_interactions",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_job_state",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_post_scores",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_posts",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "name": "recommend_user_features",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "post_builder",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "user_builder",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "ranker",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "is_active",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "actor_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "actor_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "target_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "target_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "ref_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "value",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "is_removed",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "detail",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "source_event_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "ingested_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_job_state",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_job_state",
+        "name": "watermark",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_job_state",
+        "name": "last_run_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_job_state",
+        "name": "last_error",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "builder",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "post_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "post_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "score",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "features",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "built_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "post_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "author_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "post_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "tags",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "place_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "is_verified",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "published_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "synced_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "builder",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "version",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "features",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "built_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "idx_recommend_interactions_ingested_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "ingested_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "idx_recommend_interactions_kind_occurred_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "kind",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "idx_recommend_post_scores_builder_version_post_type_score",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "builder",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "version",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "post_type",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "score",
+            "isExpression": false,
+            "asc": false,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "idx_recommend_posts_published_at",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "published_at",
+            "isExpression": false,
+            "asc": false,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_interactions",
+        "name": "recommend_interactions_pkey",
+        "columns": [
+          "actor_type",
+          "actor_id",
+          "kind",
+          "ref_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_post_scores",
+        "name": "recommend_post_scores_pkey",
+        "columns": [
+          "builder",
+          "version",
+          "post_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_user_features",
+        "name": "recommend_user_features_pkey",
+        "columns": [
+          "builder",
+          "version",
+          "user_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_algos",
+        "name": "recommend_algos_pkey",
+        "columns": [
+          "name"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_job_state",
+        "name": "recommend_job_state_pkey",
+        "columns": [
+          "name"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "recommend_posts",
+        "name": "recommend_posts_pkey",
+        "columns": [
+          "post_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

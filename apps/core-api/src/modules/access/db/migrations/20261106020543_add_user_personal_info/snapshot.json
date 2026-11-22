@@ -1,0 +1,236 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "b979d865-85c6-4277-b2af-7a5546ae4f86",
+  "prevIds": [
+    "e50f51dc-c6a0-4b04-809d-8a3467871659"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "phone"
+      ],
+      "writes": [
+        "s|col|access.users.phone",
+        "n|col|access.users.phone",
+        "e|col|access.users.phone"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "date_of_birth"
+      ],
+      "writes": [
+        "s|col|access.users.date_of_birth",
+        "n|col|access.users.date_of_birth",
+        "e|col|access.users.date_of_birth"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "gender"
+      ],
+      "writes": [
+        "s|col|access.users.gender",
+        "n|col|access.users.gender",
+        "e|col|access.users.gender"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "access",
+        "users",
+        "nationality"
+      ],
+      "writes": [
+        "s|col|access.users.nationality",
+        "n|col|access.users.nationality",
+        "e|col|access.users.nationality"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "access",
+        "users"
+      ],
+      "writes": [
+        "s|ck|access.users.ck_users_gender",
+        "n|ck|access.users.ck_users_gender",
+        "e|ck|access.users.ck_users_gender",
+        "n|con|access.users.ck_users_gender"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.gender"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "access",
+        "users"
+      ],
+      "writes": [
+        "s|ck|access.users.ck_users_nationality",
+        "n|ck|access.users.ck_users_nationality",
+        "e|ck|access.users.ck_users_nationality",
+        "n|con|access.users.ck_users_nationality"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.nationality"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "access",
+        "users"
+      ],
+      "writes": [
+        "s|ck|access.users.ck_users_phone",
+        "n|ck|access.users.ck_users_phone",
+        "e|ck|access.users.ck_users_phone",
+        "n|con|access.users.ck_users_phone"
+      ],
+      "reads": [
+        "n|tbl|access.users",
+        "n|sch|access",
+        "n|col|access.users.phone"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "phone",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "date_of_birth",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "gender",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "nationality",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "ck_users_gender",
+        "value": "\"gender\" is null or \"gender\" in ('male', 'female', 'other')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "ck_users_nationality",
+        "value": "\"nationality\" is null or \"nationality\" ~ '^[A-Z]{2}$'",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "access",
+        "table": "users",
+        "name": "ck_users_phone",
+        "value": "\"phone\" is null or \"phone\" ~ '^[+]?[0-9]{8,15}$'",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

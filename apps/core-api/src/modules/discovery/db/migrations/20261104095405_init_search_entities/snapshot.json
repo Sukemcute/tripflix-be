@@ -1,0 +1,228 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3a467f85-6c85-4299-bc35-28afe3a42608",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "discovery"
+      ],
+      "writes": [
+        "s|sch|discovery",
+        "n|sch|discovery",
+        "e|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "discovery",
+        "search_entities"
+      ],
+      "writes": [
+        "s|tbl|discovery.search_entities",
+        "n|tbl|discovery.search_entities",
+        "e|tbl|discovery.search_entities",
+        "n|rel|discovery.search_entities",
+        "n|type|discovery.search_entities",
+        "n|rel|discovery.search_entities_pkey"
+      ],
+      "reads": [
+        "n|sch|discovery"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "search_entities",
+        "idx_search_entities_search_text"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_search_entities_search_text",
+        "n|idx|discovery.idx_search_entities_search_text",
+        "e|idx|discovery.idx_search_entities_search_text",
+        "n|rel|discovery.idx_search_entities_search_text"
+      ],
+      "reads": [
+        "n|tbl|discovery.search_entities",
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "discovery",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "discovery",
+      "name": "search_entities",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "ref_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "subtitle",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "place_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "search_text",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "popularity",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "idx_search_entities_search_text",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "\"search_text\" gin_trgm_ops",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gin",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "search_entities_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "discovery",
+      "table": "search_entities",
+      "name": "ck_search_entities_type",
+      "value": "\"type\" in ('place', 'hotel', 'airport')",
+      "entityType": "checks"
+    }
+  ]
+}

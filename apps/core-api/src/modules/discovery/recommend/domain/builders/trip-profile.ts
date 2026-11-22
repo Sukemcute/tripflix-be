@@ -1,0 +1,93 @@
+import { z } from 'zod';
+import { assignBins } from '../bins.js';
+import { round4, type Kind, type PostMeta, type RawRow, type UserBuilder } from '../contracts.js';
+
+/**
+ * trip_profile@v1 (TF28 v1): câu trả lời DÀI HẠN của người dùng, mỗi câu hỏi một histogram trên ngăn.
+ * H1b thường thích nơi nào → answers.place · H2 thích làm gì → answers.exp · H3/H4/H5 dài hạn → cost/with/len · H6 → creators.
+ * Chỉ tương tác lên bài mới trả lời các câu này. Tìm kiếm, xem khách sạn là "đang tìm hiểu": tính lúc gọi (live-answers.ts),
+ * không cộng vào đây, để 200 lượt tìm Hà Nội không đè gu.
+ * Muốn đổi trọng số / thời gian nhạt dần: sửa hai hằng dưới, tăng version nếu đổi hình dạng features.
+ */
+const INTEREST_KINDS: Partial<Record<Kind, number>> = { order_item: 5, bookmark: 4, share: 4, comment: 3, reaction: 2 };
+const HALF_LIFE_DAYS = 14;
+/** Xem reels (chốt 18/11): xem ≥ 80% ngang comment, xem thật (≥ 15 s hoặc ≥ 50%) nhẹ, lướt < 2 s trừ nhẹ. */
+export const VIEW_WEIGHTS = { fullRatio: 0.8, full: 3, qualified: 1, skipMs: 2_000, skip: -0.5 };
+
+/** Trọng số một lượt xem reels; 0 = không nói lên gì (xem nửa vời). */
+export function viewWeight(row: RawRow): number {
+  const watchedMs = typeof row.detail?.watchedMs === 'number' ? row.detail.watchedMs : 0;
+  if (row.value !== null && row.value >= VIEW_WEIGHTS.fullRatio) return VIEW_WEIGHTS.full;
+  if (row.detail?.isQualified === true) return VIEW_WEIGHTS.qualified;
+  return watchedMs < VIEW_WEIGHTS.skipMs ? VIEW_WEIGHTS.skip : 0;
+}
+
+export const TripProfileV1FeaturesSchema = z.object({
+  /** câu hỏi ('place', 'exp', 'cost', 'with', 'len', 'season') → ngăn → tổng trọng số (chưa chuẩn hoá: ranker lấy cosine). */
+  answers: z.record(z.string(), z.record(z.string(), z.number())),
+  /** câu hỏi → tổng trọng số dấu hiệu, để ranker tính độ tin (cosine bỏ mất độ lớn). */
+  evidence: z.record(z.string(), z.number()),
+  creators: z.record(z.string(), z.number()),
+  interactionCount: z.number(),
+});
+export type TripProfileV1Features = z.infer<typeof TripProfileV1FeaturesSchema>;
+
+const question = (bin: string) => bin.slice(0, bin.indexOf(':'));
+
+/** Bài mà một dòng nói tới: thả tim/lưu/... lên bài, hoặc đơn đặt từ bài (sourcePostId). */
+function postOf(row: RawRow, posts: Record<string, PostMeta>) {
+  if (row.targetType === 'post' && row.targetId) return posts[row.targetId];
+  const source = row.detail?.sourcePostId;
+  return typeof source === 'string' ? posts[source] : undefined;
+}
+
+/**
+ * Cộng các dòng tương tác lên bài thành câu trả lời dài hạn (chưa làm tròn).
+ * Builder dùng cho 30 ngày; ranker dùng lại cho vài phút gần nhất (job chưa kịp chạy) để feed đổi ngay sau khi thả tim.
+ */
+export function accumulateInterest(rows: RawRow[], posts: Record<string, PostMeta>, now: Date) {
+  const answers: Record<string, Record<string, number>> = {};
+  const evidence: Record<string, number> = {};
+  const creators: Record<string, number> = {};
+  for (const row of rows) {
+    const wKind = row.isRemoved ? undefined : row.kind === 'view_post' ? viewWeight(row) : INTEREST_KINDS[row.kind];
+    const post = wKind ? postOf(row, posts) : undefined;
+    if (!wKind || !post) continue;
+    const ageDays = Math.max(0, (now.getTime() - Date.parse(row.occurredAt)) / 86_400_000);
+    const w = wKind * 0.5 ** (ageDays / HALF_LIFE_DAYS);
+    const touched = new Set<string>();
+    for (const [bin, binW] of Object.entries(assignBins(post))) {
+      const q = question(bin);
+      (answers[q] ??= {})[bin] = (answers[q][bin] ?? 0) + w * binW;
+      touched.add(q);
+    }
+    // Lướt qua chỉ hạ gu, không tính là "biết thêm" về người này.
+    for (const q of touched) evidence[q] = (evidence[q] ?? 0) + Math.max(0, w);
+    creators[post.authorId] = (creators[post.authorId] ?? 0) + w;
+  }
+  // Trừ nhiều hơn cộng thì về 0: cosine không dùng giá trị âm.
+  for (const m of [...Object.values(answers), creators]) for (const [k, v] of Object.entries(m)) if (v <= 0) delete m[k];
+  return { answers, evidence, creators };
+}
+
+const roundAll = (m: Record<string, number>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round4(v)]));
+
+export const tripProfileV1: UserBuilder = {
+  key: 'trip_profile@v1',
+  needsVectors: true,
+  featuresSchema: TripProfileV1FeaturesSchema,
+  build(items, now) {
+    return Promise.resolve(
+      items.map((item) => {
+        const { answers, evidence, creators } = accumulateInterest(item.rows, item.posts, now);
+        const features: TripProfileV1Features = {
+          answers: Object.fromEntries(Object.entries(answers).map(([q, m]) => [q, roundAll(m)])),
+          evidence: roundAll(evidence),
+          creators: roundAll(creators),
+          interactionCount: item.rows.filter((r) => !r.isRemoved).length,
+        };
+        return { userId: item.userId, features };
+      }),
+    );
+  },
+};

@@ -1,0 +1,144 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "6ab43875-32e1-4da2-a424-55c09e47fac6",
+  "prevIds": [
+    "e6706782-f588-4cfc-8198-4c3770ebfd62"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "flights",
+        "airline_code"
+      ],
+      "writes": [
+        "s|col|commerce.flights.airline_code",
+        "n|col|commerce.flights.airline_code",
+        "e|col|commerce.flights.airline_code"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "flights",
+        "flight_number"
+      ],
+      "writes": [
+        "s|col|commerce.flights.flight_number",
+        "n|col|commerce.flights.flight_number",
+        "e|col|commerce.flights.flight_number"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "commerce",
+        "flights",
+        "stops"
+      ],
+      "writes": [
+        "s|col|commerce.flights.stops",
+        "n|col|commerce.flights.stops",
+        "e|col|commerce.flights.stops"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "commerce",
+        "flights"
+      ],
+      "writes": [
+        "s|ck|commerce.flights.ck_flights_stops",
+        "n|ck|commerce.flights.ck_flights_stops",
+        "e|ck|commerce.flights.ck_flights_stops",
+        "n|con|commerce.flights.ck_flights_stops"
+      ],
+      "reads": [
+        "n|tbl|commerce.flights",
+        "n|sch|commerce",
+        "n|col|commerce.flights.stops"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flights",
+        "name": "airline_code",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flights",
+        "name": "flight_number",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flights",
+        "name": "stops",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "commerce",
+        "table": "flights",
+        "name": "ck_flights_stops",
+        "value": "\"stops\" >= 0",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

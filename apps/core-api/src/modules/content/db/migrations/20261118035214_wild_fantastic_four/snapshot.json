@@ -1,0 +1,178 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e499436a-43f1-46b6-9087-80fd2c966088",
+  "prevIds": [
+    "ffffa8e9-1e0f-4be0-88d6-f2e4332af7a0"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "posts",
+        "comments_enabled"
+      ],
+      "writes": [
+        "s|col|content.posts.comments_enabled",
+        "n|col|content.posts.comments_enabled",
+        "e|col|content.posts.comments_enabled"
+      ],
+      "reads": [
+        "n|tbl|content.posts",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "posts",
+        "comment_keywords"
+      ],
+      "writes": [
+        "s|col|content.posts.comment_keywords",
+        "n|col|content.posts.comment_keywords",
+        "e|col|content.posts.comment_keywords"
+      ],
+      "reads": [
+        "n|tbl|content.posts",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "comments",
+        "creator_review"
+      ],
+      "writes": [
+        "s|col|content.comments.creator_review",
+        "n|col|content.comments.creator_review",
+        "e|col|content.comments.creator_review"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "content",
+        "comments",
+        "platform_held"
+      ],
+      "writes": [
+        "s|col|content.comments.platform_held",
+        "n|col|content.comments.platform_held",
+        "e|col|content.comments.platform_held"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "content",
+        "comments"
+      ],
+      "writes": [
+        "s|ck|content.comments.ck_comments_creator_review",
+        "n|ck|content.comments.ck_comments_creator_review",
+        "e|ck|content.comments.ck_comments_creator_review",
+        "n|con|content.comments.ck_comments_creator_review"
+      ],
+      "reads": [
+        "n|tbl|content.comments",
+        "n|sch|content",
+        "n|col|content.comments.creator_review"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "posts",
+        "name": "comments_enabled",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "posts",
+        "name": "comment_keywords",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "creator_review",
+        "type": "varchar(12)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'approved'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "platform_held",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "comments",
+        "name": "ck_comments_creator_review",
+        "value": "\"creator_review\" IN ('approved', 'pending', 'rejected')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

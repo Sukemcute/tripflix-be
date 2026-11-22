@@ -1,0 +1,169 @@
+import { sql } from 'drizzle-orm';
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { contentSchema } from './content-schema.js';
+import { createIdempotencyKeysTable } from '@tripflix/idempotency';
+import { moderationActions } from './moderation-actions.js';
+
+export const contentIdempotencyKeys = createIdempotencyKeysTable(contentSchema);
+
+export type ModerationTarget = 'post' | 'comment';
+export const moderationAppeals = contentSchema.table(
+  'moderation_appeals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    decisionId: uuid('decision_id')
+      .notNull()
+      .references(() => moderationActions.id),
+    authorId: uuid('author_id').notNull(),
+    reason: text('reason').notNull(),
+    status: varchar('status', { length: 20 })
+      .$type<'pending' | 'upheld' | 'overturned'>()
+      .notNull()
+      .default('pending'),
+    reviewerId: uuid('reviewer_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('uq_moderation_appeal_decision').on(t.decisionId),
+    check('ck_moderation_appeal_status', sql`${t.status} IN ('pending', 'upheld', 'overturned')`),
+    index('idx_moderation_appeal_queue').on(t.status, t.createdAt),
+  ],
+);
+export const moderationScans = contentSchema.table(
+  'moderation_scans',
+  {
+    eventId: uuid('event_id').primaryKey(),
+    targetType: varchar('target_type', { length: 20 }).$type<ModerationTarget>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    contentVersion: text('content_version').notNull(),
+    status: varchar('status', { length: 20 })
+      .$type<'deferred' | 'passed' | 'flagged' | 'failed' | 'superseded'>()
+      .notNull(),
+    model: text('model'),
+    policyVersion: text('policy_version'),
+    evidence: jsonb('evidence').$type<Record<string, unknown>>(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+    retriedBy: uuid('retried_by'),
+    retriedAt: timestamp('retried_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(1),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    check(
+      'ck_moderation_scans_status',
+      sql`${t.status} IN ('deferred', 'passed', 'flagged', 'failed', 'superseded')`,
+    ),
+    index('idx_moderation_scans_status').on(t.status, t.updatedAt),
+  ],
+);
+export const moderationCases = contentSchema.table(
+  'moderation_cases',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    targetType: varchar('target_type', { length: 20 }).$type<ModerationTarget>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    postId: uuid('post_id').notNull(),
+    authorId: uuid('author_id').notNull(),
+    status: varchar('status', { length: 20 }).$type<'pending' | 'resolved'>().notNull().default('pending'),
+    sources: jsonb('sources').$type<string[]>().notNull().default([]),
+    severity: integer('severity').notNull().default(0),
+    flags: jsonb('flags').$type<Record<string, unknown>>().notNull().default({}),
+    reportCount: integer('report_count').notNull().default(0),
+    isAutoHidden: boolean('is_auto_hidden').notNull().default(false),
+    resolution: varchar('resolution', { length: 20 }),
+    assigneeId: uuid('assignee_id'),
+    leaseId: uuid('lease_id'),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+    dueAt: timestamp('due_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '24 hours'`),
+    resolvedBy: uuid('resolved_by'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    check('ck_moderation_cases_target_type', sql`${t.targetType} IN ('post', 'comment')`),
+    check('ck_moderation_cases_status', sql`${t.status} IN ('pending', 'resolved')`),
+    check('ck_moderation_cases_severity', sql`${t.severity} BETWEEN 0 AND 100`),
+    uniqueIndex('uq_moderation_cases_target_pending')
+      .on(t.targetType, t.targetId)
+      .where(sql`${t.status} = 'pending'`),
+    index('idx_moderation_cases_queue').on(t.status, t.severity.desc(), t.createdAt),
+    index('idx_moderation_cases_due')
+      .on(t.dueAt)
+      .where(sql`${t.status} = 'pending'`),
+    index('idx_moderation_cases_assignee')
+      .on(t.assigneeId, t.leaseExpiresAt)
+      .where(sql`${t.status} = 'pending'`),
+  ],
+);
+export const reports = contentSchema.table(
+  'reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    targetType: varchar('target_type', { length: 20 }).$type<ModerationTarget>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    reporterId: uuid('reporter_id').notNull(),
+    contentVersion: text('content_version').notNull().default('legacy'),
+    reasonCode: varchar('reason_code', { length: 50 }).notNull(),
+    reasonDetail: text('reason_detail'),
+    caseId: uuid('case_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    foreignKey({ name: 'fk_reports_case_id', columns: [t.caseId], foreignColumns: [moderationCases.id] }),
+    check('ck_reports_target_type', sql`${t.targetType} IN ('post', 'comment')`),
+    uniqueIndex('uq_reports_target_reporter').on(t.targetType, t.targetId, t.contentVersion, t.reporterId),
+    index('idx_reports_target_created').on(t.targetType, t.targetId, t.createdAt),
+    index('idx_reports_reporter_created').on(t.reporterId, t.createdAt),
+  ],
+);
+export const moderationProcessedEvents = contentSchema.table(
+  'moderation_processed_events',
+  {
+    consumerGroup: varchar('consumer_group', { length: 50 }).notNull(),
+    eventId: uuid('event_id').notNull(),
+    processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ name: 'pk_moderation_processed_events', columns: [t.consumerGroup, t.eventId] })],
+);
+export type ModerationCaseRecord = typeof moderationCases.$inferSelect;
+
+export const moderationReviewAudit = contentSchema.table(
+  'moderation_review_audit',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => moderationCases.id, { onDelete: 'cascade' }),
+    actorId: uuid('actor_id').notNull(),
+    action: varchar('action', { length: 24 })
+      .$type<'claim' | 'renew' | 'release' | 'evidence_view'>()
+      .notNull(),
+    leaseId: uuid('lease_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_moderation_review_audit_case').on(t.caseId, t.createdAt),
+    check(
+      'ck_moderation_review_audit_action',
+      sql`${t.action} IN ('claim', 'renew', 'release', 'evidence_view')`,
+    ),
+  ],
+);

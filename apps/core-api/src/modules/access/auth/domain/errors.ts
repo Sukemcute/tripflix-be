@@ -1,0 +1,26 @@
+/** Lỗi nghiệp vụ của access; tầng api đổi sang mã HTTP. */
+export class AccessError extends Error {
+  constructor(
+    readonly code:
+      | 'invalid_credentials'
+      | 'too_many_attempts'
+      | 'email_taken'
+      | 'invalid_refresh'
+      | 'session_revoked'
+      | 'not_found'
+      | 'invalid_avatar'
+      | 'forbidden'
+      | 'staff_rule'
+      | 'wrong_password'
+      | 'invalid_reset_token'
+      | 'invalid_verify_token'
+      | 'invalid_registration_code'
+      | 'google_invalid'
+      | 'google_not_configured',
+    message: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = 'AccessError';
+  }
+}

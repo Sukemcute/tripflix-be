@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { loggerModule } from '@tripflix/observability';
 import { AccessModule } from './modules/access/index.js';
-import { AnalyticsModule } from './modules/analytics/index.js';
+import { AiInsightsModule, AnalyticsModule, UserActivityModule } from './modules/analytics/index.js';
 import { CommerceModule } from './modules/commerce/index.js';
 import { ContentModule } from './modules/content/index.js';
 import { DiscoveryModule } from './modules/discovery/index.js';
@@ -20,6 +20,8 @@ import { PlatformModule } from './platform/platform.module.js';
     DiscoveryModule,
     CommerceModule,
     AnalyticsModule,
+    UserActivityModule,
+    AiInsightsModule,
   ],
 })
 export class AppModule {}

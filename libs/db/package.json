@@ -19,13 +19,29 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "drizzle-orm": "catalog:", "pg": "catalog:" },
+  "dependencies": {
+    "@nestjs-cls/transactional": "catalog:",
+    "@nestjs-cls/transactional-adapter-drizzle-orm": "catalog:",
+    "drizzle-orm": "catalog:",
+    "nestjs-cls": "catalog:",
+    "pg": "catalog:"
+  },
   "devDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "@types/pg": "catalog:"
+    "@types/pg": "catalog:",
+    "@nestjs/testing": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^12.0.0",
+    "@nestjs/core": "^12.0.0",
+    "rxjs": "^7.0.0"
   }
 }

@@ -1,0 +1,441 @@
+# Chạy Tripflix trên một máy server. Khác compose.yaml (máy dev): dùng image production trên GHCR,
+# mật khẩu riêng trong .env.server, Postgres và Redis không mở cổng, API chỉ nghe trên 127.0.0.1.
+# Cách dùng: xem deploy/SERVER.md.
+name: tripflix-server
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '3' }
+
+x-core-env: &core-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  REDIS_URL: redis://redis:6379
+  DATABASE_URL_ACCESS: postgres://tf_access:${DB_PASS_ACCESS:?}@postgres:5432/core
+  DATABASE_URL_CONTENT: postgres://tf_content:${DB_PASS_CONTENT:?}@postgres:5432/core
+  DATABASE_URL_DISCOVERY: postgres://tf_discovery:${DB_PASS_DISCOVERY:?}@postgres:5432/core
+  DATABASE_URL_ANALYTICS: postgres://tf_analytics:${DB_PASS_ANALYTICS:?}@postgres:5432/core
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:${DB_PASS_COMMERCE:?}@postgres:5432/core
+  AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:?}
+  # Khoá để client mã hoá mật khẩu (TF056; sinh bằng init-server-env.sh hoặc auth:password-keygen).
+  # Trống: tắt mã hoá, client gửi mật khẩu như cũ. Chỉ bật REQUIRED khi web, admin, mobile đều đã mã hoá.
+  AUTH_PASSWORD_KEYS: ${AUTH_PASSWORD_KEYS:-}
+  AUTH_PASSWORD_ENCRYPTION_REQUIRED: ${AUTH_PASSWORD_ENCRYPTION_REQUIRED:-false}
+  AUTH_JWT_ISSUER: tripflix-core
+  AUTH_JWT_AUDIENCE: tripflix
+  AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100}
+  AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  AUTH_EMAIL_VERIFY_URL: ${AUTH_EMAIL_VERIFY_URL:-http://localhost:3100/xac-thuc-email}
+  AUTH_REGISTER_MAX_PER_IP_HOUR: ${AUTH_REGISTER_MAX_PER_IP_HOUR:-5}
+  # OAuth Client ID của Google (cách nhau bởi dấu phẩy). Trống: tắt đăng nhập Google, POST /api/auth/google trả 503.
+  GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
+  S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
+  MEDIA_CDN_URL: ${MEDIA_CDN_URL:?}
+  # Cookie ký cho video trên CloudFront (TF82, deploy/aws/README.md). Trống: không ký, video phát không cần cookie.
+  CLOUDFRONT_KEY_PAIR_ID: ${CLOUDFRONT_KEY_PAIR_ID:-}
+  CLOUDFRONT_PRIVATE_KEY: ${CLOUDFRONT_PRIVATE_KEY:-}
+  MEDIA_COOKIE_DOMAIN: ${MEDIA_COOKIE_DOMAIN:-}
+  MEDIA_PLAYBACK_TTL_SEC: ${MEDIA_PLAYBACK_TTL_SEC:-}
+  VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+  VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+  VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-}
+  VNPAY_API_URL: ${VNPAY_API_URL:-}
+  # Không để trống: core-api kiểm biến này là URL, chuỗi rỗng làm app không khởi động được.
+  VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-https://tripflix.io.vn/payments/vnpay/return}
+  # Kiểm duyệt bằng AI (TF32, deploy/SERVER.md mục Kiểm duyệt). Thiếu AI_SERVICE_URL hoặc secret thì core chỉ lọc bằng regex.
+  AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+  CORE_API_INTERNAL_URL: http://core-api:3000
+  MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
+  # Link chia sẻ bài do core-api trả về (shareUrl) trỏ về web này; trùng biến của notification-service.
+  WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
+
+# Gửi metric, trace sang otel-collector (profile observability, deploy/SERVER.md mục Observability).
+# Đặt OTEL_SDK_DISABLED=true trong .env.server để tắt. Trace lấy mẫu 10%, metric request vẫn đo đủ.
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT-http://otel-collector:4318}
+  OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
+  OTEL_TRACES_SAMPLER: parentbased_traceidratio
+  OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
+
+services:
+  # ---------- Giai đoạn 1: database, Redis ----------
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    logging: *logging
+    # Mặc định 100. Mỗi bản core-api mở tối đa 33 kết nối (5 module), notification-service 10, cộng pool commerce tự tăng
+    # theo tải: 200 đủ cho 2–3 bản core-api. Đổi giá trị này phải tạo lại container: `up -d postgres` (deploy-api.sh không làm).
+    command: ['postgres', '-c', 'max_connections=200']
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      DB_PASS_ACCESS: ${DB_PASS_ACCESS:?}
+      DB_PASS_CONTENT: ${DB_PASS_CONTENT:?}
+      DB_PASS_DISCOVERY: ${DB_PASS_DISCOVERY:?}
+      DB_PASS_ANALYTICS: ${DB_PASS_ANALYTICS:?}
+      DB_PASS_COMMERCE: ${DB_PASS_COMMERCE:?}
+      DB_PASS_NOTIFICATION: ${DB_PASS_NOTIFICATION:?}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      # Chạy theo tên file, một lần khi volume còn trống. File 90 thay mật khẩu dev của file 02.
+      - ./postgres/init/01-databases.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+      - ./postgres/init/02-roles-schemas.sql:/docker-entrypoint-initdb.d/02-roles-schemas.sql:ro
+      - ./postgres/init/03-extensions.sql:/docker-entrypoint-initdb.d/03-extensions.sql:ro
+      - ./postgres/server/90-passwords.sh:/docker-entrypoint-initdb.d/90-passwords.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d core']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.8-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  # ---------- Giai đoạn 2: core-api ----------
+  migrate:
+    profiles: [api]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${CORE_API_TAG:-${IMAGE_TAG:-develop}}
+    logging: *logging
+    command: ['node', 'dist/cli/migrate.js']
+    environment: *core-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  core-api:
+    profiles: [api]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/core-api:${CORE_API_TAG:-${IMAGE_TAG:-develop}}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: [*core-env, *otel-env]
+      APP_ROLE: all
+      PORT: 3000
+      OTEL_SERVICE_NAME: core-api
+      # Trang /analytics của admin đọc metric, trace qua core-api (docs/observability.md).
+      ANALYTICS_PROMETHEUS_URL: ${ANALYTICS_PROMETHEUS_URL-http://prometheus:9090}
+      ANALYTICS_TEMPO_URL: ${ANALYTICS_TEMPO_URL-http://tempo:3200}
+    ports: ['127.0.0.1:${API_PORT:-3000}:3000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ---------- Giai đoạn 4: gửi email (TF05D) ----------
+  # Gửi email xác thực, đặt lại mật khẩu, chào mừng qua SMTP của Amazon SES (deploy/SERVER.md, Giai đoạn 4).
+  # Profile riêng, bật khi đã có SMTP_URL; thiếu thì service dừng lúc khởi động với lỗi rõ ràng, profile khác chạy như cũ.
+  notification-service:
+    profiles: [mail]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/notification-service:${NOTIFICATION_TAG:-${IMAGE_TAG:-develop}}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL_NOTIFICATION: postgres://tf_notification:${DB_PASS_NOTIFICATION:?}@postgres:5432/notification
+      JWKS_URL: http://core-api:3000/.well-known/jwks.json
+      AUTH_JWT_ISSUER: tripflix-core
+      AUTH_JWT_AUDIENCE: tripflix
+      # smtps://<SMTP user>:<SMTP password>@email-smtp.<region>.amazonaws.com:465 (mật khẩu đã URL-encode).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Tripflix <no-reply@tripflix.io.vn>}
+      WEB_APP_URL: ${WEB_APP_URL:-https://tripflix.io.vn}
+      # Web, admin gọi /notifications từ trình duyệt (TF46): cùng danh sách origin với core-api.
+      WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
+      # Push mobile qua Expo (N3, PR #202). Bật khi app đã gửi Expo push token lên. Khoá FCM, APNs nằm trên Expo, không nằm ở đây.
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
+      WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
+      WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      # Chỉ cần khi bật "Enhanced Push Security" trên Expo. EXPO_PUSH_URL để mặc định trong code.
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      <<: *otel-env
+      OTEL_SERVICE_NAME: notification-service
+    depends_on:
+      redis: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ---------- Giai đoạn 5: AI (repo tripflix-ai) ----------
+  # ai-service và worker dùng chung image và AI_TAG. App đọc tóm tắt, kết quả kiểm duyệt qua core-api.
+  # ai-service (TF32): POST /moderate cho core-api gọi kiểm duyệt chữ và ảnh qua OpenAI moderation.
+  # /moderate chỉ nghe trong mạng nội bộ, chỉ nhận service token của core-api,
+  # kiểm bằng JWKS của core-api. Thiếu OPENAI_API_KEY thì /moderate trả 503 và core giữ bước lọc regex.
+  # POST /chat (TF31, trợ lý Tripi): gateway mở đúng https://<API_HOST>/ai/chat, chỉ nhận token người dùng.
+  # CHAT_LLM_ENABLED=false thì Tripi chỉ tìm kiếm thường, không gọi DeepSeek.
+  # Không tải bộ phân loại, không gọi LLM nên nhẹ, giới hạn nửa nhân.
+  ai-service:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CORE_API_URL: http://core-api:3000
+      # Web gọi /ai/chat từ trình duyệt; thiếu biến này ai-service chỉ nhận localhost và chặn preflight của web.
+      CORS_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # ViSoBERT INT8 chạy cạnh OpenAI moderation, cần AI_TAG từ sha-eadf699. Bận hoặc quá 1,5 giây thì dùng riêng kết quả OpenAI.
+      IS_VISOBERT_ENABLED: ${IS_VISOBERT_ENABLED:-false}
+      LOG_LEVEL: INFO
+      # Tripi v3 (TF31): Controller (OpenAI) chọn công cụ, Responder (DeepSeek) viết câu trả lời.
+      # Giá USD mỗi 1 triệu token của gpt-5-nano, Bảo xác nhận lại khi đổi model. Không để giá rỗng:
+      # ai-service đọc "" thành lỗi và không khởi động, kéo theo /moderate. Staging đặt model, giá trong .env.server.
+      CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
+      CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
+      CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
+      CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
+      CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
+      # Trống thì dùng mặc định của code (minimal). gpt-5.6-luna không nhận minimal, phải đặt none,
+      # nếu không mọi lượt gọi Controller lỗi 400 và Tripi chỉ trả "chưa tìm thấy kết quả".
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
+      CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
+      # Băm IP của khách để tính hạn mức. Mỗi môi trường một chuỗi; đổi thì hạn mức khách tính lại từ đầu.
+      CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
+      # Hạn mức lượt, token, USD/ngày, lượt chạy cùng lúc để mặc định trong code; cần thì thêm CHAT_* vào đây.
+      CHAT_SYSTEM_DAILY_USD: ${CHAT_SYSTEM_DAILY_USD:-3}
+      # Khoá lượt, đếm lượt/phút, lượt và token/ngày của Tripi.
+      REDIS_URL: redis://redis:6379
+      # fastapi run chỉ tin X-Forwarded-For từ các địa chỉ này. Đặt bằng dải mạng compose (SERVER.md, mục Trợ lý Tripi);
+      # để mặc định 127.0.0.1 thì mọi khách chung IP của Traefik và chạm hạn mức khách rất nhanh.
+      FORWARDED_ALLOW_IPS: ${AI_FORWARDED_ALLOW_IPS:-127.0.0.1}
+    depends_on:
+      redis: { condition: service_healthy }
+    cpus: 0.5
+    # Bản thử của TF32: đỉnh khoảng 290 MiB khi gọi API, 640 MiB khi suy luận văn bản dài (ViSoBERT).
+    # TF28: e5-small INT8 của POST /embed thêm khoảng 380 MiB, nạp khi core gọi lần đầu. Bật cả hai thì khoảng
+    # 1,03 GiB, vượt 1g và container bị kill, mất luôn /moderate và /chat. 1536m để có chỗ dư.
+    mem_limit: 1536m
+    healthcheck:
+      test: ['CMD', '/app/.venv/bin/python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # Worker tóm tắt (TF14): nghe bình luận trên stream:core.content, gom 60 giây mỗi bài rồi gọi DeepSeek, ghi kết quả về core-api
+  # bằng service token (client ai-service, deploy/SERVER.md mục Tóm tắt AI). Lần đầu chạy đọc lại cả sự kiện cũ trong stream.
+  # Bộ phân loại bình luận cần ~2 nhân và ~820 MB RAM với 2 luồng. Máy chỉ 2 vCPU dùng chung với core-api,
+  # nên mặc định giới hạn 1 nhân, 1 luồng; số luồng phải bằng số nhân được cấp.
+  ai-summary-worker:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.summary_worker']
+    environment:
+      CORE_API_URL: http://core-api:3000
+      REDIS_URL: redis://redis:6379
+      # Thiếu key thì worker dừng lúc khởi động với lỗi DEEPSEEK_API_KEY is empty.
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      LLM_MODEL: ${LLM_MODEL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      SERVICE_CLIENT_ID: ai-service
+      SERVICE_CLIENT_SECRET: ${AI_SERVICE_CLIENT_SECRET:-}
+      # true = không gọi DeepSeek (tắt khẩn cấp, ví dụ khi tốn tiền bất thường).
+      SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
+      CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
+      # false = chỉ tóm tắt bằng luật, không chạy bộ phân loại (tắt khi model có vấn đề).
+      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
+      LOG_LEVEL: INFO
+    cpus: ${AI_WORKER_CPUS:-1}
+    mem_limit: 1536m
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # Worker gắn nhãn bình luận (TF44): group ai-labels trên stream:core.content, ghi ai:labels:*, ai:safety:* vào Redis (TTL 30 ngày).
+  # Không gọi core-api, không gọi LLM, nhưng thiếu LLM_PROVIDER thì không khởi động được. Staging dùng ~290 MB.
+  # Lần đầu chạy đọc lại cả sự kiện cũ trong stream. Sự cố model: CLASSIFIER_ENABLED=false hoặc dừng service này.
+  ai-label-worker:
+    profiles: [ai]
+    image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.label_worker']
+    environment:
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
+      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
+      LOG_LEVEL: INFO
+    cpus: ${AI_WORKER_CPUS:-1}
+    mem_limit: 1g
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # ---------- Giai đoạn 6: chuyển mã video ----------
+  # video-worker bản Go (apps/video-worker-go): nhận content.media.transcode_requested trên stream:media, tải file gốc từ S3,
+  # chuyển sang HLS 360p, 540p, 720p bằng FFmpeg rồi tải lên S3. Cần key AWS ghi được S3_KEY_PREFIX (deploy/SERVER.md, Giai đoạn 6).
+  # Không chạy cùng bản TypeScript trên cùng Redis vì chung consumer group video-worker.
+  # FFmpeg ăn hết CPU được cấp, nên giới hạn 1 nhân để core-api vẫn trả lời nhanh; đo thật một video 60 giây đỉnh khoảng 400 MB.
+  video-worker:
+    profiles: [video]
+    image: ${IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-be}/video-worker-go:${VIDEO_WORKER_TAG:-${IMAGE_TAG:-develop}}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_URL: redis://redis:6379
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:?}
+      # Tên cố định: tạo lại container không để lại consumer cũ trong group.
+      VIDEO_WORKER_CONSUMER_NAME: server-1
+      VIDEO_WORKER_JOB_TIMEOUT: ${VIDEO_WORKER_JOB_TIMEOUT:-30m}
+    cpus: 1
+    mem_limit: 1g
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # Dữ liệu mẫu, chạy tay một lần. Image production không có file seed và cli/seed chặn NODE_ENV=production,
+  # nên service này build stage dev từ mã nguồn trên server.
+  seed:
+    profiles: [seed]
+    build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
+    logging: *logging
+    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:seed']
+    environment:
+      <<: *core-env
+      NODE_ENV: development
+      SEED_PASSWORD: ${SEED_PASSWORD:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # ---------- Giai đoạn 3: HTTPS ----------
+  traefik:
+    profiles: [gateway]
+    image: traefik:v3.7
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/server.yml
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --ping=true
+      # Mỗi request một dòng JSON ra stdout, xoay vòng theo logging ở trên (tối đa 30 MB). Có IP người dùng: chỉ xem nội bộ.
+      - --accesslog=true
+      - --accesslog.format=json
+    environment:
+      API_HOST: ${API_HOST:?}
+      WEB_HOST: ${WEB_HOST:?}
+      # Back Office. Chưa đặt thì dùng admin.<WEB_HOST>; DNS của tên này phải trỏ về máy này.
+      ADMIN_HOST: ${ADMIN_HOST:-admin.${WEB_HOST}}
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./traefik/server.yml:/etc/traefik/server.yml:ro
+      - letsencrypt:/letsencrypt
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Build trên server vì Next gắn địa chỉ API vào bundle lúc build, image trên GHCR không có địa chỉ này.
+  web:
+    profiles: [gateway]
+    # Mặc định dùng image build trên máy; deploy-web.sh đặt 2 biến này trong .env.web để dùng image từ GHCR.
+    image: ${WEB_IMAGE:-tripflix-server-web}:${WEB_TAG:-latest}
+    build:
+      context: ${FE_REPO:-../../tripflix-fe}
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_HOST:?}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Back Office (tripflix-fe/apps/admin). Chỉ chạy image từ GHCR: CI gắn địa chỉ API và web vào bundle lúc build.
+  # Profile riêng để `--profile gateway up` không bật admin khi chưa deploy; deploy-web.sh tự bật profile này.
+  admin:
+    profiles: [admin]
+    image: ${ADMIN_IMAGE:-ghcr.io/sukemcute/tripflix-fe/admin}:${ADMIN_TAG:-develop}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3200/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ---------- Observability: metric, trace cho trang /analytics ----------
+  # Cấu hình chung với compose.observability.yaml (máy dev), file trong deploy/observability/.
+  # Không mở cổng ra ngoài: core-api, notification-service gọi qua mạng nội bộ của compose.
+  # Profile riêng, deploy-api.sh không đụng tới; bật một lần là chạy tiếp qua các lần deploy.
+  otel-collector:
+    profiles: [observability]
+    image: otel/opentelemetry-collector-contrib:0.137.0
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes: ['./observability/collector.yaml:/etc/otelcol/config.yaml:ro']
+    depends_on: [tempo]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.6.0
+    command:
+      ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=7d', '--storage.tsdb.retention.size=2GB']
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:2.9.0
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+
+volumes:
+  pg-data:
+  redis-data:
+  letsencrypt:
+  prometheus-data:
+  tempo-data:

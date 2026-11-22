@@ -1,0 +1,69 @@
+import type { PostImage, PostMediaPort, PostVideoPlayback } from '../ports/post-media.port.js';
+
+export type WithPostImages<T> = T & {
+  images: PostImage[];
+  video?: PostVideoPlayback | null;
+};
+
+export interface PostLike {
+  postType: string;
+  mediaIds: string[];
+  tripAttachment?: { posterMediaId?: string; posterUrl?: string } | null;
+}
+
+/**
+ * Gắn link ảnh của bài viết (vlog) hoặc video HLS/poster (video) vào bài trả về API, đúng thứ tự mediaIds.
+ * Một lần hỏi module media cho cả trang.
+ */
+export class PostImagesResolver {
+  constructor(private readonly postMedia: PostMediaPort) {}
+
+  async attach<T extends PostLike>(posts: T[]): Promise<Array<WithPostImages<T>>> {
+    const imageIds = posts.filter((post) => post.postType === 'vlog').flatMap((post) => post.mediaIds);
+    const posterIds = posts.flatMap((post) => (post.tripAttachment?.posterMediaId ? [post.tripAttachment.posterMediaId] : []));
+    const allIds = [...imageIds, ...posterIds];
+    const images = allIds.length > 0 ? await this.postMedia.getImages(allIds) : new Map<string, PostImage>();
+
+    const videoPosts = posts.filter((post) => post.postType === 'video' && post.mediaIds.length > 0);
+    const videoIds = videoPosts.map((post) => post.mediaIds[0]!).filter(Boolean);
+    const playback =
+      videoIds.length > 0 && this.postMedia.getPlayback
+        ? await this.postMedia.getPlayback(videoIds)
+        : new Map<string, PostVideoPlayback>();
+
+    return posts.map((post) => {
+      const videoInfo = post.postType === 'video' && post.mediaIds[0] ? (playback.get(post.mediaIds[0]) ?? null) : null;
+      return {
+        ...post,
+        ...withTripPoster(post, images),
+        images:
+          post.postType === 'vlog'
+            ? post.mediaIds.flatMap((mediaId) => {
+                const image = images.get(mediaId);
+                return image ? [image] : [];
+              })
+            : [],
+        video: videoInfo,
+      };
+    });
+  }
+
+  async attachOne<T extends PostLike>(post: T): Promise<WithPostImages<T>> {
+    const [withImages] = await this.attach([post]);
+    return withImages!;
+  }
+
+  /** Trang danh sách { items, ... }: giữ nguyên các trường khác. */
+  async attachToPage<T extends PostLike, P extends { items: T[] }>(
+    page: P,
+  ): Promise<Omit<P, 'items'> & { items: Array<WithPostImages<T>> }> {
+    return { ...page, items: await this.attach(page.items) };
+  }
+}
+
+/** Poster lộ trình (TF105): đổi posterMediaId thành link; ảnh chưa sẵn sàng hoặc đã xoá thì bỏ qua để dùng poster video. */
+function withTripPoster<T extends PostLike>(post: T, images: Map<string, PostImage>): Partial<Pick<T, 'tripAttachment'>> {
+  const posterId = post.tripAttachment?.posterMediaId;
+  const poster = posterId ? images.get(posterId) : undefined;
+  return poster ? { tripAttachment: { ...post.tripAttachment!, posterUrl: poster.url } } : {};
+}

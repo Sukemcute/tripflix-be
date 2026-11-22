@@ -1,0 +1,100 @@
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { contentSchema } from './content-schema.js';
+
+export type PostType = 'video' | 'vlog';
+// held: luật nhanh giữ lại lúc đăng, chờ kiểm duyệt; chỉ tác giả và staff thấy (TF90).
+export type PostStatus = 'draft' | 'published' | 'held' | 'hidden' | 'removed' | 'deleted';
+export type PostVisibility = 'public' | 'private';
+
+export interface TripItineraryItem {
+  day: number;
+  title: string;
+  location?: string;
+  notes?: string;
+  /** Giờ trong ngày (HH:mm), tuỳ chọn (TF105). */
+  time?: string;
+  /** Loại điểm gợi ý để app chọn icon (cà phê, ăn uống, vui chơi, khác), tuỳ chọn (TF105). */
+  category?: 'cafe' | 'food' | 'fun' | 'other';
+  /** Khách sạn và loại phòng của điểm khách sạn này; một chuyến có thể ở nhiều khách sạn (TF105). */
+  hotel?: {
+    hotelId: string;
+    productId?: string;
+    ratePlanCode?: string;
+  };
+  transport?: {
+    mode: 'flight' | 'bus' | 'train' | 'car' | 'other';
+    fromAirport?: string;
+    toAirport?: string;
+  };
+}
+
+export interface TripAttachmentData {
+  bookingId?: string;
+  hotelId?: string;
+  hotelName?: string;
+  /** Loại phòng (productId) và gói giá người đăng chọn cho khách sạn của chuyến (TF105). */
+  hotelProductId?: string;
+  hotelRatePlanCode?: string;
+  /** Điểm đến chọn từ ô tìm kiếm của discovery (refId của dòng place). */
+  destinationPlaceId?: string;
+  destinationName?: string;
+  daysCount?: number;
+  estimatedCostPerPerson?: number;
+  priceDisclaimer?: string;
+  /** Ảnh poster riêng của lộ trình (asset ảnh của module media); bỏ trống thì dùng poster video (TF105). */
+  posterMediaId?: string;
+  /** Chỉ có khi đọc: link poster đổi từ posterMediaId, không lưu. */
+  posterUrl?: string;
+  items?: TripItineraryItem[];
+}
+
+/**
+ * Bảng posts: Quản lý bài đăng reels/video ngắn và vlog của thành viên.
+ * Schema: content
+ */
+export const posts = contentSchema.table(
+  'posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    authorId: uuid('author_id').notNull(),
+    postType: varchar('post_type', { length: 20 }).$type<PostType>().notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    body: text('body').notNull().default(''),
+    hashtags: jsonb('hashtags').$type<string[]>().notNull().default([]),
+    status: varchar('status', { length: 20 }).$type<PostStatus>().notNull().default('draft'),
+    visibility: varchar('visibility', { length: 20 }).$type<PostVisibility>().notNull().default('public'),
+    isVerified: boolean('is_verified').notNull().default(false),
+    mediaIds: jsonb('media_ids').$type<string[]>().notNull().default([]),
+    coverMediaId: uuid('cover_media_id'),
+    tripAttachment: jsonb('trip_attachment').$type<TripAttachmentData | null>(),
+    reactionCounts: jsonb('reaction_counts').$type<Record<string, number>>().notNull().default({}),
+    reactionTotal: integer('reaction_total').notNull().default(0),
+    commentCount: integer('comment_count').notNull().default(0),
+    commentsEnabled: boolean('comments_enabled').notNull().default(true),
+    commentKeywords: jsonb('comment_keywords').$type<string[]>().notNull().default([]),
+    shareCount: integer('share_count').notNull().default(0),
+    bookmarkCount: integer('bookmark_count').notNull().default(0),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('idx_posts_status_visibility_created').on(t.status, t.visibility, t.createdAt),
+    index('idx_posts_author_created').on(t.authorId, t.createdAt),
+    index('idx_posts_author_status').on(t.authorId, t.status),
+  ],
+);
+
+type StoredPost = typeof posts.$inferSelect;
+export type PostRecord = Omit<StoredPost, 'commentsEnabled' | 'commentKeywords'> & Partial<Pick<StoredPost, 'commentsEnabled' | 'commentKeywords'>>;
+export type NewPostRecord = typeof posts.$inferInsert;

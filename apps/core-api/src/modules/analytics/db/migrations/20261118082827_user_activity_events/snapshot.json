@@ -1,0 +1,262 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9c38c097-68df-482f-afda-ad840fe887c9",
+  "prevIds": [
+    "ea22406d-b098-48d3-83d1-aaab350bcc60"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "analytics",
+        "user_activity_events"
+      ],
+      "writes": [
+        "s|tbl|analytics.user_activity_events",
+        "n|tbl|analytics.user_activity_events",
+        "e|tbl|analytics.user_activity_events",
+        "n|rel|analytics.user_activity_events",
+        "n|type|analytics.user_activity_events",
+        "n|rel|analytics.user_activity_events_pkey"
+      ],
+      "reads": [
+        "n|sch|analytics"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "analytics",
+        "user_activity_events",
+        "idx_user_activity_events_user_occurred"
+      ],
+      "writes": [
+        "s|idx|analytics.idx_user_activity_events_user_occurred",
+        "n|idx|analytics.idx_user_activity_events_user_occurred",
+        "e|idx|analytics.idx_user_activity_events_user_occurred",
+        "n|rel|analytics.idx_user_activity_events_user_occurred"
+      ],
+      "reads": [
+        "n|tbl|analytics.user_activity_events",
+        "n|sch|analytics",
+        "n|col|analytics.user_activity_events.user_id",
+        "n|col|analytics.user_activity_events.occurred_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "analytics",
+        "user_activity_events",
+        "idx_user_activity_events_occurred"
+      ],
+      "writes": [
+        "s|idx|analytics.idx_user_activity_events_occurred",
+        "n|idx|analytics.idx_user_activity_events_occurred",
+        "e|idx|analytics.idx_user_activity_events_occurred",
+        "n|rel|analytics.idx_user_activity_events_occurred"
+      ],
+      "reads": [
+        "n|tbl|analytics.user_activity_events",
+        "n|sch|analytics",
+        "n|col|analytics.user_activity_events.occurred_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "name": "user_activity_events",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "target_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "detail",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "idx_user_activity_events_user_occurred",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "idx_user_activity_events_occurred",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "analytics",
+        "table": "user_activity_events",
+        "name": "user_activity_events_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

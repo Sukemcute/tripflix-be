@@ -10,14 +10,33 @@ x-be-env: &be-env
   DATABASE_URL_CONTENT: postgres://tf_content:tf_content_dev@postgres:5432/core
   DATABASE_URL_DISCOVERY: postgres://tf_discovery:tf_discovery_dev@postgres:5432/core
   DATABASE_URL_ANALYTICS: postgres://tf_analytics:tf_analytics_dev@postgres:5432/core
-  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/commerce
+  DATABASE_URL_COMMERCE: postgres://tf_commerce:tf_commerce_dev@postgres:5432/core
   DATABASE_URL_NOTIFICATION: postgres://tf_notification:tf_notification_dev@postgres:5432/notification
-  AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+  # Access token: core-api ký (bỏ trống khoá ở dev thì tự sinh khoá tạm), service khác kiểm qua JWKS.
+  AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
+  # Khoá để client mã hoá mật khẩu trước khi gửi (TF056). Bỏ trống ở dev thì tự sinh khoá tạm.
+  AUTH_PASSWORD_KEYS: ${AUTH_PASSWORD_KEYS:-}
+  AUTH_JWT_ISSUER: tripflix-core
+  AUTH_JWT_AUDIENCE: tripflix
+  # Web (3100), admin (3200) gọi API qua gateway :8080 từ trình duyệt: CORS và cookie refresh token.
+  AUTH_WEB_ORIGINS: ${AUTH_WEB_ORIGINS:-http://localhost:3100,http://localhost:3200}
+  AUTH_PASSWORD_RESET_URL: ${AUTH_PASSWORD_RESET_URL:-http://localhost:3100/dat-lai-mat-khau}
+  AUTH_EMAIL_VERIFY_URL: ${AUTH_EMAIL_VERIFY_URL:-http://localhost:3100/xac-thuc-email}
+  # Dev chạy e2e đăng ký nhiều tài khoản từ cùng IP; production để mặc định 5.
+  AUTH_REGISTER_MAX_PER_IP_HOUR: ${AUTH_REGISTER_MAX_PER_IP_HOUR:-1000}
+  GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+  JWKS_URL: http://core-api:3000/.well-known/jwks.json
+  # Mật khẩu của 3 tài khoản mẫu (pnpm db:seed), chỉ dùng ở máy local.
+  SEED_PASSWORD: ${SEED_PASSWORD:-tripflix-dev-123}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
   S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-tripflix-media-dev}
   S3_KEY_PREFIX: dev/${DEV_NAME:-unknown}/
   MEDIA_CDN_URL: ${MEDIA_CDN_URL:-}
+  AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+  CORE_API_INTERNAL_URL: ${CORE_API_INTERNAL_URL:-http://localhost:3000}
+  MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
 
 x-node-health: &node-health
   interval: 10s
@@ -31,7 +50,7 @@ services:
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_PASSWORD: postgres
-    ports: ['${PG_PORT:-5432}:5432']
+    ports: ['127.0.0.1:${PG_PORT:-5432}:5432']
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -43,7 +62,7 @@ services:
   redis:
     image: redis:8.8-alpine
     command: ['redis-server', '--appendonly', 'yes']
-    ports: ['${REDIS_PORT:-6379}:6379']
+    ports: ['127.0.0.1:${REDIS_PORT:-6379}:6379']
     volumes:
       - redis-data:/data
     healthcheck:
@@ -53,13 +72,13 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.33
-    ports: ['8025:8025', '1025:1025']
+    ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
 
   # ---------- Backend (profile be) ----------
   migrate:
     profiles: [be]
     build: { context: .., dockerfile: apps/core-api/Dockerfile, target: dev }
-    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:migrate']
+    command: ['sh', '-c', 'pnpm turbo run build --filter=@tripflix/core-api... && pnpm --filter @tripflix/core-api db:migrate && pnpm --filter @tripflix/core-api db:seed']
     environment: *be-env
     depends_on:
       postgres: { condition: service_healthy }
@@ -70,6 +89,7 @@ services:
     environment:
       <<: *be-env
       APP_ROLE: all
+      ENABLE_MOCK_PAYMENT: ${ENABLE_MOCK_PAYMENT:-false}
       PORT: 3000
     ports: ['3000:3000']
     depends_on:
@@ -81,7 +101,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/core-api/src, target: /repo/apps/core-api/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   notification-service:
@@ -90,6 +110,13 @@ services:
     environment:
       <<: *be-env
       PORT: 3001
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
+      WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
+      WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
+      SMTP_URL: smtp://mailpit:1025
+      MAIL_FROM: Tripflix <no-reply@tripflix.local>
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3100}
     ports: ['3001:3001']
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -100,7 +127,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/notification-service/src, target: /repo/apps/notification-service/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   video-worker:
@@ -112,7 +139,7 @@ services:
     develop:
       watch:
         - { action: sync, path: ../apps/video-worker/src, target: /repo/apps/video-worker/src }
-        - { action: sync, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
+        - { action: sync+restart, path: ../libs, target: /repo/libs, ignore: ['**/node_modules', '**/dist'] }
         - { action: rebuild, path: ../pnpm-lock.yaml }
 
   # ---------- AI (profile ai) — build từ repo tripflix-ai đặt cạnh ----------
@@ -124,10 +151,52 @@ services:
       REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Trợ lý Tripi (/chat), cùng biến như compose.server.yaml. Mặc định false: máy không có key
+      # vẫn chạy, Tripi chỉ tìm theo từ khoá. Bật thì cần OPENAI_API_KEY và DEEPSEEK_API_KEY.
+      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
+      CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
+      CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
+      CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
+      CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
+      # Trống thì dùng mặc định của code (minimal); model không nhận minimal (gpt-5.6-luna) đặt none.
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
+      CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
+      CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
+      CHAT_SYSTEM_DAILY_USD: ${CHAT_SYSTEM_DAILY_USD:-3}
     ports: ['8000:8000']
     develop:
       watch:
         - { action: sync, path: '${AI_REPO:-../../tripflix-ai}/app', target: /srv/app }
+        - { action: rebuild, path: '${AI_REPO:-../../tripflix-ai}/uv.lock' }
+
+  # Worker tóm tắt bài viết: nghe stream:core.content. Cùng image với ai-service (build dùng lại cache).
+  # Chỉ chạy khi bật profile ai (pnpm stack:ai); stack:down tắt cùng các service khác.
+  ai-summary-worker:
+    profiles: [ai]
+    build: { context: '${AI_REPO:-../../tripflix-ai}', target: dev }
+    command: ['/app/.venv/bin/python', '-m', 'app.workers.summary_worker']
+    environment:
+      CORE_API_URL: http://core-api:3000
+      REDIS_URL: redis://redis:6379
+      # Dev mặc định fake (không gọi LLM thật); đặt LLM_PROVIDER trong deploy/.env để đổi.
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      LLM_MODEL: ${LLM_MODEL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      SERVICE_CLIENT_SECRET: ${SERVICE_CLIENT_SECRET:-}
+      SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
+      # Bộ phân loại bình luận: khoảng 2 nhân CPU, ~820 MB RAM lúc cao nhất. Nếu giới hạn CPU container thì đặt số luồng bằng số nhân đó.
+      CLASSIFIER_THREADS: ${CLASSIFIER_THREADS:-2}
+      # logging của Python chỉ nhận chữ hoa (DEBUG, INFO), không dùng chung LOG_LEVEL=debug của BE.
+      LOG_LEVEL: ${AI_WORKER_LOG_LEVEL:-INFO}
+    depends_on:
+      redis: { condition: service_started }
+    restart: unless-stopped
+    develop:
+      watch:
+        - { action: sync+restart, path: '${AI_REPO:-../../tripflix-ai}/app', target: /app/app }
         - { action: rebuild, path: '${AI_REPO:-../../tripflix-ai}/uv.lock' }
 
   # ---------- Web, admin (profile fe) — build từ repo tripflix-fe đặt cạnh ----------
@@ -174,12 +243,12 @@ services:
     image: adminer:5
     environment:
       ADMINER_DEFAULT_SERVER: postgres
-    ports: ['8090:8080']
+    ports: ['127.0.0.1:8090:8080']
 
   redisinsight:
     profiles: [tools]
     image: redis/redisinsight:3.8
-    ports: ['5540:5540']
+    ports: ['127.0.0.1:5540:5540']
 
 volumes:
   pg-data:

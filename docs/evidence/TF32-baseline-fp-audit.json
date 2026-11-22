@@ -1,0 +1,305 @@
+{
+  "date": "2026-11-11",
+  "scope": "300 reviewed synthetic examples; seen regression data",
+  "config": {
+    "aiThreshold": 0.8,
+    "reportThreshold": 3,
+    "reportCount": 0,
+    "allowedDomains": []
+  },
+  "old_rules_sha256": "070acdee0ae02087e6d1c01b680aaa8022c395633d5db63a182d54d7ca2ad69b",
+  "new_rules_sha256": "a61215f73c9da398c3cfa8a3bd9f9ed40285ca83f641a3583ca8088eb254645b",
+  "old_baseline": {
+    "tp": 118,
+    "fp": 19,
+    "fn": 32,
+    "tn": 131,
+    "precision": 0.8613138686131386,
+    "recall": 0.7866666666666666,
+    "f1": 0.8222996515679443,
+    "fpr": 0.12666666666666668,
+    "target_total": 50,
+    "target_recall": 0.84
+  },
+  "new_baseline": {
+    "tp": 118,
+    "fp": 10,
+    "fn": 32,
+    "tn": 140,
+    "precision": 0.921875,
+    "recall": 0.7866666666666666,
+    "f1": 0.8489208633093526,
+    "fpr": 0.06666666666666667,
+    "target_total": 50,
+    "target_recall": 0.84
+  },
+  "old_hybrid_097": {
+    "tp": 125,
+    "fp": 21,
+    "fn": 25,
+    "tn": 129,
+    "precision": 0.8561643835616438,
+    "recall": 0.8333333333333334,
+    "f1": 0.8445945945945946,
+    "fpr": 0.14,
+    "target_total": 50,
+    "target_recall": 0.98
+  },
+  "new_hybrid_097": {
+    "tp": 125,
+    "fp": 13,
+    "fn": 25,
+    "tn": 137,
+    "precision": 0.9057971014492754,
+    "recall": 0.8333333333333334,
+    "f1": 0.8680555555555556,
+    "fpr": 0.08666666666666667,
+    "target_total": 50,
+    "target_recall": 0.98
+  },
+  "attribution": {
+    "openai_only": 6,
+    "core_only": 11,
+    "both": 2
+  },
+  "false_positives": [
+    {
+      "id": "tf32-h1-slang-020",
+      "kind": "quoted_report",
+      "text": "Mình báo cáo câu 'lũ đồng tính là thứ dơ bẩn' vì đó là lời kỳ thị, xin quản trị viên xử lý.",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang-016",
+      "kind": "slang",
+      "text": "Mệt muốn chết sau buổi đạp xe nhưng ngủ một giấc là khỏe lại.",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-021",
+      "kind": "slang_praise",
+      "text": "Đường trượt phao vui vkl, tụi mình chơi tới lúc đóng cửa.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-024",
+      "kind": "slang_praise",
+      "text": "Ông tài xế tìm quán ăn trưa chất vcl, vừa ngon vừa có chỗ đỗ.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang-012",
+      "kind": "slang",
+      "text": "Bà điên này lên lịch ăn uống chuẩn ghê, cả nhóm được nhờ rồi 😂",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-014",
+      "kind": "slang_praise",
+      "text": "Con đường xe đạp ven đầm xịn vcc, mặt đường phẳng dễ chạy.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang-022",
+      "kind": "quoted_report",
+      "text": "Tôi nghe người ở sảnh đòi đánh gãy chân hướng dẫn viên nên đã báo trực ban can thiệp.",
+      "source": "both",
+      "openai_flagged": true,
+      "old_core_codes": ["THREAT"],
+      "new_core_hits": [
+        {
+          "code": "THREAT",
+          "category": "VIOLENCE",
+          "match": "danh gay chan",
+          "weight": 70
+        }
+      ],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-safety-022",
+      "kind": "safety",
+      "text": "Mình bị một người lạ kéo tay ở bến tàu, bảo vệ đã đến can thiệp.",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang-021",
+      "kind": "quoted_report",
+      "text": "Một tài khoản nhắn 'tao sẽ đốt xe mày', tôi đã lưu bằng chứng và nhờ bảo vệ hỗ trợ.",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-006",
+      "kind": "slang_praise",
+      "text": "Vcl, phần cá nướng gói lá thơm thật, hai đứa ăn sạch.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-010",
+      "kind": "slang_praise",
+      "text": "Ông chỉ chỗ dựng lều đỉnh vcl, sáng mở cửa là thấy mây.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-008",
+      "kind": "slang_praise",
+      "text": "Nhạc acoustic tối thứ bảy cuốn vkl, ngồi nghe quên giờ về.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang-025",
+      "kind": "standalone_profanity",
+      "text": "Vcl!",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-017",
+      "kind": "slang_praise",
+      "text": "Đm cảnh đom đóm tối qua đẹp quá, lần đầu mình thấy nhiều vậy.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [
+        {
+          "code": "PROFANITY",
+          "category": "HARASSMENT",
+          "match": "dm",
+          "weight": 45
+        }
+      ],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-neutral-005",
+      "kind": "quoted_report",
+      "text": "Nghe có người cổ vũ ném đá vào khách trên thuyền, tôi đề nghị bảo vệ ngăn chặn.",
+      "source": "openai_only",
+      "openai_flagged": true,
+      "old_core_codes": [],
+      "new_core_hits": [],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-018",
+      "kind": "slang_praise",
+      "text": "Cái võng cạnh suối nằm chill vcl, nghe nước chảy buồn ngủ luôn.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-neutral-002",
+      "kind": "quoted_report",
+      "text": "Tôi yêu cầu xóa bình luận 'phụ nữ là lũ ngu dốt', vì không thể công kích giới tính như thế.",
+      "source": "both",
+      "openai_flagged": true,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [
+        {
+          "code": "PROFANITY",
+          "category": "HARASSMENT",
+          "match": "ngu dot",
+          "weight": 45
+        }
+      ],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-neutral-004",
+      "kind": "quoted_report",
+      "text": "Tôi được nhắn câu 'mày ngu như chó' sau khi hỏi giá, mong quản trị viên xem xét.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [
+        {
+          "code": "PROFANITY",
+          "category": "HARASSMENT",
+          "match": "may ngu",
+          "weight": 45
+        }
+      ],
+      "still_suspicious": true,
+      "should_auto_hide": false
+    },
+    {
+      "id": "tf32-h1-slang_praise-001",
+      "kind": "slang_praise",
+      "text": "Bình minh trên đồi cỏ tím đỉnh vcl, đáng công dậy từ bốn giờ.",
+      "source": "core_only",
+      "openai_flagged": false,
+      "old_core_codes": ["PROFANITY"],
+      "new_core_hits": [],
+      "still_suspicious": false,
+      "should_auto_hide": false
+    }
+  ],
+  "clean_auto_hidden_after": 0
+}

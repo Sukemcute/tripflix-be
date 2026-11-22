@@ -1,0 +1,32 @@
+{
+  "CallerReference": "@CALLER_REFERENCE@",
+  "Comment": "@BUCKET@",
+  "Enabled": true,
+  "HttpVersion": "http2and3",
+  "IsIPV6Enabled": true,
+  "PriceClass": "PriceClass_200",
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "s3-media",
+        "DomainName": "@BUCKET@.s3.@REGION@.amazonaws.com",
+        "S3OriginConfig": { "OriginAccessIdentity": "" },
+        "OriginAccessControlId": "@OAC_ID@"
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "s3-media",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 3,
+      "Items": ["GET", "HEAD", "OPTIONS"],
+      "CachedMethods": { "Quantity": 3, "Items": ["GET", "HEAD", "OPTIONS"] }
+    },
+    "Compress": true,
+    "CachePolicyId": "@CACHE_POLICY_ID@",
+    "OriginRequestPolicyId": "@ORIGIN_REQUEST_POLICY_ID@",
+    "ResponseHeadersPolicyId": "@RESPONSE_HEADERS_POLICY_ID@"
+  }
+}

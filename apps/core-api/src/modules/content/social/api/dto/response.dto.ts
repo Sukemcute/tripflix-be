@@ -1,0 +1,245 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TripAttachmentDto } from './post.dto.js';
+import { CommentMentionDto } from './comment.dto.js';
+
+export class PostViewerContextDto {
+  @ApiProperty({ type: String, enum: ['like', 'love', 'helpful'], nullable: true }) myReaction!:
+    string | null;
+  @ApiProperty() isBookmarked!: boolean;
+}
+
+export class PostImageDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'Link CDN của ảnh gốc' }) url!: string;
+  @ApiProperty({ type: Number, nullable: true }) widthPx!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) heightPx!: number | null;
+}
+
+export class PostVideoPostersDto {
+  @ApiProperty() w360!: string;
+  @ApiProperty() w540!: string;
+  @ApiProperty() w720!: string;
+}
+
+export class PostVideoDto {
+  @ApiProperty({ description: 'master.m3u8 trên CloudFront' }) hlsUrl!: string;
+  @ApiProperty({ type: PostVideoPostersDto }) posters!: PostVideoPostersDto;
+  @ApiProperty() durationSec!: number;
+  @ApiProperty({ enum: ['9:16', '16:9', '1:1'] }) aspect!: string;
+  @ApiProperty({ isArray: true, type: Number }) levels!: number[];
+}
+
+// Document the existing wire format so generated clients do not treat JSON responses as void.
+export class SocialPostDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() authorId!: string;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
+  authorName?: string | null;
+  @ApiProperty({ enum: ['video', 'vlog'] }) postType!: string;
+  @ApiProperty() title!: string;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: [String] }) hashtags!: string[];
+  @ApiProperty({ enum: ['draft', 'published', 'held', 'hidden', 'removed', 'deleted'] }) status!: string;
+  @ApiProperty({ enum: ['public', 'private'] }) visibility!: string;
+  @ApiProperty() isVerified!: boolean;
+  @ApiProperty({ type: [String] }) mediaIds!: string[];
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    deprecated: true,
+    description: 'ID media làm ảnh bìa (DEPRECATED: UI dùng post.images[0].url hoặc video.posters)',
+  })
+  coverMediaId!: string | null;
+  @ApiProperty({
+    type: [PostImageDto],
+    required: false,
+    description: 'Ảnh của bài viết (vlog) theo đúng thứ tự mediaIds; Reels luôn rỗng',
+  })
+  images?: PostImageDto[];
+  @ApiPropertyOptional({
+    type: PostVideoDto,
+    nullable: true,
+    description: 'Thông tin phát video và posters của Reels',
+  })
+  video?: PostVideoDto | null;
+  @ApiProperty({ type: TripAttachmentDto, nullable: true }) tripAttachment!: TripAttachmentDto | null;
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reactionCounts!: Record<
+    string,
+    number
+  >;
+  @ApiProperty() reactionTotal!: number;
+  @ApiProperty() commentCount!: number;
+  @ApiProperty() shareCount!: number;
+  @ApiProperty() bookmarkCount!: number;
+  @ApiProperty({ type: PostViewerContextDto, required: false, nullable: true })
+  viewerContext?: PostViewerContextDto | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) publishedAt!: string | null;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) deletedAt!: string | null;
+}
+export class SocialPostPageDto {
+  @ApiProperty({ type: [SocialPostDto] }) items!: SocialPostDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+  @ApiProperty() hasMore!: boolean;
+}
+export class SocialPostDetailDto {
+  @ApiProperty({ type: SocialPostDto }) post!: SocialPostDto;
+  @ApiProperty({ type: PostViewerContextDto }) viewerContext!: PostViewerContextDto;
+  @ApiProperty() shareUrl!: string;
+}
+export class PublishedPostDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['published', 'held'] }) status!: string;
+  @ApiProperty() isVerified!: boolean;
+  @ApiProperty({ format: 'date-time', type: String, nullable: true }) publishedAt!: string | null;
+  @ApiProperty() shareUrl!: string;
+}
+export class DeletedSocialItemDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() deleted!: boolean;
+}
+export class SharedPostDto {
+  @ApiProperty() postId!: string;
+  @ApiProperty() shareUrl!: string;
+  @ApiProperty() shareCount!: number;
+}
+export class SocialCommentDto {
+  @ApiProperty({ type: [CommentMentionDto], maxItems: 10, description: 'Tag theo UTF-16; [] nếu không có hoặc nội dung bị che' })
+  mentions!: CommentMentionDto[];
+  @ApiPropertyOptional({ enum: ['approved', 'pending', 'rejected'] }) creatorReview?: string;
+  @ApiPropertyOptional({ enum: ['visible', 'held', 'hidden', 'removed'] }) status?: string;
+  @ApiProperty({ enum: ['hidden'], nullable: true, description: 'Trạng thái kiểm duyệt hiển thị cho tác giả' })
+  moderationState!: 'hidden' | null;
+  @ApiProperty() id!: string;
+  @ApiProperty() postId!: string;
+  @ApiProperty() authorId!: string;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của tác giả' })
+  authorName?: string | null;
+  @ApiProperty({ type: String, nullable: true }) parentCommentId!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'ID bình luận hoặc phản hồi được trả lời trực tiếp' })
+  replyToCommentId!: string | null;
+  @ApiProperty({ type: String, nullable: true, required: false, description: 'Tên hiển thị của người được trả lời' })
+  replyToName?: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Đoạn trích tối đa 120 ký tự của câu được trả lời; null nếu câu đó không còn công khai',
+  })
+  replyToExcerpt!: string | null;
+  @ApiProperty() body!: string;
+  @ApiProperty() isEdited!: boolean;
+  @ApiProperty({ example: 0, description: 'Số lượt thích bình luận' }) likeCount!: number;
+  @ApiProperty({ example: false, description: 'Người xem hiện tại đã thích bình luận hay chưa' }) isLiked!: boolean;
+  @ApiProperty({
+    example: 0,
+    required: false,
+    description: 'Số trả lời còn hiển thị. Có trong danh sách bình luận; bình luận vừa tạo hoặc vừa sửa thì không có',
+  })
+  replyCount?: number;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
+  @ApiProperty({ type: String, nullable: true }) deletedAt!: string | null;
+}
+export class UpdatedCommentReactionDto {
+  @ApiProperty() commentId!: string;
+  @ApiProperty() isLiked!: boolean;
+  @ApiProperty() likeCount!: number;
+}
+export class SocialCommentPageDto {
+  @ApiProperty({ type: [SocialCommentDto] }) items!: SocialCommentDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor!: string | null;
+  @ApiProperty() total!: number;
+}
+export class PostStatsDto {
+  @ApiProperty() postId!: string;
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reactionCounts!: Record<
+    string,
+    number
+  >;
+  @ApiProperty() reactionTotal!: number;
+  @ApiProperty() commentCount!: number;
+  @ApiProperty() shareCount!: number;
+  @ApiProperty() bookmarkCount!: number;
+}
+export class PostReactionDto {
+  @ApiProperty() post_id!: string;
+  @ApiProperty({ type: String, nullable: true }) type!: string | null;
+}
+export class UpdatedPostReactionDto {
+  @ApiProperty() postId!: string;
+  @ApiProperty({ type: String, nullable: true }) myReaction!: string | null;
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reactionCounts!: Record<
+    string,
+    number
+  >;
+  @ApiProperty() reactionTotal!: number;
+}
+export class UpdatedBookmarkDto {
+  @ApiProperty() postId!: string;
+  @ApiProperty() isBookmarked!: boolean;
+  @ApiProperty() bookmarkCount!: number;
+}
+export class SocialAuthorDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() display_name!: string;
+}
+export class AdminSocialPostDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ type: SocialAuthorDto }) author!: SocialAuthorDto;
+  @ApiProperty() title!: string;
+  @ApiProperty() post_type!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() visibility!: string;
+  @ApiProperty() report_count!: number;
+  @ApiProperty() reaction_total!: number;
+  @ApiProperty() comment_count!: number;
+  @ApiProperty({ format: 'date-time' }) created_at!: string;
+}
+export class AdminSocialPostPageDto {
+  @ApiProperty({ type: [AdminSocialPostDto] }) items!: AdminSocialPostDto[];
+  @ApiProperty({ type: String, nullable: true }) next_cursor!: string | null;
+  @ApiProperty() total!: number;
+}
+export class SocialModerationHistoryDto {
+  @ApiProperty() action_id!: string;
+  @ApiProperty() action!: string;
+  @ApiProperty() reason_code!: string;
+  @ApiProperty({ type: String, nullable: true }) reason_detail!: string | null;
+  @ApiProperty({ type: [String] }) report_ids!: string[];
+  @ApiProperty() moderator_id!: string;
+  @ApiProperty() created_at!: string;
+}
+export class AdminSocialPostDetailDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() title!: string;
+  @ApiProperty() body!: string;
+  @ApiProperty() post_type!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() visibility!: string;
+  @ApiProperty() is_verified!: boolean;
+  @ApiProperty({ type: SocialAuthorDto }) author!: SocialAuthorDto;
+  @ApiProperty({ type: [String] }) media_ids!: string[];
+  @ApiProperty({ type: String, nullable: true }) cover_media_id!: string | null;
+  @ApiProperty({ type: [String] }) hashtags!: string[];
+  @ApiProperty({ type: TripAttachmentDto, nullable: true }) trip_attachment!: TripAttachmentDto | null;
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'number' } }) reaction_counts!: Record<
+    string,
+    number
+  >;
+  @ApiProperty() reaction_total!: number;
+  @ApiProperty() comment_count!: number;
+  @ApiProperty() share_count!: number;
+  @ApiProperty() bookmark_count!: number;
+  @ApiProperty() created_at!: string;
+  @ApiProperty() updated_at!: string;
+  @ApiProperty({ type: [SocialModerationHistoryDto] }) moderation_history!: SocialModerationHistoryDto[];
+}
+export class SocialModerationResultDto {
+  @ApiProperty() actionId!: string;
+  @ApiProperty() postId!: string;
+  @ApiProperty() previousStatus!: string;
+  @ApiProperty() postStatus!: string;
+  @ApiProperty() moderatorId!: string;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+}
