@@ -43,8 +43,17 @@ const MAX_EMPTY_PAGE_SKIPS = 3;
  */
 const RANKED_SESSION_CACHE_MS = 5 * 60_000;
 const RANKED_SESSION_CACHE_MAX = 500;
+/** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 5.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
+const RANKED_SESSION_CACHE_ITEMS = 300;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
+
+interface RankedSession {
+  rankedOnly: RankedItem[];
+  reserved: RankedItem[];
+  /** Số bài xếp hạng thật của phiên; cache chỉ giữ phần đầu nên có thể lớn hơn rankedOnly.length. */
+  rankedTotal: number;
+}
 
 export interface PostRecommendationQuery {
   mode: RecommendMode;
@@ -164,7 +173,7 @@ export class PostRecommendationUseCases {
   private readonly logger = new Logger(PostRecommendationUseCases.name);
   private algoCache: { at: number; rows: Map<string, AlgoRow> } | null = null;
   private placeProfileCache: { at: number; profiles: Map<string, Record<string, number>> } | null = null;
-  private readonly rankedSessions = new Map<string, { at: number; rankedOnly: RankedItem[]; reserved: RankedItem[] }>();
+  private readonly rankedSessions = new Map<string, RankedSession & { at: number }>();
 
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
@@ -333,9 +342,9 @@ export class PostRecommendationUseCases {
     const slots = exploreSlots(q.limit);
     const sessionKey = [q.userId ?? 'guest', algo.name, mode, q.postType ?? '', seenBefore, seenUntil].join('|');
     // Trang đầu (cả khi tải lại) luôn xếp mới; trang sau của cùng phiên đọc lại kết quả đó.
-    const { rankedOnly, reserved } =
-      (cursor ? this.readRankedSession(sessionKey) : null) ??
-      this.writeRankedSession(sessionKey, await this.rankSession(q, { algo, hasPlanOnly, seenUntil, sessionAt, now }));
+    const cached = cursor ? this.readRankedSession(sessionKey, offset + q.limit) : null;
+    const { rankedOnly, reserved, rankedTotal } =
+      cached ?? this.writeRankedSession(sessionKey, await this.rankSession(q, { algo, hasPlanOnly, seenUntil, sessionAt, now }));
     const explore = reserved.slice(page * slots, (page + 1) * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
     const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
@@ -343,7 +352,7 @@ export class PostRecommendationUseCases {
 
     // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
     const nextOffset = offset + rankedTake.length;
-    const hasMore = rankedOnly.length > nextOffset || reserved.length > (page + 1) * slots;
+    const hasMore = rankedTotal > nextOffset || reserved.length > (page + 1) * slots;
     return {
       pageItems,
       algo,
@@ -354,19 +363,24 @@ export class PostRecommendationUseCases {
     };
   }
 
-  private readRankedSession(key: string) {
+  /** Phiên còn hạn và còn đủ bài tới `end` (cuộn sâu quá phần đã giữ thì xếp lại như trước). */
+  private readRankedSession(key: string, end: number): RankedSession | null {
     const hit = this.rankedSessions.get(key);
     if (!hit) return null;
-    if (Date.now() - hit.at < RANKED_SESSION_CACHE_MS) return hit;
-    this.rankedSessions.delete(key);
-    return null;
+    if (Date.now() - hit.at >= RANKED_SESSION_CACHE_MS) {
+      this.rankedSessions.delete(key);
+      return null;
+    }
+    return end <= hit.rankedOnly.length || hit.rankedOnly.length === hit.rankedTotal ? hit : null;
   }
 
-  private writeRankedSession(key: string, ranked: { rankedOnly: RankedItem[]; reserved: RankedItem[] }) {
+  private writeRankedSession(key: string, ranked: { rankedOnly: RankedItem[]; reserved: RankedItem[] }): RankedSession {
+    const session = { ...ranked, rankedTotal: ranked.rankedOnly.length };
     // Map giữ thứ tự chèn: đầy thì bỏ phiên cũ nhất.
     if (this.rankedSessions.size >= RANKED_SESSION_CACHE_MAX) this.rankedSessions.delete(this.rankedSessions.keys().next().value!);
-    this.rankedSessions.set(key, { at: Date.now(), ...ranked });
-    return ranked;
+    this.rankedSessions.delete(key);
+    this.rankedSessions.set(key, { at: Date.now(), ...session, rankedOnly: ranked.rankedOnly.slice(0, RANKED_SESSION_CACHE_ITEMS) });
+    return session;
   }
 
   /** Xếp hạng cả phiên: ứng viên, ranker, chính sách theo người xem, tập bài khám phá giữ trước. */
