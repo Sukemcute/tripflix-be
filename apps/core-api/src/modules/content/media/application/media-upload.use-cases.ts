@@ -85,7 +85,11 @@ export class MediaUploadUseCases {
     const assetId = randomUUID();
     const sourceKey = this.storage.resolveKey(buildSourceRelativeKey(assetId, input.mimeType));
     // Gọi S3 trước, không nằm trong transaction. Ghi database lỗi thì lifecycle của S3 tự xoá phiên dở sau 1 ngày.
-    const s3UploadId = await this.storage.createMultipartUpload({ key: sourceKey, contentType: input.mimeType });
+    const s3UploadId = await this.storage.createMultipartUpload({
+      key: sourceKey,
+      contentType: input.mimeType,
+      cacheControl: 'public, max-age=31536000, immutable',
+    });
     await this.store.insertUploadingAsset({
       id: assetId,
       ownerId,
