@@ -12,8 +12,12 @@ export interface ListPostsQuery {
   authorId?: string;
   postType?: PostType;
   hashtag?: string;
+  /** Lấy đúng các bài này theo thứ tự truyền vào (đã kiểm ở API, tối đa MAX_POST_IDS). */
+  ids?: string[];
   viewerId?: string | null;
 }
+
+export const MAX_POST_IDS = 50;
 
 export type EnrichedPostItem = PostRecord & {
   authorName: string | null;
@@ -38,6 +42,9 @@ export class ListPostsUseCase {
   ) {}
 
   async execute(query: ListPostsQuery): Promise<ListPostsResult> {
+    if (query.ids) {
+      return { items: await this.enrich(await this.findVisibleInOrder(query.ids), query.viewerId), nextCursor: null, hasMore: false };
+    }
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const decoded = decodeCursor(query.cursor);
 
@@ -57,6 +64,24 @@ export class ListPostsUseCase {
     const lastItem = items[items.length - 1];
     const nextCursor = hasMore && lastItem ? encodeCursor(lastItem.createdAt, lastItem.id) : null;
 
+    return {
+      items: await this.enrich(items, query.viewerId),
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /** Cùng điều kiện với bảng tin công khai (đã đăng, công khai, chưa xoá), giữ thứ tự id truyền vào. */
+  private async findVisibleInOrder(ids: string[]): Promise<PostRecord[]> {
+    const byId = new Map((await this.postRepository.findByIds(ids)).map((post) => [post.id, post]));
+    return ids.flatMap((id) => {
+      const post = byId.get(id);
+      return post && post.status === 'published' && post.visibility === 'public' && !post.deletedAt ? [post] : [];
+    });
+  }
+
+  private async enrich(items: PostRecord[], viewerId: string | null | undefined): Promise<EnrichedPostItem[]> {
+
     let authorNames = new Map<string, string>();
     if (items.length > 0 && this.userDirectory) {
       try {
@@ -70,27 +95,27 @@ export class ListPostsUseCase {
     let reactionsMap = new Map<string, ReactionType>();
     let bookmarkedSet = new Set<string>();
 
-    if (query.viewerId && postIds.length > 0) {
+    if (viewerId && postIds.length > 0) {
       const [reactionsResult, bookmarksResult] = await Promise.all([
         this.reactionRepository
-          ? this.reactionRepository.findByPostsAndUser(postIds, query.viewerId)
+          ? this.reactionRepository.findByPostsAndUser(postIds, viewerId)
           : Promise.resolve(new Map<string, ReactionType>()),
         this.bookmarkRepository
-          ? this.bookmarkRepository.findBookmarkedPostIds(postIds, query.viewerId)
+          ? this.bookmarkRepository.findBookmarkedPostIds(postIds, viewerId)
           : Promise.resolve(new Set<string>()),
       ]);
       reactionsMap = reactionsResult;
       bookmarkedSet = bookmarksResult;
     }
 
-    const enrichedItems: EnrichedPostItem[] = items.map((post) => {
+    return items.map((post) => {
       const domainPost = new Post({ ...post, coverMediaId: post.coverMediaId ?? undefined });
       return {
         ...post,
         commentKeywords: undefined,
         tripAttachment: domainPost.getMaskedTripAttachment(),
         authorName: authorNames.get(post.authorId) ?? null,
-        viewerContext: query.viewerId
+        viewerContext: viewerId
           ? {
               myReaction: reactionsMap.get(post.id) ?? null,
               isBookmarked: bookmarkedSet.has(post.id),
@@ -98,11 +123,5 @@ export class ListPostsUseCase {
           : null,
       };
     });
-
-    return {
-      items: enrichedItems,
-      nextCursor,
-      hasMore,
-    };
   }
 }

@@ -166,6 +166,13 @@ export class ListPostsQueryDto {
 
   @ApiPropertyOptional({ description: 'Lọc theo hashtag' })
   hashtag?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Lấy nhiều bài một lần theo id (uuid, cách nhau bởi dấu phẩy, tối đa 50), giữ đúng thứ tự truyền vào; bài ẩn, xoá, không tồn tại thì bỏ qua. Có ids thì bỏ qua cursor và các bộ lọc khác. Dùng thay cho gọi GET /v1/posts/:id từng bài (gợi ý, tìm kiếm)',
+    example: '018d9f20-0000-7000-8000-000000000001,018d9f20-0000-7000-8000-000000000002',
+  })
+  ids?: string;
 }
 
 export class ListUserPostsQueryDto {
