@@ -59,7 +59,8 @@ export const HOT_IDS_MAX_LIMIT = 50;
 export class InvalidHotCursorError extends Error {}
 
 /** Trang đầu giống nhau với mọi người nên giữ ngắn trong Redis; bài mới hay số đếm trễ tối đa chừng này giây. */
-export const FEED_FIRST_PAGE_TTL_SECONDS = 10;
+// 16 seed × 10 giây gần như lần nào cũng trượt cache khi ít người xem; 60 giây vẫn đủ mới cho trang đầu.
+export const FEED_FIRST_PAGE_TTL_SECONDS = 60;
 
 /**
  * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo điểm job chấm sẵn
