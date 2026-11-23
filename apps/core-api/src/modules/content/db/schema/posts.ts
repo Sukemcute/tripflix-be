@@ -92,6 +92,10 @@ export const posts = contentSchema.table(
     index('idx_posts_status_visibility_created').on(t.status, t.visibility, t.createdAt),
     index('idx_posts_author_created').on(t.authorId, t.createdAt),
     index('idx_posts_author_status').on(t.authorId, t.status),
+    // Lọc bảng tin theo hashtag (`hashtags @> '["x"]'`).
+    index('idx_posts_hashtags').using('gin', t.hashtags),
+    // Đồng bộ bài theo updated_at (search index, discovery) đi theo keyset (updated_at, id).
+    index('idx_posts_updated_id').on(t.updatedAt, t.id),
   ],
 );
 

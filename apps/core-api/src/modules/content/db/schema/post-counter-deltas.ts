@@ -1,4 +1,4 @@
-import { bigint, integer, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { contentSchema } from './content-schema.js';
 import { posts } from './posts.js';
 
@@ -13,6 +13,9 @@ export const postCounterDeltas = contentSchema.table('post_counter_deltas', {
     .references(() => posts.id, { onDelete: 'cascade' }),
   commentDelta: integer('comment_delta').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+},
+  // Xoá bài (FK cascade) và cộng dồn của một bài tìm theo post_id.
+  (t) => [index('idx_post_counter_deltas_post_id').on(t.postId)],
+);
 
 export type PostCounterDeltaRecord = typeof postCounterDeltas.$inferSelect;
