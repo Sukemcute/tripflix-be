@@ -114,6 +114,21 @@ export class FeedUseCases {
   }
 
   /**
+   * Thời lượng video theo bài, chỉ bài phát được (cùng điều kiện với getByIds). Cho sự kiện xem: không dựng thẻ
+   * (tên tác giả, ảnh bìa, playback) chỉ để lấy một con số.
+   */
+  async getDurations(postIds: string[]): Promise<Map<string, PlaybackInfo['durationSec']>> {
+    const rows = await this.store.findPlayablePostsByIds([...new Set(postIds)]);
+    const playback = await this.media.getPlayback(rows.flatMap((row) => row.mediaIds));
+    return new Map(
+      rows.flatMap((row) => {
+        const mediaId = row.mediaIds.find((id) => playback[id]);
+        return mediaId ? [[row.id, playback[mediaId]!.durationSec] as const] : [];
+      }),
+    );
+  }
+
+  /**
    * Id bài của tab Đang hot theo đúng thứ tự tab đó (TF110), cho discovery trộn vào Reels.
    * Không dựng thẻ: chỉ hỏi media để bỏ bài chưa có video phát được, bên gọi dựng thẻ bằng getByIds.
    * Mỗi bài kèm cursor riêng, vì bên gọi có thể chỉ dùng vài bài đầu của trang.

@@ -35,11 +35,7 @@ export class FeedEventsUseCases {
   ) {}
 
   async record(input: RecordFeedEventsInput): Promise<{ accepted: number }> {
-    const page = await this.feed.getByIds(
-      input.events.map((event) => event.postId),
-      null,
-    );
-    const durationByPostId = new Map(page.items.map((card) => [card.postId, card.video.durationSec]));
+    const durationByPostId = await this.feed.getDurations(input.events.map((event) => event.postId));
     const occurredAt = new Date().toISOString();
     const envelopes = input.events.flatMap((event) => {
       if (!durationByPostId.has(event.postId)) return [];

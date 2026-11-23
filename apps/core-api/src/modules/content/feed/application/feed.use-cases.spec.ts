@@ -233,6 +233,23 @@ describe('FeedUseCases poster lộ trình (TF105)', () => {
   });
 });
 
+describe('FeedUseCases.getDurations', () => {
+  it('trả thời lượng của bài phát được, bỏ bài ẩn; không hỏi tên tác giả hay ảnh bìa', async () => {
+    const { store } = setup();
+    const media = {
+      getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, playback(id)])))),
+      getImages: vi.fn(),
+    } as unknown as MediaFacade;
+    const access = { getPublicAuthors: vi.fn() } as unknown as AccessFacade;
+
+    const durations = await new FeedUseCases(store, media, access, undefined, () => 0).getDurations(['p1', 'hidden', 'p1']);
+
+    expect([...durations]).toEqual([['p1', 10]]);
+    expect(store.findPlayablePostsByIds).toHaveBeenCalledWith(['p1', 'hidden']);
+    expect(access.getPublicAuthors).not.toHaveBeenCalled();
+  });
+});
+
 describe('FeedUseCases: tác giả trên thẻ', () => {
   it('thẻ mang sẵn tên và ảnh đại diện để app không gọi /users/:id/avatar cho từng tác giả', async () => {
     const { store } = setup();
