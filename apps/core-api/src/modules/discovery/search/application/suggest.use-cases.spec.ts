@@ -39,6 +39,17 @@ describe('SuggestUseCases', () => {
     expect(store.queries).toEqual([]);
   });
 
+  it('cùng câu gõ (khác hoa thường, dấu) trong 60 giây chỉ tìm một lần; dựng lại chỉ mục thì tìm lại', async () => {
+    const store = new FakeStore();
+    const suggestions = new SuggestUseCases(store, pagedCatalog([]));
+    await suggestions.suggest({ q: 'Đà Lạt', types: ['place', 'hotel'] });
+    await suggestions.suggest({ q: 'da lat', types: ['hotel', 'place'] });
+    expect(store.queries).toEqual(['da lat']);
+    await suggestions.rebuildIndex();
+    await suggestions.suggest({ q: 'da lat', types: ['place', 'hotel'] });
+    expect(store.queries).toEqual(['da lat', 'da lat']);
+  });
+
   it('dựng lại chỉ mục đọc hết mọi trang danh mục', async () => {
     const store = new FakeStore();
     const count = await new SuggestUseCases(store, pagedCatalog([[hotel('a'), hotel('b')], [hotel('c')]])).rebuildIndex();
