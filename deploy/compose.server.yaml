@@ -378,8 +378,8 @@ services:
     restart: unless-stopped
     logging: *logging
     healthcheck:
-      test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 10s
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3100/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
       timeout: 5s
       retries: 12
       start_period: 30s
@@ -391,6 +391,9 @@ services:
     image: ${ADMIN_IMAGE:-ghcr.io/sukemcute/tripflix-fe/admin}:${ADMIN_TAG:-develop}
     restart: unless-stopped
     logging: *logging
+    environment:
+      ADMIN_CORE_API_URL: http://core-api:3000
+      ADMIN_REALTIME_URL: http://notification-service:3001
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3200/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
