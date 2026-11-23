@@ -89,6 +89,7 @@ import {
   ReactionRepository,
 } from './social/infra/index.js';
 import { FlushCommentCountsJob } from './social/jobs/flush-comment-counts.job.js';
+import { ContentCleanupJob } from './social/jobs/content-cleanup.job.js';
 
 export const CONTENT_DB = Symbol('CONTENT_DB');
 export const CONTENT_EVENT_PRODUCER = 'core-api/content';
@@ -177,6 +178,7 @@ export const CONTENT_EVENT_PRODUCER = 'core-api/content';
     },
     // Cộng bảng đệm số bình luận của bài đông mỗi giây (TF99), chỉ ở vai trò worker hoặc all.
     FlushCommentCountsJob,
+    ContentCleanupJob,
     {
       provide: BookmarkRepository,
       inject: [buildTransactionHostToken('content')],
