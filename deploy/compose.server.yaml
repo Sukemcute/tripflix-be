@@ -126,6 +126,8 @@ services:
       APP_ROLE: all
       PORT: 3000
       OTEL_SERVICE_NAME: core-api
+      # Nạp OTel trước pg, ioredis để có span từng câu SQL, lệnh Redis (TF99). Tắt OTel thì register không làm gì.
+      NODE_OPTIONS: --import @tripflix/observability/register
       # Trang /analytics của admin đọc metric, trace qua core-api (docs/observability.md).
       ANALYTICS_PROMETHEUS_URL: ${ANALYTICS_PROMETHEUS_URL-http://prometheus:9090}
       ANALYTICS_TEMPO_URL: ${ANALYTICS_TEMPO_URL-http://tempo:3200}
@@ -173,6 +175,8 @@ services:
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
       <<: *otel-env
       OTEL_SERVICE_NAME: notification-service
+      # Nạp OTel trước pg, ioredis để có span từng câu SQL, lệnh Redis (TF99). Tắt OTel thì register không làm gì.
+      NODE_OPTIONS: --import @tripflix/observability/register
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
