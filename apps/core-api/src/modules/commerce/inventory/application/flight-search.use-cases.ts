@@ -1,7 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { CommerceError } from '../domain/errors.js';
 import { addDays, calculatePassengerFares, countNights, findPassengerMixError, isIsoDate, quoteFlight, type PassengerMix, type UnavailableReason } from '../domain/sales-rules.js';
-import { COMMERCE_STORE, TODAY, type CommerceStore, type FlightRecord, type FlightRouteRecord, type Today } from './ports.js';
+import { COMMERCE_STORE, READ_CALENDAR, TODAY, type CommerceStore, type FlightRecord, type FlightRouteRecord, type ReadCalendar, type Today } from './ports.js';
 
 const DEFAULT_PASSENGERS = 1;
 const AIRPORT_CODE = /^[A-Z]{3}$/;
@@ -122,6 +122,8 @@ export class FlightSearchUseCases {
   constructor(
     @Inject(COMMERCE_STORE) private readonly store: CommerceStore,
     @Inject(TODAY) private readonly today: Today,
+    // Lịch giá, số ghế chỉ để hiển thị: đọc bản trong bộ nhớ như trang khách sạn; giữ chỗ vẫn kiểm trong database.
+    @Optional() @Inject(READ_CALENDAR) private readonly calendar: ReadCalendar = store.calendar,
   ) {}
 
   listRoutes(): Promise<FlightRouteRecord[]> {
@@ -155,7 +157,7 @@ export class FlightSearchUseCases {
       throw new CommerceError('invalid_query', `Ngày cuối phải từ ngày đầu trở đi, tối đa ${MAX_CALENDAR_DAYS} ngày.`, 'end');
     }
     const flights = await this.store.catalog.findFlightsByRoute(from, to);
-    const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), query.start, query.end);
+    const days = await this.calendar.loadFlightDays(flights.map((f) => f.id), query.start, query.end);
     const dates = Array.from({ length: countNights(query.start, query.end) + 1 }, (_, i) => addDays(query.start, i));
     return {
       query: { from, to, start: query.start, end: query.end, passengers: mix.adults },
@@ -189,7 +191,7 @@ export class FlightSearchUseCases {
   }
 
   private async quote(flights: FlightRecord[], date: string, mix: PassengerMix): Promise<FlightOffer[]> {
-    const days = await this.store.calendar.loadFlightDays(flights.map((f) => f.id), date, date);
+    const days = await this.calendar.loadFlightDays(flights.map((f) => f.id), date, date);
     return flights.map((flight): FlightOffer => {
       const day = days.get(flight.id)?.[0];
       const quotes = flight.farePlans.map((plan) => {
