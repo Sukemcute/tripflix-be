@@ -22,5 +22,9 @@ app.enableCors({
 // /ws (Socket.IO) phát qua Redis để chạy nhiều replica; phải gắn trước app.listen.
 await useRedisRealtime(app);
 app.enableShutdownHooks();
+const server = app.getHttpServer();
+// Giảm lỗi 502 khi Traefik tái dùng kết nối rảnh mà Node đã đóng.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 await app.listen(Number(process.env.PORT ?? 3001), '0.0.0.0');
 app.get(Logger).log(`notification-service chạy ở cổng ${process.env.PORT ?? 3001}`);

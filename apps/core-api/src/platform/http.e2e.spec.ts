@@ -3,7 +3,7 @@ import { Controller, Get, type INestApplication, Module, NotFoundException } fro
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyCors, applyGlobalPrefix, applySecurityHeaders, SECURITY_HEADERS } from './http.js';
+import { SECURITY_HEADERS, setupHttp } from './http.js';
 
 @Controller('probe')
 class ProbeController {
@@ -30,10 +30,7 @@ describe('E2E: header bảo mật (TF33)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [ProbeModule] }).compile();
     app = moduleRef.createNestApplication({ logger: false });
-    // Cùng thứ tự với setupHttp.
-    applySecurityHeaders(app);
-    applyGlobalPrefix(app);
-    applyCors(app, [WEB_ORIGIN]);
+    setupHttp(app, { swagger: false, webOrigins: [WEB_ORIGIN] });
     await app.init();
   });
 
@@ -46,6 +43,10 @@ describe('E2E: header bảo mật (TF33)', () => {
       expect(headers[name.toLowerCase()], name).toBe(value);
     }
   };
+
+  it('giữ kết nối đủ lâu để Traefik không tái dùng kết nối Node vừa đóng', () => {
+    expect(app.getHttpServer()).toMatchObject({ keepAliveTimeout: 65_000, headersTimeout: 66_000 });
+  });
 
   it('phản hồi thành công có đủ header bảo mật', async () => {
     const res = await http().get('/api/probe').expect(200);
