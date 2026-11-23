@@ -120,4 +120,12 @@ describe('@Idempotent()', () => {
     await post('/orders', 'key-fail', { amount: 1 }).expect(201);
     expect(counter.callCount).toBe(2);
   });
+
+  it('lưu kết quả lỗi sau khi đã xử lý thì không gỡ chỗ giữ, gửi lại không chạy lần hai', async () => {
+    const complete = vi.spyOn(store, 'complete').mockRejectedValueOnce(new Error('DB mất kết nối'));
+    await post('/orders', 'key-complete-fail', { amount: 1 }).expect(201);
+    await post('/orders', 'key-complete-fail', { amount: 1 }).expect(409);
+    expect(counter.callCount).toBe(1);
+    complete.mockRestore();
+  });
 });
