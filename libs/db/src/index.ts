@@ -8,9 +8,10 @@ export type ModuleName = (typeof MODULES)[number];
 
 /** Số kết nối gợi ý cho mỗi module (docs/architecture/11 §3.3). */
 export const DEFAULT_POOL_SIZE: Record<ModuleName, number> = {
-  access: 5,
+  // Pool lớn hơn giúp access và discovery tránh xếp hàng quá timeout 3 giây khi chạy nhiều truy vấn song song.
+  access: 10,
   content: 10,
-  discovery: 5,
+  discovery: 12,
   analytics: 3,
   commerce: 10,
 };
