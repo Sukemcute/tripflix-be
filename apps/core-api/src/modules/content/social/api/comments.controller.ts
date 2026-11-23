@@ -12,8 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, RequireVerifiedEmail, ServiceOnly, type AuthUser } from '@tripflix/auth';
-import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
+import { Authenticated, CurrentUser, OptionalAuthenticated, OptionalCurrentUser, RequireVerifiedEmail, ServiceOnly, type AuthUser } from '@tripflix/auth';
 import {
   DeletedSocialItemDto,
   SocialCommentDto,

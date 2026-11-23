@@ -1,8 +1,7 @@
 import { SocialErrorFilter } from './social-error.filter.js';
 import { UseFilters, Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
-import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
+import { Authenticated, CurrentUser, OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { SetReactionDto } from './dto/reaction.dto.js';
 import { PostReactionDto, PostStatsDto, UpdatedPostReactionDto } from './dto/response.dto.js';
 import { GetMyReactionUseCase, GetPostStatsUseCase, SetReactionUseCase } from '../application/index.js';

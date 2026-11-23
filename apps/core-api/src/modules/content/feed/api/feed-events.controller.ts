@@ -1,9 +1,8 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiBadRequestResponse, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { z } from 'zod';
 import { ZodBody } from '../../media/api/http.js';
-import { OptionalAuthenticated, OptionalCurrentUser } from '../../social/api/optional-auth.guard.js';
 import { FeedEventsUseCases } from '../application/feed-events.use-cases.js';
 import {
   FEED_EVENTS_MAX,
