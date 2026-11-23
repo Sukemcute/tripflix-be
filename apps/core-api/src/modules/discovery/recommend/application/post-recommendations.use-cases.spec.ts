@@ -120,6 +120,18 @@ describe('PostRecommendationUseCases', () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
+  it('trang sau của cùng phiên dùng lại kết quả xếp hạng: không đọc lại ứng viên, ra đúng trang như tính lại', async () => {
+    const { useCases, store } = setup();
+    const first = await useCases.recommend(query());
+    expect(first.nextCursor).not.toBeNull();
+    const expected = ids(await setup().useCases.recommend(query({ cursor: first.nextCursor })));
+
+    const second = await useCases.recommend(query({ cursor: first.nextCursor }));
+
+    expect(ids(second)).toEqual(expected);
+    expect(store.listHotCandidates).toHaveBeenCalledTimes(1);
+  });
+
   it('ranker cũ không đọc dòng thô người xem và giữ giới hạn 150 bài hot', async () => {
     const { useCases, store } = setup();
     await useCases.recommend(query());
