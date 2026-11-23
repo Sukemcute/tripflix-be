@@ -20,4 +20,4 @@ export { MemoryAccessStore } from './auth/infra/memory/memory-access.store.js';
 export { MemoryLoginRateLimiter } from './auth/infra/memory/memory-login-rate-limiter.js';
 export { registerServiceClient } from './service/application/service-token.use-cases.js';
 export { MemoryActionRateLimiter } from './auth/infra/memory/memory-action-rate-limiter.js';
-export type { UserContact } from './access.facade.js';
+export type { PublicAuthor, UserContact } from './access.facade.js';

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { AccessFacade } from '../../../access/index.js';
+import { AccessFacade, type PublicAuthor } from '../../../access/index.js';
 import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { decodeFeedCursor, encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
@@ -228,11 +228,11 @@ export class FeedUseCases {
 
   private async buildCards(rows: FeedPostRow[]): Promise<FeedCard[]> {
     const posterIds = rows.flatMap((row) => (row.tripAttachment?.posterMediaId ? [row.tripAttachment.posterMediaId] : []));
-    const [playback, authorNames, posters] = await Promise.all([
+    const [playback, authors, posters] = await Promise.all([
       this.media.getPlayback(rows.flatMap((row) => row.mediaIds)),
       this.access
-        ? this.access.getDisplayNames(rows.map((r) => r.authorId)).catch(() => new Map<string, string>())
-        : new Map<string, string>(),
+        ? this.access.getPublicAuthors(rows.map((r) => r.authorId)).catch(() => new Map<string, PublicAuthor>())
+        : new Map<string, PublicAuthor>(),
       posterIds.length > 0 ? this.media.getImages(posterIds) : Promise.resolve({} as Awaited<ReturnType<MediaFacade['getImages']>>),
     ]);
     return rows.flatMap((row) => {
@@ -241,7 +241,7 @@ export class FeedUseCases {
       const video = mediaId ? playback[mediaId] : undefined;
       if (!video) return [];
       const posterId = row.tripAttachment?.posterMediaId;
-      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null, posterId ? posters[posterId]?.url : undefined)];
+      return [buildCard(row, video, null, authors.get(row.authorId) ?? null, posterId ? posters[posterId]?.url : undefined)];
     });
   }
 }
@@ -260,12 +260,12 @@ function buildCard(
   row: FeedPostRow,
   video: PlaybackInfo,
   viewerState: FeedCard['viewerState'],
-  authorName: string | null = null,
+  author: PublicAuthor | null = null,
   posterUrl?: string,
 ): FeedCard {
   return {
     postId: row.id,
-    author: { id: row.authorId, name: authorName, avatarUrl: null, isKol: false },
+    author: { id: row.authorId, name: author?.displayName ?? null, avatarUrl: author?.avatarUrl ?? null, isKol: false },
     video,
     title: row.title,
     caption: row.body,

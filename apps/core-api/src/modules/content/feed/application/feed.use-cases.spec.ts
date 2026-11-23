@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AccessFacade } from '../../../access/index.js';
 import type { MediaFacade, PlaybackInfo } from '../../media/media.facade.js';
 import { encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
 import { FEED_FIRST_PAGE_TTL_SECONDS, FeedUseCases, HOT_IDS_MAX_LIMIT, InvalidHotCursorError } from './feed.use-cases.js';
@@ -229,6 +230,28 @@ describe('FeedUseCases poster lộ trình (TF105)', () => {
     expect(page.items[1]!.tripAttachment).not.toHaveProperty('posterUrl');
     // Tích "Đã đi" theo cờ của bài; bài thiếu cờ coi như chưa xác thực.
     expect(page.items.map((card) => card.isVerified)).toEqual([true, false]);
+  });
+});
+
+describe('FeedUseCases: tác giả trên thẻ', () => {
+  it('thẻ mang sẵn tên và ảnh đại diện để app không gọi /users/:id/avatar cho từng tác giả', async () => {
+    const { store } = setup();
+    const media = {
+      getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, playback(id)])))),
+    } as unknown as MediaFacade;
+    const access = {
+      getPublicAuthors: vi.fn(() =>
+        Promise.resolve(new Map([['author-p1', { displayName: 'Khang', avatarUrl: 'https://cdn/a.jpg' }]])),
+      ),
+    } as unknown as AccessFacade;
+    const feed = new FeedUseCases(store, media, access, undefined, () => 0);
+
+    const page = await feed.getByIds(['p1', 'p2'], null);
+
+    expect(page.items.map((card) => card.author)).toEqual([
+      { id: 'author-p1', name: 'Khang', avatarUrl: 'https://cdn/a.jpg', isKol: false },
+      { id: 'author-p2', name: null, avatarUrl: null, isKol: false },
+    ]);
   });
 });
 

@@ -20,6 +20,19 @@ export class AccessFacade {
     return new Map(users.map((u) => [u.id, u.displayName]));
   }
 
+  /**
+   * Tên và ảnh đại diện công khai theo id, cho thẻ bài (feed): thẻ mang sẵn ảnh để app không gọi /users/:id/avatar cho
+   * từng tác giả. Ảnh chỉ có khi tài khoản đang hoạt động, giống GET /users/:id/avatar.
+   */
+  async getPublicAuthors(userIds: string[]): Promise<Map<string, PublicAuthor>> {
+    const ids = [...new Set(userIds)].filter((id) => UUID.test(id));
+    if (ids.length === 0) return new Map();
+    const users = await this.store.users.findPublicAuthorsByIds(ids);
+    return new Map(
+      users.map((u) => [u.id, { displayName: u.displayName, avatarUrl: u.status === 'active' ? u.avatarUrl : null }]),
+    );
+  }
+
   /** Tên, email đăng ký và ngày đăng ký theo id, cho trang admin theo dõi hành vi (TF177). Id không tồn tại thì không có trong Map. */
   async getUserContacts(userIds: string[]): Promise<Map<string, UserContact>> {
     // Email là dữ liệu cá nhân: mỗi lần tối đa 100 id để không kéo cả bảng (Dũng duyệt, #272).
@@ -31,6 +44,11 @@ export class AccessFacade {
       users.map((u) => [u.id, { displayName: u.displayName, email: u.email, createdAt: u.createdAt }]),
     );
   }
+}
+
+export interface PublicAuthor {
+  displayName: string;
+  avatarUrl: string | null;
 }
 
 export interface UserContact {
