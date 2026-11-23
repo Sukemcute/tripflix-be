@@ -1,0 +1,63 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "ab76799a-7d8c-4d6d-86d8-35f69b534531",
+  "prevIds": [
+    "4a2edb25-7b80-4645-bc3c-c88e5f95d18e"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "discovery",
+        "search_counts",
+        "idx_search_counts_df_first_len"
+      ],
+      "writes": [
+        "s|idx|discovery.idx_search_counts_df_first_len",
+        "n|idx|discovery.idx_search_counts_df_first_len",
+        "e|idx|discovery.idx_search_counts_df_first_len",
+        "n|rel|discovery.idx_search_counts_df_first_len"
+      ],
+      "reads": [
+        "n|tbl|discovery.search_counts",
+        "n|sch|discovery"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "discovery",
+        "table": "search_counts",
+        "name": "idx_search_counts_df_first_len",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "left(\"key\", 1)",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "length(\"key\")",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"ns\" = 'df'",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}
