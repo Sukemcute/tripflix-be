@@ -8,6 +8,7 @@ export interface UploadedPart {
 export interface CreateMultipartUploadInput {
   key: string;
   contentType: string;
+  cacheControl?: string;
 }
 
 export interface SignUploadPartInput {

@@ -7,10 +7,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import type { z } from 'zod';
 import { ZodBody } from '../../media/api/http.js';
-import { OptionalAuthenticated, OptionalCurrentUser } from '../../social/api/optional-auth.guard.js';
 import { FEED_TABS, FeedUseCases, type FeedPage } from '../application/feed.use-cases.js';
 import { FEED_DEFAULT_LIMIT, FEED_MAX_LIMIT, FeedPageDto, FeedQuerySchema } from './dto.js';
 

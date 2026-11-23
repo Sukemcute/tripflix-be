@@ -11,8 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ServiceOnly, type AuthUser } from '@tripflix/auth';
-import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
+import { OptionalAuthenticated, OptionalCurrentUser, ServiceOnly, type AuthUser } from '@tripflix/auth';
 import { SocialErrorFilter } from './social-error.filter.js';
 import { ZodBody } from './http.js';
 import {

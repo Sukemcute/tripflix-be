@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '@tripflix/db';
 import { assertReviewLease } from '../../moderation/infra/review-lease.js';
 import { isAfterCursor, isBeforeCursor } from './keyset-cursor.js';
@@ -88,6 +88,16 @@ export class PostRepository {
   async findByIds(ids: string[]): Promise<PostRecord[]> {
     if (ids.length === 0) return [];
     return this.db.select().from(posts).where(inArray(posts.id, ids));
+  }
+
+  /** Trong ids, bài còn hiện công khai. Chỉ đọc id: search gọi với tới 1.000 id mỗi trang. */
+  async findVisibleIds(ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(and(inArray(posts.id, ids), eq(posts.status, 'published'), eq(posts.visibility, 'public'), isNull(posts.deletedAt)));
+    return rows.map((row) => row.id);
   }
 
   async update(id: string, data: Partial<NewPostRecord>): Promise<PostRecord> {

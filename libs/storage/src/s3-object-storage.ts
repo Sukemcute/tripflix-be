@@ -70,9 +70,14 @@ export class S3ObjectStorage implements ObjectStorage {
     return buildCdnUrl(this.cdnBaseUrl, key);
   }
 
-  async createMultipartUpload({ key, contentType }: CreateMultipartUploadInput): Promise<string> {
+  async createMultipartUpload({ key, contentType, cacheControl }: CreateMultipartUploadInput): Promise<string> {
     const response = await this.client.send(
-      new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }),
+      new CreateMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ContentType: contentType,
+        CacheControl: cacheControl,
+      }),
     );
     if (!response.UploadId) throw new Error(`S3 không trả về UploadId cho ${key}`);
     return response.UploadId;

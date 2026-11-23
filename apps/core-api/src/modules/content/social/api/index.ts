@@ -5,7 +5,6 @@ export * from './bookmarks.controller.js';
 export * from './admin-posts.controller.js';
 export * from './post-summary.controller.js';
 export * from './ai-summary-internal.controller.js';
-export * from './optional-auth.guard.js';
 export * from './dto/post.dto.js';
 export * from './dto/comment.dto.js';
 export * from './dto/comment-sample.dto.js';

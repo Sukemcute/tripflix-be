@@ -91,7 +91,7 @@ const exploreCatalog = (
   },
   // Gắn poster video để kết quả tìm có ảnh bìa: một lần đọc media cho mỗi trang 100 bài.
   listPosts: async (cursor) => withVideoPosters(await content.listPosts({ cursor, limit: 100 }), (ids) => media.getPlayback(ids)),
-  findVisiblePostIds: async (postIds) => new Set((await content.getVisiblePosts(postIds)).map((p) => p.id)),
+  findVisiblePostIds: (postIds) => content.findVisiblePostIds(postIds),
   getAuthorNames: (authorIds) => access.getDisplayNames(authorIds),
 });
 

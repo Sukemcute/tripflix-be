@@ -24,8 +24,10 @@ export function decodeCursor(cursor?: string): { createdAt: Date; id: string; to
     const raw = Buffer.from(cursor, 'base64url').toString('utf8');
     const parsed = JSON.parse(raw) as CursorPayload;
     if (!parsed.createdAt || !parsed.id) return undefined;
+    const createdAt = new Date(parsed.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return undefined;
     return {
-      createdAt: new Date(parsed.createdAt),
+      createdAt,
       id: parsed.id,
       // Cursor cũ không có total, hoặc total sai kiểu: trang đó đếm lại như trước.
       ...(Number.isInteger(parsed.total) && (parsed.total as number) >= 0 ? { total: parsed.total } : {}),
@@ -50,8 +52,10 @@ export function decodeSyncCursor(cursor?: string): { updatedAt: Date; id: string
     const parsed = JSON.parse(raw) as CursorPayload;
     const ts = parsed.updatedAt ?? parsed.createdAt;
     if (!ts || !parsed.id) return undefined;
+    const updatedAt = new Date(ts);
+    if (Number.isNaN(updatedAt.getTime())) return undefined;
     return {
-      updatedAt: new Date(ts),
+      updatedAt,
       id: parsed.id,
     };
   } catch {

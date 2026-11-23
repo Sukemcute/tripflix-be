@@ -9,6 +9,8 @@ import { computePoolCap, decidePoolMax, type AutoscaleState } from './pool-autos
 
 /** Mỗi instance ghi một khoá; khoá tự hết hạn nên instance đã tắt không còn trong tổng. */
 export const METRICS_KEY_PREFIX = 'commerce:metrics:';
+// Sorted set giúp đếm instance còn sống mà không SCAN toàn keyspace mỗi 5 giây.
+const METRICS_INSTANCES_KEY = `${METRICS_KEY_PREFIX}instances`;
 const PUBLISH_EVERY_MS = 5_000;
 const KEY_TTL_SECONDS = 30;
 /** Lấy mẫu số request chờ kết nối 4 lần/giây: một lần đo mỗi 5 giây dễ trượt lúc pool đang dồn. */
@@ -106,9 +108,12 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
     const metrics = this.snapshot();
     try {
       await this.redis.set(`${METRICS_KEY_PREFIX}${this.instance}`, JSON.stringify(metrics), 'EX', KEY_TTL_SECONDS);
+      await this.redis.zadd(METRICS_INSTANCES_KEY, Date.now(), this.instance);
+      // Bản đã tắt (tên mới mỗi lần khởi động) phải rời set kể cả khi tắt autoscale, không thì set phình mãi.
+      await this.redis.zremrangebyscore(METRICS_INSTANCES_KEY, 0, Date.now() - KEY_TTL_SECONDS * 1000);
       if (this.isRedisDown) this.logger.log('Ghi số đo commerce vào Redis chạy lại');
       this.isRedisDown = false;
-      if (this.env.COMMERCE_POOL_AUTOSCALE) this.adjustPool(metrics, (await this.listMetricKeys()).length);
+      if (this.env.COMMERCE_POOL_AUTOSCALE) this.adjustPool(metrics, await this.redis.zcard(METRICS_INSTANCES_KEY));
     } catch (error) {
       // Báo một lần khi bắt đầu lỗi, không dội log mỗi 5 giây.
       if (!this.isRedisDown) this.logger.warn({ err: error }, 'Không ghi được số đo commerce vào Redis, bỏ qua');
@@ -140,14 +145,10 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
   }
 
   private async listMetricKeys(): Promise<string[]> {
-    const keys: string[] = [];
-    let cursor = '0';
-    do {
-      const [next, batch] = await this.redis.scan(cursor, 'MATCH', `${METRICS_KEY_PREFIX}*`, 'COUNT', 100);
-      cursor = next;
-      keys.push(...batch);
-    } while (cursor !== '0');
-    return keys;
+    const cutoff = Date.now() - KEY_TTL_SECONDS * 1000;
+    await this.redis.zremrangebyscore(METRICS_INSTANCES_KEY, 0, cutoff);
+    const instances = await this.redis.zrangebyscore(METRICS_INSTANCES_KEY, cutoff, '+inf');
+    return instances.map((instance) => `${METRICS_KEY_PREFIX}${instance}`);
   }
 
   /** Số đo mới nhất của mọi instance còn sống, kèm tổng. Redis lỗi thì báo không đọc được, không ném lỗi. */

@@ -89,13 +89,17 @@ export class IdempotencyInterceptor implements NestInterceptor {
           return of(begin.responseBody);
         }
         return next.handle().pipe(
-          mergeMap(async (body: unknown) => {
-            await this.store.complete(scope, key, successStatus, body);
-            return body;
-          }),
+          // Chỉ lỗi của handler mới gỡ chỗ đã giữ. Đặt sau mergeMap thì complete() lỗi cũng gọi abort() dù thao tác
+          // đã commit, client gửi lại sẽ chạy lần hai.
           catchError(async (err: unknown) => {
             await this.store.abort(scope, key);
             throw err;
+          }),
+          mergeMap(async (body: unknown) => {
+            // Thao tác đã xong: không lưu được kết quả thì vẫn trả kết quả. Khoá giữ trạng thái đang xử lý tới hết TTL,
+            // client gửi lại nhận 409 thay vì chạy lần hai.
+            await this.store.complete(scope, key, successStatus, body).catch(() => undefined);
+            return body;
           }),
         );
       }),

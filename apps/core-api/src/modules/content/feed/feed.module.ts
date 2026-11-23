@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
+import { OptionalAuthGuard } from '@tripflix/auth';
 import { RedisStreamsEventBus } from '@tripflix/event-bus';
 import { buildTransactionHostToken, type ModuleTransactionHost } from '@tripflix/db';
 import { AccessModule } from '../../access/index.js';
 import { MediaModule } from '../media/media.module.js';
-import { OptionalAuthGuard } from '../social/api/optional-auth.guard.js';
 import { FeedController } from './api/feed.controller.js';
 import { FeedEventsController } from './api/feed-events.controller.js';
 import { FEED_EVENT_BUS, FeedEventsUseCases } from './application/feed-events.use-cases.js';

@@ -7,12 +7,11 @@ import {
   ApiPropertyOptional,
   ApiTags,
 } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import { z } from 'zod';
 import { CommentControlsUseCases } from '../application/comment-controls.use-cases.js';
 import { normalizeCommentKeyword } from '../domain/comment-filter.js';
-import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
 import { ZodBody } from './http.js';
 import { CommentMentionDto } from './dto/comment.dto.js';
 

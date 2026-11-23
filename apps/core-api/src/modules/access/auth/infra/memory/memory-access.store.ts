@@ -40,6 +40,11 @@ export class MemoryAccessStore implements AccessStore {
         const u = this.userRows.get(id);
         return u ? [{ id: u.id, displayName: u.displayName }] : [];
       }),
+    findPublicAuthorsByIds: async (ids: string[]) =>
+      ids.flatMap((id) => {
+        const u = this.userRows.get(id);
+        return u ? [{ id: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl, status: u.status }] : [];
+      }),
     findContactsByIds: async (ids: string[]) =>
       ids.flatMap((id) => {
         const u = this.userRows.get(id);

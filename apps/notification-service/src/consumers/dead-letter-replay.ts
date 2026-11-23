@@ -8,6 +8,7 @@ interface ReplayRedis {
   hgetall(key: string): Promise<Record<string, string>>;
   hset(key: string, fields: Record<string, string>): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
+  xdel(key: string, ...ids: string[]): Promise<number>;
 }
 
 interface ReplayOptions {
@@ -27,7 +28,7 @@ export class DeadLetterReplayer {
   async replayOnce(): Promise<{ replayed: number; failed: number; skipped: number }> {
     const counts = { replayed: 0, failed: 0, skipped: 0 };
     const entries = await this.redis.xrange(STREAMS.deadLetter, '-', '+');
-    for (const [, fields] of entries) {
+    for (const [entryId, fields] of entries) {
       const entry: Record<string, string> = {};
       for (let index = 0; index < fields.length; index += 2) {
         entry[fields[index]!] = fields[index + 1]!;
@@ -45,7 +46,13 @@ export class DeadLetterReplayer {
       const stateKey = `notification:dlq:${event.eventId}`;
       const state = await this.redis.hgetall(stateKey);
       const attempts = Number(state.attempts ?? 0);
-      if (state.status === 'done' || attempts >= (this.options.maxAttempts ?? 8)
+      if (state.status === 'done') {
+        // Bản ghi cũ đã gửi xong (trước khi có XDEL): gỡ luôn, không thì trạng thái hết hạn sau 7 ngày là gửi lại.
+        await this.redis.xdel(STREAMS.deadLetter, entryId);
+        counts.skipped += 1;
+        continue;
+      }
+      if (attempts >= (this.options.maxAttempts ?? 8)
         || this.now() < Number(state.nextAt ?? 0)) {
         counts.skipped += 1;
         continue;
@@ -71,6 +78,8 @@ export class DeadLetterReplayer {
       }
       await this.redis.hset(stateKey, { attempts: String(attempts), nextAt: '0', status: 'done' });
       await this.redis.expire(stateKey, REPLAY_STATE_TTL_SECONDS);
+      // Gửi xong thì gỡ khỏi hàng đợi lỗi: khoá trạng thái chỉ sống 7 ngày, để lại thì tuần sau gửi trùng.
+      await this.redis.xdel(STREAMS.deadLetter, entryId);
       counts.replayed += 1;
     }
     return counts;

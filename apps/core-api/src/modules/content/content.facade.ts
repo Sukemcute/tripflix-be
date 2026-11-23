@@ -159,6 +159,11 @@ export class ContentFacade {
    * Lấy danh sách bài viết hiển thị công khai (published + public) cho Discovery và Feed.
    * Dữ liệu lộ trình (tripAttachment) tự động được PII Masking theo quy chuẩn PRD F5.
    */
+  /** Trong postIds, bài còn hiện công khai (cùng điều kiện với getVisiblePosts), không đọc nội dung bài. */
+  async findVisiblePostIds(postIds: string[]): Promise<Set<string>> {
+    return new Set(await this.postRepo.findVisibleIds(postIds));
+  }
+
   async getVisiblePosts(postIds: string[]): Promise<VisiblePostSummary[]> {
     if (postIds.length === 0) return [];
 

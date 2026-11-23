@@ -51,6 +51,10 @@ export function applySecurityHeaders(app: INestApplication) {
 }
 
 export function setupHttp(app: INestApplication, { swagger, webOrigins }: { swagger: boolean; webOrigins: string[] }) {
+  const server = app.getHttpServer();
+  // Giảm lỗi 502 khi Traefik tái dùng kết nối rảnh mà Node đã đóng.
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
   // Đứng sau Traefik: lấy IP người dùng từ X-Forwarded-For (một proxy) để chặn đăng nhập sai theo IP.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set('trust proxy', 1);
   applySecurityHeaders(app);

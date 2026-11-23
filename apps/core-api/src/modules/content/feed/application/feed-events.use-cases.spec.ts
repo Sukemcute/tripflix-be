@@ -3,15 +3,14 @@ import type { EventEnvelope } from '@tripflix/contracts';
 import type { StreamName } from '@tripflix/event-bus';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedEventsUseCases } from './feed-events.use-cases.js';
-import type { FeedCard, FeedUseCases } from './feed.use-cases.js';
+import type { FeedUseCases } from './feed.use-cases.js';
 
 const POST_ID = randomUUID();
 
 function setup(publish: () => Promise<string>) {
-  const card = { postId: POST_ID, video: { durationSec: 8 } } as FeedCard;
-  const getByIds = vi.fn((_postIds: string[], _viewerId: string | null) => Promise.resolve({ items: [card], nextCursor: null }));
+  const getDurations = vi.fn((_postIds: string[]) => Promise.resolve(new Map([[POST_ID, 8]])));
   const bus = { publish: vi.fn((_stream: StreamName, _event: EventEnvelope) => publish()) };
-  return { getByIds, bus, events: new FeedEventsUseCases({ getByIds } as unknown as FeedUseCases, bus) };
+  return { getDurations, bus, events: new FeedEventsUseCases({ getDurations } as unknown as FeedUseCases, bus) };
 }
 
 describe('FeedEventsUseCases', () => {
@@ -28,8 +27,8 @@ describe('FeedEventsUseCases', () => {
     expect(bus.publish).toHaveBeenCalledTimes(1);
   });
 
-  it('video 8 giây xem 4 giây là xem thật; hỏi feed không kèm người xem để không đọc thích, lưu thừa', async () => {
-    const { getByIds, bus, events } = setup(() => Promise.resolve('1-0'));
+  it('video 8 giây xem 4 giây là xem thật; chỉ hỏi feed thời lượng, không dựng thẻ', async () => {
+    const { getDurations, bus, events } = setup(() => Promise.resolve('1-0'));
 
     await events.record({
       events: [{ eventId: randomUUID(), type: 'view', postId: POST_ID, watchedMs: 4_000, surface: 'post_detail' }],
@@ -37,7 +36,7 @@ describe('FeedEventsUseCases', () => {
       anonId: null,
     });
 
-    expect(getByIds).toHaveBeenCalledWith([POST_ID], null);
+    expect(getDurations).toHaveBeenCalledWith([POST_ID]);
     expect(bus.publish.mock.calls[0]?.[1]).toMatchObject({ payload: { isQualified: true, durationSec: 8, surface: 'post_detail' } });
   });
 });
