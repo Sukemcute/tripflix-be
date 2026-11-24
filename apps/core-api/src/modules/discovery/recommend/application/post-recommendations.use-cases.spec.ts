@@ -1,3 +1,4 @@
+import type { TasteRetrieval } from './ports.js';
 import type { Candidate, RawRow } from '../domain/contracts.js';
 import type { AlgoRow } from '../domain/registry.js';
 import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
@@ -24,7 +25,7 @@ const ALGOS: AlgoRow[] = [
 ];
 
 /** 30 bài hot (h00 điểm cao nhất), bài Đà Lạt d1 điểm thấp, bài mới f1, pool explore e00..e09. */
-function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[]; viewerRows?: RawRow[] } = {}) {
+function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[]; viewerRows?: RawRow[]; taste?: TasteRetrieval } = {}) {
   const hot = Array.from({ length: 30 }, (_, i) => cand(`h${String(i).padStart(2, '0')}`, { score: 1 - i / 100 }));
   hot.push(cand('d1', { score: 0.1, tags: ['dalat'], placeId: 'da-lat' }));
   hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang', postFeatures: { bins: { 'place:nha-trang': 1 } } }));
@@ -40,6 +41,10 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
     findUserFeatures: vi.fn(async (key: string) => (key === 'tag_affinity@v0' ? { tags: { dalat: 1 }, places: { 'da-lat': 1 } } : {})),
     listHotCandidates: vi.fn(async (q: CandidateQuery) => without(hot, q)),
     listFreshCandidates: vi.fn(async (q: CandidateQuery) => without(fresh, q)),
+    // Bài chỉ nguồn gu tìm ra (ngoài hot): t1 ở Đà Lạt.
+    listCandidatesByIds: vi.fn(async (_q: CandidateQuery, postIds: string[], source: Candidate['source']) =>
+      postIds.filter((id) => id === 't1').map((id) => cand(id, { score: 0, source, tags: ['dalat'], placeId: 'da-lat' })),
+    ),
     listExplorePool: vi.fn(async (q: CandidateQuery) => without([...hot, ...fresh, ...explore], q)),
     listUserRows: vi.fn(async (_ids: string[], _now: Date) => opts.viewerRows ?? []),
     findProductPlaces: vi.fn(async (_ids: string[]): Promise<Record<string, string>> => ({})),
@@ -66,7 +71,7 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
       ids.filter((id) => !opts.hidden?.includes(id)).map((id) => ({ id, postType: 'video', title: id, hashtags: [], coverMediaId: null, authorId: 'a', reactionTotal: 0 })),
     ),
   };
-  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served, recent);
+  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served, recent, opts.taste);
   return { useCases, store, servedList, servedAdd, seenAt, catalog, recentAt };
 }
 
@@ -576,6 +581,41 @@ describe('PostRecommendationUseCases', () => {
       );
       const page = await useCases.recommendReels({ mode: 'recent', limit: 3, cursor: null, userId: U, now: NOW });
       expect(page.items.map((i) => i.card.postId)).toEqual(['r03', 'r04', 'r05']);
+    });
+  });
+
+  describe('nguồn gu từ chỉ mục dùng chung (Typesense)', () => {
+    it('for_you: hỏi nguồn gu theo nơi/tag người xem thích, gộp bài chỉ nguồn gu có vào ứng viên', async () => {
+      const findPostIds = vi.fn(async () => ['t1', 'h01']);
+      const { useCases, store } = setup({ taste: { findPostIds } });
+      const page = await useCases.recommend(query({ limit: 30 }));
+      expect(findPostIds).toHaveBeenCalledWith({ places: ['da-lat'], tags: ['dalat'], postType: null, limitPerSource: 150 });
+      expect(store.listCandidatesByIds).toHaveBeenCalledWith(expect.objectContaining({ limit: 2 }), ['t1', 'h01'], 'taste');
+      expect(ids(page)).toContain('t1');
+    });
+
+    it('trip_v1: có nguồn gu thì hot chỉ 500 thay vì 5000 (5000 không còn là "toàn bộ" ở ~40k bài)', async () => {
+      const { useCases, store } = setup({
+        algos: [{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }, ALGOS[1]!],
+        taste: { findPostIds: vi.fn(async () => ['t1']) },
+      });
+      store.findUserFeatures.mockResolvedValue({ places: { 'nha-trang': 0.9 }, tags: {} } as never);
+      await useCases.recommend(query());
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+    });
+
+    it('nguồn gu lỗi: feed vẫn trả trang từ hot/fresh', async () => {
+      const { useCases } = setup({ taste: { findPostIds: vi.fn(async () => Promise.reject(new Error('typesense down'))) } });
+      const page = await useCases.recommend(query());
+      expect(page.items).toHaveLength(10);
+    });
+
+    it('không có gu (khách, người mới): không hỏi nguồn gu', async () => {
+      const findPostIds = vi.fn(async () => ['t1']);
+      const { useCases, store } = setup({ taste: { findPostIds } });
+      store.findUserFeatures.mockResolvedValue({} as never);
+      await useCases.recommend(query());
+      expect(findPostIds).not.toHaveBeenCalled();
     });
   });
 });

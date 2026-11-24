@@ -1,10 +1,25 @@
-import type { Candidate, Kind, ProductBuildOutput, ProductType, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
+import type { Candidate, CandidateSource, Kind, ProductBuildOutput, ProductType, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 import type { AlgoRow } from '../domain/registry.js';
 
 export const RECOMMEND_STORE = Symbol('RECOMMEND_STORE');
 export const RECOMMEND_CATALOG = Symbol('RECOMMEND_CATALOG');
 export const TEXT_EMBEDDER = Symbol('TEXT_EMBEDDER');
+export const TASTE_RETRIEVAL = Symbol('TASTE_RETRIEVAL');
+
+export interface TasteQuery {
+  /** Mã nơi người xem thích nhất (vd 'da-lat'), nặng trước. */
+  places: string[];
+  /** Tag (đã bỏ dấu) người xem thích nhất, nặng trước. */
+  tags: string[];
+  postType: string | null;
+  limitPerSource: number;
+}
+
+/** Nguồn ứng viên theo gu từ chỉ mục tìm kiếm dùng chung (Typesense). Không có thì feed chỉ dùng hot/fresh như cũ. */
+export interface TasteRetrieval {
+  findPostIds(q: TasteQuery): Promise<string[]>;
+}
 
 /** Nhúng văn bản thành vector đơn vị. Thật: ai-service POST /embed. null = AI tắt hoặc lỗi (job bỏ nguồn caption). */
 export interface TextEmbedder {
@@ -220,6 +235,8 @@ export interface RecommendStore {
   findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */
   listHotCandidates(q: CandidateQuery): Promise<Candidate[]>;
+  /** Ứng viên theo danh sách bài (nguồn gu), cùng điều kiện và đặc trưng như hot; bài chưa có trong recommend_posts bị bỏ. */
+  listCandidatesByIds(q: CandidateQuery, postIds: string[], source: CandidateSource): Promise<Candidate[]>;
   /** Bài đăng trong `hours` giờ tới now, mới nhất trước. */
   listFreshCandidates(q: CandidateQuery & { hours: number }): Promise<Candidate[]>;
   /** Pool explore: bài trong `days` ngày, mới nhất trước. */

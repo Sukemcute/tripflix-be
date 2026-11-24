@@ -24,6 +24,7 @@ import {
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   SERVED_STORE,
+  TASTE_RETRIEVAL,
   TEXT_EMBEDDER,
   type ProductProfileCatalog,
   type RecommendCatalog,
@@ -35,6 +36,7 @@ import { AiEmbeddingClient } from './recommend/infra/ai-embedding.client.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
+import { TypesenseTasteRetrieval } from './recommend/infra/typesense-taste.retrieval.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
@@ -82,6 +84,8 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
 });
 
 /** Khách sạn + bài cho tìm khám phá. days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
+const TYPESENSE_CLIENT = Symbol('TYPESENSE_CLIENT');
+
 const exploreCatalog = (
   commerce: CommerceFacade,
   content: ContentFacade,
@@ -172,17 +176,25 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
     {
+      // Một client Typesense dùng chung cho tìm khám phá và nguồn gu của recommend; null khi SEARCH_BACKEND=postgres.
+      provide: TYPESENSE_CLIENT,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv) =>
+        env.SEARCH_BACKEND === 'typesense'
+          ? new TypesenseClient({ host: env.TYPESENSE_HOST, port: env.TYPESENSE_PORT, protocol: env.TYPESENSE_PROTOCOL, apiKey: env.TYPESENSE_API_KEY })
+          : null,
+    },
+    {
+      provide: TASTE_RETRIEVAL,
+      inject: [TYPESENSE_CLIENT, CORE_ENV],
+      useFactory: (client: TypesenseClient | null, env: CoreEnv) => (client ? new TypesenseTasteRetrieval(client, env.TYPESENSE_COLLECTION_ALIAS) : null),
+    },
+    {
       provide: EXPLORE_STORE,
-      inject: [CORE_ENV, DB_POOLS, REDIS],
-      useFactory: (env: CoreEnv, pools: DbPools, redis: Redis) => {
+      inject: [CORE_ENV, DB_POOLS, REDIS, TYPESENSE_CLIENT],
+      useFactory: (env: CoreEnv, pools: DbPools, redis: Redis, client: TypesenseClient | null) => {
         const pgStore = new DrizzleExploreStore(createDb(pools.discovery));
-        if (env.SEARCH_BACKEND !== 'typesense') return pgStore;
-        const client = new TypesenseClient({
-          host: env.TYPESENSE_HOST,
-          port: env.TYPESENSE_PORT,
-          protocol: env.TYPESENSE_PROTOCOL,
-          apiKey: env.TYPESENSE_API_KEY,
-        });
+        if (!client) return pgStore;
         const statsCache = new ExploreStatsCache(redis, () => pgStore.loadAllCounts());
         return new TypesenseExploreStore(client, statsCache, pgStore, redis, env.TYPESENSE_COLLECTION_ALIAS);
       },

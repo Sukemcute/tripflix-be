@@ -50,3 +50,29 @@ export function interleave(ranked: RankedItem[], explore: RankedItem[], limit: n
   });
   return page;
 }
+
+const TASTE_PLACES = 3;
+const TASTE_TAGS = 5;
+/** Trọng số gu tối thiểu: thấp hơn là nhiễu một lần xem, không đáng mở nguồn riêng. */
+const TASTE_MIN_WEIGHT = 0.2;
+
+/** Khoá nặng nhất, bỏ tiền tố ngăn (`place:da-lat` → `da-lat`). */
+const topKeys = (v: unknown, n: number, prefix = ''): string[] =>
+  v && typeof v === 'object'
+    ? Object.entries(v as Record<string, unknown>)
+        .filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] >= TASTE_MIN_WEIGHT)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, n)
+        .map(([k]) => (prefix && k.startsWith(prefix) ? k.slice(prefix.length) : k))
+    : [];
+
+/**
+ * Nơi và tag/trải nghiệm người xem thích nhất; không có gu thì null. Đọc hai dạng hồ sơ:
+ * tag_affinity@v0 (`places`, `tags`) và trip_profile@v1 (`answers.place` `place:<id>`, `answers.exp` `exp:<chủ đề>`).
+ */
+export function tasteOf(features: Record<string, unknown> | null): { places: string[]; tags: string[] } | null {
+  const answers = (features?.answers ?? null) as Record<string, unknown> | null;
+  const places = answers ? topKeys(answers.place, TASTE_PLACES, 'place:') : topKeys(features?.places, TASTE_PLACES);
+  const tags = answers ? topKeys(answers.exp, TASTE_TAGS, 'exp:') : topKeys(features?.tags, TASTE_TAGS);
+  return places.length || tags.length ? { places, tags } : null;
+}
