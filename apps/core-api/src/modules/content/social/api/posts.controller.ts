@@ -1,5 +1,6 @@
 import { SocialErrorFilter } from './social-error.filter.js';
 import {
+  BadRequestException,
   Optional,
   UseFilters,
   Body,
@@ -14,8 +15,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, RequireVerifiedEmail, type AuthUser } from '@tripflix/auth';
-import { OptionalAuthenticated, OptionalCurrentUser } from './optional-auth.guard.js';
+import { Authenticated, CurrentUser, OptionalAuthenticated, OptionalCurrentUser, RequireVerifiedEmail, type AuthUser } from '@tripflix/auth';
 import {
   DeletedSocialItemDto,
   PublishedPostDto,
@@ -32,6 +32,7 @@ import {
   GetPostDetailUseCase,
   ListPostsUseCase,
   ListUserPostsUseCase,
+  MAX_POST_IDS,
   PostImagesResolver,
   PublishPostUseCase,
   TrackShareUseCase,
@@ -82,6 +83,7 @@ export class PostsController {
   @ApiResponse({ status: 200, description: 'Danh sách bài đăng kèm nextCursor', type: SocialPostPageDto })
   async listPublicPosts(@Query() query: ListPostsQueryDto, @OptionalCurrentUser() user?: AuthUser) {
     const page = await this.listPostsUseCase.execute({
+      ids: parsePostIds(query.ids),
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
       authorId: query.author_id,
@@ -190,4 +192,16 @@ export class PostsController {
       userId: user?.userId,
     });
   }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `ids=a,b,c` → mảng uuid không trùng, giữ thứ tự. Sai dạng hay quá MAX_POST_IDS thì 400. */
+function parsePostIds(raw: string | undefined): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const ids = [...new Set(raw.split(',').map((id) => id.trim().toLowerCase()).filter(Boolean))];
+  if (ids.length === 0 || ids.length > MAX_POST_IDS || !ids.every((id) => UUID.test(id))) {
+    throw new BadRequestException(`ids phải là 1–${MAX_POST_IDS} uuid cách nhau bởi dấu phẩy`);
+  }
+  return ids;
 }

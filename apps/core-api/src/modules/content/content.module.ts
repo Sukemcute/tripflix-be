@@ -1,6 +1,7 @@
 import { CONTENT_GATE_PORT, type ContentGatePort } from './social/application/ports/content-gate.port.js';
 import { ModuleRef } from '@nestjs/core';
 import { Module } from '@nestjs/common';
+import { OptionalAuthGuard } from '@tripflix/auth';
 import type { EventEnvelope } from '@tripflix/contracts';
 import { buildTransactionHostToken, createDb, type Db, type ModuleTransactionHost } from '@tripflix/db';
 import { RedisStreamsEventBus, STREAMS } from '@tripflix/event-bus';
@@ -31,7 +32,6 @@ import {
   AiSummaryInternalController,
   BookmarksController,
   CommentsController,
-  OptionalAuthGuard,
   PostSummaryController,
   PostsController,
   ReactionsController,

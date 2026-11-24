@@ -1,6 +1,6 @@
 // Chép các tự kiểm của prototype Python (engine.py, ngrams.py): bản TS phải cho cùng kết quả.
 import { buildIndex } from './build.js';
-import { MemoryExploreSource } from './memory-source.js';
+import { CANDIDATE_LIMIT, EMPTY_QUERY_LIMIT, MemoryExploreSource } from './memory-source.js';
 import { budgetOf, parse, typoFix, understand, view } from './query.js';
 import { searchExplore, VERTICALS } from './rank.js';
 import { Stats } from './stats.js';
@@ -118,6 +118,14 @@ describe('tìm', () => {
     o({ id: 'p1', kind: 'plan', src: 'x', title: 'Đà Lạt 3N2Đ', text: 'lich trinh', place: 'Đà Lạt', cost: 2_500_000, days: 3 }),
     o({ id: 'p2', kind: 'plan', src: 'x', title: 'Đà Lạt 3N2Đ sang', text: 'lich trinh', place: 'Đà Lạt', cost: 6_000_000, days: 3 }),
   ];
+
+  it('không kéo cả bảng: câu rỗng (không từ, không nơi) tối đa EMPTY_QUERY_LIMIT, câu khác tối đa CANDIDATE_LIMIT mỗi nhánh', async () => {
+    const eats = Array.from({ length: CANDIDATE_LIMIT + 50 }, (_, i) => o({ id: `e${i}`, kind: 'food', title: `Bún bò ${i}`, place: 'Đà Lạt' }));
+    const food = async (q: string) => (await searchExplore(src(eats), q, { perSection: 1000 })).sections.find((s) => s.kind === 'food')!.total;
+    expect(await food('nhậu')).toBe(EMPTY_QUERY_LIMIT); // không từ tìm, không nơi
+    expect(await food('nhậu đà lạt')).toBe(CANDIDATE_LIMIT); // không từ tìm nhưng có nơi
+    expect(await food('bún bò')).toBe(CANDIDATE_LIMIT); // có từ tìm
+  });
 
   it('tên không dấu không bắt đúng dấu; có kết quả trước, rỗng sau', async () => {
     const ba = src([o({ id: 'b', kind: 'see', src: 'WV', title: 'Ba Na Hills', text: 'Ba Na Hills, the hills are 25 km from Lăng Cô and Da Nang' })]);

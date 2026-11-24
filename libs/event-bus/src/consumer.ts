@@ -2,6 +2,9 @@ import { eventEnvelopeSchema, type EventEnvelope } from '@tripflix/contracts';
 import type { Redis } from 'ioredis';
 import { CONSUMER_GROUPS, STREAMS, type StreamName } from './index.js';
 
+/** Số bản ghi tối đa (xấp xỉ) của stream:dead-letter; cùng giá trị với worker của tripflix-ai. */
+export const DEAD_LETTER_MAXLEN = 10_000;
+
 export type ConsumerGroup = (typeof CONSUMER_GROUPS)[number];
 
 export interface DeliveryInfo {
@@ -162,6 +165,10 @@ export class RedisStreamsConsumer {
     const { redis, group } = this.options;
     await redis.xadd(
       STREAMS.deadLetter,
+      // Hàng đợi lỗi chỉ để xem tay và gửi lại: giữ chừng này bản ghi mới nhất, không để Redis phình mãi.
+      'MAXLEN',
+      '~',
+      String(DEAD_LETTER_MAXLEN),
       '*',
       'event',
       raw ?? '',

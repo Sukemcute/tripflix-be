@@ -101,6 +101,15 @@ class DrizzleUserRepository implements UserRepository {
     return this.db.select({ id: users.id, displayName: users.displayName }).from(users).where(inArray(users.id, ids));
   }
 
+  async findPublicAuthorsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl, status: users.status })
+      .from(users)
+      .where(inArray(users.id, ids));
+    return rows.map((row) => ({ ...row, status: row.status as UserRecord['status'] }));
+  }
+
   async findContactsByIds(ids: string[]) {
     if (ids.length === 0) return [];
     return this.db

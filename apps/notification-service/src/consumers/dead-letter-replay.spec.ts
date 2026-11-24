@@ -28,6 +28,13 @@ class MemoryReplayRedis {
     return 1;
   }
 
+  async xdel(stream: string, ...ids: string[]): Promise<number> {
+    expect(stream).toBe(STREAMS.deadLetter);
+    const before = this.entries.length;
+    this.entries.splice(0, this.entries.length, ...this.entries.filter(([id]) => !ids.includes(id)));
+    return before - this.entries.length;
+  }
+
   addEvent(event: EventEnvelope, group = 'notification'): void {
     this.entries.push([`${this.entries.length + 1}-0`, ['group', group, 'event', JSON.stringify(event)]]);
   }
@@ -46,7 +53,7 @@ function createEvent(): EventEnvelope {
 }
 
 describe('DeadLetterReplayer', () => {
-  it('gửi lại sự kiện đến hạn, lưu trạng thái xong để lần sau không gửi trùng', async () => {
+  it('gửi lại sự kiện đến hạn, lưu trạng thái xong và gỡ khỏi hàng đợi để không gửi trùng', async () => {
     const redis = new MemoryReplayRedis();
     const event = createEvent();
     redis.addEvent(event);
@@ -57,8 +64,23 @@ describe('DeadLetterReplayer', () => {
     expect(route).toHaveBeenCalledWith(event);
     expect(redis.hashes.get(`notification:dlq:${event.eventId}`)?.status).toBe('done');
     expect(redis.expirations.get(`notification:dlq:${event.eventId}`)).toBe(604_800);
-    expect(await replayer.replayOnce()).toEqual({ replayed: 0, failed: 0, skipped: 1 });
+    expect(redis.entries).toEqual([]);
+    // Trạng thái hết hạn sau 7 ngày cũng không gửi lại, vì bản ghi đã gỡ.
+    redis.hashes.clear();
+    expect(await replayer.replayOnce()).toEqual({ replayed: 0, failed: 0, skipped: 0 });
     expect(route).toHaveBeenCalledTimes(1);
+  });
+
+  it('gỡ bản ghi cũ đã gửi xong (trước khi có XDEL) mà không gửi lại', async () => {
+    const redis = new MemoryReplayRedis();
+    const event = createEvent();
+    redis.addEvent(event);
+    redis.hashes.set(`notification:dlq:${event.eventId}`, { status: 'done', attempts: '0', nextAt: '0' });
+    const route = vi.fn();
+
+    expect(await new DeadLetterReplayer(redis, { route }, () => 0).replayOnce()).toEqual({ replayed: 0, failed: 0, skipped: 1 });
+    expect(route).not.toHaveBeenCalled();
+    expect(redis.entries).toEqual([]);
   });
 
   it('bỏ qua sự kiện của group khác', async () => {

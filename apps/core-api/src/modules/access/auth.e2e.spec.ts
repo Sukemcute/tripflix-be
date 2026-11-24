@@ -148,13 +148,19 @@ describe('access E2E', () => {
     expect(payload.exp! - payload.iat!).toBe(900);
   });
 
-  it('dùng lại refresh token cũ sau 10 giây thì thu hồi cả phiên', async () => {
+  it('dùng lại refresh token cũ sau 10 giây thì thu hồi toàn bộ các phiên của tài khoản (RFC 6819)', async () => {
     const { accessToken, refreshToken } = await registerAndLogin('reuse@example.com');
+    // Đăng nhập phiên thứ hai trên thiết bị khác
+    const login2 = await http().post('/api/auth/login').send({ email: 'reuse@example.com', password: PASSWORD }).expect(200);
+    const session2Token = (login2.body as { accessToken: string }).accessToken;
+
     await http().post('/api/auth/refresh').send({ refreshToken }).expect(200);
     nowMs += 11_000;
     const reused = await http().post('/api/auth/refresh').send({ refreshToken }).expect(401);
     expect(reused.body.message).toMatch(/thu hồi/);
+    // Cả phiên 1 và phiên 2 đều bị thu hồi lập tức
     await http().get('/api/auth/me').set('Authorization', `Bearer ${accessToken}`).expect(401);
+    await http().get('/api/auth/me').set('Authorization', `Bearer ${session2Token}`).expect(401);
   });
 
   it('sai email hay sai mật khẩu đều cùng một thông báo; sai quá 5 lần thì 429', async () => {

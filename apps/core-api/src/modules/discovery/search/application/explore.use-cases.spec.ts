@@ -111,6 +111,12 @@ describe('ExploreUseCases', () => {
     expect(postToObject(post('P3', 'Review quán'))).toMatchObject({ kind: 'post', place: null });
   });
 
+  it('bài video có poster thì kết quả tìm có ảnh bìa, không có thì null', () => {
+    const url = 'https://media.tripflix.io.vn/staging/videos/V1/r1/poster_360.jpg';
+    expect(postToObject(post('P1', 'Săn mây', { postType: 'video', posterUrl: url })).thumbnail).toBe(url);
+    expect(postToObject(post('P2', 'Review quán')).thumbnail).toBeNull();
+  });
+
   it('tìm theo nơi, ngân sách; bài bị ẩn không lọt ra kết quả', async () => {
     const trip = (d: number) => ({ destinationName: 'Đà Nẵng', daysCount: d, estimatedCostPerPerson: 2_500_000 });
     const { explore } = setup(

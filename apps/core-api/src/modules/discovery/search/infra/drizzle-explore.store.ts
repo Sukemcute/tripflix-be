@@ -2,6 +2,7 @@ import type { Db } from '@tripflix/db';
 import { and, arrayOverlaps, asc, between, eq, gte, inArray, isNull, lt, lte, or, sql, type SQL } from 'drizzle-orm';
 import { searchCounts, searchDocuments, searchQueryGrams } from '../../db/schema/index.js';
 import type { ExploreStore } from '../application/ports.js';
+import { candidateLimitOf } from '../domain/explore/memory-source.js';
 import { PHRASE_NS } from '../domain/explore/stats.js';
 import type { BuiltIndex, CandidateFilter, CountRow, IndexedDoc } from '../domain/explore/types.js';
 import { MAX_SAMPLES, type QueryGramRow } from '../domain/explore/vocab-gaps.js';
@@ -91,7 +92,8 @@ export class DrizzleExploreStore implements ExploreStore {
       .select({ doc: searchDocuments.doc })
       .from(searchDocuments)
       .where(and(...where))
-      .orderBy(asc(searchDocuments.ord));
+      .orderBy(asc(searchDocuments.ord))
+      .limit(candidateLimitOf(f));
     return rows.map((r) => r.doc);
   }
 

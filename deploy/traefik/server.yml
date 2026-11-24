@@ -21,6 +21,10 @@ http:
         average: 20
         period: 1m
         burst: 5
+    # Nén JSON/HTML (gzip/brotli). Không nén SSE: luồng realtime của admin phải đẩy từng sự kiện, không bị đệm.
+    compress:
+      compress:
+        excludedContentTypes: ['text/event-stream']
 
     redirect-to-apex:
       redirectRegex:
@@ -36,9 +40,8 @@ http:
   routers:
     core-api-auth:
       rule: >-
-        Host(`{{ env "API_HOST" }}`) && Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/registration-code`) ||
-        Path(`/api/auth/google`) || Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`) ||
-        Path(`/api/auth/service-token`))
+        Host(`{{ env "API_HOST" }}`) && Method(`POST`) && (Path(`/api/auth/login`) || Path(`/api/auth/login-code`) || Path(`/api/auth/register`) || Path(`/api/auth/registration-code`) ||
+        Path(`/api/auth/google`) || Path(`/api/auth/password/forgot`) || Path(`/api/auth/password/reset`))
       priority: 100
       service: core-api
       entryPoints: [websecure]
@@ -46,10 +49,10 @@ http:
       tls:
         certResolver: letsencrypt
     core-api:
-      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`) && !PathPrefix(`/api/mock-gateway`)
+      rule: Host(`{{ env "API_HOST" }}`) && PathPrefix(`/api`) && !PathPrefix(`/api/mock-gateway`) && !PathPrefix(`/api/auth/service-token`)
       service: core-api
       entryPoints: [websecure]
-      middlewares: [rate-limit-api]
+      middlewares: [rate-limit-api, compress]
       tls:
         certResolver: letsencrypt
 
@@ -75,7 +78,17 @@ http:
       rule: Host(`{{ env "API_HOST" }}`) && (PathPrefix(`/notifications`) || PathPrefix(`/ws`))
       service: notification-service
       entryPoints: [websecure]
-      middlewares: [rate-limit-api]
+      middlewares: [rate-limit-api, compress]
+      tls:
+        certResolver: letsencrypt
+
+    # File tĩnh Next.js chỉ nén, không qua rate-limit-api để tránh 429 khi nhiều người dùng chung IP.
+    web-static:
+      rule: Host(`{{ env "WEB_HOST" }}`) && PathPrefix(`/_next/static`)
+      priority: 200
+      service: web
+      entryPoints: [websecure]
+      middlewares: [compress]
       tls:
         certResolver: letsencrypt
 
@@ -83,7 +96,7 @@ http:
       rule: Host(`{{ env "WEB_HOST" }}`) && !PathPrefix(`/api/mock-gateway`)
       service: web
       entryPoints: [websecure]
-      middlewares: [rate-limit-api]
+      middlewares: [rate-limit-api, compress]
       tls:
         certResolver: letsencrypt
     # Link trong email mang ?token=, không ghi vào access log. Rule dài hơn router web nên được ưu tiên.
@@ -91,7 +104,7 @@ http:
       rule: Host(`{{ env "WEB_HOST" }}`) && (Path(`/dat-lai-mat-khau`) || Path(`/xac-thuc-email`))
       service: web
       entryPoints: [websecure]
-      middlewares: [rate-limit-api]
+      middlewares: [rate-limit-api, compress]
       tls:
         certResolver: letsencrypt
       observability:
@@ -107,7 +120,7 @@ http:
       rule: Host(`{{ env "ADMIN_HOST" }}`) && !PathPrefix(`/api/mock-gateway`)
       service: admin
       entryPoints: [websecure]
-      middlewares: [rate-limit-api]
+      middlewares: [rate-limit-api, compress]
       tls:
         certResolver: letsencrypt
 

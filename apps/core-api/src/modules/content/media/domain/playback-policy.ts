@@ -2,11 +2,15 @@
 export const DEFAULT_PLAYBACK_TTL_SEC = 6 * 60 * 60;
 
 /**
- * Đường dẫn CloudFront mà cookie được phép mở: mọi file dưới gốc CDN (`https://media.tripflix.io.vn/*`).
- * Dùng chung một cookie cho mọi video để app không phải xin cookie mỗi lần lướt sang reel khác.
+ * Đường dẫn CloudFront mà cookie được phép mở:
+ * Mặc định mọi file dưới gốc CDN (`https://media.tripflix.io.vn/*`).
+ * Khi truyền `resourcePath`, chỉ ký cho tiền tố / tài nguyên đó (ví dụ `videos/reel-123/*` hoặc `env/public/*`).
  */
-export function buildPlaybackResource(cdnBaseUrl: string): string {
-  return `${cdnBaseUrl.replace(/\/+$/, '')}/*`;
+export function buildPlaybackResource(cdnBaseUrl: string, resourcePath?: string): string {
+  const base = cdnBaseUrl.replace(/\/+$/, '');
+  if (!resourcePath || resourcePath.trim() === '') return `${base}/*`;
+  const cleanPath = resourcePath.replace(/^\/+/, '').replace(/\/+$/, '');
+  return `${base}/${cleanPath}/*`;
 }
 
 /**

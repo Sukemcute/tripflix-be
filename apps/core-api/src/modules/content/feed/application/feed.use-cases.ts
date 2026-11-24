@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { AccessFacade } from '../../../access/index.js';
+import { AccessFacade, type PublicAuthor } from '../../../access/index.js';
 import type { TripAttachmentData } from '../../db/schema/posts.js';
 import { MediaFacade, type PlaybackInfo } from '../../media/media.facade.js';
 import { decodeFeedCursor, encodeFeedCursor, type FeedCursor } from '../domain/feed-cursor.js';
@@ -59,7 +59,8 @@ export const HOT_IDS_MAX_LIMIT = 50;
 export class InvalidHotCursorError extends Error {}
 
 /** Trang đầu giống nhau với mọi người nên giữ ngắn trong Redis; bài mới hay số đếm trễ tối đa chừng này giây. */
-export const FEED_FIRST_PAGE_TTL_SECONDS = 10;
+// 16 seed × 10 giây gần như lần nào cũng trượt cache khi ít người xem; 60 giây vẫn đủ mới cho trang đầu.
+export const FEED_FIRST_PAGE_TTL_SECONDS = 60;
 
 /**
  * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo điểm job chấm sẵn
@@ -110,6 +111,21 @@ export class FeedUseCases {
     const byId = new Map(cards.map((card) => [card.postId, card]));
     const items = ids.flatMap((id) => byId.get(id) ?? []);
     return { items: viewerId ? await this.withViewerState(items, viewerId) : items, nextCursor: null };
+  }
+
+  /**
+   * Thời lượng video theo bài, chỉ bài phát được (cùng điều kiện với getByIds). Cho sự kiện xem: không dựng thẻ
+   * (tên tác giả, ảnh bìa, playback) chỉ để lấy một con số.
+   */
+  async getDurations(postIds: string[]): Promise<Map<string, PlaybackInfo['durationSec']>> {
+    const rows = await this.store.findPlayablePostsByIds([...new Set(postIds)]);
+    const playback = await this.media.getPlayback(rows.flatMap((row) => row.mediaIds));
+    return new Map(
+      rows.flatMap((row) => {
+        const mediaId = row.mediaIds.find((id) => playback[id]);
+        return mediaId ? [[row.id, playback[mediaId]!.durationSec] as const] : [];
+      }),
+    );
   }
 
   /**
@@ -228,11 +244,11 @@ export class FeedUseCases {
 
   private async buildCards(rows: FeedPostRow[]): Promise<FeedCard[]> {
     const posterIds = rows.flatMap((row) => (row.tripAttachment?.posterMediaId ? [row.tripAttachment.posterMediaId] : []));
-    const [playback, authorNames, posters] = await Promise.all([
+    const [playback, authors, posters] = await Promise.all([
       this.media.getPlayback(rows.flatMap((row) => row.mediaIds)),
       this.access
-        ? this.access.getDisplayNames(rows.map((r) => r.authorId)).catch(() => new Map<string, string>())
-        : new Map<string, string>(),
+        ? this.access.getPublicAuthors(rows.map((r) => r.authorId)).catch(() => new Map<string, PublicAuthor>())
+        : new Map<string, PublicAuthor>(),
       posterIds.length > 0 ? this.media.getImages(posterIds) : Promise.resolve({} as Awaited<ReturnType<MediaFacade['getImages']>>),
     ]);
     return rows.flatMap((row) => {
@@ -241,7 +257,7 @@ export class FeedUseCases {
       const video = mediaId ? playback[mediaId] : undefined;
       if (!video) return [];
       const posterId = row.tripAttachment?.posterMediaId;
-      return [buildCard(row, video, null, authorNames.get(row.authorId) ?? null, posterId ? posters[posterId]?.url : undefined)];
+      return [buildCard(row, video, null, authors.get(row.authorId) ?? null, posterId ? posters[posterId]?.url : undefined)];
     });
   }
 }
@@ -260,12 +276,12 @@ function buildCard(
   row: FeedPostRow,
   video: PlaybackInfo,
   viewerState: FeedCard['viewerState'],
-  authorName: string | null = null,
+  author: PublicAuthor | null = null,
   posterUrl?: string,
 ): FeedCard {
   return {
     postId: row.id,
-    author: { id: row.authorId, name: authorName, avatarUrl: null, isKol: false },
+    author: { id: row.authorId, name: author?.displayName ?? null, avatarUrl: author?.avatarUrl ?? null, isKol: false },
     video,
     title: row.title,
     caption: row.body,

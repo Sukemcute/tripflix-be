@@ -118,6 +118,21 @@ describe('Social API Controllers', () => {
       });
     });
 
+    it('listPublicPosts nhận ids: bỏ trùng, giữ thứ tự, chữ thường', async () => {
+      const a = '018d9f20-0000-7000-8000-00000000000A';
+      const b = '018d9f20-0000-7000-8000-00000000000b';
+      await controller.listPublicPosts({ ids: `${b}, ${a},${b}` });
+      expect(mockListPosts.execute).toHaveBeenLastCalledWith(expect.objectContaining({ ids: [b, a.toLowerCase()] }));
+    });
+
+    it('listPublicPosts từ chối ids sai dạng hoặc quá 50 bằng 400', async () => {
+      mockListPosts.execute.mockClear();
+      await expect(controller.listPublicPosts({ ids: 'not-a-uuid' })).rejects.toBeInstanceOf(BadRequestException);
+      const tooMany = Array.from({ length: 51 }, (_, i) => `018d9f20-0000-7000-8000-${String(i).padStart(12, '0')}`).join(',');
+      await expect(controller.listPublicPosts({ ids: tooMany })).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockListPosts.execute).not.toHaveBeenCalled();
+    });
+
     it('trackShare nên gọi trackShareUseCase', async () => {
       const res = await controller.trackShare('p1', mockUser);
       expect(mockTrackShare.execute).toHaveBeenCalledWith({

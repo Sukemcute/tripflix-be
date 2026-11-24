@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Logger } from '@nestjs/common';
 import { AiModerationClient } from './ai-moderation.client.js';
 import type { ModerationItem } from '../application/ports.js';
 
@@ -171,5 +172,24 @@ describe('AI moderation client qua HTTP thật', () => {
     expect(await new AiModerationClient({}).moderate([item])).toBeNull();
     expect(calls).toBe(0);
     expect(tokenCalls).toBe(0);
+  });
+});
+
+describe('OCR failure diagnostics', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  it.each([['ocr', 404], ['token', 403]] as const)('logs %s HTTP status without secrets', async (step, httpStatus) => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/auth/service-token') && step === 'ocr')
+        return new Response(JSON.stringify({ accessToken: 'private-token', expiresIn: 300, tokenType: 'Bearer' }));
+      return new Response('private-provider-body', { status: httpStatus });
+    });
+    const client = new AiModerationClient({ aiUrl: 'http://ai', coreUrl: 'http://core', secret: 'private-secret' }, request);
+    expect(await client.ocrVideoCover('part-1', jpeg)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ step, httpStatus }), expect.any(String));
+    const logs = JSON.stringify(warn.mock.calls);
+    for (const secret of ['private-token', 'private-secret', 'private-provider-body', jpeg.toString('base64')])
+      expect(logs).not.toContain(secret);
   });
 });

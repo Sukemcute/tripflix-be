@@ -37,6 +37,12 @@ const EXPLORE_RESERVE = 50;
 const FULL_READ_EXPLORE_SKIP = 100;
 /** Số trang rỗng (bị lọc hết sau hydrate) server tự bỏ qua trong một request. */
 const MAX_EMPTY_PAGE_SKIPS = 3;
+/**
+ * Kết quả xếp hạng của một phiên (đã chốt theo sessionAt nên trang nào cũng như nhau): giữ lại để trang sau chỉ cắt
+ * offset, không đọc lại tới 5.000 ứng viên và xếp lại.
+ */
+const RANKED_SESSION_CACHE_MS = 5 * 60_000;
+const RANKED_SESSION_CACHE_MAX = 500;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
 
@@ -158,6 +164,7 @@ export class PostRecommendationUseCases {
   private readonly logger = new Logger(PostRecommendationUseCases.name);
   private algoCache: { at: number; rows: Map<string, AlgoRow> } | null = null;
   private placeProfileCache: { at: number; profiles: Map<string, Record<string, number>> } | null = null;
+  private readonly rankedSessions = new Map<string, { at: number; rankedOnly: RankedItem[]; reserved: RankedItem[] }>();
 
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
@@ -323,7 +330,50 @@ export class PostRecommendationUseCases {
     // Gu trong phiên chốt theo lúc tải trang đầu: tương tác giữa chừng có hiệu lực ở lần tải feed sau, trang không xô lệch.
     const sessionAt = seenBefore + SESSION_MS;
     const hasPlanOnly = mode === 'has_plan';
+    const slots = exploreSlots(q.limit);
+    const sessionKey = [q.userId ?? 'guest', algo.name, mode, q.postType ?? '', seenBefore, seenUntil].join('|');
+    // Trang đầu (cả khi tải lại) luôn xếp mới; trang sau của cùng phiên đọc lại kết quả đó.
+    const { rankedOnly, reserved } =
+      (cursor ? this.readRankedSession(sessionKey) : null) ??
+      this.writeRankedSession(sessionKey, await this.rankSession(q, { algo, hasPlanOnly, seenUntil, sessionAt, now }));
+    const explore = reserved.slice(page * slots, (page + 1) * slots);
+    // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
+    const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
+    const pageItems = interleave(rankedTake, explore, q.limit);
 
+    // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
+    const nextOffset = offset + rankedTake.length;
+    const hasMore = rankedOnly.length > nextOffset || reserved.length > (page + 1) * slots;
+    return {
+      pageItems,
+      algo,
+      nextCursor:
+        pageItems.length > 0 && hasMore
+          ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore, ...seenUntilField(seenUntil, seenBefore) })
+          : null,
+    };
+  }
+
+  private readRankedSession(key: string) {
+    const hit = this.rankedSessions.get(key);
+    if (!hit) return null;
+    if (Date.now() - hit.at < RANKED_SESSION_CACHE_MS) return hit;
+    this.rankedSessions.delete(key);
+    return null;
+  }
+
+  private writeRankedSession(key: string, ranked: { rankedOnly: RankedItem[]; reserved: RankedItem[] }) {
+    // Map giữ thứ tự chèn: đầy thì bỏ phiên cũ nhất.
+    if (this.rankedSessions.size >= RANKED_SESSION_CACHE_MAX) this.rankedSessions.delete(this.rankedSessions.keys().next().value!);
+    this.rankedSessions.set(key, { at: Date.now(), ...ranked });
+    return ranked;
+  }
+
+  /** Xếp hạng cả phiên: ứng viên, ranker, chính sách theo người xem, tập bài khám phá giữ trước. */
+  private async rankSession(
+    q: PostRecommendationQuery,
+    { algo, hasPlanOnly, seenUntil, sessionAt, now }: { algo: ResolvedAlgo; hasPlanOnly: boolean; seenUntil: number; sessionAt: number; now: Date },
+  ): Promise<{ rankedOnly: RankedItem[]; reserved: RankedItem[] }> {
     // Mọi tín hiệu người xem chốt theo trang đầu (sessionAt): tương tác giữa phiên không làm trang sau xô lệch.
     const [interacted, seenIds, longTaste, recent, rawOwnRecent] = q.userId
       ? await Promise.all([
@@ -365,7 +415,6 @@ export class PostRecommendationUseCases {
     const candidates = mergeCandidates(hot, fresh);
     const inCandidates = new Set(candidates.map((c) => c.postId));
 
-    const slots = exploreSlots(q.limit);
     // Bài vừa đăng chưa qua job thì chưa là ứng viên: thêm thẳng, tầng chính sách đưa lên đầu.
     const ownExtra: RankedItem[] = ownRecent
       .filter((postId) => !inCandidates.has(postId))
@@ -387,22 +436,7 @@ export class PostRecommendationUseCases {
     const reserved = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: new Date(sessionAt).toISOString().slice(0, 10) }, EXPLORE_RESERVE, 0);
     const reservedIds = new Set(reserved.map((r) => r.postId));
     const rankedOnly = ranked.filter((r) => !reservedIds.has(r.postId));
-    const explore = reserved.slice(page * slots, (page + 1) * slots);
-    // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
-    const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
-    const pageItems = interleave(rankedTake, explore, q.limit);
-
-    // Phân trang bằng offset cho mọi người: gọi lại cùng cursor (tải lại sau khi thả tim) ra cùng trang.
-    const nextOffset = offset + rankedTake.length;
-    const hasMore = rankedOnly.length > nextOffset || reserved.length > (page + 1) * slots;
-    return {
-      pageItems,
-      algo,
-      nextCursor:
-        pageItems.length > 0 && hasMore
-          ? encodeCursor({ algo: algo.name, mode, page: page + 1, offset: nextOffset, seenBefore, ...seenUntilField(seenUntil, seenBefore) })
-          : null,
-    };
+    return { rankedOnly, reserved };
   }
 
   /** Mode recent: mới nhất trước (cửa sổ 30 ngày), không qua ranker/explore/phạt lịch sử; bài tự đăng trong 1h lên đầu. */
