@@ -1,6 +1,7 @@
 // Tìm khám phá: HIỂU CÂU một lần -> mỗi NHÁNH lấy ứng viên rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần -> GỘP theo vùng.
 // Port từ experiments/natural-search/search/engine.py + verticals/*.py; giữ nguyên công thức để so được với bộ câu thử.
 import { bucketsWithin } from '../places.js';
+import { VERTICAL_OF } from './build.js';
 import { LEX } from './lexicon.js';
 import { branchTerms, understand, type Interpretation, type QueryTerm, type Understood } from './query.js';
 import { NS, Stats } from './stats.js';
@@ -138,6 +139,8 @@ type LatLon = { lat: number; lon: number };
 export const FAR_KM = 150;
 /** Từ khớp sai dấu người dùng gõ ('trứng' ~ 'Trung'): còn chừng này trọng số, và không tính là đã khớp. */
 const ACCENT_MISS = 0.3;
+/** Ứng viên của nhánh câu không nhắm tới (vùng đó chỉ hiện 3 mục). */
+const SIDE_CANDIDATE_LIMIT = 30;
 /** Câu không có nơi, không có ý muốn: gợi ý thay thế phải phủ ít nhất chừng này phần câu (chặn câu ngoài phạm vi). */
 const RELATED_COVERAGE = 0.5;
 
@@ -440,13 +443,13 @@ async function collect(
   interps: readonly Interpretation[],
   user: LatLon | null,
   isBroad: boolean,
-  candidateLimit: number,
+  limitOf: (vertical: string) => number,
 ): Promise<Map<string, Map<string, Row>>> {
   const groups = new Map<string, Map<string, Row>>();
   const centers = await Promise.all(interps.map((it) => (it.u.place ? st.center(it.u.place) : Promise.resolve(null))));
   const prepared = await Promise.all(
     interps.flatMap((it, idx) =>
-      VERTICALS.map((vt) => prepareVertical(vt, it, st, centers[idx] ?? null, user, isBroad, candidateLimit)),
+      VERTICALS.map((vt) => prepareVertical(vt, it, st, centers[idx] ?? null, user, isBroad, limitOf(vt.name))),
     ),
   );
   const active = prepared.filter((p): p is PreparedVertical => p !== null);
@@ -539,16 +542,20 @@ export async function searchExplore(
   const interps = await understand(q, st);
   const u = interps[0]!.u;
   const user = options.loc && !u.place ? options.loc : null;
-  const groups = await collect(st, interps, user, false, candidateLimit);
-  const sections = buildSections(groups, u, perSection, full);
   const kinds = u.intents.length ? u.intents : full ? [...full] : SECTIONS.map(([k]) => k);
+  // Engine ngoài (Typesense) đọc `limit`: nhánh câu không nhắm tới chỉ hiện 3 mục nên lấy ít ứng viên.
+  // Lộ trình còn đến từ video kèm lịch trình. Nguồn trong RAM/Postgres có trần riêng (candidateLimitOf), bỏ qua `limit`.
+  const mainVerticals = new Set([...kinds.map((k) => VERTICAL_OF[k as keyof typeof VERTICAL_OF]), ...(kinds.includes('plan') ? ['videos'] : [])]);
+  const limitOf = (vertical: string) => (mainVerticals.has(vertical) ? candidateLimit : SIDE_CANDIDATE_LIMIT);
+  const groups = await collect(st, interps, user, false, limitOf);
+  const sections = buildSections(groups, u, perSection, full);
   let fallback: ExploreFallback | null = null;
   if (!sections.some((s) => kinds.includes(s.kind) && s.total)) {
     const n = u.intents.length || full ? perSection : 2;
     fallback = buildFallback(groups, kinds, u, n);
     // Chưa có gì để thay thế mà câu có nơi (hoặc gần tôi): mở rộng ứng viên ra mọi mục quanh nơi, không cần chứa từ.
     if (!fallback && (user || interps.some((it) => it.u.place))) {
-      fallback = buildFallback(await collect(st, interps, user, true, candidateLimit), kinds, u, n);
+      fallback = buildFallback(await collect(st, interps, user, true, limitOf), kinds, u, n);
     }
   }
   return { query: q, understood: u, sections, nearUser: Boolean(user), fallback, suggest: fallback?.items ?? [], dropped: fallback?.dropped ?? [] };
