@@ -184,4 +184,14 @@ describe('TypesenseExploreStore', () => {
     expect(client.createCollection).toHaveBeenCalledTimes(1);
     expect(client.deleteCollection).toHaveBeenCalledWith('explore_1795540833445');
   });
+
+  it('candidatesBatch: search con lỗi (vd sai cú pháp filter) thì ném lỗi, không trả kết quả thiếu', async () => {
+    const redis = mockRedis('OK');
+    const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
+    const multiSearch = vi.fn(async () => [{ code: 400, error: 'Could not parse the filter query.' }]);
+    const store = new TypesenseExploreStore({ multiSearch } as unknown as TypesenseClient, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
+    await expect(
+      store.candidatesBatch([{ vertical: 'plans', isAll: true, terms: [], names: [], tiers: [], days: null, place: null, places: [], placeTerms: [], center: null, latSpan: FAR_KM / 111 }]),
+    ).rejects.toThrow('Could not parse the filter query.');
+  });
 });

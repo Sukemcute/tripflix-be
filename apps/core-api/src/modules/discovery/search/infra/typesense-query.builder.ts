@@ -94,7 +94,8 @@ export function buildTypesenseSearches(f: CandidateFilter): TypesenseSearchReque
 
   // 4. Địa điểm lân cận trong bán kính FAR_KM (150 km).
   if (f.center) {
-    const geoScope = `${base} && location(${f.center.lat}, ${f.center.lon}, ${FAR_KM} km)`;
+    // Lọc bán kính cần dấu `:` (location:(…)); dạng sort location(…):asc thì không.
+    const geoScope = `${base} && location:(${f.center.lat}, ${f.center.lon}, ${FAR_KM} km)`;
     out.push(...buildScopeSearches(f, geoScope, fallbackLimit, allSortBy, orExpr));
   }
 

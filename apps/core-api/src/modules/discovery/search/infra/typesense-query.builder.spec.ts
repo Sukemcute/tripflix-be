@@ -57,6 +57,6 @@ describe('buildTypesenseSearches', () => {
     expect(filters.some((f) => f.includes('place:=[`Đà Nẵng`]'))).toBe(true);
     expect(filters.some((f) => f.includes('has_place:=false && terms:=[`da_nang`,`danang`]'))).toBe(true);
     expect(filters.some((f) => f.includes('has_place:=false') && !f.includes('`da_nang`'))).toBe(true);
-    expect(filters.some((f) => f.includes(`location(16.054, 108.202, ${FAR_KM} km)`))).toBe(true);
+    expect(filters.some((f) => f.includes(`location:(16.054, 108.202, ${FAR_KM} km)`))).toBe(true);
   });
 });

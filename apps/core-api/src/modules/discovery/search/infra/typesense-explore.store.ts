@@ -87,10 +87,8 @@ export class TypesenseExploreStore implements ExploreStore {
           }
           continue;
         }
-        if (res.error) {
-          this.logger.warn(`Typesense multi_search sub-query lỗi: ${res.error}`);
-          continue;
-        }
+        // Lỗi search con (cú pháp, timeout) mà bỏ qua thì kết quả thiếu nhưng trông như bình thường: ném ra.
+        if (res.error) throw new TypesenseError(res.code ?? 500, `Typesense multi_search search con lỗi: ${res.error}`);
         for (const hit of res.hits ?? []) {
           if (hit.document && !byId.has(hit.document.id)) {
             byId.set(hit.document.id, typesenseDocToIndexedDoc(hit.document));
