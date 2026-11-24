@@ -81,6 +81,12 @@ export interface CandidateFilter {
   center: { lat: number; lon: number } | null;
   /** Nửa bề rộng khung vĩ độ quanh center. */
   latSpan: number;
+  /** Câu tìm giữ dấu để engine ngoài (Typesense) xếp hạng văn bản. */
+  queryText?: string;
+  /** Giới hạn ứng viên mỗi nhánh cho engine ngoài. */
+  limit?: number;
+  /** Vị trí người dùng (khi câu không nói rõ nơi) để ưu tiên ứng viên gần. */
+  user?: { lat: number; lon: number } | null;
 }
 
 /** Nguồn chỉ mục: Postgres (infra) hoặc RAM (test, so với bản Python). */
@@ -92,6 +98,8 @@ export interface ExploreSource {
   phrasePool(first: string, minLen: number, maxLen: number): Promise<string[]>;
   /** Tài liệu của một nhánh, theo `ord` tăng dần. */
   candidates(filter: CandidateFilter): Promise<IndexedDoc[]>;
+  /** Lấy ứng viên cho nhiều nhánh/cách hiểu trong một lượt (Typesense multi_search). */
+  candidatesBatch?(filters: readonly CandidateFilter[]): Promise<IndexedDoc[][]>;
 }
 
 export interface BuiltIndex {

@@ -422,4 +422,29 @@ describe('ExploreUseCases', () => {
       expect(errFallback.items.map((i) => i.refId)).toEqual(rel.items.map((i) => i.refId));
     });
   });
+
+  describe('real-time syncPost & syncMetrics', () => {
+    it('syncPost upsert khi bài công khai và xoá khi bài bị ẩn; syncMetrics cập nhật likes/comments/hotScore', async () => {
+      const p1 = post('P1', 'Review Phú Quốc mới', { reactionTotal: 42, commentCount: 7 });
+      const { store, catalog, places } = setup([], [p1]);
+      let isVisible = true;
+      catalog.getVisiblePosts = vi.fn(async (ids: string[]) => (isVisible && ids.includes('P1') ? [p1] : []));
+      const upsertDocuments = vi.fn(async () => 1);
+      const updateMetrics = vi.fn(async () => 1);
+      const tsStore: ExploreStore = Object.assign(store, { upsertDocuments, updateMetrics });
+      const findPostScores = vi.fn(async () => new Map([['P1', 0.85]]));
+      const explore = new ExploreUseCases(tsStore, catalog, places, { findPostScores });
+
+      expect(await explore.syncPost('P1')).toBe('upserted');
+      expect(upsertDocuments).toHaveBeenCalledWith([expect.objectContaining({ id: 'post:P1' })], new Map([['P1', 0.85]]));
+
+      isVisible = false;
+      expect(await explore.syncPost('P1')).toBe('deleted');
+
+      expect(await explore.syncMetrics()).toBe(1);
+      expect(updateMetrics).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'post:P1', likes: 42, comments: 7, hotScore: 0.85 }),
+      ]);
+    });
+  });
 });

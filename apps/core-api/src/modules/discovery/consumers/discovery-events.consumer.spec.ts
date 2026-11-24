@@ -62,6 +62,28 @@ describe('DiscoveryEventsConsumer', () => {
     expect(ingest).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'content.post.published',
+    'content.post.updated',
+    'content.post.held',
+    'content.post.hidden',
+    'content.post.restored',
+    'content.post.moderated',
+    'content.post.deleted',
+  ])('%s: gọi explore.syncPost khi có sẵn để đồng bộ real-time', async (type) => {
+    const syncPost = vi.fn(async () => 'upserted' as const);
+    const ingest = vi.fn(async () => undefined);
+    const consumer = new DiscoveryEventsConsumer(
+      { APP_ROLE: 'api' } as CoreEnv,
+      {} as Redis,
+      { syncPost } as unknown as ExploreUseCases,
+      { ingest } as unknown as RecommendIngestUseCases,
+    );
+    await consumer.route(event(type, { postId: 'p99' }));
+    expect(syncPost).toHaveBeenCalledWith('p99');
+    expect(ingest).toHaveBeenCalledTimes(1);
+  });
+
   it('APP_ROLE=api: không bật consumer', () => {
     const { consumer } = setup();
     consumer.onApplicationBootstrap();

@@ -1,6 +1,7 @@
-import { Controller, Get, Header, Inject, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, Header, Inject, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@tripflix/auth';
+import { EXPLORE_STORE, type ExploreStore } from '../application/ports.js';
 import {
   HEALTH_STATUSES,
   IndexHealth,
@@ -92,22 +93,31 @@ class IndexHealthDto {
 @Roles('moderator', 'superadmin')
 @Controller('v1/admin/search/index-health')
 export class AdminIndexHealthController {
-  constructor(@Inject(IndexHealth) private readonly health: IndexHealth) {}
+  constructor(
+    @Inject(IndexHealth) private readonly health: IndexHealth,
+    @Optional() @Inject(EXPLORE_STORE) private readonly exploreStore?: Pick<ExploreStore, 'healthCheck'>,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
   @ApiOkResponse({ type: IndexHealthDto })
   async check(): Promise<IndexHealthDto> {
     let timer: NodeJS.Timeout | undefined;
+    let status: IndexHealthDto;
     try {
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Redis timeout')), 3000);
       });
-      return await Promise.race([this.health.read(), timeout]);
+      status = await Promise.race([this.health.read(), timeout]);
     } catch {
       throw new ServiceUnavailableException('Không đọc được trạng thái worker tìm kiếm');
     } finally {
       clearTimeout(timer);
     }
+    if (this.exploreStore?.healthCheck) {
+      const ok = await this.exploreStore.healthCheck();
+      if (!ok) throw new ServiceUnavailableException('Typesense search engine không phản hồi');
+    }
+    return status;
   }
 }

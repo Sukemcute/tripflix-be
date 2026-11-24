@@ -25,6 +25,11 @@ export class DrizzleExploreStore implements ExploreStore {
       .where(or(...[...byNs].map(([ns, ks]) => and(eq(searchCounts.ns, ns), inArray(searchCounts.key, ks)))));
   }
 
+  /** Đọc toàn bộ bộ đếm để khởi tạo fallback RAM cache lúc cold-start nếu Redis chưa có snapshot. */
+  async loadAllCounts(): Promise<CountRow[]> {
+    return this.db.select().from(searchCounts);
+  }
+
   async typoPool(first: string, minLen: number, maxLen: number) {
     // Từ đơn của chỉ mục: không có '_' (cặp từ), không bắt đầu bằng '#' (viết tắt).
     const rows = await this.db

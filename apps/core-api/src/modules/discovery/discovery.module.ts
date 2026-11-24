@@ -62,6 +62,9 @@ import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
+import { ExploreStatsCache } from './search/infra/explore-stats.cache.js';
+import { TypesenseExploreStore } from './search/infra/typesense-explore.store.js';
+import { TypesenseClient } from './search/infra/typesense.client.js';
 import { IndexHealth } from './search/jobs/index-health.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from './search/jobs/rebuild-suggest-index.job.js';
@@ -85,6 +88,7 @@ const exploreCatalog = (commerce: CommerceFacade, content: ContentFacade, access
   },
   listPosts: (cursor) => content.listPosts({ cursor, limit: 100 }),
   findVisiblePostIds: async (postIds) => new Set((await content.getVisiblePosts(postIds)).map((p) => p.id)),
+  getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
   getAuthorNames: (authorIds) => access.getDisplayNames(authorIds),
 });
 
@@ -160,7 +164,22 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
-    { provide: EXPLORE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleExploreStore(createDb(pools.discovery)) },
+    {
+      provide: EXPLORE_STORE,
+      inject: [CORE_ENV, DB_POOLS, REDIS],
+      useFactory: (env: CoreEnv, pools: DbPools, redis: Redis) => {
+        const pgStore = new DrizzleExploreStore(createDb(pools.discovery));
+        if (env.SEARCH_BACKEND !== 'typesense') return pgStore;
+        const client = new TypesenseClient({
+          host: env.TYPESENSE_HOST,
+          port: env.TYPESENSE_PORT,
+          protocol: env.TYPESENSE_PROTOCOL,
+          apiKey: env.TYPESENSE_API_KEY,
+        });
+        const statsCache = new ExploreStatsCache(redis, () => pgStore.loadAllCounts());
+        return new TypesenseExploreStore(client, statsCache, pgStore, redis, env.TYPESENSE_COLLECTION_ALIAS);
+      },
+    },
     { provide: PLACES_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzlePlacesStore(createDb(pools.discovery)) },
     PlacesUseCases,
     LoadPlacesJob,

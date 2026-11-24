@@ -146,6 +146,13 @@ export const coreEnvSchema = baseEnvSchema
       (v) => (v === '' ? undefined : v),
       z.coerce.number().int().min(300).max(86_400).optional(),
     ),
+    // Tìm khám phá (Typesense / Postgres fallback): mặc định postgres khi chạy unit/CI không có Typesense, compose đặt typesense.
+    SEARCH_BACKEND: z.enum(['typesense', 'postgres']).default('postgres'),
+    TYPESENSE_HOST: z.string().default('localhost'),
+    TYPESENSE_PORT: z.coerce.number().int().positive().default(8108),
+    TYPESENSE_PROTOCOL: z.enum(['http', 'https']).default('http'),
+    TYPESENSE_API_KEY: z.string().default('dev-typesense-key'),
+    TYPESENSE_COLLECTION_ALIAS: z.string().default('explore'),
   })
   .superRefine((env, ctx) => {
     // Thiếu một trong hai thì không ký được: dừng ngay lúc khởi động thay vì âm thầm phát video không khoá.

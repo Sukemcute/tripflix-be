@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { calculateCompleteness } from '../../../content/index.js';
 import { RECOMMEND_STORE, type RecommendStore } from '../../recommend/application/ports.js';
-import { buildIndex } from '../domain/explore/build.js';
-import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';
+import { buildIndex, indexDoc, VERTICAL_OF } from '../domain/explore/build.js';
+import { searchExplore, VERTICALS, type ExploreItem, type Relax } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
 import { paginate } from '../domain/stays.js';
 import { NS } from '../domain/explore/stats.js';
@@ -11,7 +11,17 @@ import { placeBucketOfId, placeParentOf, placesIn } from '../domain/places.js';
 import { QUERY_TOTAL_KEYS, queryGrams, rankVocabGaps, type QueryGramRow, type VocabGap } from '../domain/explore/vocab-gaps.js';
 import type { ExploreObject } from '../domain/explore/types.js';
 import { POI_ATTRIBUTION, type PointOfInterestSeed } from '../domain/points-of-interest.js';
-import { EXPLORE_CATALOG, EXPLORE_STORE, PLACES_STORE, type PlacesStore, type ExploreCatalog, type ExploreHotel, type ExplorePost, type ExploreStore } from './ports.js';
+import {
+  EXPLORE_CATALOG,
+  EXPLORE_STORE,
+  PLACES_STORE,
+  type ExploreCatalog,
+  type ExploreHotel,
+  type ExploreMetricUpdate,
+  type ExplorePost,
+  type ExploreStore,
+  type PlacesStore,
+} from './ports.js';
 
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_PAGES = 1_000;
@@ -342,20 +352,57 @@ export class ExploreUseCases {
     const candidates = isFallback
       ? fallback!.items.filter((i) => (query.postType === 'all' ? POST_KINDS.has(i.obj.kind) : kinds.includes(i.obj.kind)) && !seen.has(i.obj.id) && Boolean(seen.add(i.obj.id)))
       : found;
-    const visible = candidates.length ? await this.catalog.findVisiblePostIds(candidates.map((i) => i.obj.refId ?? '')) : new Set<string>();
-    const shown = candidates.filter((i) => visible.has(i.obj.refId ?? ''));
-    const sorted = await this.sortPostItems(shown, query.sort ?? 'relevance');
-    const page = paginate(sorted, query.cursor, query.limit);
+    const sorted = await this.sortPostItems(candidates, query.sort ?? 'relevance');
+    const page = await this.paginateVisiblePosts(sorted, query.cursor, query.limit);
     const names = await this.authorNames(page.items);
     return {
       understood: understoodOf(r.understood),
       items: page.items.map((i) => toResultItem({ ...i, reason: postReason(i) }, names)),
-      total: sorted.length,
+      total: page.total,
       nextCursor: page.nextCursor,
-      dropped: isFallback && sorted.length > 0 ? fallback!.dropped : [],
-      isFallback: isFallback && sorted.length > 0,
-      fallbackRelaxed: isFallback && sorted.length > 0 ? fallback!.relaxed : [],
+      dropped: isFallback && page.total > 0 ? fallback!.dropped : [],
+      isFallback: isFallback && page.total > 0,
+      fallbackRelaxed: isFallback && page.total > 0 ? fallback!.relaxed : [],
     };
+  }
+
+  private async paginateVisiblePosts(
+    sorted: ExploreItem[],
+    cursor: string | undefined,
+    limit: number,
+  ): Promise<{ items: ExploreItem[]; nextCursor: string | null; total: number }> {
+    const start = cursor ? Number(cursor) : 0;
+    if (!sorted.length || !Number.isInteger(start) || start < 0 || start >= sorted.length) {
+      return { items: [], nextCursor: null, total: sorted.length };
+    }
+    const items: ExploreItem[] = [];
+    let idx = start;
+    let nextIdx = start;
+    let hiddenCount = 0;
+    let hasMore = false;
+
+    while (idx < sorted.length && !hasMore) {
+      const batchSize = Math.max(limit - items.length + 15, 50);
+      const slice = sorted.slice(idx, idx + batchSize);
+      const ids = [...new Set(slice.map((i) => i.obj.refId ?? '').filter(Boolean))];
+      const visible = ids.length ? await this.catalog.findVisiblePostIds(ids) : new Set<string>();
+      for (const item of slice) {
+        idx += 1;
+        if (!visible.has(item.obj.refId ?? '')) {
+          hiddenCount += 1;
+          continue;
+        }
+        if (items.length < limit) {
+          items.push(item);
+          nextIdx = idx;
+        } else {
+          hasMore = true;
+        }
+      }
+    }
+
+    const total = Math.max(items.length, sorted.length - hiddenCount);
+    return { items, nextCursor: hasMore ? String(nextIdx) : null, total };
   }
 
   private async sortPostItems(shown: ExploreItem[], sort: PostSort): Promise<ExploreItem[]> {
@@ -454,6 +501,20 @@ export class ExploreUseCases {
     return ids.length ? this.catalog.getAuthorNames(ids) : new Map();
   }
 
+  private async loadHotScores(postIds: readonly string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (!this.recommendStore || !postIds.length) return out;
+    try {
+      for (let i = 0; i < postIds.length; i += 1_000) {
+        const part = await this.recommendStore.findPostScores('hot@v2', postIds.slice(i, i + 1_000));
+        for (const [id, score] of part) out.set(id, score);
+      }
+    } catch (error) {
+      this.logger.warn(`Đọc điểm hot@v2 khi đồng bộ chỉ mục lỗi: ${(error as Error).message}`);
+    }
+    return out;
+  }
+
   /** Dựng lại toàn bộ chỉ mục từ commerce + content + điểm OSM. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */
   async rebuildIndex(): Promise<number | null> {
     const [hotels, posts, places, points] = await Promise.all([
@@ -465,7 +526,8 @@ export class ExploreUseCases {
     const placeName = new Map(places.map((p) => [p.id, p.name]));
     const pois = points.flatMap((p) => pointToObject(p, placeName.get(p.cityId) ?? '') ?? []);
     const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject), ...pois]);
-    if (!(await this.store.replaceAll(index))) return null;
+    const hotScores = await this.loadHotScores(posts.map((p) => p.id));
+    if (!(await this.store.replaceAll(index, hotScores))) return null;
     // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
     // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.
     // Lỗi ở đây chỉ để lại bài ẩn tới lượt sau, chỉ mục mới vẫn dùng được.
@@ -476,6 +538,47 @@ export class ExploreUseCases {
       this.logger.error(`Dọn bài ẩn sau khi dựng chỉ mục lỗi: ${(error as Error).message}`);
     }
     return index.docs.length;
+  }
+
+  /** Đồng bộ ngay một bài viết theo sự kiện (upsert khi còn công khai, hoặc gỡ nếu đã ẩn/xoá). */
+  async syncPost(postId: string): Promise<'upserted' | 'deleted' | 'skipped'> {
+    if (this.catalog.getVisiblePosts && this.store.upsertDocuments) {
+      const visible = await this.catalog.getVisiblePosts([postId]);
+      if (visible.length > 0) {
+        const obj = postToObject(visible[0]!);
+        const vertical = VERTICAL_OF[obj.kind];
+        if (!vertical) return 'skipped';
+        const doc = indexDoc(obj, vertical, Math.floor(Date.now() % 1_000_000_000));
+        const hotScores = await this.loadHotScores([postId]);
+        await this.store.upsertDocuments([doc], hotScores);
+        return 'upserted';
+      }
+      const removed = await this.store.deleteDocuments([`post:${postId}`]);
+      return removed > 0 ? 'deleted' : 'skipped';
+    }
+    const removed = await this.dropHidden([postId]);
+    return removed > 0 ? 'deleted' : 'skipped';
+  }
+
+  /** Đồng bộ định kỳ các chỉ số tương tác (`likes`, `comments`, `hotScore`, `qualityScore`) lên chỉ mục. */
+  async syncMetrics(): Promise<number> {
+    if (!this.store.updateMetrics) return 0;
+    const posts = await readAll((c) => this.catalog.listPosts(c));
+    if (!posts.length) return 0;
+    const hotScores = await this.loadHotScores(posts.map((p) => p.id));
+    const verticalMap = new Map(VERTICALS.map((v) => [v.name, v]));
+    const updates: ExploreMetricUpdate[] = posts.map((p) => {
+      const obj = postToObject(p);
+      const vt = verticalMap.get(VERTICAL_OF[obj.kind] ?? '');
+      return {
+        id: obj.id,
+        likes: p.reactionTotal,
+        comments: p.commentCount,
+        hotScore: hotScores.get(p.id) ?? 0,
+        qualityScore: vt ? vt.quality(obj) : 0.35,
+      };
+    });
+    return this.store.updateMetrics(updates);
   }
 
   /**
