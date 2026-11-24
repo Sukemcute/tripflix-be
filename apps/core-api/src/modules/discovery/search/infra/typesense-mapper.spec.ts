@@ -52,16 +52,13 @@ describe('typesense-schema & typesense-mapper', () => {
       createdAt: '2026-11-01T00:00:00.000Z',
       completeness: 0.8,
     };
-    const tsDoc = indexedDocToTypesenseDoc(indexDoc(postObj, 'plans', 0), 0.91);
+    const tsDoc = indexedDocToTypesenseDoc(indexDoc(postObj, 'plans', 0));
     expect(tsDoc.tags_folded).toContain('phuquoc');
     expect(tsDoc.place_buckets).toEqual(['Phú Quốc', 'An Giang']);
-    expect(tsDoc.hot_score).toBe(0.91);
+    expect(tsDoc).not.toHaveProperty('hot_score');
 
-    tsDoc.likes = 250;
-    tsDoc.comments = 44;
     const restored = typesenseDocToIndexedDoc(tsDoc);
-    expect(restored.doc.obj.likes).toBe(250);
-    expect(restored.doc.obj.n).toBe(44);
-    expect(restored.hotScore).toBe(0.91);
+    expect(restored.obj.likes).toBe(10);
+    expect(restored.obj.n).toBe(2);
   });
 });

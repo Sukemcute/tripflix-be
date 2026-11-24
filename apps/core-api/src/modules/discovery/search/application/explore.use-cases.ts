@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { calculateCompleteness } from '../../../content/index.js';
 import { RECOMMEND_STORE, type RecommendStore } from '../../recommend/application/ports.js';
 import { buildIndex, indexDoc, VERTICAL_OF } from '../domain/explore/build.js';
-import { searchExplore, VERTICALS, type ExploreItem, type Relax } from '../domain/explore/rank.js';
+import { searchExplore, type ExploreItem, type Relax } from '../domain/explore/rank.js';
 import type { Understood } from '../domain/explore/query.js';
 import { paginate } from '../domain/stays.js';
 import { NS } from '../domain/explore/stats.js';
@@ -17,7 +17,6 @@ import {
   PLACES_STORE,
   type ExploreCatalog,
   type ExploreHotel,
-  type ExploreMetricUpdate,
   type ExplorePost,
   type ExploreStore,
   type PlacesStore,
@@ -502,18 +501,9 @@ export class ExploreUseCases {
     return ids.length ? this.catalog.getAuthorNames(ids) : new Map();
   }
 
-  private async loadHotScores(postIds: readonly string[]): Promise<Map<string, number>> {
-    const out = new Map<string, number>();
-    if (!this.recommendStore || !postIds.length) return out;
-    try {
-      for (let i = 0; i < postIds.length; i += 1_000) {
-        const part = await this.recommendStore.findPostScores('hot@v2', postIds.slice(i, i + 1_000));
-        for (const [id, score] of part) out.set(id, score);
-      }
-    } catch (error) {
-      this.logger.warn(`Đọc điểm hot@v2 khi đồng bộ chỉ mục lỗi: ${(error as Error).message}`);
-    }
-    return out;
+  /** Chỉ mục đã có tài liệu chưa. Postgres (không khai báo) coi như chưa: job dựng ngay lúc khởi động như trước. */
+  hasIndex(): Promise<boolean> {
+    return this.store.hasIndex ? this.store.hasIndex() : Promise.resolve(false);
   }
 
   /** Dựng lại toàn bộ chỉ mục từ commerce + content + điểm OSM. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */
@@ -527,8 +517,7 @@ export class ExploreUseCases {
     const placeName = new Map(places.map((p) => [p.id, p.name]));
     const pois = points.flatMap((p) => pointToObject(p, placeName.get(p.cityId) ?? '') ?? []);
     const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject), ...pois]);
-    const hotScores = await this.loadHotScores(posts.map((p) => p.id));
-    if (!(await this.store.replaceAll(index, hotScores))) return null;
+    if (!(await this.store.replaceAll(index))) return null;
     // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
     // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.
     // Lỗi ở đây chỉ để lại bài ẩn tới lượt sau, chỉ mục mới vẫn dùng được.
@@ -550,8 +539,7 @@ export class ExploreUseCases {
         const vertical = VERTICAL_OF[obj.kind];
         if (!vertical) return 'skipped';
         const doc = indexDoc(obj, vertical, Math.floor(Date.now() % 1_000_000_000));
-        const hotScores = await this.loadHotScores([postId]);
-        await this.store.upsertDocuments([doc], hotScores);
+        await this.store.upsertDocuments([doc]);
         return 'upserted';
       }
       const removed = await this.store.deleteDocuments([`post:${postId}`]);
@@ -559,27 +547,6 @@ export class ExploreUseCases {
     }
     const removed = await this.dropHidden([postId]);
     return removed > 0 ? 'deleted' : 'skipped';
-  }
-
-  /** Đồng bộ định kỳ các chỉ số tương tác (`likes`, `comments`, `hotScore`, `qualityScore`) lên chỉ mục. */
-  async syncMetrics(): Promise<number> {
-    if (!this.store.updateMetrics) return 0;
-    const posts = await readAll((c) => this.catalog.listPosts(c));
-    if (!posts.length) return 0;
-    const hotScores = await this.loadHotScores(posts.map((p) => p.id));
-    const verticalMap = new Map(VERTICALS.map((v) => [v.name, v]));
-    const updates: ExploreMetricUpdate[] = posts.map((p) => {
-      const obj = postToObject(p);
-      const vt = verticalMap.get(VERTICAL_OF[obj.kind] ?? '');
-      return {
-        id: obj.id,
-        likes: p.reactionTotal,
-        comments: p.commentCount,
-        hotScore: hotScores.get(p.id) ?? 0,
-        qualityScore: vt ? vt.quality(obj) : 0.35,
-      };
-    });
-    return this.store.updateMetrics(updates);
   }
 
   /**

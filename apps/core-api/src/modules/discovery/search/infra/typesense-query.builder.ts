@@ -64,7 +64,7 @@ function buildScopeSearches(
  * 2) không để mục lân cận hoặc chưa rõ nơi đẩy mục đúng nơi ra khỏi Top-K.
  */
 export function buildTypesenseSearches(f: CandidateFilter): TypesenseSearchRequest[] {
-  const base = `is_hidden:=false && vertical:=${escapeTypesenseFilterValue(f.vertical)}`;
+  const base = `vertical:=${escapeTypesenseFilterValue(f.vertical)}`;
   const perPage = Math.min(MAX_PER_PAGE, Math.max(10, f.limit ?? DEFAULT_LIMIT));
   const fallbackLimit = Math.min(FALLBACK_PER_PAGE, perPage);
   const allSortBy = f.user ? `location(${f.user.lat},${f.user.lon}):asc,quality_score:desc,ord:asc` : 'quality_score:desc,ord:asc';

@@ -28,7 +28,7 @@ describe('buildTypesenseSearches', () => {
     expect(searches).toHaveLength(1);
     expect(searches[0]).toMatchObject({
       q: '*',
-      filter_by: 'is_hidden:=false && vertical:=`eats`',
+      filter_by: 'vertical:=`eats`',
       sort_by: 'location(10.77,106.7):asc,quality_score:desc,ord:asc',
     });
   });

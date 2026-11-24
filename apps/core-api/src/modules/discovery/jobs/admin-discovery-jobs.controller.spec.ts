@@ -9,7 +9,7 @@ import type { JobRuns } from './job-runs.js';
 
 function setup() {
   const job = () => ({ isRunning: false, run: vi.fn(() => Promise.resolve()) });
-  const explore = job();
+  const explore = { ...job(), defaultIntervalMs: 600_000 }; // Postgres: 10 phút
   const suggest = job();
   const build = job();
   const purge = job();

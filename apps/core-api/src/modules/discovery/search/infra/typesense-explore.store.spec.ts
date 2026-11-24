@@ -3,7 +3,8 @@ import { buildIndex } from '../domain/explore/build.js';
 import { FAR_KM } from '../domain/explore/rank.js';
 import type { ExploreStore } from '../application/ports.js';
 import { ExploreStatsCache } from './explore-stats.cache.js';
-import { indexedDocToTypesenseDoc } from './typesense-mapper.js';
+import { indexedDocToTypesenseDoc, toTypesenseDocWithHash } from './typesense-mapper.js';
+import { EXPLORE_SCHEMA_VERSION } from './typesense-schema.js';
 import { TypesenseExploreStore } from './typesense-explore.store.js';
 import { TypesenseError, type TypesenseClient } from './typesense.client.js';
 
@@ -32,7 +33,7 @@ describe('TypesenseExploreStore', () => {
     purgeQueryGrams: vi.fn(async () => 0),
   } as unknown as Pick<ExploreStore, 'recordQueryGrams' | 'listQueryGrams' | 'purgeQueryGrams'>;
 
-  it('replaceAll: tạo collection mới, nạp synonyms, bulk import, swap alias và xoá collection cũ', async () => {
+  it('replaceAll chưa có alias: tạo collection mới (kèm phiên bản schema), nạp synonyms, bulk import, swap alias và xoá collection cũ', async () => {
     const redis = mockRedis('OK');
     const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
     const createCollection = vi.fn(async () => undefined);
@@ -41,15 +42,17 @@ describe('TypesenseExploreStore', () => {
     const upsertAlias = vi.fn(async () => undefined);
     const listCollections = vi.fn(async () => [{ name: 'explore_1', num_documents: 1 }, { name: 'other', num_documents: 1 }]);
     const deleteCollection = vi.fn(async () => undefined);
-    const client = { createCollection, upsertSynonym, importDocuments, upsertAlias, listCollections, deleteCollection } as unknown as TypesenseClient;
+    const getAlias = vi.fn(async () => null);
+    const client = { getAlias, createCollection, upsertSynonym, importDocuments, upsertAlias, listCollections, deleteCollection } as unknown as TypesenseClient;
 
     const store = new TypesenseExploreStore(client, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
-    const ok = await store.replaceAll(index, new Map([['P1', 0.88]]));
+    const ok = await store.replaceAll(index);
     expect(ok).toBe(true);
     expect(createCollection).toHaveBeenCalledTimes(1);
     expect(upsertSynonym).toHaveBeenCalled();
-    expect(importDocuments).toHaveBeenCalledWith(expect.stringMatching(/^explore_\d+$/), expect.any(Array), 'create');
-    expect(upsertAlias).toHaveBeenCalledWith('explore', expect.stringMatching(/^explore_\d+$/));
+    const versioned = new RegExp(`^explore_${EXPLORE_SCHEMA_VERSION}_\\d+$`);
+    expect(importDocuments).toHaveBeenCalledWith(expect.stringMatching(versioned), expect.any(Array), 'create');
+    expect(upsertAlias).toHaveBeenCalledWith('explore', expect.stringMatching(versioned));
     expect(deleteCollection).toHaveBeenCalledWith('explore_1');
     expect(deleteCollection).not.toHaveBeenCalledWith('other');
     expect(redis.eval).toHaveBeenCalledTimes(1);
@@ -65,12 +68,10 @@ describe('TypesenseExploreStore', () => {
     expect(createCollection).not.toHaveBeenCalled();
   });
 
-  it('candidatesBatch: gộp tất cả filter vào 1 multi_search, overlay likes/comments và khử trùng theo ord', async () => {
+  it('candidatesBatch: gộp tất cả filter vào 1 multi_search và khử trùng theo id', async () => {
     const redis = mockRedis('OK');
     const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
-    const tsDoc = indexedDocToTypesenseDoc(index.docs[1]!, 0.5);
-    tsDoc.likes = 99;
-    tsDoc.comments = 12;
+    const tsDoc = indexedDocToTypesenseDoc(index.docs[1]!);
 
     const multiSearch = vi.fn(async (searches: unknown[]) =>
       searches.map(() => ({ found: 1, hits: [{ document: tsDoc }, { document: tsDoc }] })),
@@ -85,8 +86,7 @@ describe('TypesenseExploreStore', () => {
     expect(multiSearch).toHaveBeenCalledTimes(1);
     expect(res).toHaveLength(2);
     expect(res[0]).toHaveLength(1);
-    expect(res[0]![0]!.obj.likes).toBe(99);
-    expect(res[0]![0]!.obj.n).toBe(12);
+    expect(res[0]![0]!.id).toBe(index.docs[1]!.id);
   });
 
   it('candidatesBatch: xử lý 404 nhẹ nhàng khi chưa dựng chỉ mục lần đầu', async () => {
@@ -104,7 +104,7 @@ describe('TypesenseExploreStore', () => {
     expect(res).toEqual([[]]);
   });
 
-  it('upsertDocuments & updateMetrics & deleteDocuments gọi đúng endpoint Typesense', async () => {
+  it('upsertDocuments & deleteDocuments gọi đúng endpoint Typesense', async () => {
     const redis = mockRedis('OK');
     const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
     const importDocuments = vi.fn(async () => ({ success: 1, failed: 0 }));
@@ -113,11 +113,75 @@ describe('TypesenseExploreStore', () => {
     const client = { importDocuments, deleteDocumentsByIds, health } as unknown as TypesenseClient;
 
     const store = new TypesenseExploreStore(client, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
-    expect(await store.upsertDocuments([index.docs[1]!], new Map([['P1', 0.7]]))).toBe(1);
+    expect(await store.upsertDocuments([index.docs[1]!])).toBe(1);
     expect(importDocuments).toHaveBeenCalledWith('explore', expect.any(Array), 'upsert');
-    expect(await store.updateMetrics([{ id: 'post:P1', likes: 15, hotScore: 0.9 }])).toBe(1);
-    expect(importDocuments).toHaveBeenCalledWith('explore', [{ id: 'post:P1', likes: 15, hot_score: 0.9 }], 'update');
     expect(await store.deleteDocuments(['post:P1'])).toBe(1);
     expect(await store.healthCheck()).toBe(true);
+  });
+
+  it('hasIndex: true chỉ khi alias trỏ tới collection có tài liệu', async () => {
+    const redis = mockRedis('OK');
+    const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
+    const make = (alias: { name: string; collection_name: string } | null, docs: number) =>
+      new TypesenseExploreStore(
+        {
+          getAlias: vi.fn(async () => alias),
+          listCollections: vi.fn(async () => [{ name: 'explore_2', num_documents: docs }]),
+        } as unknown as TypesenseClient,
+        statsCache,
+        queryGramsStore,
+        redis as unknown as Pick<Redis, 'set' | 'eval'>,
+        'explore',
+      );
+    expect(await make(null, 10).hasIndex()).toBe(false);
+    expect(await make({ name: 'explore', collection_name: 'explore_2' }, 0).hasIndex()).toBe(false);
+    expect(await make({ name: 'explore', collection_name: 'explore_2' }, 10).hasIndex()).toBe(true);
+  });
+
+  it('replaceAll cùng phiên bản schema: chỉ ghi mục đổi/mới, xoá mục không còn, không tạo collection', async () => {
+    const redis = mockRedis('OK');
+    const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
+    const current = `explore_${EXPLORE_SCHEMA_VERSION}_1`;
+    const [hotel, post] = index.docs;
+    const client = {
+      getAlias: vi.fn(async () => ({ name: 'explore', collection_name: current })),
+      // Khách sạn không đổi (cùng hash, dù ord khác), bài đổi, còn một bài cũ đã bị gỡ khỏi nguồn.
+      exportDocuments: vi.fn(async () => [
+        { id: hotel!.id, content_hash: toTypesenseDocWithHash({ ...hotel!, ord: 99 }).content_hash },
+        { id: post!.id, content_hash: 'hash-cu' },
+        { id: 'post:GONE', content_hash: 'x' },
+      ]),
+      upsertSynonym: vi.fn(async () => undefined),
+      importDocuments: vi.fn(async () => ({ success: 1, failed: 0 })),
+      deleteDocumentsByIds: vi.fn(async () => 1),
+      createCollection: vi.fn(),
+      upsertAlias: vi.fn(),
+    };
+    const store = new TypesenseExploreStore(client as unknown as TypesenseClient, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
+    expect(await store.replaceAll(index)).toBe(true);
+    expect(client.importDocuments).toHaveBeenCalledWith(current, [expect.objectContaining({ id: post!.id })], 'upsert');
+    expect(client.deleteDocumentsByIds).toHaveBeenCalledWith(current, ['post:GONE']);
+    expect(client.createCollection).not.toHaveBeenCalled();
+    expect(client.upsertAlias).not.toHaveBeenCalled();
+  });
+
+  it('replaceAll alias trỏ collection khác phiên bản schema: dựng mới và đổi alias', async () => {
+    const redis = mockRedis('OK');
+    const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
+    const client = {
+      getAlias: vi.fn(async () => ({ name: 'explore', collection_name: 'explore_1795540833445' })),
+      exportDocuments: vi.fn(),
+      createCollection: vi.fn(async () => undefined),
+      upsertSynonym: vi.fn(async () => undefined),
+      importDocuments: vi.fn(async () => ({ success: 2, failed: 0 })),
+      upsertAlias: vi.fn(async () => undefined),
+      listCollections: vi.fn(async () => [{ name: 'explore_1795540833445', num_documents: 2 }]),
+      deleteCollection: vi.fn(async () => undefined),
+    };
+    const store = new TypesenseExploreStore(client as unknown as TypesenseClient, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
+    expect(await store.replaceAll(index)).toBe(true);
+    expect(client.exportDocuments).not.toHaveBeenCalled();
+    expect(client.createCollection).toHaveBeenCalledTimes(1);
+    expect(client.deleteCollection).toHaveBeenCalledWith('explore_1795540833445');
   });
 });

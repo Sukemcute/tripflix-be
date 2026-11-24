@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { RECOMMEND_STORE, type RecommendStore } from '../recommend/application/ports.js';
 import { BUILD_FEATURES_EVERY_MS, BuildFeaturesJob } from '../recommend/jobs/build-features.job.js';
 import { PURGE_INTERACTIONS_EVERY_MS, PurgeInteractionsJob } from '../recommend/jobs/purge-interactions.job.js';
-import { EXPLORE_INDEX_INTERVAL_MS } from '../search/jobs/index-health.js';
 import { RebuildExploreIndexJob } from '../search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from '../search/jobs/rebuild-suggest-index.job.js';
 import { JOB_KEYS, JOB_OUTCOMES, JobRuns, type JobKey, type JobOutcome, type JobTrigger } from './job-runs.js';
@@ -188,7 +187,7 @@ export class AdminDiscoveryJobsController {
     @Inject(PurgeInteractionsJob) purge: PurgeInteractionsJob,
   ) {
     this.jobs = {
-      explore: { group: 'search', intervalMs: EXPLORE_INDEX_INTERVAL_MS, canChangeInterval: true, instance: explore },
+      explore: { group: 'search', intervalMs: explore.defaultIntervalMs, canChangeInterval: true, instance: explore },
       suggest: { group: 'search', intervalMs: null, canChangeInterval: false, instance: suggest },
       recommend_build: { group: 'recommend', intervalMs: BUILD_FEATURES_EVERY_MS, canChangeInterval: true, instance: build },
       recommend_purge: { group: 'recommend', intervalMs: PURGE_INTERACTIONS_EVERY_MS, canChangeInterval: false, instance: purge },

@@ -192,6 +192,18 @@ export class TypesenseClient {
     return { success, failed };
   }
 
+  /** Xuất toàn bộ tài liệu (chỉ các trường cần) của một collection, dạng NDJSON. */
+  async exportDocuments<T>(collection: string, includeFields: string): Promise<T[]> {
+    const raw = await this.requestText(
+      `/collections/${encodeURIComponent(collection)}/documents/export?include_fields=${encodeURIComponent(includeFields)}`,
+      { method: 'GET', timeoutMs: BULK_TIMEOUT_MS },
+    );
+    return raw
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as T);
+  }
+
   async upsertDocument(collection: string, doc: Record<string, unknown>): Promise<void> {
     await this.request(`/collections/${encodeURIComponent(collection)}/documents?action=upsert`, {
       method: 'POST',

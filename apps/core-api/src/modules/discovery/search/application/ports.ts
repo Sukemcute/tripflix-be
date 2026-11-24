@@ -9,22 +9,14 @@ export const EXPLORE_STORE = Symbol('EXPLORE_STORE');
 export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
 export const PLACES_STORE = Symbol('PLACES_STORE');
 
-export interface ExploreMetricUpdate {
-  id: string;
-  likes?: number;
-  comments?: number;
-  hotScore?: number;
-  qualityScore?: number;
-}
-
 /** Chỉ mục tìm khám phá (Typesense hoặc Postgres). */
 export interface ExploreStore extends ExploreSource {
   /** Thay toàn bộ chỉ mục. false = worker khác đang dựng, bỏ lượt này. */
-  replaceAll(index: BuiltIndex, hotScores?: ReadonlyMap<string, number>): Promise<boolean>;
+  replaceAll(index: BuiltIndex): Promise<boolean>;
   /** Thêm hoặc cập nhật một nhóm tài liệu lên chỉ mục (real-time event sync). */
-  upsertDocuments?(docs: readonly IndexedDoc[], hotScores?: ReadonlyMap<string, number>): Promise<number>;
-  /** Cập nhật một phần chỉ số tương tác (`likes`, `comments`, `hotScore`, `qualityScore`). */
-  updateMetrics?(updates: readonly ExploreMetricUpdate[]): Promise<number>;
+  upsertDocuments?(docs: readonly IndexedDoc[]): Promise<number>;
+  /** Chỉ mục đã dựng và có tài liệu chưa (engine ngoài; Postgres không khai báo). */
+  hasIndex?(): Promise<boolean>;
   /** Kiểm tra sức khoẻ engine tìm kiếm ngoài (nếu dùng). */
   healthCheck?(): Promise<boolean>;
   /** Xoá tài liệu theo id (`post:<uuid>`), trả số dòng đã xoá. Id không có trong chỉ mục thì bỏ qua. */

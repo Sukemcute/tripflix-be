@@ -429,28 +429,30 @@ describe('ExploreUseCases', () => {
     });
   });
 
-  describe('real-time syncPost & syncMetrics', () => {
-    it('syncPost upsert khi bài công khai và xoá khi bài bị ẩn; syncMetrics cập nhật likes/comments/hotScore', async () => {
+  describe('real-time syncPost', () => {
+    it('upsert khi bài công khai, xoá khi bài bị ẩn; không đọc điểm hot (chỉ số nhanh không vào chỉ mục)', async () => {
       const p1 = post('P1', 'Review Phú Quốc mới', { reactionTotal: 42, commentCount: 7 });
       const { store, catalog, places } = setup([], [p1]);
       let isVisible = true;
       catalog.getVisiblePosts = vi.fn(async (ids: string[]) => (isVisible && ids.includes('P1') ? [p1] : []));
       const upsertDocuments = vi.fn(async () => 1);
-      const updateMetrics = vi.fn(async () => 1);
-      const tsStore: ExploreStore = Object.assign(store, { upsertDocuments, updateMetrics });
+      const tsStore: ExploreStore = Object.assign(store, { upsertDocuments });
       const findPostScores = vi.fn(async () => new Map([['P1', 0.85]]));
       const explore = new ExploreUseCases(tsStore, catalog, places, { findPostScores });
 
       expect(await explore.syncPost('P1')).toBe('upserted');
-      expect(upsertDocuments).toHaveBeenCalledWith([expect.objectContaining({ id: 'post:P1' })], new Map([['P1', 0.85]]));
+      expect(upsertDocuments).toHaveBeenCalledWith([expect.objectContaining({ id: 'post:P1' })]);
+      expect(findPostScores).not.toHaveBeenCalled();
 
       isVisible = false;
       expect(await explore.syncPost('P1')).toBe('deleted');
+    });
 
-      expect(await explore.syncMetrics()).toBe(1);
-      expect(updateMetrics).toHaveBeenCalledWith([
-        expect.objectContaining({ id: 'post:P1', likes: 42, comments: 7, hotScore: 0.85 }),
-      ]);
+    it('hasIndex: hỏi store; store không khai báo (Postgres) thì coi như chưa có', async () => {
+      const { store, catalog, places } = setup([], []);
+      expect(await new ExploreUseCases(store, catalog, places).hasIndex()).toBe(false);
+      const tsStore: ExploreStore = Object.assign(store, { hasIndex: vi.fn(async () => true) });
+      expect(await new ExploreUseCases(tsStore, catalog, places).hasIndex()).toBe(true);
     });
   });
 });

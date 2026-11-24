@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { bucketsWithin, placeBucketOfId, placeIdOfName, placeParentOf } from '../domain/places.js';
 import { VERTICALS } from '../domain/explore/rank.js';
 import { brandOf, fold } from '../domain/explore/text.js';
@@ -29,12 +30,9 @@ export interface TypesenseExploreDoc {
   tier?: string;
   brand?: string;
   quality_score: number;
-  hot_score: number;
-  likes: number;
-  comments: number;
   created_at: number;
-  is_hidden: boolean;
   doc_json: string;
+  content_hash?: string;
 }
 
 const VERTICAL_MAP = new Map(VERTICALS.map((v) => [v.name, v]));
@@ -63,7 +61,7 @@ function placeBucketsOf(place: string | null | undefined): string[] {
 }
 
 /** Chuyển IndexedDoc sang document phẳng lưu trên Typesense. */
-export function indexedDocToTypesenseDoc(doc: IndexedDoc, hotScore = 0): TypesenseExploreDoc {
+export function indexedDocToTypesenseDoc(doc: IndexedDoc): TypesenseExploreDoc {
   const o = doc.obj;
   const vt = VERTICAL_MAP.get(doc.vertical);
   const qualityScore = vt ? vt.quality(o) : 0.35;
@@ -112,22 +110,23 @@ export function indexedDocToTypesenseDoc(doc: IndexedDoc, hotScore = 0): Typesen
     ...(doc.tier ? { tier: doc.tier[0] } : {}),
     ...(brand ? { brand } : {}),
     quality_score: Number.isFinite(qualityScore) ? qualityScore : 0.35,
-    hot_score: Number.isFinite(hotScore) ? hotScore : 0,
-    likes: typeof o.likes === 'number' && Number.isFinite(o.likes) ? Math.trunc(o.likes) : 0,
-    comments: typeof o.n === 'number' && Number.isFinite(o.n) ? Math.trunc(o.n) : 0,
     created_at: Number.isFinite(createdMs) ? Math.trunc(createdMs) : 0,
-    is_hidden: false,
     doc_json: JSON.stringify(doc),
   };
 }
 
-/** Khôi phục IndexedDoc từ Typesense kèm overlay các chỉ số tương tác mới nhất (likes, comments, hotScore). */
-export function typesenseDocToIndexedDoc(raw: TypesenseExploreDoc): { doc: IndexedDoc; hotScore: number } {
-  const doc = JSON.parse(raw.doc_json) as IndexedDoc;
-  if (typeof raw.likes === 'number' && typeof doc.obj.likes === 'number') doc.obj.likes = raw.likes;
-  if (typeof raw.comments === 'number' && typeof doc.obj.n === 'number') doc.obj.n = raw.comments;
-  return {
-    doc,
-    hotScore: typeof raw.hot_score === 'number' && Number.isFinite(raw.hot_score) ? raw.hot_score : 0,
-  };
+/**
+ * Tài liệu kèm `content_hash`. Băm trên bản `ord = 0`: thêm một bài làm dời `ord` của mọi mục sau nó,
+ * không được tính là "đổi" (ord chỉ để phá hoà khi bằng điểm; mục không đổi giữ ord cũ).
+ */
+export function toTypesenseDocWithHash(doc: IndexedDoc): TypesenseExploreDoc {
+  const hash = createHash('sha1')
+    .update(JSON.stringify(indexedDocToTypesenseDoc({ ...doc, ord: 0 })))
+    .digest('hex');
+  return { ...indexedDocToTypesenseDoc(doc), content_hash: hash };
+}
+
+/** Khôi phục IndexedDoc đã lưu lúc lập chỉ mục. Like, comment là số lúc lập chỉ mục (đối soát đêm hoặc sự kiện bài). */
+export function typesenseDocToIndexedDoc(raw: TypesenseExploreDoc): IndexedDoc {
+  return JSON.parse(raw.doc_json) as IndexedDoc;
 }

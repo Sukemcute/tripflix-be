@@ -1,8 +1,7 @@
-import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
 import { isDue, JobRuns, SCHEDULE_TICK_MS, type JobTrigger } from '../../jobs/job-runs.js';
-import { ExploreUseCases } from '../../search/application/explore.use-cases.js';
 import { BuildFeaturesUseCases } from '../application/build-features.use-cases.js';
 import { BuildProductFeaturesUseCases } from '../application/build-product-features.use-cases.js';
 
@@ -25,7 +24,6 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
     @Inject(BuildFeaturesUseCases) private readonly features: BuildFeaturesUseCases,
     @Inject(JobRuns) private readonly runs: JobRuns,
     @Inject(BuildProductFeaturesUseCases) private readonly products: BuildProductFeaturesUseCases,
-    @Optional() @Inject(ExploreUseCases) private readonly explore?: Pick<ExploreUseCases, 'syncMetrics'>,
   ) {}
 
   onApplicationBootstrap() {
@@ -59,9 +57,6 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
           this.logger.log('Worker khác đang tính đặc trưng gợi ý (hoặc chưa có bài), bỏ lượt');
           return { outcome: 'skipped' };
         }
-        await this.explore?.syncMetrics().catch((err: unknown) => {
-          this.logger.warn(`Đồng bộ chỉ số lên chỉ mục tìm kiếm lỗi: ${err instanceof Error ? err.message : String(err)}`);
-        });
         const summary = {
           ...result,
           hotels: products?.hotels ?? 0,
