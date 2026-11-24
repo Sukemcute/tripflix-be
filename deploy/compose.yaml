@@ -86,6 +86,10 @@ services:
       TYPESENSE_DATA_DIR: /data
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-dev-typesense-key}
       TYPESENSE_ENABLE_CORS: 'true'
+      # Snapshot cắt nhật ký raft; mặc định 3600 s thì khởi động lại trong giờ đó phát lại cả lượt dựng (~3,6 GB ghi ở 44k mục).
+      TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: ${TYPESENSE_SNAPSHOT_INTERVAL_SECONDS:-300}
+      # Bộ đệm ghi RocksDB mặc định 4 MB: nạp 44k mục phải gộp ~180 lần, mỗi lần ghi lại cả dữ liệu (đo: ~7,8 GB ghi mỗi lượt dựng).
+      TYPESENSE_DB_WRITE_BUFFER_SIZE: ${TYPESENSE_DB_WRITE_BUFFER_SIZE:-67108864}
     ports: ['${TYPESENSE_PORT:-8108}:8108']
     volumes:
       - typesense-data:/data
