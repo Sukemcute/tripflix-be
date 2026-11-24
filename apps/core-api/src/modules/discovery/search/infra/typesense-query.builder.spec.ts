@@ -37,11 +37,11 @@ describe('buildTypesenseSearches', () => {
     const searches = buildTypesenseSearches(
       baseFilter({ vertical: 'stays', terms: ['resort'], tiers: ['cao cap'], days: 3, queryText: 'resort' }),
     );
-    expect(searches).toHaveLength(4); // 2 search × 2 trang (trần 500)
+    expect(searches).toHaveLength(2);
     expect(searches[0]!.q).toBe('resort');
     expect(searches[0]!.query_by).toContain('title_vi,title_folded');
-    expect(searches[2]!.q).toBe('*');
-    expect(searches[2]!.filter_by).toContain('terms:=[`resort`] || tier:=[`cao cap`] || days:=3');
+    expect(searches[1]!.q).toBe('*');
+    expect(searches[1]!.filter_by).toContain('terms:=[`resort`] || tier:=[`cao cap`] || days:=3');
   });
 
   it('có place: tách riêng đúng nơi, nhắc nơi (has_place:=false), chưa rõ nơi fallback, và lân cận 150km', () => {
@@ -58,14 +58,5 @@ describe('buildTypesenseSearches', () => {
     expect(filters.some((f) => f.includes('has_place:=false && terms:=[`da_nang`,`danang`]'))).toBe(true);
     expect(filters.some((f) => f.includes('has_place:=false') && !f.includes('`da_nang`'))).toBe(true);
     expect(filters.some((f) => f.includes(`location(16.054, 108.202, ${FAR_KM} km)`))).toBe(true);
-  });
-
-  it('cùng trần ứng viên với Postgres: câu có từ lấy 500 (2 trang × 250), câu rỗng lấy 100', () => {
-    const [p1, p2, ...rest] = buildTypesenseSearches(baseFilter({ names: [], terms: [] }));
-    expect(rest).toHaveLength(0);
-    expect([p1, p2].map((r) => [r!.per_page, r!.page])).toEqual([[250, 1], [250, 2]]);
-    const [empty] = buildTypesenseSearches(baseFilter({ isAll: true, terms: [], queryText: '' }));
-    expect(empty).toMatchObject({ per_page: 100 });
-    expect(empty!.page).toBeUndefined();
   });
 });

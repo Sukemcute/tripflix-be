@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import type { ExploreMetricUpdate, ExploreStore } from '../application/ports.js';
 import type { BuiltIndex, CandidateFilter, CountRow, IndexedDoc } from '../domain/explore/types.js';
 import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
-import { candidateLimitOf } from '../domain/explore/memory-source.js';
 import { ExploreStatsCache } from './explore-stats.cache.js';
 import { indexedDocToTypesenseDoc, typesenseDocToIndexedDoc, type TypesenseExploreDoc } from './typesense-mapper.js';
 import { buildTypesenseSearches } from './typesense-query.builder.js';
@@ -76,9 +75,7 @@ export class TypesenseExploreStore implements ExploreStore {
     }
 
     let loggedNotReady = false;
-    return slices.map(({ start, count }, fi) => {
-      // Cùng trần với Postgres; giữ thứ tự scope (đúng nơi trước) và độ khớp của Typesense khi cắt.
-      const limit = candidateLimitOf(filters[fi]!);
+    return slices.map(({ start, count }) => {
       const byId = new Map<string, IndexedDoc>();
       for (let i = start; i < start + count; i++) {
         const res = results[i];
@@ -95,7 +92,6 @@ export class TypesenseExploreStore implements ExploreStore {
           continue;
         }
         for (const hit of res.hits ?? []) {
-          if (byId.size >= limit) break;
           if (hit.document && !byId.has(hit.document.id)) {
             byId.set(hit.document.id, typesenseDocToIndexedDoc(hit.document).doc);
           }
