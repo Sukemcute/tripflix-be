@@ -3,6 +3,8 @@ import type { ModuleName } from '@tripflix/db';
 import { z } from 'zod';
 
 const OptionalStringSchema = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
+/** Key Typesense cho máy dev/compose local (công khai trong repo); production phải đặt key riêng. */
+const DEV_TYPESENSE_API_KEY = 'dev-typesense-key';
 
 /** Trang đặt lại mật khẩu của web (Thành); link trong email là địa chỉ này kèm ?token=... */
 export const DEFAULT_PASSWORD_RESET_URL = 'http://localhost:3100/dat-lai-mat-khau';
@@ -146,6 +148,13 @@ export const coreEnvSchema = baseEnvSchema
       (v) => (v === '' ? undefined : v),
       z.coerce.number().int().min(300).max(86_400).optional(),
     ),
+    // Tìm khám phá (Typesense / Postgres fallback): mặc định postgres khi chạy unit/CI không có Typesense, compose đặt typesense.
+    SEARCH_BACKEND: z.enum(['typesense', 'postgres']).default('postgres'),
+    TYPESENSE_HOST: z.string().default('localhost'),
+    TYPESENSE_PORT: z.coerce.number().int().positive().default(8108),
+    TYPESENSE_PROTOCOL: z.enum(['http', 'https']).default('http'),
+    TYPESENSE_API_KEY: z.string().default(DEV_TYPESENSE_API_KEY),
+    TYPESENSE_COLLECTION_ALIAS: z.string().default('explore'),
   })
   .superRefine((env, ctx) => {
     // Thiếu một trong hai thì không ký được: dừng ngay lúc khởi động thay vì âm thầm phát video không khoá.
@@ -161,6 +170,14 @@ export const coreEnvSchema = baseEnvSchema
     }
     if (env.NODE_ENV === 'production' && !env.AUTH_JWT_PRIVATE_KEY) {
       ctx.addIssue({ code: 'custom', path: ['AUTH_JWT_PRIVATE_KEY'], message: 'bắt buộc ở production' });
+    }
+    // Thiếu key thì giá trị mặc định là key dev công khai trong repo: production phải đặt key riêng.
+    if (
+      env.NODE_ENV === 'production' &&
+      env.SEARCH_BACKEND === 'typesense' &&
+      (!env.TYPESENSE_API_KEY || env.TYPESENSE_API_KEY === DEV_TYPESENSE_API_KEY)
+    ) {
+      ctx.addIssue({ code: 'custom', path: ['TYPESENSE_API_KEY'], message: 'bắt buộc (khác key dev) ở production khi SEARCH_BACKEND=typesense' });
     }
     // Bắt buộc mã hoá mà không có khoá thì không ai đăng nhập được: dừng ngay lúc khởi động.
     // Production chưa bắt buộc mà thiếu khoá: vẫn chạy, tắt mã hoá (log lỗi), để lần deploy chưa kịp đặt khoá không làm sập server.

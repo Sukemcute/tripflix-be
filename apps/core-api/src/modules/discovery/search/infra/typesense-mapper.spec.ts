@@ -1,0 +1,82 @@
+import { indexDoc } from '../domain/explore/build.js';
+import type { ExploreObject } from '../domain/explore/types.js';
+import { indexedDocToTypesenseDoc, toTypesenseDocWithHash, typesenseDocToIndexedDoc } from './typesense-mapper.js';
+import { buildExploreCollectionSchema, buildExploreSynonyms } from './typesense-schema.js';
+
+describe('typesense-schema & typesense-mapper', () => {
+  it('schema không chứa embedding ở Phase 1–4 và có đủ cặp *_vi + *_folded', () => {
+    const schema = buildExploreCollectionSchema('explore_1');
+    const names = schema.fields.map((f) => f.name);
+    expect(names).not.toContain('embedding');
+    expect(names).toEqual(expect.arrayContaining(['title_vi', 'title_folded', 'body_vi', 'body_folded', 'place_buckets', 'doc_json']));
+    expect(schema.default_sorting_field).toBe('quality_score');
+  });
+
+  it('buildExploreSynonyms sinh one-way cho norm (>= 2 ký tự) và multi-way cho concept/mod', () => {
+    const syns = buildExploreSynonyms();
+    const cafeNorm = syns.find((s) => s.payload.root === 'cafe');
+    expect(cafeNorm).toBeDefined();
+    expect(cafeNorm!.payload.synonyms).toEqual(expect.arrayContaining(['cf', 'coffee', 'ca phe']));
+    // Bỏ từ 1 ký tự như 'k', 'j', 'r' để không gây nhiễu
+    expect(syns.every((s) => s.payload.synonyms.every((t) => t.length >= 2))).toBe(true);
+    const sunset = syns.find((s) => !s.payload.root && s.payload.synonyms.includes('hoang hon'));
+    expect(sunset?.payload.synonyms).toEqual(expect.arrayContaining(['hoang hon', 'sunset', 'san may']));
+  });
+
+  it('place_buckets tuân thủ CITY_PROVINCES: Đà Lạt gồm Lâm Đồng; Hội An KHÔNG gồm Đà Nẵng', () => {
+    const daLatHotel = indexDoc(
+      { id: 'hotel:1', kind: 'stay', title: 'Khách sạn Đà Lạt', place: 'Đà Lạt', priceNight: 900_000, stars: 4 },
+      'stays',
+      0,
+    );
+    const hoiAnHotel = indexDoc(
+      { id: 'hotel:2', kind: 'stay', title: 'Resort Hội An', place: 'Hội An', lat: 15.88, lon: 108.33, priceNight: 2_500_000, stars: 5 },
+      'stays',
+      1,
+    );
+    expect(indexedDocToTypesenseDoc(daLatHotel).place_buckets).toEqual(['Đà Lạt', 'Lâm Đồng']);
+    expect(indexedDocToTypesenseDoc(hoiAnHotel).place_buckets).toEqual(['Hội An']);
+    expect(indexedDocToTypesenseDoc(hoiAnHotel).location).toEqual([15.88, 108.33]);
+  });
+
+  it('typesenseDocToIndexedDoc overlay likes/comments mới và bỏ qua hotel không có likes', () => {
+    const postObj: ExploreObject = {
+      id: 'post:P1',
+      refId: 'P1',
+      kind: 'post',
+      title: 'Kinh nghiệm Phú Quốc #phuquoc #hoanghon',
+      text: 'Ngắm hoàng hôn rất đẹp #phuquoc',
+      place: 'Phú Quốc',
+      likes: 10,
+      n: 2,
+      createdAt: '2026-11-01T00:00:00.000Z',
+      completeness: 0.8,
+    };
+    const tsDoc = indexedDocToTypesenseDoc(indexDoc(postObj, 'plans', 0));
+    expect(tsDoc.tags_folded).toContain('phuquoc');
+    expect(tsDoc.place_buckets).toEqual(['Phú Quốc', 'An Giang']);
+    expect(tsDoc).not.toHaveProperty('hot_score');
+
+    const restored = typesenseDocToIndexedDoc(tsDoc);
+    expect(restored.obj.likes).toBe(10);
+    expect(restored.obj.n).toBe(2);
+  });
+});
+
+describe('ngăn recommend và payload', () => {
+  it('bins của bài thành place_bins / exp_bins; doc_json bỏ toàn văn và ngăn', () => {
+    const obj: ExploreObject = {
+      id: 'post:P2', refId: 'P2', kind: 'post', title: 'Ăn sáng ở Đà Lạt', text: 'toàn văn rất dài #dalat', place: 'Đà Lạt',
+      bins: ['place:da-lat', 'place:lam-dong', 'exp:an_uong', 'cost:re'],
+    };
+    const tsDoc = toTypesenseDocWithHash(indexDoc(obj, 'plans', 3));
+    expect(tsDoc.place_bins).toEqual(['da-lat', 'lam-dong']);
+    expect(tsDoc.exp_bins).toEqual(['an_uong']);
+    expect(tsDoc.ord).toBe(3);
+    const restored = typesenseDocToIndexedDoc(tsDoc);
+    expect(restored.ord).toBe(3);
+    expect(restored.obj.text).toBeUndefined();
+    expect(restored.obj.bins).toBeUndefined();
+    expect(restored.obj.title).toBe('Ăn sáng ở Đà Lạt');
+  });
+});

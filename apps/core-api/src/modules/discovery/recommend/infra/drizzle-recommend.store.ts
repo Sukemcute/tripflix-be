@@ -425,6 +425,16 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
       .onConflictDoNothing();
   }
 
+  async findPostBins(builderKey: string, postIds: string[]): Promise<Map<string, Record<string, number>>> {
+    if (!postIds.length) return new Map();
+    const { builder, version } = splitKey(builderKey);
+    const rows = await this.db
+      .select({ postId: recommendPostScores.postId, bins: sql<Record<string, number> | null>`${recommendPostScores.features} -> 'bins'` })
+      .from(recommendPostScores)
+      .where(and(eq(recommendPostScores.builder, builder), eq(recommendPostScores.version, version), inArray(recommendPostScores.postId, postIds)));
+    return new Map(rows.flatMap((r) => (r.bins ? [[r.postId, r.bins] as const] : [])));
+  }
+
   async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {
     if (!postIds.length) return new Map();
     const { builder, version } = splitKey(builderKey);
@@ -439,6 +449,11 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
     return this.candidates(q, 'hot', [desc(recommendPostScores.score), desc(recommendPosts.publishedAt), desc(recommendPosts.postId)]);
   }
 
+  listCandidatesByIds(q: CandidateQuery, postIds: string[], source: CandidateSource) {
+    if (!postIds.length) return Promise.resolve([]);
+    return this.candidates({ ...q, limit: postIds.length }, source, [desc(recommendPosts.publishedAt), desc(recommendPosts.postId)], undefined, postIds);
+  }
+
   listFreshCandidates(q: CandidateQuery & { hours: number }) {
     const since = new Date(q.now.getTime() - q.hours * 3_600_000);
     return this.candidates(q, 'fresh', [desc(recommendPosts.publishedAt), desc(recommendPosts.postId)], since);
@@ -449,7 +464,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
   }
 
   /** hot: chỉ bài có điểm (inner join). fresh/explore: mọi bài trong cửa sổ, chưa có điểm thì 0. */
-  private async candidates(q: CandidateQuery, source: CandidateSource, orderBy: SQL[], publishedAfter?: Date): Promise<Candidate[]> {
+  private async candidates(q: CandidateQuery, source: CandidateSource, orderBy: SQL[], publishedAfter?: Date, onlyPostIds?: string[]): Promise<Candidate[]> {
     const { builder, version } = splitKey(q.postBuilder);
     const onScore = and(
       eq(recommendPostScores.postId, recommendPosts.postId),
@@ -464,6 +479,7 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
       q.excludePostIds.length ? notInArray(recommendPosts.postId, q.excludePostIds) : undefined,
       lte(recommendPosts.publishedAt, q.now),
       publishedAfter ? gt(recommendPosts.publishedAt, publishedAfter) : undefined,
+      onlyPostIds ? inArray(recommendPosts.postId, onlyPostIds) : undefined,
     );
     const select = {
       postId: recommendPosts.postId,

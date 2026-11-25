@@ -1,6 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { MIX_REELS_DEFAULT_EVERY, mixReels } from '../../../content/index.js';
-import { exploreSlots, interleave, mergeCandidates, pickExplore } from '../domain/candidates.js';
+import { exploreSlots, interleave, mergeCandidates, pickExplore, tasteOf } from '../domain/candidates.js';
 import type { CandidateSource, RankedItem, ViewerRaw } from '../domain/contracts.js';
 import { applyFeedPolicy, OWN_POST_REASON } from '../domain/feed-policy.js';
 import { resolveAlgo, type AlgoRow, type ResolvedAlgo } from '../domain/registry.js';
@@ -13,12 +13,14 @@ import {
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   SERVED_STORE,
+  TASTE_RETRIEVAL,
   type RecommendCardPost,
   type RecommendReelCard,
   type RecentPostsStore,
   type RecommendCatalog,
   type RecommendStore,
   type ServedStore,
+  type TasteRetrieval,
 } from './ports.js';
 
 export type RecommendMode = 'for_you' | 'trending' | 'has_plan' | 'recent' | 'mixed';
@@ -28,6 +30,8 @@ const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 const ALGO_CACHE_MS = 60_000;
 const PLACE_PROFILE_CACHE_MS = 10 * 60_000;
 const HOT_LIMIT = 150;
+/** Mỗi nguồn gu (nơi, tag) lấy chừng này bài. */
+const TASTE_PER_SOURCE = 150;
 const FRESH_LIMIT = 50;
 const FRESH_HOURS = 48;
 const EXPLORE_POOL_LIMIT = 500;
@@ -180,6 +184,7 @@ export class PostRecommendationUseCases {
     @Inject(RECOMMEND_CATALOG) private readonly catalog: RecommendCatalog,
     @Inject(SERVED_STORE) private readonly served: ServedStore,
     @Inject(RECENT_POSTS_STORE) private readonly recentPosts: RecentPostsStore,
+    @Optional() @Inject(TASTE_RETRIEVAL) private readonly tasteRetrieval?: TasteRetrieval,
   ) {}
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
@@ -420,13 +425,20 @@ export class PostRecommendationUseCases {
       excludePostIds: [],
       now,
     };
-    const [hot, fresh, rawExplorePool, viewer] = await Promise.all([
-      this.store.listHotCandidates({ ...base, limit: algo.ranker.candidateLimit ?? HOT_LIMIT }),
+    const taste = this.tasteRetrieval ? tasteOf(userFeatures) : null;
+    // Nguồn gu chỉ BỔ SUNG ứng viên, không thay hot: gu dài hạn không gồm "đang tìm hiểu / sắp đi" (live-answers, trọng số
+    // lớn nhất ở trip_v1). Giảm hot chỉ khi nguồn gu gồm cả tín hiệu đó và đã đo trên người dùng thật.
+    const readsAll = Boolean(algo.ranker.candidateLimit);
+    const hotLimit = algo.ranker.candidateLimit ?? HOT_LIMIT;
+    const [hot, fresh, rawExplorePool, viewer, tasteIds] = await Promise.all([
+      this.store.listHotCandidates({ ...base, limit: hotLimit }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
       this.store.listExplorePool({ ...base, excludePostIds: interacted, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS }),
       algo.ranker.needsViewerRows && q.userId ? this.loadViewer(q.userId, new Date(sessionAt)) : null,
+      taste ? this.findTasteIds(taste, q.postType, hasPlanOnly) : [],
     ]);
-    const candidates = mergeCandidates(hot, fresh);
+    const tasteCandidates = tasteIds.length ? await this.store.listCandidatesByIds({ ...base, limit: tasteIds.length }, tasteIds, 'taste') : [];
+    const candidates = mergeCandidates(hot, fresh, tasteCandidates);
     const inCandidates = new Set(candidates.map((c) => c.postId));
 
     // Bài vừa đăng chưa qua job thì chưa là ứng viên: thêm thẳng, tầng chính sách đưa lên đầu.
@@ -444,13 +456,23 @@ export class PostRecommendationUseCases {
     // Ranker đọc toàn bộ bài thì mọi bài đều là ứng viên: ô khám phá lấy bài xếp ngoài top, không lấy bài ngoài ứng viên.
     const topIds = new Set(ranked.slice(0, FULL_READ_EXPLORE_SKIP).map((r) => r.postId));
     const explorePool = rawExplorePool.filter(
-      (c) => !seen.has(c.postId) && (algo.ranker.candidateLimit ? !topIds.has(c.postId) : !inCandidates.has(c.postId)),
+      (c) => !seen.has(c.postId) && (readsAll ? !topIds.has(c.postId) : !inCandidates.has(c.postId)),
     );
     // Giữ trước một tập bài khám phá cố định cho cả phiên và bỏ chúng khỏi danh sách xếp hạng: bài khám phá không gặp lại ở trang sau.
     const reserved = pickExplore(explorePool, { userKey: q.userId ?? 'guest', day: new Date(sessionAt).toISOString().slice(0, 10) }, EXPLORE_RESERVE, 0);
     const reservedIds = new Set(reserved.map((r) => r.postId));
     const rankedOnly = ranked.filter((r) => !reservedIds.has(r.postId));
     return { rankedOnly, reserved };
+  }
+
+  /** Nguồn gu lỗi (Typesense chưa sẵn sàng) thì feed vẫn chạy với hot/fresh, chỉ ghi log. */
+  private async findTasteIds(taste: { places: string[]; tags: string[] }, postType: string | null, hasPlan: boolean): Promise<string[]> {
+    try {
+      return await this.tasteRetrieval!.findPostIds({ ...taste, postType, hasPlan, limitPerSource: TASTE_PER_SOURCE });
+    } catch (error) {
+      this.logger.warn(`Nguồn gu (Typesense) lỗi, feed dùng hot/fresh: ${(error as Error).message}`);
+      return [];
+    }
   }
 
   /** Mode recent: mới nhất trước (cửa sổ 30 ngày), không qua ranker/explore/phạt lịch sử; bài tự đăng trong 1h lên đầu. */

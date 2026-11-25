@@ -1,4 +1,4 @@
-import type { BuiltIndex, ExploreSource } from '../domain/explore/types.js';
+import type { BuiltIndex, ExploreSource, IndexedDoc } from '../domain/explore/types.js';
 import type { QueryGramRow } from '../domain/explore/vocab-gaps.js';
 import type { PointOfInterestSeed, PoiPlace } from '../domain/points-of-interest.js';
 import type { HotelSummary, SuggestEntity, SuggestType } from '../domain/suggest-entity.js';
@@ -9,10 +9,16 @@ export const EXPLORE_STORE = Symbol('EXPLORE_STORE');
 export const EXPLORE_CATALOG = Symbol('EXPLORE_CATALOG');
 export const PLACES_STORE = Symbol('PLACES_STORE');
 
-/** Chỉ mục tìm khám phá trên Postgres. */
+/** Chỉ mục tìm khám phá (Typesense hoặc Postgres). */
 export interface ExploreStore extends ExploreSource {
-  /** Thay toàn bộ chỉ mục trong một transaction. false = worker khác đang dựng, bỏ lượt này. */
+  /** Thay toàn bộ chỉ mục. false = worker khác đang dựng, bỏ lượt này. */
   replaceAll(index: BuiltIndex): Promise<boolean>;
+  /** Thêm hoặc cập nhật một nhóm tài liệu lên chỉ mục (real-time event sync). */
+  upsertDocuments?(docs: readonly IndexedDoc[]): Promise<number>;
+  /** Chỉ mục đã dựng và có tài liệu chưa (engine ngoài; Postgres không khai báo). */
+  hasIndex?(): Promise<boolean>;
+  /** Kiểm tra sức khoẻ engine tìm kiếm ngoài (nếu dùng). */
+  healthCheck?(): Promise<boolean>;
   /** Xoá tài liệu theo id (`post:<uuid>`), trả số dòng đã xoá. Id không có trong chỉ mục thì bỏ qua. */
   deleteDocuments(ids: string[]): Promise<number>;
   /** Cộng dồn n-gram của một câu tìm vào ngày `day` (YYYY-MM-DD): `hits` cộng thêm, `samples` thêm câu mới khi còn chỗ. */
@@ -72,6 +78,8 @@ export interface ExploreCatalog {
   listPosts(cursor: string | null): Promise<Page<ExplorePost>>;
   /** Trong postIds, những bài còn hiện công khai. */
   findVisiblePostIds(postIds: string[]): Promise<Set<string>>;
+  /** Lấy bài công khai đủ thông tin để lập chỉ mục theo danh sách ID. */
+  getVisiblePosts?(postIds: string[]): Promise<ExplorePost[]>;
   /** Tên hiển thị theo id tác giả. Thật: AccessFacade.getDisplayNames. Id không có thì không có trong Map. */
   getAuthorNames(authorIds: string[]): Promise<Map<string, string>>;
 }

@@ -24,6 +24,7 @@ import {
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   SERVED_STORE,
+  TASTE_RETRIEVAL,
   TEXT_EMBEDDER,
   type ProductProfileCatalog,
   type RecommendCatalog,
@@ -35,6 +36,7 @@ import { AiEmbeddingClient } from './recommend/infra/ai-embedding.client.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
+import { TypesenseTasteRetrieval } from './recommend/infra/typesense-taste.retrieval.js';
 import { BuildFeaturesJob } from './recommend/jobs/build-features.job.js';
 import { PurgeInteractionsJob } from './recommend/jobs/purge-interactions.job.js';
 import { AdminIndexHealthController } from './search/api/admin-index-health.controller.js';
@@ -63,6 +65,9 @@ import { StaysUseCases } from './search/application/stays.use-cases.js';
 import { SuggestUseCases } from './search/application/suggest.use-cases.js';
 import { DrizzleExploreStore } from './search/infra/drizzle-explore.store.js';
 import { DrizzleSuggestStore } from './search/infra/drizzle-suggest.store.js';
+import { ExploreStatsCache } from './search/infra/explore-stats.cache.js';
+import { TypesenseExploreStore } from './search/infra/typesense-explore.store.js';
+import { TypesenseClient } from './search/infra/typesense.client.js';
 import { IndexHealth } from './search/jobs/index-health.js';
 import { RebuildExploreIndexJob } from './search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from './search/jobs/rebuild-suggest-index.job.js';
@@ -79,6 +84,8 @@ const commerceHotelCatalog = (commerce: CommerceFacade): HotelCatalog => ({
 });
 
 /** Khách sạn + bài cho tìm khám phá. days: 30 để priceFrom là giá thấp nhất 30 ngày tới. */
+const TYPESENSE_CLIENT = Symbol('TYPESENSE_CLIENT');
+
 const exploreCatalog = (
   commerce: CommerceFacade,
   content: ContentFacade,
@@ -92,6 +99,7 @@ const exploreCatalog = (
   // Gắn poster video để kết quả tìm có ảnh bìa: một lần đọc media cho mỗi trang 100 bài.
   listPosts: async (cursor) => withVideoPosters(await content.listPosts({ cursor, limit: 100 }), (ids) => media.getPlayback(ids)),
   findVisiblePostIds: (postIds) => content.findVisiblePostIds(postIds),
+  getVisiblePosts: (postIds) => content.getVisiblePosts(postIds),
   getAuthorNames: (authorIds) => access.getDisplayNames(authorIds),
 });
 
@@ -167,7 +175,30 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
   providers: [
     { provide: SUGGEST_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleSuggestStore(createDb(pools.discovery)) },
     { provide: HOTEL_CATALOG, inject: [CommerceFacade], useFactory: commerceHotelCatalog },
-    { provide: EXPLORE_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzleExploreStore(createDb(pools.discovery)) },
+    {
+      // Một client Typesense dùng chung cho tìm khám phá và nguồn gu của recommend; null khi SEARCH_BACKEND=postgres.
+      provide: TYPESENSE_CLIENT,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv) =>
+        env.SEARCH_BACKEND === 'typesense'
+          ? new TypesenseClient({ host: env.TYPESENSE_HOST, port: env.TYPESENSE_PORT, protocol: env.TYPESENSE_PROTOCOL, apiKey: env.TYPESENSE_API_KEY })
+          : null,
+    },
+    {
+      provide: TASTE_RETRIEVAL,
+      inject: [TYPESENSE_CLIENT, CORE_ENV],
+      useFactory: (client: TypesenseClient | null, env: CoreEnv) => (client ? new TypesenseTasteRetrieval(client, env.TYPESENSE_COLLECTION_ALIAS) : null),
+    },
+    {
+      provide: EXPLORE_STORE,
+      inject: [CORE_ENV, DB_POOLS, REDIS, TYPESENSE_CLIENT],
+      useFactory: (env: CoreEnv, pools: DbPools, redis: Redis, client: TypesenseClient | null) => {
+        const pgStore = new DrizzleExploreStore(createDb(pools.discovery));
+        if (!client) return pgStore;
+        const statsCache = new ExploreStatsCache(redis, () => pgStore.loadAllCounts());
+        return new TypesenseExploreStore(client, statsCache, pgStore, redis, env.TYPESENSE_COLLECTION_ALIAS);
+      },
+    },
     { provide: PLACES_STORE, inject: [DB_POOLS], useFactory: (pools: DbPools) => new DrizzlePlacesStore(createDb(pools.discovery)) },
     PlacesUseCases,
     LoadPlacesJob,

@@ -1,11 +1,12 @@
 // Tìm khám phá: HIỂU CÂU một lần -> mỗi NHÁNH lấy ứng viên rồi chấm BM25, độ phủ, luật dấu, chất lượng, độ gần -> GỘP theo vùng.
 // Port từ experiments/natural-search/search/engine.py + verticals/*.py; giữ nguyên công thức để so được với bộ câu thử.
 import { bucketsWithin } from '../places.js';
+import { VERTICAL_OF } from './build.js';
 import { LEX } from './lexicon.js';
 import { branchTerms, understand, type Interpretation, type QueryTerm, type Understood } from './query.js';
 import { NS, Stats } from './stats.js';
 import { km } from './text.js';
-import type { ExploreObject, ExploreSource, IndexedDoc } from './types.js';
+import type { CandidateFilter, ExploreObject, ExploreSource, IndexedDoc } from './types.js';
 
 export const NEAR_KM = 40; // 'gần đó': bán kính quanh tâm nơi (Hội An–Đà Nẵng ~25 km)
 const USER_W = 0.35; // gần người dùng: nặng 35%
@@ -138,21 +139,59 @@ type LatLon = { lat: number; lon: number };
 export const FAR_KM = 150;
 /** Từ khớp sai dấu người dùng gõ ('trứng' ~ 'Trung'): còn chừng này trọng số, và không tính là đã khớp. */
 const ACCENT_MISS = 0.3;
+/** Ứng viên của nhánh câu không nhắm tới (vùng đó chỉ hiện 3 mục). */
+const SIDE_CANDIDATE_LIMIT = 30;
 /** Câu không có nơi, không có ý muốn: gợi ý thay thế phải phủ ít nhất chừng này phần câu (chặn câu ngoài phạm vi). */
 const RELATED_COVERAGE = 0.5;
 
-async function searchVertical(
+interface PreparedVertical {
+  vt: Vertical;
+  u: Understood;
+  v: Understood;
+  weight: number;
+  qterms: QueryTerm[];
+  core: string[];
+  subs: string[];
+  qtier: Set<string>;
+  cmap: Map<string, string>;
+  softc: string[];
+  units: number;
+  placeGroups: string[][];
+  places: string[];
+  center: LatLon | null;
+  filter: CandidateFilter;
+}
+
+function buildQueryText(v: Understood, subs: readonly string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const phrase of [...v.terms, ...subs, ...v.names]) {
+    const accented = phrase
+      .split(' ')
+      .map((w) => v.accents[w] ?? w)
+      .join(' ')
+      .trim();
+    if (accented && !seen.has(accented)) {
+      seen.add(accented);
+      out.push(accented);
+    }
+  }
+  return out.join(' ');
+}
+
+async function prepareVertical(
   vt: Vertical,
-  u: Understood,
+  it: Interpretation,
   st: Stats,
   center: LatLon | null,
   user: LatLon | null,
   isBroad: boolean,
-): Promise<Map<string, Row[]>> {
-  const out = new Map<string, Row[]>();
+  candidateLimit: number,
+): Promise<PreparedVertical | null> {
+  const u = it.u;
   const [v, qterms] = await branchTerms(u, st, vt.mods);
   // Câu có từ nhưng nhánh không hiểu từ nào -> không đoán. Lượt mở rộng (isBroad) vẫn lấy theo nơi / ý muốn.
-  if (!isBroad && !qterms.length && (u.terms.length || u.subtypes.length)) return out;
+  if (!isBroad && !qterms.length && (u.terms.length || u.subtypes.length)) return null;
   // Từ chính (không bổ nghĩa, có trong dữ liệu): kết quả chính phải khớp ít nhất một. Độ phủ = phần câu được đáp ứng.
   let core = v.terms.filter((t) => !v.soft.includes(t) && !u.unknown.includes(t));
   const nameWords = new Set(u.names.flatMap((n) => n.split(' ')));
@@ -166,6 +205,61 @@ async function searchVertical(
   const cmap = new Map(v.matched.filter(([, typ]) => typ === 'concept').map(([p, , b]) => [p, b]));
   const softc = v.concepts.filter((c) => LEX.soft.has(c));
   const units = core.length + softc.length + subs.length;
+
+  await st.load([{ ns: NS.docs, key: vt.name }, { ns: NS.len, key: vt.name }, ...qterms.map(([t]) => ({ ns: NS.dfOf(vt.name), key: t }))]);
+
+  // Bí danh nơi thành token của tf: 'hanoi' -> [hanoi], 'ha noi' -> [ha_noi], 'ho chi minh' -> [ho_chi, chi_minh] (tf chỉ có từ đơn + cặp).
+  const placeGroups = (u.place ? LEX.membersOf('place', u.place) : []).map((m) => {
+    const w = m.split(' ');
+    return w.length === 1 ? w : w.slice(1).map((b, i) => `${w[i]}_${b}`);
+  });
+  const placeTerms = [...new Set(placeGroups.flat())];
+  const places = u.place ? bucketsWithin(u.place) : [];
+  const isAll = isBroad || !qterms.length;
+  const queryText = isAll ? '' : buildQueryText(v, subs);
+
+  return {
+    vt,
+    u,
+    v,
+    weight: it.weight,
+    qterms,
+    core,
+    subs,
+    qtier,
+    cmap,
+    softc,
+    units,
+    placeGroups,
+    places,
+    center,
+    filter: {
+      vertical: vt.name,
+      isAll,
+      terms: qterms.map(([t]) => t),
+      names: u.names,
+      tiers: [...qtier],
+      days: u.days,
+      place: u.place,
+      places,
+      placeTerms,
+      center,
+      latSpan: FAR_KM / 111,
+      ...(queryText ? { queryText } : {}),
+      limit: candidateLimit,
+      user,
+    },
+  };
+}
+
+function scoreVerticalDocs(
+  prep: PreparedVertical,
+  docs: readonly IndexedDoc[],
+  st: Stats,
+  user: LatLon | null,
+): Map<string, Row[]> {
+  const { vt, u, v, qterms, core, subs, qtier, cmap, softc, units, placeGroups, places, center } = prep;
+  const out = new Map<string, Row[]>();
 
   const coverage = (hit: readonly string[], ot: readonly [string, number] | null): [string[], number, string[]] => {
     const ws = new Set(hit.flatMap((h) => h.split('_').map((x) => x.replace(/^#+/, ''))));
@@ -183,7 +277,6 @@ async function searchVertical(
     return [missing, units ? (core.length - missing.length + ss + ts) / units : 1, v.terms.filter((t) => !isCovered(t))];
   };
 
-  await st.load([{ ns: NS.docs, key: vt.name }, { ns: NS.len, key: vt.name }, ...qterms.map(([t]) => ({ ns: NS.dfOf(vt.name), key: t }))]);
   const live = st.get(NS.docs, vt.name);
   const avgdl = st.get(NS.len, vt.name) / Math.max(live, 1);
   const idf = (t: string) => {
@@ -210,26 +303,6 @@ async function searchVertical(
     return [s, hit];
   };
 
-  // Bí danh nơi thành token của tf: 'hanoi' -> [hanoi], 'ha noi' -> [ha_noi], 'ho chi minh' -> [ho_chi, chi_minh] (tf chỉ có từ đơn + cặp).
-  const placeGroups = (u.place ? LEX.membersOf('place', u.place) : []).map((m) => {
-    const w = m.split(' ');
-    return w.length === 1 ? w : w.slice(1).map((b, i) => `${w[i]}_${b}`);
-  });
-  const placeTerms = [...new Set(placeGroups.flat())];
-  const places = u.place ? bucketsWithin(u.place) : [];
-  const docs = await st.source.candidates({
-    vertical: vt.name,
-    isAll: isBroad || !qterms.length,
-    terms: qterms.map(([t]) => t),
-    names: u.names,
-    tiers: [...qtier],
-    days: u.days,
-    place: u.place,
-    places,
-    placeTerms,
-    center,
-    latSpan: FAR_KM / 111,
-  });
   for (const doc of docs) {
     const o = doc.obj;
     const relaxed: Relax[] = [];
@@ -370,20 +443,32 @@ async function collect(
   interps: readonly Interpretation[],
   user: LatLon | null,
   isBroad: boolean,
+  limitOf: (vertical: string) => number,
 ): Promise<Map<string, Map<string, Row>>> {
   const groups = new Map<string, Map<string, Row>>();
-  for (const it of interps) {
-    const center = it.u.place ? await st.center(it.u.place) : null;
-    // Các nhánh độc lập: chạy song song (mỗi nhánh vài lần đọc DB), gộp theo đúng thứ tự VERTICALS.
-    const perVertical = await Promise.all(VERTICALS.map((vt) => searchVertical(vt, it.u, st, center, user, isBroad)));
-    for (const found of perVertical) {
-      for (const [k, rows] of found) {
-        const g = groups.get(k) ?? groups.set(k, new Map()).get(k)!;
-        for (const r of rows) {
-          r.rank *= it.weight;
-          const old = g.get(r.doc.id);
-          if (!old || isBetter(r, old)) g.set(r.doc.id, r);
-        }
+  const centers = await Promise.all(interps.map((it) => (it.u.place ? st.center(it.u.place) : Promise.resolve(null))));
+  const prepared = await Promise.all(
+    interps.flatMap((it, idx) =>
+      VERTICALS.map((vt) => prepareVertical(vt, it, st, centers[idx] ?? null, user, isBroad, limitOf(vt.name))),
+    ),
+  );
+  const active = prepared.filter((p): p is PreparedVertical => p !== null);
+  if (!active.length) return groups;
+
+  const filters = active.map((p) => p.filter);
+  const docsList = st.source.candidatesBatch
+    ? await st.source.candidatesBatch(filters)
+    : await Promise.all(filters.map((f) => st.source.candidates(f)));
+
+  for (let i = 0; i < active.length; i++) {
+    const prep = active[i]!;
+    const found = scoreVerticalDocs(prep, docsList[i] ?? [], st, user);
+    for (const [k, rows] of found) {
+      const g = groups.get(k) ?? groups.set(k, new Map()).get(k)!;
+      for (const r of rows) {
+        r.rank *= prep.weight;
+        const old = g.get(r.doc.id);
+        if (!old || isBetter(r, old)) g.set(r.doc.id, r);
       }
     }
   }
@@ -452,19 +537,28 @@ export async function searchExplore(
 ): Promise<ExploreResult> {
   const full = options.fullKinds ? new Set(options.fullKinds) : null;
   const perSection = options.perSection ?? 6;
+  const candidateLimit = Math.max(100, Math.min(250, perSection * 15));
   const st = new Stats(source);
   const interps = await understand(q, st);
   const u = interps[0]!.u;
   const user = options.loc && !u.place ? options.loc : null;
-  const groups = await collect(st, interps, user, false);
-  const sections = buildSections(groups, u, perSection, full);
   const kinds = u.intents.length ? u.intents : full ? [...full] : SECTIONS.map(([k]) => k);
+  // Engine ngoài (Typesense) đọc `limit`: nhánh câu không nhắm tới chỉ hiện 3 mục nên lấy ít ứng viên.
+  // Lộ trình còn đến từ video kèm lịch trình. Nguồn trong RAM/Postgres có trần riêng (candidateLimitOf), bỏ qua `limit`.
+  // fullKinds (/search/posts, /search/places) luôn là nhánh chính dù câu nhắm vùng khác (vd 'khách sạn đà nẵng' ở tab Bài viết).
+  const mainKinds = [...kinds, ...(full ?? [])];
+  const mainVerticals = new Set([...mainKinds.map((k) => VERTICAL_OF[k as keyof typeof VERTICAL_OF]), ...(mainKinds.includes('plan') ? ['videos'] : [])]);
+  const limitOf = (vertical: string) => (mainVerticals.has(vertical) ? candidateLimit : SIDE_CANDIDATE_LIMIT);
+  const groups = await collect(st, interps, user, false, limitOf);
+  const sections = buildSections(groups, u, perSection, full);
   let fallback: ExploreFallback | null = null;
   if (!sections.some((s) => kinds.includes(s.kind) && s.total)) {
     const n = u.intents.length || full ? perSection : 2;
     fallback = buildFallback(groups, kinds, u, n);
     // Chưa có gì để thay thế mà câu có nơi (hoặc gần tôi): mở rộng ứng viên ra mọi mục quanh nơi, không cần chứa từ.
-    if (!fallback && (user || interps.some((it) => it.u.place))) fallback = buildFallback(await collect(st, interps, user, true), kinds, u, n);
+    if (!fallback && (user || interps.some((it) => it.u.place))) {
+      fallback = buildFallback(await collect(st, interps, user, true, limitOf), kinds, u, n);
+    }
   }
   return { query: q, understood: u, sections, nearUser: Boolean(user), fallback, suggest: fallback?.items ?? [], dropped: fallback?.dropped ?? [] };
 }

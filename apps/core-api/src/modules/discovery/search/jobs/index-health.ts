@@ -17,6 +17,10 @@ const SAMPLE_MS = 5 * MINUTE;
 const OFFLINE_MS = 8 * MINUTE;
 const WINDOW_MS = 24 * SAMPLE_MS;
 export const EXPLORE_INDEX_INTERVAL_MS = 10 * MINUTE;
+/** Typesense: bài đồng bộ theo sự kiện, dựng lại toàn bộ chỉ để đối soát (khách sạn, điểm OSM, bộ đếm). */
+export const EXPLORE_RECONCILE_INTERVAL_MS = 24 * 60 * MINUTE;
+/** Typesense: mỗi lượt dựng ghi lại cả chỉ mục (vài GB ở ~40k mục), chu kỳ admin đặt thấp hơn mức này bị nâng lên. */
+export const EXPLORE_RECONCILE_MIN_INTERVAL_MS = 60 * MINUTE;
 
 export const JOB_NAMES = ['explore', 'suggest'] as const;
 export type IndexJob = (typeof JOB_NAMES)[number];

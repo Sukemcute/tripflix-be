@@ -12,11 +12,19 @@ const RETRY_START_MS = 5_000;
 // app-events: xem reels, bấm đặt từ reels (module feed phát; discovery chỉ đọc).
 const DISCOVERY_STREAMS = [STREAMS.content, STREAMS.commerce, STREAMS.access, STREAMS.discovery, STREAMS.appEvents];
 /**
- * Sự kiện có thể làm bài thôi hiện công khai. Không đọc action/status trong payload mà hỏi lại Content (dropHidden),
- * nên event cũ, trùng hay đến lệch thứ tự (hide rồi restore) đều không xoá nhầm bài đang hiện.
- * content.post.updated: sửa bài đã đăng, có thể đổi visibility sang private.
+ * Các sự kiện vòng đời bài viết cần đồng bộ lên chỉ mục tìm kiếm ngay lập tức (< 1 giây).
+ * Không tin vào payload mà luôn hỏi lại Content (`getVisiblePosts` / `findVisiblePostIds`),
+ * nên event cũ, trùng hay đến lệch thứ tự (hide rồi restore) đều idempotent.
  */
-const POST_EVENTS = new Set(['content.post.moderated', 'content.post.deleted', 'content.post.updated']);
+const POST_SYNC_EVENTS = new Set([
+  'content.post.published',
+  'content.post.updated',
+  'content.post.held',
+  'content.post.hidden',
+  'content.post.restored',
+  'content.post.moderated',
+  'content.post.deleted',
+]);
 
 /**
  * Consumer DUY NHẤT của group "core-discovery": Redis giao mỗi sự kiện cho một consumer trong group, nên consumer thứ hai
@@ -62,17 +70,24 @@ export class DiscoveryEventsConsumer implements OnApplicationBootstrap, OnApplic
   }
 
   async route(event: EventEnvelope): Promise<void> {
-    await this.dropHiddenPost(event);
+    await this.syncPost(event);
     await this.recommend.ingest(event);
   }
 
-  private async dropHiddenPost(event: EventEnvelope): Promise<void> {
+  private async syncPost(event: EventEnvelope): Promise<void> {
     // Các stream còn nhiều sự kiện khác (comment, reaction, order...): search bỏ qua.
-    if (!POST_EVENTS.has(event.type)) return;
+    if (!POST_SYNC_EVENTS.has(event.type)) return;
     const postId = (event.payload as { postId?: unknown } | null)?.postId;
     if (typeof postId !== 'string' || !postId) {
       // Thử lại cũng không sửa được payload hỏng: ghi log rồi bỏ qua.
       this.logger.warn({ eventId: event.eventId, type: event.type }, 'Sự kiện bài thiếu postId, bỏ qua');
+      return;
+    }
+    if (typeof this.explore.syncPost === 'function') {
+      const result = await this.explore.syncPost(postId);
+      if (result !== 'skipped') {
+        this.logger.log(`Đã đồng bộ bài ${postId} (${result}) theo sự kiện ${event.type}`);
+      }
       return;
     }
     const removed = await this.explore.dropHidden([postId]);

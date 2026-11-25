@@ -37,6 +37,13 @@ x-be-env: &be-env
   AI_SERVICE_URL: ${AI_SERVICE_URL:-}
   CORE_API_INTERNAL_URL: ${CORE_API_INTERNAL_URL:-http://localhost:3000}
   MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
+  SEARCH_BACKEND: ${SEARCH_BACKEND:-typesense}
+  # Trong mạng compose, ghi thẳng như DATABASE_URL_* (postgres:5432); cổng mở ra máy là TYPESENSE_HOST_PORT.
+  TYPESENSE_HOST: typesense
+  TYPESENSE_PORT: 8108
+  TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}
+  TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-dev-typesense-key}
+  TYPESENSE_COLLECTION_ALIAS: ${TYPESENSE_COLLECTION_ALIAS:-explore}
 
 x-node-health: &node-health
   interval: 10s
@@ -74,6 +81,27 @@ services:
     image: axllent/mailpit:v1.33
     ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
 
+  typesense:
+    image: typesense/typesense:29.0
+    environment:
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-dev-typesense-key}
+      # Snapshot cắt nhật ký raft; mặc định 3600 s thì khởi động lại trong giờ đó phát lại cả lượt dựng (~3,6 GB ghi ở 44k mục).
+      TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: ${TYPESENSE_SNAPSHOT_INTERVAL_SECONDS:-300}
+      # Bộ đệm ghi RocksDB mặc định 4 MB: nạp 44k mục phải gộp ~180 lần, mỗi lần ghi lại cả dữ liệu (đo: ~7,8 GB ghi mỗi lượt dựng).
+      TYPESENSE_DB_WRITE_BUFFER_SIZE: ${TYPESENSE_DB_WRITE_BUFFER_SIZE:-67108864}
+    # Chỉ máy local: key mặc định không được mở ra mạng LAN.
+    ports: ['127.0.0.1:${TYPESENSE_HOST_PORT:-8108}:8108']
+    volumes:
+      - typesense-data:/data
+    healthcheck:
+      # Image typesense không có curl/wget: gọi /health qua /dev/tcp của bash.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/8108 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && grep -q "\"ok\":true" <&3']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
   # ---------- Backend (profile be) ----------
   migrate:
     profiles: [be]
@@ -95,6 +123,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
+      typesense: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       <<: *node-health
@@ -253,3 +282,4 @@ services:
 volumes:
   pg-data:
   redis-data:
+  typesense-data:
