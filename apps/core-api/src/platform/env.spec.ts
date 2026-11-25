@@ -25,6 +25,14 @@ describe('AUTH_JWT_PREVIOUS_JWKS', () => {
   });
 });
 
+describe('DB_CONNECTION_TIMEOUT_MS', () => {
+  it('mặc định 3000, nhận số trong 500–30000, ngoài khoảng thì báo lỗi', () => {
+    expect(coreEnvSchema.parse(required).DB_CONNECTION_TIMEOUT_MS).toBe(3_000);
+    expect(coreEnvSchema.parse({ ...required, DB_CONNECTION_TIMEOUT_MS: '8000' }).DB_CONNECTION_TIMEOUT_MS).toBe(8_000);
+    expect(coreEnvSchema.safeParse({ ...required, DB_CONNECTION_TIMEOUT_MS: '100' }).success).toBe(false);
+  });
+});
+
 describe('AUTH_WEB_ORIGINS', () => {
   it('mặc định là web 3100 và admin 3200', () => {
     expect(coreEnvSchema.parse(required).AUTH_WEB_ORIGINS).toEqual(DEFAULT_WEB_ORIGINS);

@@ -24,7 +24,7 @@ const DRIZZLE_TOKENS = MODULES.map((m) => buildDrizzleToken(m));
         Object.fromEntries(
           MODULES.map((m) => [
             m,
-            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}`, statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS }),
+            createPool({ url: dbUrlOf(env, m), max: DEFAULT_POOL_SIZE[m], applicationName: `core-api:${m}`, statementTimeoutMs: APP_STATEMENT_TIMEOUT_MS, idleInTransactionTimeoutMs: APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, connectionTimeoutMs: env.DB_CONNECTION_TIMEOUT_MS }),
           ]),
         ) as DbPools,
     },

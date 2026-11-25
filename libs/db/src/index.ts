@@ -25,6 +25,9 @@ export const APP_STATEMENT_TIMEOUT_MS = 10_000;
 /** Transaction mở mà không gửi câu nào quá lâu (tiến trình kẹt giữa transaction): Postgres cắt, trả khoá và kết nối. */
 export const APP_IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000;
 
+/** Chờ mượn kết nối quá lâu thì báo lỗi; pool cạn lúc tải cao thì đây là thời gian người dùng phải đợi trước khi nhận 500. */
+export const DEFAULT_CONNECTION_TIMEOUT_MS = 3_000;
+
 export interface PoolOptions {
   url: string;
   max: number;
@@ -34,15 +37,24 @@ export interface PoolOptions {
   statementTimeoutMs?: number;
   /** Transaction đứng yên quá lâu thì Postgres đóng phiên. Không đặt thì không giới hạn. */
   idleInTransactionTimeoutMs?: number;
+  /** Thời gian chờ mượn kết nối từ pool. Không đặt thì DEFAULT_CONNECTION_TIMEOUT_MS. */
+  connectionTimeoutMs?: number;
 }
 
 /** Mỗi module một pool, đăng nhập bằng user Postgres chỉ có quyền trên schema của module đó. */
-export function createPool({ url, max, applicationName, statementTimeoutMs, idleInTransactionTimeoutMs }: PoolOptions): pg.Pool {
+export function createPool({
+  url,
+  max,
+  applicationName,
+  statementTimeoutMs,
+  idleInTransactionTimeoutMs,
+  connectionTimeoutMs = DEFAULT_CONNECTION_TIMEOUT_MS,
+}: PoolOptions): pg.Pool {
   const pool = new pg.Pool({
     connectionString: url,
     max,
     application_name: applicationName,
-    connectionTimeoutMillis: 3_000,
+    connectionTimeoutMillis: connectionTimeoutMs,
     idleTimeoutMillis: 30_000,
     ...(statementTimeoutMs !== undefined && { statement_timeout: statementTimeoutMs }),
     ...(idleInTransactionTimeoutMs !== undefined && { idle_in_transaction_session_timeout: idleInTransactionTimeoutMs }),

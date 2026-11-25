@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, createPool, setPoolMax } from './index.js';
+import { APP_IDLE_IN_TRANSACTION_TIMEOUT_MS, APP_STATEMENT_TIMEOUT_MS, DEFAULT_CONNECTION_TIMEOUT_MS, createPool, setPoolMax } from './index.js';
 
 describe('createPool', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -32,6 +32,14 @@ describe('createPool', () => {
     expect(options.statement_timeout).toBe(10_000);
     expect(options.idle_in_transaction_session_timeout).toBe(30_000);
     await pool.end();
+  });
+
+  it('thời gian chờ mượn kết nối: mặc định 3 giây, đổi được qua connectionTimeoutMs', async () => {
+    const byDefault = createPool({ url: 'postgres://user:pass@localhost:1/none', max: 1, applicationName: 'pool-spec' });
+    const custom = createPool({ url: 'postgres://user:pass@localhost:1/none', max: 1, applicationName: 'pool-spec', connectionTimeoutMs: 8_000 });
+    expect(byDefault.options.connectionTimeoutMillis).toBe(DEFAULT_CONNECTION_TIMEOUT_MS);
+    expect(custom.options.connectionTimeoutMillis).toBe(8_000);
+    await Promise.all([byDefault.end(), custom.end()]);
   });
 
   it('L2: không truyền thì không giới hạn (migrate, seed tạo index có thể lâu)', async () => {
