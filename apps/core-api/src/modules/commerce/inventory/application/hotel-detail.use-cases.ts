@@ -13,11 +13,24 @@ import {
   type UnavailableReason,
 } from '../domain/sales-rules.js';
 import type { HotelAmenity } from '../../db/schema/index.js';
-import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type ReadCalendar, type MediaUrl, type Today } from './ports.js';
+import { COMMERCE_STORE, MEDIA_URL, READ_CALENDAR, TODAY, keepMediaKey, type CommerceStore, type ReadCalendar, type MediaUrl, type Today , type PropertyRecord, type RoomTypeRecord } from './ports.js';
+import { TtlCache } from './ttl-cache.js';
 
 const DEFAULT_ADULTS = 2;
 const DEFAULT_CALENDAR_DAYS = 14;
 const MAX_CALENDAR_DAYS = 60;
+/**
+ * Phần tĩnh của khách sạn (thông tin, loại phòng, gói giá) chỉ đổi khi seed hay nhập dữ liệu, không đổi theo ngày khách chọn.
+ * Cache trong controller có ngày trong khoá nên mỗi tổ hợp ngày lại đọc database; tách phần này ra giữ 5 phút để trang
+ * khách sạn với ngày bất kỳ chỉ còn đọc lịch trong bộ nhớ. Giá, số phòng vẫn lấy từ lịch nên không bị cũ thêm.
+ */
+const STATIC_TTL_MS = 5 * 60_000;
+const MAX_STATIC_ENTRIES = 2_000;
+
+interface HotelStatic {
+  hotel: PropertyRecord;
+  roomTypes: RoomTypeRecord[];
+}
 
 export interface HotelDetailQuery {
   checkIn?: string;
@@ -106,6 +119,17 @@ export class HotelDetailUseCases {
     @Optional() @Inject(READ_CALENDAR) private readonly calendar: ReadCalendar = store.calendar,
   ) {}
 
+  private readonly staticCache = new TtlCache<HotelStatic>({ ttlMs: STATIC_TTL_MS, maxEntries: MAX_STATIC_ENTRIES });
+
+  /** Không có khách sạn thì ném lỗi: TtlCache không giữ lỗi, khách sạn vừa thêm hiện ngay ở lần gọi sau. */
+  private loadStatic(slugOrId: string): Promise<HotelStatic> {
+    return this.staticCache.get(slugOrId, async () => {
+      const hotel = await this.store.catalog.findPropertyBySlugOrId(slugOrId);
+      if (!hotel) throw new CommerceError('not_found', 'Không có khách sạn này.');
+      return { hotel, roomTypes: await this.store.catalog.findRoomTypesByPropertyIds([hotel.id]) };
+    });
+  }
+
   async getHotelDetail(hotelId: string, query: HotelDetailQuery = {}): Promise<HotelDetail> {
     const today = this.today();
     const checkIn = query.checkIn ?? today;
@@ -121,9 +145,7 @@ export class HotelDetailUseCases {
       throw new CommerceError('invalid_query', `calendarDays từ 1 đến ${MAX_CALENDAR_DAYS}.`, 'calendarDays');
     }
 
-    const hotel = await this.store.catalog.findPropertyBySlugOrId(hotelId);
-    if (!hotel) throw new CommerceError('not_found', 'Không có khách sạn này.');
-    const roomTypes = await this.store.catalog.findRoomTypesByPropertyIds([hotel.id]);
+    const { hotel, roomTypes } = await this.loadStatic(hotelId);
     const calendarEnd = addDays(today, calendarDays - 1);
     // Một lần đọc cho cả kỳ ở (gồm ngày trả phòng để xét CTD) và lịch giá.
     const from = checkIn < today ? checkIn : today;

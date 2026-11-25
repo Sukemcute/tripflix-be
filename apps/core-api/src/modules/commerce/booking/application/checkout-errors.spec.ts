@@ -18,7 +18,6 @@ const input: CheckoutInput = {
 
 function setup() {
   const orders = {
-    limitLockWait: vi.fn<OrderStore['limitLockWait']>(),
     lockUser: vi.fn<OrderStore['lockUser']>(),
     isDeadlock: vi.fn<OrderStore['isDeadlock']>().mockReturnValue(false),
     isLockWaitTimeout: vi.fn<OrderStore['isLockWaitTimeout']>().mockReturnValue(false),
