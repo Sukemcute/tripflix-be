@@ -33,7 +33,7 @@ import { PasswordEncryption } from '../application/password-encryption.js';
 import { EncryptedPasswords } from './encrypted-passwords.js';
 
 export const PASSWORD_ENCRYPTION_UNAVAILABLE_MESSAGE = 'Máy chủ chưa bật mã hoá mật khẩu';
-import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REFRESH_MESSAGE } from '../domain/credentials.js';
+import { GOOGLE_LOGIN_FAILED_MESSAGE, GOOGLE_NOT_CONFIGURED_MESSAGE, INVALID_REFRESH_MESSAGE, SERVER_BUSY_MESSAGE } from '../domain/credentials.js';
 import { AccessError } from '../domain/errors.js';
 import { REGISTRATION_CODE_COOLDOWN_SECONDS } from '../domain/registration.js';
 import {
@@ -111,6 +111,7 @@ export class AuthController {
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'register' }] })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({ type: UserDto })
+  @ApiServiceUnavailableResponse({ description: `${SERVER_BUSY_MESSAGE} (quá nhiều người đăng nhập cùng lúc, có Retry-After)` })
   register(@Body(new ZodBody(RegisterRequestSchema)) body: z.infer<typeof RegisterRequestSchema>, @Req() req: Request) {
     return this.auth.register(body, readRequestMeta(req));
   }
@@ -121,6 +122,7 @@ export class AuthController {
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
   @ApiBody({ type: LoginCodeDto })
   @ApiAcceptedResponse({ type: LoginCodeResultDto })
+  @ApiServiceUnavailableResponse({ description: `${SERVER_BUSY_MESSAGE} (quá nhiều người đăng nhập cùng lúc, có Retry-After)` })
   async requestLoginCode(
     @Body(new ZodBody(LoginCodeRequestSchema)) body: z.infer<typeof LoginCodeRequestSchema>,
     @Req() req: Request,
@@ -138,6 +140,7 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: TokenPairDto })
   @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
+  @ApiServiceUnavailableResponse({ description: `${SERVER_BUSY_MESSAGE} (quá nhiều người đăng nhập cùng lúc, có Retry-After)` })
   async login(
     @Body(new ZodBody(LoginRequestSchema)) body: z.infer<typeof LoginRequestSchema>,
     @Req() req: Request,

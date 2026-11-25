@@ -60,6 +60,18 @@ export class AccessErrorFilter implements ExceptionFilter {
       case 'google_not_configured':
         http = new ServiceUnavailableException(err.message);
         break;
+      case 'server_busy':
+        if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
+        http = new HttpException(
+          {
+            statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+            message: err.message,
+            error: 'Service Unavailable',
+            ...(err.retryAfterSeconds ? { retryAfterSeconds: err.retryAfterSeconds } : {}),
+          },
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+        break;
       case 'too_many_attempts':
         if (err.retryAfterSeconds) res.setHeader('Retry-After', String(err.retryAfterSeconds));
         // retryAfterSeconds trong body để app hiện đếm ngược mà không cần đọc header.
