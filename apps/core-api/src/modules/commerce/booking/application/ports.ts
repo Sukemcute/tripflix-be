@@ -100,11 +100,13 @@ export interface InventoryCell {
 
 /** Mọi hàm chạy trên transaction đang mở của commerce (TransactionHost); "lock" là SELECT ... FOR UPDATE. */
 export interface OrderStore {
-  /** Khoá theo tài khoản trong transaction: hai request giữ chỗ của cùng người chạy tuần tự. */
-  lockUser(userId: string): Promise<void>;
-  /** Giới hạn thời gian chờ khoá trong transaction đang mở; quá hạn thì lệnh đang chờ báo lỗi. */
-  limitLockWait(milliseconds: number): Promise<void>;
-  /** Lỗi này có phải do chờ khoá quá giới hạn của limitLockWait không. */
+  /**
+   * Khoá theo tài khoản trong transaction: hai request giữ chỗ của cùng người chạy tuần tự.
+   * lockWaitMs: từ đây tới hết transaction, lệnh nào chờ khoá quá hạn thì báo lỗi (gồm cả lần chờ khoá này).
+   * Đặt chung một câu với khoá để bớt một lượt hỏi database mỗi lần giữ chỗ.
+   */
+  lockUser(userId: string, options?: { lockWaitMs?: number }): Promise<void>;
+  /** Lỗi này có phải do chờ khoá quá giới hạn của lockWaitMs không. */
   isLockWaitTimeout(error: unknown): boolean;
   /** Lỗi deadlock của database (Postgres 40P01): transaction đã rollback, chạy lại được. */
   isDeadlock(error: unknown): boolean;
@@ -129,7 +131,7 @@ export interface OrderStore {
   listOrdersOfUser(input: { userId: string; statuses?: OrderStatus[]; after?: { createdAt: Date; id: string }; limit: number; hidesUnpaidClosed?: boolean }): Promise<OrderRecord[]>;
   /** Mục của nhiều đơn trong một câu truy vấn. */
   findItemsOfOrders(orderIds: string[]): Promise<OrderItemRecord[]>;
-  insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<string>;
+  insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }): Promise<OrderRecord>;
   insertItems(orderId: string, items: NewOrderItem[]): Promise<void>;
   findItems(orderId: string): Promise<OrderItemRecord[]>;
   updateItemPrices(prices: { id: string; unitPrice: number; childUnitPrice: number | null; infantUnitPrice: number | null; lineTotal: number }[]): Promise<void>;

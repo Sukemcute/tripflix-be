@@ -81,12 +81,15 @@ export class DrizzleOrderStore implements OrderStore {
     return this.host.tx;
   }
 
-  async lockUser(userId: string) {
-    await this.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
-  }
-
-  async limitLockWait(milliseconds: number) {
-    await this.db.execute(sql`select set_config('lock_timeout', ${`${milliseconds}ms`}, true)`);
+  async lockUser(userId: string, options: { lockWaitMs?: number } = {}) {
+    if (options.lockWaitMs === undefined) {
+      await this.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+      return;
+    }
+    // Bảng con trong FROM chạy trước danh sách cột, nên lock_timeout có hiệu lực trước khi bắt đầu chờ khoá.
+    await this.db.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0)) from (select set_config('lock_timeout', ${`${options.lockWaitMs}ms`}, true)) as wait_limit`,
+    );
   }
 
   isDeadlock(error: unknown) {
@@ -240,8 +243,9 @@ export class DrizzleOrderStore implements OrderStore {
   }
 
   async insertOrder(order: { userId: string; total: number; adults: number; children: number; infants: number; sourcePostId: string | null; holdExpiresAt: Date }) {
-    const [row] = await this.db.insert(orders).values({ ...order, ...this.statusTrace() }).returning({ id: orders.id });
-    return row!.id;
+    // Trả cả bản ghi để trang giỏ vừa tạo không phải đọc lại đơn.
+    const [row] = await this.db.insert(orders).values({ ...order, ...this.statusTrace() }).returning();
+    return mapOrder(row!);
   }
 
   async insertItems(orderId: string, items: NewOrderItem[]) {

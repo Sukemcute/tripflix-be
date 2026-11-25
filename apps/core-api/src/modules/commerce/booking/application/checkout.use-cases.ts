@@ -207,7 +207,7 @@ export class CheckoutUseCases {
     if (!(await this.holdGate.acquire(cells))) {
       throw new CommerceError('conflict', 'Đang có nhiều người đặt cùng lúc, vui lòng thử lại.', 'items', { reason: 'LOCK_BUSY' });
     }
-    const orderId = await this.holdAndCreateOrder(userId, input)
+    const order = await this.holdAndCreateOrder(userId, input)
       // Deadlock (K2): Postgres huỷ một bên, transaction đã rollback sạch nên chạy lại một lần là đủ an toàn.
       .catch((error: unknown) => (this.orders.isDeadlock(error) ? this.holdAndCreateOrder(userId, input) : Promise.reject(error)))
       .catch((error: unknown) => {
@@ -215,12 +215,12 @@ export class CheckoutUseCases {
         throw error;
       })
       .finally(() => this.holdGate.release(cells));
-    // Đơn vừa tạo chưa có hoàn tiền, chưa có khách: bỏ 2 truy vấn chắc chắn trả rỗng.
-    return this.getCheckout(userId, orderId, { isNewOrder: true });
+    // Đơn vừa tạo chưa có hoàn tiền, chưa có khách: bỏ 2 truy vấn chắc chắn trả rỗng; bản ghi đơn có sẵn từ lúc tạo.
+    return this.getCheckout(userId, order.id, { isNewOrder: true, newOrder: order });
   }
 
   @Transactional('commerce')
-  private async holdAndCreateOrder(userId: string, input: CheckoutInput): Promise<string> {
+  private async holdAndCreateOrder(userId: string, input: CheckoutInput): Promise<OrderRecord> {
     const mix = { adults: input.adults, children: input.children ?? 0, infants: input.infants ?? 0 };
     const mixError = findPassengerMixError(mix);
     // Luật mỗi em bé một người lớn chỉ dành cho vé bay; ở phòng em bé tính vào sức chứa.
@@ -231,8 +231,7 @@ export class CheckoutUseCases {
     if (!input.items.length || input.items.length > MAX_ITEMS_PER_ORDER) throw new CommerceError('invalid_query', `Giỏ có từ 1 đến ${MAX_ITEMS_PER_ORDER} mục.`, 'items');
     const priced = await this.priceItems(input.items, mix, { roomTypes, flights });
 
-    await this.orders.limitLockWait(HOLD_LOCK_WAIT_MS);
-    await this.orders.lockUser(userId);
+    await this.orders.lockUser(userId, { lockWaitMs: HOLD_LOCK_WAIT_MS });
     const now = this.now();
     if ((await this.orders.countOrdersCreatedSince(userId, new Date(now.getTime() - 3_600_000))) >= HOLDS_PER_HOUR) {
       throw new CommerceError('rate_limited', 'Bạn giữ chỗ quá nhiều lần, vui lòng thử lại sau.');
@@ -257,15 +256,15 @@ export class CheckoutUseCases {
     }
     for (const old of oldOrders) await this.orders.updateOrder(old.id, { status: 'cancelled', cancelReason: 'Đã giữ giỏ mới', cancelledAt: now });
     const total = priced.reduce((sum, p) => sum + p.lineTotal, 0);
-    const orderId = await this.orders.insertOrder({
+    const order = await this.orders.insertOrder({
       userId,
       total,
       ...mix,
       sourcePostId: input.sourcePostId ?? null,
       holdExpiresAt: new Date(now.getTime() + HOLD_MINUTES * 60_000),
     });
-    await this.orders.insertItems(orderId, priced.map(({ cells: _cells, ...item }) => item));
-    return orderId;
+    await this.orders.insertItems(order.id, priced.map(({ cells: _cells, ...item }) => item));
+    return order;
   }
 
   findRoomTypes(ids: string[]): Promise<RoomTypeRecord[]> {
@@ -464,10 +463,11 @@ export class CheckoutUseCases {
   async getCheckout(
     userId: string,
     orderId: string,
-    options: { isNewOrder?: boolean; known?: { order: OrderRecord; items: OrderItemRecord[]; refunds: RefundRecord[]; guestBirthdates: (string | null)[] } } = {},
+    options: { isNewOrder?: boolean; newOrder?: OrderRecord; known?: { order: OrderRecord; items: OrderItemRecord[]; refunds: RefundRecord[]; guestBirthdates: (string | null)[] } } = {},
   ): Promise<CheckoutView> {
     const known = options.known?.order.id === orderId && options.known.order.userId === userId ? options.known : undefined;
-    const order = known?.order ?? (await this.ownOrder(userId, orderId));
+    const newOrder = options.newOrder?.id === orderId && options.newOrder.userId === userId ? options.newOrder : undefined;
+    const order = known?.order ?? newOrder ?? (await this.ownOrder(userId, orderId));
     const items = known?.items ?? (await this.orders.findItems(orderId));
     const [refunds, guestBirthdates] = known
       ? [known.refunds, known.guestBirthdates]
