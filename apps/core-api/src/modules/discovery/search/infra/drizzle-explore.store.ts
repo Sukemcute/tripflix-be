@@ -129,7 +129,12 @@ export class DrizzleExploreStore implements ExploreStore {
     // `search_query_grams.x` trong DO UPDATE là dòng đang có; `excluded.x` là dòng vừa gửi.
     await this.db
       .insert(t)
-      .values(rows.map((r) => ({ day, gram: r.gram, hits: r.hits, samples: r.samples })))
+      // Khoá dòng theo cùng một thứ tự: hai câu tìm cùng lúc có chung gram thì chờ nhau, không deadlock.
+      .values(
+        [...rows]
+          .sort((a, b) => (a.gram < b.gram ? -1 : a.gram > b.gram ? 1 : 0))
+          .map((r) => ({ day, gram: r.gram, hits: r.hits, samples: r.samples })),
+      )
       .onConflictDoUpdate({
         target: [t.day, t.gram],
         set: {

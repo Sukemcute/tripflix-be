@@ -1,0 +1,1 @@
+CREATE INDEX "idx_search_counts_df_first_len" ON "discovery"."search_counts" (left("key", 1),length("key")) WHERE "ns" = 'df';

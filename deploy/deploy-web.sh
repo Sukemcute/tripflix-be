@@ -59,6 +59,13 @@ esac
 cd "$DEPLOY_DIR"
 touch .env.web
 
+# Web và admin cùng ghi .env.web: hai lần deploy (merge liên tiếp, hay web và admin cùng lúc) không chạy chồng nhau.
+exec 9> .deploy-web.lock
+if ! flock -w 900 9; then
+  echo "Đợi 15 phút vẫn còn lần deploy web khác đang chạy, dừng" >&2
+  exit 1
+fi
+
 compose() {
   docker compose -f compose.server.yaml --env-file .env.server --env-file .env.web --profile gateway --profile admin "$@"
 }

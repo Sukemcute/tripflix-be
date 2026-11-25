@@ -41,8 +41,14 @@ const toSuggestion = ({ id, type, refId, slug, name, subtitle, placeId }: Sugges
   placeId,
 });
 
+/** Nhiều người gõ cùng tiền tố ("da", "nha t"): giữ kết quả ngắn hạn, mỗi lần gõ khỏi quét lại cả bảng gợi ý. */
+export const SUGGEST_CACHE_TTL_MS = 60_000;
+const SUGGEST_CACHE_MAX = 500;
+
 @Injectable()
 export class SuggestUseCases {
+  private readonly cache = new Map<string, { at: number; items: Promise<Suggestion[]> }>();
+
   constructor(
     @Inject(SUGGEST_STORE) private readonly store: SuggestStore,
     @Inject(HOTEL_CATALOG) private readonly catalog: HotelCatalog,
@@ -52,8 +58,21 @@ export class SuggestUseCases {
   async suggest({ q, types }: SuggestQuery): Promise<Suggestion[]> {
     const normalizedQuery = normalizeText(q);
     if (normalizedQuery.length < 2) return [];
-    const candidates = await this.store.findCandidates(normalizedQuery, types, CANDIDATE_LIMIT);
-    return pickSuggestions(candidates, SUGGEST_LIMIT).map(toSuggestion);
+    const key = `${normalizedQuery}|${[...types].sort().join(',')}`;
+    const hit = this.cache.get(key);
+    if (hit && Date.now() - hit.at < SUGGEST_CACHE_TTL_MS) return hit.items;
+    const items = this.store
+      .findCandidates(normalizedQuery, types, CANDIDATE_LIMIT)
+      .then((candidates) => pickSuggestions(candidates, SUGGEST_LIMIT).map(toSuggestion));
+    const entry = { at: Date.now(), items };
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    // Map giữ thứ tự chèn: đầy thì bỏ mục cũ nhất.
+    if (this.cache.size > SUGGEST_CACHE_MAX) this.cache.delete(this.cache.keys().next().value!);
+    items.catch(() => {
+      if (this.cache.get(key) === entry) this.cache.delete(key);
+    });
+    return items;
   }
 
   /** Dựng lại toàn bộ chỉ mục gợi ý. Trả số dòng đã ghi. */
@@ -68,6 +87,7 @@ export class SuggestUseCases {
     }
     const entities = buildSuggestEntities(hotels);
     await this.store.replaceAll(entities);
+    this.cache.clear();
     return entities.length;
   }
 }

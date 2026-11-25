@@ -79,6 +79,16 @@
       "Expiration": {
         "Days": 7
       }
+    },
+    {
+      "ID": "expire-uploads-staging",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "staging/uploads/"
+      },
+      "Expiration": {
+        "Days": 30
+      }
     }
   ]
 }
