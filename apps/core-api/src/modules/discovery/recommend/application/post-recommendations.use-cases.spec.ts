@@ -137,6 +137,34 @@ describe('PostRecommendationUseCases', () => {
     expect(store.listHotCandidates).toHaveBeenCalledTimes(1);
   });
 
+  it('fresh: tải lại trong 30 phút không ra y hệt trang cũ; trang sau giữ cùng mốc đọc bài đã gợi ý', async () => {
+    const { useCases, servedList } = setup();
+    const first = await useCases.recommend(query({ mode: 'for_you', limit: 4, now: NOW }));
+    const later = new Date(NOW.getTime() + 60_000);
+    // Không fresh: bài vừa gợi ý 1 phút trước chưa tính là phiên trước nên trang đầu y hệt.
+    const again = await useCases.recommend(query({ mode: 'for_you', limit: 4, now: later }));
+    expect(ids(again)).toEqual(ids(first));
+
+    // Cursor không fresh giữ nguyên dạng cũ, không có seenUntil.
+    const plain = JSON.parse(Buffer.from(first.nextCursor!, 'base64url').toString()) as Record<string, unknown>;
+    expect(plain).not.toHaveProperty('seenUntil');
+
+    // Tải lại luôn tới sau lần gợi ý trước đó.
+    const reloadAt = new Date(later.getTime() + 1_000);
+    const fresh = await useCases.recommend(query({ mode: 'for_you', limit: 4, now: reloadAt, fresh: true }));
+    expect(ids(fresh).filter((id) => ids(first).includes(id))).toEqual([]);
+    expect(servedList.mock.calls.at(-1)![1]).toEqual(reloadAt);
+    const freshCursor = JSON.parse(Buffer.from(fresh.nextCursor!, 'base64url').toString()) as Record<string, unknown>;
+    expect(freshCursor.seenUntil).toBe(reloadAt.getTime());
+
+    // Trang sau tới muộn hơn (kể cả truyền fresh: true) vẫn giữ mốc của trang đầu, không trùng trang đầu.
+    const page2 = await useCases.recommend(
+      query({ mode: 'for_you', limit: 4, cursor: fresh.nextCursor, now: new Date(reloadAt.getTime() + 5_000), fresh: true }),
+    );
+    expect(servedList.mock.calls.at(-1)![1]).toEqual(reloadAt);
+    expect(ids(page2).filter((id) => ids(fresh).includes(id))).toEqual([]);
+  });
+
   it('cache phiên chỉ giữ 300 bài đầu: cuộn sâu hơn thì xếp lại, vẫn không lặp và không mất bài', async () => {
     const { useCases, store } = setup();
     const hotIds = Array.from({ length: 400 }, (_, i) => `x${String(i).padStart(3, '0')}`);
