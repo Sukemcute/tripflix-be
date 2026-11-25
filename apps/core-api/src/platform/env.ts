@@ -92,6 +92,8 @@ export const coreEnvSchema = baseEnvSchema
     DATABASE_URL_DISCOVERY: z.string(),
     DATABASE_URL_ANALYTICS: z.string(),
     DATABASE_URL_COMMERCE: z.string(),
+    // Thời gian chờ mượn kết nối từ pool (mọi module). Tăng khi load test thấy 500 do pool cạn ngắn hạn.
+    DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(3_000),
     // Pool commerce tự tăng theo tải (L4). BUDGET: tổng kết nối commerce cho mọi bản core-api cộng lại, chia theo số bản
     // đang chạy; CEILING: trần của một bản. Phải nằm trong max_connections của Postgres (deploy/compose.server.yaml).
     COMMERCE_POOL_AUTOSCALE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
