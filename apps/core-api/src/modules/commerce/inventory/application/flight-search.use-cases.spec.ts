@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CommerceError } from '../domain/errors.js';
 import { MemoryCommerceStore } from '../infra/memory/memory-commerce.store.js';
 import { CalendarUseCases } from './calendar.use-cases.js';
@@ -176,5 +176,20 @@ describe('FlightSearchUseCases.getPriceCalendar', () => {
     await expect(flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-12-05', end: '2026-12-04' })).rejects.toMatchObject({ field: 'end' });
     await expect(flights.getPriceCalendar({ from: 'SGN', to: 'CXR', start: '2026-12-01', end: '2027-01-01' })).rejects.toMatchObject({ field: 'end' });
     await expect(flights.getPriceCalendar({ from: 'SGN', to: 'SGN', start: '2026-12-01', end: '2026-12-02' })).rejects.toMatchObject({ field: 'to' });
+  });
+});
+
+describe('FlightSearchUseCases với lịch đọc (READ_CALENDAR)', () => {
+  it('tìm chuyến và dải giá đọc lịch được tiêm, không đọc thẳng database', async () => {
+    const { store } = await setup();
+    const readCalendar = { loadRoomDays: vi.fn(), loadFlightDays: vi.fn((...args: Parameters<typeof store.calendar.loadFlightDays>) => store.calendar.loadFlightDays(...args)) };
+    const direct = vi.spyOn(store.calendar, 'loadFlightDays');
+    const flights = new FlightSearchUseCases(store, () => TODAY, readCalendar);
+
+    await flights.searchFlights({ from: 'sgn', to: 'cxr', date: DATE, passengers: 1 });
+    await flights.getPriceCalendar({ from: 'sgn', to: 'cxr', start: DATE, end: DATE, passengers: 1 });
+
+    expect(readCalendar.loadFlightDays).toHaveBeenCalledTimes(2);
+    expect(direct).toHaveBeenCalledTimes(2); // chỉ qua bản đọc ủy quyền ở trên
   });
 });

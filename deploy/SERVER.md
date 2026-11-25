@@ -39,6 +39,11 @@ dc ps
 
 Xong khi `postgres` và `redis` đều `healthy`, và cột cổng không có `0.0.0.0`.
 
+Giới hạn bộ nhớ (đặt trong `.env.server`, rồi `dc up -d postgres redis` để tạo lại container; `deploy-api.sh` không làm):
+- `REDIS_MAXMEMORY`: mặc định `0` (không giới hạn). Xem `dc exec redis redis-cli info memory` (`used_memory_human`) rồi đặt cao hơn hẳn mức đang dùng, khoảng 1/8 RAM của VM (vd `512mb` cho VM 4 GB). Chính sách là `noeviction`: đầy thì lệnh ghi báo lỗi chứ không xoá khoá chống gửi trùng.
+- `PG_SHARED_BUFFERS`: mặc định `128MB`. Khoảng 1/4 RAM dành cho Postgres (vd `512MB` cho VM 4 GB).
+- `stream:dead-letter` tự gọn về ~10.000 bản ghi ở lần ghi kế tiếp (`MAXLEN ~`), replayer gỡ bản đã gửi xong, nên không cần `XTRIM` tay.
+
 ## Giai đoạn 2: core-api và dữ liệu mẫu
 
 ```bash

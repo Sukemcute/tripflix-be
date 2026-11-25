@@ -1,0 +1,153 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "dd775b50-dfa2-45eb-802c-acd096f04ee3",
+  "prevIds": [
+    "298fda19-cb64-4ce1-8806-f8a4e08c3fae"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "posts",
+        "idx_posts_hashtags"
+      ],
+      "writes": [
+        "s|idx|content.idx_posts_hashtags",
+        "n|idx|content.idx_posts_hashtags",
+        "e|idx|content.idx_posts_hashtags",
+        "n|rel|content.idx_posts_hashtags"
+      ],
+      "reads": [
+        "n|tbl|content.posts",
+        "n|sch|content",
+        "n|col|content.posts.hashtags"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "posts",
+        "idx_posts_updated_id"
+      ],
+      "writes": [
+        "s|idx|content.idx_posts_updated_id",
+        "n|idx|content.idx_posts_updated_id",
+        "e|idx|content.idx_posts_updated_id",
+        "n|rel|content.idx_posts_updated_id"
+      ],
+      "reads": [
+        "n|tbl|content.posts",
+        "n|sch|content",
+        "n|col|content.posts.updated_at",
+        "n|col|content.posts.id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "post_counter_deltas",
+        "idx_post_counter_deltas_post_id"
+      ],
+      "writes": [
+        "s|idx|content.idx_post_counter_deltas_post_id",
+        "n|idx|content.idx_post_counter_deltas_post_id",
+        "e|idx|content.idx_post_counter_deltas_post_id",
+        "n|rel|content.idx_post_counter_deltas_post_id"
+      ],
+      "reads": [
+        "n|tbl|content.post_counter_deltas",
+        "n|sch|content",
+        "n|col|content.post_counter_deltas.post_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "posts",
+        "name": "idx_posts_hashtags",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "hashtags",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "gin",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "posts",
+        "name": "idx_posts_updated_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "updated_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "post_counter_deltas",
+        "name": "idx_post_counter_deltas_post_id",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "post_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

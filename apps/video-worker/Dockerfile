@@ -5,7 +5,8 @@ ARG APP=@tripflix/video-worker
 
 FROM node:24-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
-ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true
+# turbo chạy nhiều `pnpm run` song song: bước kiểm deps trước khi chạy đọc file trạng thái đang ghi dở, lỗi "Unexpected end of JSON input".
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true npm_config_verify_deps_before_run=false
 RUN corepack enable
 WORKDIR /repo
 

@@ -69,7 +69,9 @@ services:
     logging: *logging
     # Mặc định 100. Mỗi bản core-api mở tối đa 45 kết nối (5 module), notification-service 10, cộng pool commerce tự tăng
     # theo tải: 200 đủ cho 2–3 bản core-api. Đổi giá trị này phải tạo lại container: `up -d postgres` (deploy-api.sh không làm).
-    command: ['postgres', '-c', 'max_connections=200']
+    command: ['postgres', '-c', 'max_connections=200', '-c', 'shared_buffers=${PG_SHARED_BUFFERS:-128MB}']
+    # Docker mặc định 64 MB /dev/shm: truy vấn song song (hash join) dễ lỗi "could not resize shared memory segment".
+    shm_size: 256mb
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       DB_PASS_ACCESS: ${DB_PASS_ACCESS:?}
@@ -94,7 +96,9 @@ services:
     image: redis:8.8-alpine
     restart: unless-stopped
     logging: *logging
-    command: ['redis-server', '--appendonly', 'yes']
+    # noeviction: đầy thì báo lỗi ghi, không âm thầm xoá khoá chống gửi trùng như volatile-lru. 0 = không giới hạn;
+    # đặt REDIS_MAXMEMORY (vd 512mb) theo RAM của VM, xem deploy/SERVER.md.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '${REDIS_MAXMEMORY:-0}', '--maxmemory-policy', 'noeviction']
     volumes:
       - redis-data:/data
     healthcheck:
@@ -122,6 +126,8 @@ services:
       APP_ROLE: all
       PORT: 3000
       OTEL_SERVICE_NAME: core-api
+      # Nạp OTel trước pg, ioredis để có span từng câu SQL, lệnh Redis (TF99). Tắt OTel thì register không làm gì.
+      NODE_OPTIONS: --import @tripflix/observability/register
       # Trang /analytics của admin đọc metric, trace qua core-api (docs/observability.md).
       ANALYTICS_PROMETHEUS_URL: ${ANALYTICS_PROMETHEUS_URL-http://prometheus:9090}
       ANALYTICS_TEMPO_URL: ${ANALYTICS_TEMPO_URL-http://tempo:3200}
@@ -169,6 +175,8 @@ services:
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
       <<: *otel-env
       OTEL_SERVICE_NAME: notification-service
+      # Nạp OTel trước pg, ioredis để có span từng câu SQL, lệnh Redis (TF99). Tắt OTel thì register không làm gì.
+      NODE_OPTIONS: --import @tripflix/observability/register
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }

@@ -137,6 +137,24 @@ describe('PostRecommendationUseCases', () => {
     expect(store.listHotCandidates).toHaveBeenCalledTimes(1);
   });
 
+  it('cache phiên chỉ giữ 300 bài đầu: cuộn sâu hơn thì xếp lại, vẫn không lặp và không mất bài', async () => {
+    const { useCases, store } = setup();
+    const hotIds = Array.from({ length: 400 }, (_, i) => `x${String(i).padStart(3, '0')}`);
+    store.listHotCandidates.mockResolvedValue(hotIds.map((id, i) => cand(id, { score: 1 - i / 1000 })));
+    store.listFreshCandidates.mockResolvedValue([]);
+    store.listExplorePool.mockResolvedValue([]);
+    const all: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await useCases.recommend(query({ mode: 'trending', limit: 50, cursor }));
+      all.push(...ids(res));
+      cursor = res.nextCursor;
+    } while (cursor);
+    expect(all).toEqual(hotIds);
+    // Trang 1 xếp, trang 2–6 đọc cache (tới bài 300), trang 7–8 vượt phần đã giữ nên xếp lại.
+    expect(store.listHotCandidates).toHaveBeenCalledTimes(3);
+  });
+
   it('ranker cũ không đọc dòng thô người xem và giữ giới hạn 150 bài hot', async () => {
     const { useCases, store } = setup();
     await useCases.recommend(query());

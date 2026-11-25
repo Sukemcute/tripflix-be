@@ -4,7 +4,8 @@
 ARG APP=@tripflix/core-api
 
 FROM node:24-slim AS base
-ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true
+# turbo chạy nhiều `pnpm run` song song: bước kiểm deps trước khi chạy đọc file trạng thái đang ghi dở, lỗi "Unexpected end of JSON input".
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true npm_config_verify_deps_before_run=false
 RUN corepack enable
 WORKDIR /repo
 
