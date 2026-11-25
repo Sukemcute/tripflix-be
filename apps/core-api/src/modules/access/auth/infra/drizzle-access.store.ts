@@ -185,6 +185,15 @@ class DrizzleUserRepository implements UserRepository {
     return this.patch(id, { passwordHash });
   }
 
+  async replacePasswordHash(id: string, currentHash: string, newHash: string) {
+    const rows = await this.db
+      .update(users)
+      .set({ passwordHash: newHash, updatedAt: new Date() })
+      .where(and(eq(users.id, id), eq(users.passwordHash, currentHash)))
+      .returning({ id: users.id });
+    return rows.length > 0;
+  }
+
   async updateAvatar(id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>) {
     return this.patch(id, avatar);
   }

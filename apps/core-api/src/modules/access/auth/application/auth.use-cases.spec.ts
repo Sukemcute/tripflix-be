@@ -16,7 +16,9 @@ import { hashRefreshToken } from './refresh-token.js';
 const meta = { ip: '10.0.0.1', userAgent: 'vitest' };
 const hasher: PasswordHasher = {
   hash: async (p) => `hashed:${p}`,
+  hashForTiming: async (p) => `hashed:${p}`,
   verify: async (h, p) => h === `hashed:${p}`,
+  needsRehash: () => false,
 };
 const issuer: TokenIssuer = {
   issue: async ({ sid }) => ({ token: `access-for-${sid}`, expiresIn: 900 }),
@@ -179,5 +181,52 @@ describe('AuthUseCases.login', () => {
     await expect(
       auth.login({ email: 'an@example.com', password: 'mat-khau-1', loginChallengeId, code }, meta),
     ).rejects.toMatchObject({ code: 'invalid_registration_code' });
+  });
+});
+
+describe('AuthUseCases: băm lại hash có độ khó cũ khi đăng nhập', () => {
+  // Hash "old:" giả làm hash tạo bằng độ khó cũ.
+  const rehashingHasher: PasswordHasher = {
+    hash: async (p) => `new:${p}`,
+    hashForTiming: async (p) => `old:${p}`,
+    verify: async (h, p) => h === `new:${p}` || h === `old:${p}`,
+    needsRehash: (h) => h.startsWith('old:'),
+  };
+
+  async function setupWithOldHash() {
+    const store = new MemoryAccessStore();
+    const auth = new AuthUseCases(
+      store,
+      rehashingHasher,
+      issuer,
+      new MemoryLoginRateLimiter(() => Date.now()),
+      new MemorySidBlocklist(() => Date.now()),
+      () => new Date(),
+      { verify: async () => Promise.reject(new Error('không dùng trong test này')) },
+      new MemoryActionRateLimiter(),
+      {} as CoreEnv,
+    );
+    const user = (await store.users.insert({ email: 'an@example.com', passwordHash: 'old:mat-khau-1', displayName: 'An', role: 'member' }))!;
+    return { auth, store, userId: user.id };
+  }
+
+  it('đăng nhập đúng: thay hash cũ bằng hash mới, lần sau vẫn đăng nhập được', async () => {
+    const { auth, store, userId } = await setupWithOldHash();
+    await auth.login({ email: 'an@example.com', password: 'mat-khau-1' }, meta);
+    expect(store.userRows.get(userId)!.passwordHash).toBe('new:mat-khau-1');
+    await expect(auth.login({ email: 'an@example.com', password: 'mat-khau-1' }, meta)).resolves.toBeDefined();
+  });
+
+  it('sai mật khẩu: giữ nguyên hash cũ', async () => {
+    const { auth, store, userId } = await setupWithOldHash();
+    await expect(auth.login({ email: 'an@example.com', password: 'sai' }, meta)).rejects.toBeInstanceOf(AccessError);
+    expect(store.userRows.get(userId)!.passwordHash).toBe('old:mat-khau-1');
+  });
+
+  it('mật khẩu vừa đổi giữa chừng thì không bị ghi đè bằng hash của mật khẩu cũ', async () => {
+    const { store, userId } = await setupWithOldHash();
+    await store.users.updatePasswordHash(userId, 'new:mat-khau-2');
+    expect(await store.users.replacePasswordHash(userId, 'old:mat-khau-1', 'new:mat-khau-1')).toBe(false);
+    expect(store.userRows.get(userId)!.passwordHash).toBe('new:mat-khau-2');
   });
 });

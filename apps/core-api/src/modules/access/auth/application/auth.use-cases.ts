@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { AuthUser, SidBlocklist } from '@tripflix/auth';
 import type {
@@ -103,6 +103,7 @@ export interface TokenPair {
  */
 @Injectable()
 export class AuthUseCases {
+  private readonly logger = new Logger(AuthUseCases.name);
   private dummyHash?: Promise<string>;
   private readonly registerMaxPerIp: number;
 
@@ -253,7 +254,18 @@ export class AuthUseCases {
       throw new AccessError('invalid_credentials', INVALID_CREDENTIALS_MESSAGE);
     }
 
+    await this.rehashIfOutdated(user, input.password);
     return { email, user };
+  }
+
+  /** Hash tạo bằng độ khó cũ: băm lại bằng mức mới khi đang có mật khẩu đúng trong tay. Lỗi thì bỏ qua, lần sau thử lại. */
+  private async rehashIfOutdated(user: UserRecord, password: string): Promise<void> {
+    if (!user.passwordHash || !this.hasher.needsRehash(user.passwordHash)) return;
+    try {
+      await this.store.users.replacePasswordHash(user.id, user.passwordHash, await this.hasher.hash(password));
+    } catch (error) {
+      this.logger.warn(`Không băm lại được mật khẩu của ${user.id}: ${(error as Error).message}`);
+    }
   }
 
   async login(
@@ -635,7 +647,7 @@ export class AuthUseCases {
   }
 
   private getDummyHash(): Promise<string> {
-    this.dummyHash ??= this.hasher.hash('tripflix-dummy-password-for-timing');
+    this.dummyHash ??= this.hasher.hashForTiming('tripflix-dummy-password-for-timing');
     return this.dummyHash;
   }
 }
