@@ -25,6 +25,8 @@ AUTH_JWT_PRIVATE_KEY="$jwt_key"
 AUTH_PASSWORD_KEYS="k1:$password_key"
 # Mật khẩu chung của 3 tài khoản mẫu, gồm cả superadmin.
 SEED_PASSWORD=$(secret)
+# Key của Typesense (tìm khám phá, TF13). core-api không khởi động nếu key trống hoặc là key dev.
+TYPESENSE_API_KEY=$(openssl rand -hex 32)
 
 # Điền tay. Key chỉ ghi được S3_KEY_PREFIX dưới đây.
 AWS_ACCESS_KEY_ID=

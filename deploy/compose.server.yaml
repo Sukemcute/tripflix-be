@@ -131,16 +131,50 @@ services:
       # Trang /analytics của admin đọc metric, trace qua core-api (docs/observability.md).
       ANALYTICS_PROMETHEUS_URL: ${ANALYTICS_PROMETHEUS_URL-http://prometheus:9090}
       ANALYTICS_TEMPO_URL: ${ANALYTICS_TEMPO_URL-http://tempo:3200}
+      # Tìm khám phá (TF13). Quay lui: đặt SEARCH_BACKEND=postgres trong .env.server rồi chạy lại core-api.
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-typesense}
+      TYPESENSE_HOST: typesense
+      TYPESENSE_PORT: 8108
+      TYPESENSE_PROTOCOL: http
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:?đặt TYPESENSE_API_KEY trong .env.server}
+      TYPESENSE_COLLECTION_ALIAS: explore
     ports: ['127.0.0.1:${API_PORT:-3000}:3000']
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
+      typesense: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 60s
+
+  # Chỉ mục tìm khám phá (TF13). Không mở cổng: chỉ core-api gọi qua mạng compose.
+  # Lần đầu core-api tự dựng chỉ mục khoảng 1–2 phút, trong lúc đó tìm kiếm trả rỗng (deploy/SERVER.md, mục Tìm kiếm).
+  typesense:
+    profiles: [api]
+    image: typesense/typesense:29.0
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:?đặt TYPESENSE_API_KEY trong .env.server}
+      # Snapshot cắt nhật ký raft: mặc định 3600 s thì khởi động lại phát lại cả lượt dựng (~3,6 GB ghi).
+      TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: 300
+      # Bộ đệm ghi RocksDB mặc định 4 MB khuếch đại ghi ~21 lần (~7,8 GB mỗi lượt dựng); 64 MB còn ~0,75 GB.
+      TYPESENSE_DB_WRITE_BUFFER_SIZE: 67108864
+    volumes:
+      - typesense-data:/data
+    # Đo ở 44k mục: 0,5–0,7 GB.
+    mem_limit: 1g
+    healthcheck:
+      # Image không có curl/wget: gọi /health qua /dev/tcp của bash.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/8108 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && grep -q "\"ok\":true" <&3']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   # ---------- Giai đoạn 4: gửi email (TF05D) ----------
   # Gửi email xác thực, đặt lại mật khẩu, chào mừng qua SMTP của Amazon SES (deploy/SERVER.md, Giai đoạn 4).
@@ -450,3 +484,4 @@ volumes:
   letsencrypt:
   prometheus-data:
   tempo-data:
+  typesense-data:

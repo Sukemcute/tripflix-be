@@ -420,6 +420,24 @@ Trang `/analytics` (tài khoản superadmin) phải báo nguồn `ready`, có s�
 
 Tắt: đặt `OTEL_SDK_DISABLED=true` trong `.env.server`, tạo lại core-api và notification-service, rồi `dc --profile observability stop`. Collector dừng mà app vẫn bật thì app chỉ ghi log lỗi gửi, không ảnh hưởng request.
 
+## Tìm kiếm: Typesense (TF13)
+
+`typesense` chạy cùng profile `api` với core-api, không mở cổng, `mem_limit: 1g` (đo 0,5–0,7 GB ở 44k mục). core-api đợi Typesense healthy rồi mới chạy.
+
+Bật lần đầu trên server đang chạy (làm lúc ít người dùng):
+
+```bash
+df -h / && free -h                                   # cần trống ít nhất ~2 GB đĩa (lượt dựng ghi ~0,75 GB)
+grep -q '^TYPESENSE_API_KEY=.' .env.server || echo "TYPESENSE_API_KEY=$(openssl rand -hex 32)" >> .env.server
+# Chép compose.server.yaml mới lên server (deploy chỉ kéo image, không chép file), rồi:
+dc --profile api up -d --wait core-api               # tự bật typesense trước, core-api khởi động lại
+dc --profile api logs core-api | grep "Đã dựng chỉ mục tìm khám phá"
+```
+
+- Phải đặt `TYPESENSE_API_KEY` **trước** khi chép compose mới: thiếu biến thì mọi lệnh `dc` báo lỗi, kể cả deploy tự động. core-api production cũng không khởi động nếu key trống hoặc là `dev-typesense-key`.
+- Lần đầu core-api tự dựng chỉ mục khoảng 1–2 phút; trong lúc đó tìm kiếm trả rỗng. Sau đó bài mới, sửa, ẩn đồng bộ theo sự kiện; đối soát toàn bộ mỗi 24 giờ.
+- Quay lui: thêm `SEARCH_BACKEND=postgres` vào `.env.server`, chạy `dc --profile api up -d --wait core-api`. Không cần migrate hay xoá gì; Typesense vẫn chạy nhưng không được dùng.
+
 ## Vận hành
 
 ```bash
