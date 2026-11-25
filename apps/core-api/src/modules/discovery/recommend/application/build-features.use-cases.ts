@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { captionExpOf, captionOf, EXP_DESCRIPTION_TEXTS } from '../domain/bins.js';
 import { calculateCompleteness, hasPlan } from '../../../content/index.js';
 import { round4, type PostBuilder, type PostContent, type PostMeta, type RawRow, type UserBuilder } from '../domain/contracts.js';
+import { groupBy } from '../domain/group-by.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
 import { CAPTION_MODEL } from '../domain/topics.js';
@@ -289,12 +290,6 @@ export class BuildFeaturesUseCases {
       this.logger.error({ builder: key, err: error }, `Builder ${key} lỗi, giữ dữ liệu cũ`);
     }
   }
-}
-
-function groupBy<T>(xs: T[], key: (x: T) => string): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const x of xs) m.set(key(x), [...(m.get(key(x)) ?? []), x]);
-  return m;
 }
 
 /** Bài mà các dòng nhắm tới (target post hoặc detail.sourcePostId / detail.postId). */

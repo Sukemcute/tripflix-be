@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { round4, type FlightBuilder, type FlightBuildItem, type ProductBuildOutput } from '../contracts.js';
+import { groupBy } from '../group-by.js';
 
 export const FlightProfileV0FeaturesSchema = z.object({
   route: z.string(),
@@ -39,8 +40,7 @@ export const flightProfileV0: FlightBuilder = {
   featuresSchema: FlightProfileV0FeaturesSchema,
   build: ({ flights }) => {
     const maxBookings = Math.max(0, ...flights.map((f) => f.bookings30d));
-    const byRoute = new Map<string, FlightBuildItem[]>();
-    for (const f of flights) byRoute.set(routeOf(f), [...(byRoute.get(routeOf(f)) ?? []), f]);
+    const byRoute = groupBy(flights, routeOf);
     const out: ProductBuildOutput[] = [];
     for (const [route, peers] of byRoute) {
       const prices = peers.flatMap((p) => (p.priceFrom === null ? [] : [p.priceFrom]));

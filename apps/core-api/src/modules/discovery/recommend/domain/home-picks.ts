@@ -90,14 +90,18 @@ export function pickHomeRecommendations(
 
   for (const h of candidates) {
     if (h.stars !== null) {
-      nationalTiers.set(h.stars, [...(nationalTiers.get(h.stars) ?? []), h.priceFrom]);
+      const national = nationalTiers.get(h.stars);
+      if (national) national.push(h.priceFrom);
+      else nationalTiers.set(h.stars, [h.priceFrom]);
 
       let pMap = provinceTiers.get(h.province.slug);
       if (!pMap) {
         pMap = new Map();
         provinceTiers.set(h.province.slug, pMap);
       }
-      pMap.set(h.stars, [...(pMap.get(h.stars) ?? []), h.priceFrom]);
+      const tier = pMap.get(h.stars);
+      if (tier) tier.push(h.priceFrom);
+      else pMap.set(h.stars, [h.priceFrom]);
     }
   }
 
