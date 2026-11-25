@@ -173,6 +173,8 @@ export interface UserRepository {
   updateProfile(id: string, patch: ProfilePatch): Promise<UserRecord | null>;
   /** passwordHash null: xoá mật khẩu (tài khoản chỉ còn đăng nhập Google). */
   updatePasswordHash(id: string, passwordHash: string | null): Promise<UserRecord | null>;
+  /** Thay hash chỉ khi hash hiện tại vẫn là `currentHash`, để không ghi đè mật khẩu vừa đổi. Trả true nếu đã thay. */
+  replacePasswordHash(id: string, currentHash: string, newHash: string): Promise<boolean>;
   updateAvatar(id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>): Promise<UserRecord | null>;
   updateAvatarDecor(id: string, avatarDecor: AvatarDecor | null): Promise<UserRecord | null>;
   /** Đặt email_verified_at nếu đang trống (giữ mốc đầu tiên); trả người dùng sau khi đổi. */
@@ -267,7 +269,11 @@ export interface AccessStore {
 
 export interface PasswordHasher {
   hash(password: string): Promise<string>;
+  /** Hash giả cho tài khoản không tồn tại, cùng độ khó với đa số hash đang lưu để thời gian phản hồi không lộ tài khoản. */
+  hashForTiming(password: string): Promise<string>;
   verify(hash: string, password: string): Promise<boolean>;
+  /** Hash tạo bằng độ khó cũ: băm lại khi người dùng đăng nhập đúng mật khẩu. */
+  needsRehash(hash: string): boolean;
 }
 
 /** Khoá công khai client dùng để mã hoá mật khẩu trước khi gửi (GET /auth/password-key). */

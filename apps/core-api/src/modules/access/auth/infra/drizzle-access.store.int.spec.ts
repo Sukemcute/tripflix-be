@@ -178,6 +178,13 @@ describe('DrizzleAccessStore trên Postgres thật (user tf_access)', () => {
     expect(await store.users.findById(user!.id)).toMatchObject({ displayName: 'Bình', passwordHash: 'new', email: 'profile@example.com' });
   });
 
+  it('replacePasswordHash chỉ thay khi hash hiện tại khớp, không ghi đè mật khẩu vừa đổi', async () => {
+    const user = await store.users.insert({ email: 'rehash@example.com', passwordHash: 'old', displayName: 'A', role: 'member' });
+    expect(await store.users.replacePasswordHash(user!.id, 'old', 'rehashed')).toBe(true);
+    expect(await store.users.replacePasswordHash(user!.id, 'old', 'stale')).toBe(false);
+    expect((await store.users.findById(user!.id))?.passwordHash).toBe('rehashed');
+  });
+
   it('TF109: ảnh đại diện lưu khi tạo và khi đổi; DB chặn nguồn ảnh lạ', async () => {
     const avatar = { avatarUrl: 'https://lh3.googleusercontent.com/a/x', avatarSource: 'google' as const };
     const user = await store.users.insert({ email: 'avatar@example.com', passwordHash: null, displayName: 'D', role: 'member', avatar });

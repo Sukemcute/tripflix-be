@@ -99,6 +99,11 @@ export class MemoryAccessStore implements AccessStore {
       });
     },
     updatePasswordHash: async (id: string, passwordHash: string | null) => this.patchUser(id, { passwordHash }),
+    replacePasswordHash: async (id: string, currentHash: string, newHash: string) => {
+      if (this.userRows.get(id)?.passwordHash !== currentHash) return false;
+      await this.patchUser(id, { passwordHash: newHash });
+      return true;
+    },
     updateAvatar: async (id: string, avatar: Pick<UserRecord, 'avatarUrl' | 'avatarSource'>) => this.patchUser(id, avatar),
     updateAvatarDecor: async (id: string, avatarDecor: UserRecord['avatarDecor']) => this.patchUser(id, { avatarDecor }),
     markEmailVerified: async (id: string, at: Date) => {

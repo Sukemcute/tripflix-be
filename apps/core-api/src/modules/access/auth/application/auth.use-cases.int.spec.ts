@@ -88,7 +88,7 @@ describe('AuthUseCases + @Transactional trên Postgres, Redis thật', () => {
             return store;
           },
         },
-        { provide: PASSWORD_HASHER, useValue: { hash: async (p: string) => `h:${p}`, verify: async (hash: string, plain: string) => hash === `h:${plain}` } },
+        { provide: PASSWORD_HASHER, useValue: { hash: async (p: string) => `h:${p}`, hashForTiming: async (p: string) => `h:${p}`, verify: async (hash: string, plain: string) => hash === `h:${plain}`, needsRehash: () => false } },
         { provide: TOKEN_ISSUER, useValue: { issue: async () => ({ token: 't', expiresIn: 900 }), getJwks: () => ({ keys: [] }) } },
         { provide: LOGIN_RATE_LIMITER, useValue: new MemoryLoginRateLimiter() },
         { provide: ACCESS_SID_BLOCKLIST, useValue: new MemorySidBlocklist() },
