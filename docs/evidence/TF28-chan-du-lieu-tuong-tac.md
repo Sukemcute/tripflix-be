@@ -4,7 +4,7 @@
 
 ## Bối cảnh
 
-Phong báo BuildFeaturesJob chạy rất lâu và chặn API khi `APP_ROLE=all`. Bảng `recommend_interactions` không có trần dòng mỗi người: các loại `search`, `stays_search`, `share`, `booking_click` lấy `ref_id = eventId`, nên mỗi lần tìm thêm một dòng. Một người, bot hay stress test đã đăng nhập có thể tạo hàng chục nghìn dòng. Job tính đặc trưng và feed (`loadViewer`) đều đọc hết số dòng đó vào RAM. PR này chặn và dọn dữ liệu, và sửa `groupBy` O(N²) trong job.
+Thành báo BuildFeaturesJob chạy rất lâu và chặn API khi `APP_ROLE=all`. Bảng `recommend_interactions` không có trần dòng mỗi người: các loại `search`, `stays_search`, `share`, `booking_click` lấy `ref_id = eventId`, nên mỗi lần tìm thêm một dòng. Một người, bot hay stress test đã đăng nhập có thể tạo hàng chục nghìn dòng. Job tính đặc trưng và feed (`loadViewer`) đều đọc hết số dòng đó vào RAM. PR này chặn và dọn dữ liệu, và sửa `groupBy` O(N²) trong job.
 
 ## Đã làm
 
@@ -14,7 +14,7 @@ Trần đặt chung ở `recommend/domain/row-limits.ts`.
 2. **Dọn phần thừa**: job `recommend_purge` thêm bước `purgeExcess`, xoá theo lô 5.000 các dòng chỉ-thêm vượt 300 dòng mới nhất mỗi người mỗi loại. Hàm cửa sổ chỉ chạy trên các nhóm vượt trần. Admin bấm "Chạy ngay" để dọn ngay.
 3. **Chặn lúc nạp**: `RecommendIngestUseCases` đếm số dòng chỉ-thêm theo (người, loại, ngày UTC) bằng Redis `INCRBY` + hết hạn 2 ngày; quá 500 thì bỏ phần vượt và ghi cảnh báo một lần. Redis lỗi thì nạp như cũ, vì trần lúc đọc và job dọn vẫn chặn phía sau.
 4. **Cầu chì cho job**: nhường event loop (`setImmediate`) giữa các lô 200 người; lượt quá 5 phút thì dừng phần người dùng. Người chưa tính giữ đặc trưng cũ, lỗi ghi vào `last_error` / Admin Jobs.
-5. **`groupBy` O(N²) → O(N)** (nguyên nhân chặn event loop Phong báo): bản cũ chép lại cả mảng mỗi dòng (`[...old, x]`). Thay bằng `recommend/domain/group-by.ts` (push vào mảng sẵn có), dùng chung cho `build-features` và `hotel-profile`; sửa cùng kiểu ở `flight-profile` và `home-picks`. Đo trên máy dev: 5.000 dòng 12 ms → 0,5 ms; 20.000 dòng 100 ms → 1,4 ms; 50.000 dòng 2.118 ms → 4,9 ms.
+5. **`groupBy` O(N²) → O(N)** (nguyên nhân chặn event loop Thành báo): bản cũ chép lại cả mảng mỗi dòng (`[...old, x]`). Thay bằng `recommend/domain/group-by.ts` (push vào mảng sẵn có), dùng chung cho `build-features` và `hotel-profile`; sửa cùng kiểu ở `flight-profile` và `home-picks`. Đo trên máy dev: 5.000 dòng 12 ms → 0,5 ms; 20.000 dòng 100 ms → 1,4 ms; 50.000 dòng 2.118 ms → 4,9 ms.
 
 ## Đối chiếu "Xong khi"
 
