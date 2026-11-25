@@ -20,6 +20,10 @@ import {
 const LOCK = 'discovery.recommend-features';
 const JOB = 'build-features';
 const USER_BATCH = 200;
+/** Một lượt quá lâu thì dừng phần người dùng: người chưa tính giữ đặc trưng cũ, lỗi hiện ở Admin Jobs thay vì giữ worker hàng giờ. */
+export const BUILD_BUDGET_MS = 5 * 60_000;
+/** Trả lượt cho event loop giữa các lô: APP_ROLE=all thì request API không phải chờ hết job. */
+const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
 /** Văn bản mới nhúng tối đa mỗi chu kỳ (~45 giây ở ai-service 0,5 CPU; 42k bài backfill ~3,5 giờ); phần còn lại để chu kỳ sau. */
 const EMBED_PER_CYCLE = 2048;
 /** Số caption đọc vector mỗi lần: một câu IN vừa phải, và RAM chỉ giữ vector của một lô. */
@@ -140,11 +144,11 @@ export class BuildFeaturesUseCases {
   }
 
   /** null = worker khác đang chạy hoặc content tạm rỗng, bỏ lượt. */
-  runCycle(now = new Date()): Promise<BuildCycleResult | null> {
-    return this.store.withLock(LOCK, () => this.build(now)).then((r) => r ?? null);
+  runCycle(now = new Date(), budgetMs = BUILD_BUDGET_MS): Promise<BuildCycleResult | null> {
+    return this.store.withLock(LOCK, () => this.build(now, Date.now() + budgetMs)).then((r) => r ?? null);
   }
 
-  private async build(now: Date): Promise<BuildCycleResult | null> {
+  private async build(now: Date, deadline: number): Promise<BuildCycleResult | null> {
     const [sourcePosts, hotels] = await Promise.all([
       readAll((c) => this.catalog.listPosts(c)),
       readAll((c) => this.catalog.listHotelProvinces(c)),
@@ -232,6 +236,10 @@ export class BuildFeaturesUseCases {
     for (const builder of userBuilders) {
       await this.runBuilder(builder.key, now, failedBuilders, async () => {
         for (let i = 0; i < userIds.length; i += USER_BATCH) {
+          if (Date.now() > deadline) {
+            throw new Error(`Quá ngân sách thời gian của lượt, mới tính ${i}/${userIds.length} người; phần còn lại giữ đặc trưng cũ`);
+          }
+          if (i > 0) await yieldToEventLoop();
           const batch = userIds.slice(i, i + USER_BATCH);
           const rowsByUser = groupBy(await this.store.listUserRows(batch, now), (r) => r.actorId);
           const input = batch.map((userId) => {
