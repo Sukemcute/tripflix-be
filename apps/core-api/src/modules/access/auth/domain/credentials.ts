@@ -32,3 +32,6 @@ export function buildDisplayName(name: string | null, email: string): string {
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
+
+/** Quá nhiều lượt băm mật khẩu cùng lúc: trả 503 kèm Retry-After để client thử lại sau. */
+export const SERVER_BUSY_MESSAGE = 'Hệ thống đang bận, bạn thử lại sau vài giây';

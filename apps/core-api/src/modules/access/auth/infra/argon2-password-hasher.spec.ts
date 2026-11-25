@@ -1,4 +1,5 @@
 import { Argon2PasswordHasher } from './argon2-password-hasher.js';
+import { ConcurrencyLimiter } from './concurrency-limiter.js';
 
 // Độ khó nhỏ cho nhanh; tỉ lệ cũ/mới giống production (mới nhẹ hơn cũ).
 const NEW_COST = { memoryCost: 4096, timeCost: 1 };
@@ -25,5 +26,16 @@ describe('Argon2PasswordHasher', () => {
   it('hash hỏng: verify trả false, không cần băm lại', async () => {
     expect(await hasher.verify('khong-phai-hash', 'x')).toBe(false);
     expect(hasher.needsRehash('khong-phai-hash')).toBe(false);
+  });
+});
+
+describe('Argon2PasswordHasher khi quá tải', () => {
+  it('báo bận (503) chứ không coi là sai mật khẩu', async () => {
+    const cost = { memoryCost: 4096, timeCost: 1 };
+    const hash = await new Argon2PasswordHasher(cost, cost).hash('mat-khau');
+    const busy = new Argon2PasswordHasher(cost, cost, new ConcurrencyLimiter(1, 0));
+    const first = busy.verify(hash, 'mat-khau');
+    await expect(busy.verify(hash, 'mat-khau')).rejects.toMatchObject({ code: 'server_busy' });
+    expect(await first).toBe(true);
   });
 });

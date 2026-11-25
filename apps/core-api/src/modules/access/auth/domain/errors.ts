@@ -16,7 +16,8 @@ export class AccessError extends Error {
       | 'invalid_verify_token'
       | 'invalid_registration_code'
       | 'google_invalid'
-      | 'google_not_configured',
+      | 'google_not_configured'
+      | 'server_busy',
     message: string,
     readonly retryAfterSeconds?: number,
   ) {

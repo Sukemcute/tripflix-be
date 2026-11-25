@@ -94,6 +94,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Hệ thống đang bận, bạn thử lại sau vài giây (quá nhiều người đăng nhập cùng lúc, có Retry-After)"
           }
         },
         "tags": [
@@ -125,6 +128,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Hệ thống đang bận, bạn thử lại sau vài giây (quá nhiều người đăng nhập cùng lúc, có Retry-After)"
           }
         },
         "tags": [
@@ -181,6 +187,9 @@
           },
           "403": {
             "description": "Nguồn gửi request không được phép"
+          },
+          "503": {
+            "description": "Hệ thống đang bận, bạn thử lại sau vài giây (quá nhiều người đăng nhập cùng lúc, có Retry-After)"
           }
         },
         "tags": [
