@@ -5306,9 +5306,22 @@
     },
     "/api/recommendations/posts": {
       "get": {
-        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- `trending`: bài thịnh hành chung.\n- `has_plan`: giống `for_you` (khách nhận `trending`) nhưng chỉ lấy bài có lịch trình.\n- `recent`: bài mới đăng gần đây (mới nhất trước, không xếp hạng cá nhân hoá).\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.",
+        "description": "Đăng nhập tuỳ chọn. Gu người dùng tính lại mỗi 10 phút từ cảm xúc, bình luận, chia sẻ, đơn, lượt tìm.\n\n- `for_you`: theo gu; khách (không token) nhận `trending`, xem trường `algo`.\n- `trending`: bài thịnh hành chung.\n- `has_plan`: giống `for_you` (khách nhận `trending`) nhưng chỉ lấy bài có lịch trình.\n- `recent`: bài mới đăng gần đây (mới nhất trước, không xếp hạng cá nhân hoá).\n- Không bỏ bài nào vì lịch sử người xem, chỉ hạ điểm: bài đã tương tác, bài đã gợi ý ở phiên trước (hơn 30 phút, trong 48 giờ, tối đa 100 bài), bài thứ 3 trở đi của cùng tác giả. Gọi lại cùng cursor ra cùng trang.\n- Người đăng nhập: bài tự đăng trong 1 giờ lên đầu feed của chính họ (`reason.code: own_post`, `source: own`); người khác thấy bài đó như bài thường.\n- Phân trang: gửi `nextCursor` của trang trước vào `cursor`; trang sau dùng cùng thuật toán với trang đầu.\n- Khoảng 5% vị trí là bài ngẫu nhiên (`source: explore`) để đo chất lượng gợi ý.\n- `fresh=true` (trang đầu, khi người xem tự tải lại): bài đã gợi ý cho người này, kể cả vừa gợi ý, bị đẩy xuống để tải lại không ra y hệt trang cũ. Mặc định chỉ bài gợi ý cách hơn 30 phút bị đẩy xuống. Bỏ qua khi có `cursor` hoặc khách.",
         "operationId": "PostRecommendationsController_recommendPosts",
         "parameters": [
+          {
+            "name": "fresh",
+            "required": false,
+            "in": "query",
+            "description": "true khi người xem tự tải lại: mở phiên mới, đẩy xuống mọi bài đã gợi ý",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
           {
             "name": "cursor",
             "required": false,
