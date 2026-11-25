@@ -38,8 +38,9 @@ x-be-env: &be-env
   CORE_API_INTERNAL_URL: ${CORE_API_INTERNAL_URL:-http://localhost:3000}
   MODERATION_SERVICE_CLIENT_SECRET: ${MODERATION_SERVICE_CLIENT_SECRET:-}
   SEARCH_BACKEND: ${SEARCH_BACKEND:-typesense}
-  TYPESENSE_HOST: ${TYPESENSE_HOST:-typesense}
-  TYPESENSE_PORT: ${TYPESENSE_PORT:-8108}
+  # Trong mạng compose, ghi thẳng như DATABASE_URL_* (postgres:5432); cổng mở ra máy là TYPESENSE_HOST_PORT.
+  TYPESENSE_HOST: typesense
+  TYPESENSE_PORT: 8108
   TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}
   TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-dev-typesense-key}
   TYPESENSE_COLLECTION_ALIAS: ${TYPESENSE_COLLECTION_ALIAS:-explore}
@@ -85,12 +86,12 @@ services:
     environment:
       TYPESENSE_DATA_DIR: /data
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-dev-typesense-key}
-      TYPESENSE_ENABLE_CORS: 'true'
       # Snapshot cắt nhật ký raft; mặc định 3600 s thì khởi động lại trong giờ đó phát lại cả lượt dựng (~3,6 GB ghi ở 44k mục).
       TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: ${TYPESENSE_SNAPSHOT_INTERVAL_SECONDS:-300}
       # Bộ đệm ghi RocksDB mặc định 4 MB: nạp 44k mục phải gộp ~180 lần, mỗi lần ghi lại cả dữ liệu (đo: ~7,8 GB ghi mỗi lượt dựng).
       TYPESENSE_DB_WRITE_BUFFER_SIZE: ${TYPESENSE_DB_WRITE_BUFFER_SIZE:-67108864}
-    ports: ['${TYPESENSE_PORT:-8108}:8108']
+    # Chỉ máy local: key mặc định không được mở ra mạng LAN.
+    ports: ['127.0.0.1:${TYPESENSE_HOST_PORT:-8108}:8108']
     volumes:
       - typesense-data:/data
     healthcheck:
@@ -99,6 +100,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 30s
 
   # ---------- Backend (profile be) ----------
   migrate:
