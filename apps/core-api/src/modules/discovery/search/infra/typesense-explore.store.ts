@@ -185,6 +185,8 @@ export class TypesenseExploreStore implements ExploreStore {
     const alias = await this.client.getAlias(this.alias);
     if (!alias) return false;
     const collections = await this.client.listCollections();
+    // Khác phiên bản schema thì coi như chưa có: khởi động lại dựng ngay, không chờ hết chu kỳ 24 giờ.
+    if (!alias.collection_name.startsWith(`${this.alias}_${EXPLORE_SCHEMA_VERSION}_`)) return false;
     return collections.some((c) => c.name === alias.collection_name && c.num_documents > 0);
   }
 

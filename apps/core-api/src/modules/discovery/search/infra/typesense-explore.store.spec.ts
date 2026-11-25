@@ -126,7 +126,7 @@ describe('TypesenseExploreStore', () => {
       new TypesenseExploreStore(
         {
           getAlias: vi.fn(async () => alias),
-          listCollections: vi.fn(async () => [{ name: 'explore_2', num_documents: docs }]),
+          listCollections: vi.fn(async () => [{ name: `explore_${EXPLORE_SCHEMA_VERSION}_2`, num_documents: docs }, { name: 'explore_2', num_documents: docs }]),
         } as unknown as TypesenseClient,
         statsCache,
         queryGramsStore,
@@ -134,8 +134,10 @@ describe('TypesenseExploreStore', () => {
         'explore',
       );
     expect(await make(null, 10).hasIndex()).toBe(false);
-    expect(await make({ name: 'explore', collection_name: 'explore_2' }, 0).hasIndex()).toBe(false);
-    expect(await make({ name: 'explore', collection_name: 'explore_2' }, 10).hasIndex()).toBe(true);
+    expect(await make({ name: 'explore', collection_name: `explore_${EXPLORE_SCHEMA_VERSION}_2` }, 0).hasIndex()).toBe(false);
+    expect(await make({ name: 'explore', collection_name: `explore_${EXPLORE_SCHEMA_VERSION}_2` }, 10).hasIndex()).toBe(true);
+    // Collection khác phiên bản schema (đổi schema xong khởi động lại): coi như chưa có để dựng ngay.
+    expect(await make({ name: 'explore', collection_name: 'explore_2' }, 10).hasIndex()).toBe(false);
   });
 
   it('replaceAll cùng phiên bản schema: chỉ ghi mục đổi/mới, xoá mục không còn, không tạo collection', async () => {

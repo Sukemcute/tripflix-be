@@ -120,10 +120,10 @@ export function indexedDocToTypesenseDoc(doc: IndexedDoc): TypesenseExploreDoc {
  * không được tính là "đổi" (ord chỉ để phá hoà khi bằng điểm; mục không đổi giữ ord cũ).
  */
 export function toTypesenseDocWithHash(doc: IndexedDoc): TypesenseExploreDoc {
-  const hash = createHash('sha1')
-    .update(JSON.stringify(indexedDocToTypesenseDoc({ ...doc, ord: 0 })))
-    .digest('hex');
-  return { ...indexedDocToTypesenseDoc(doc), content_hash: hash };
+  const unordered = indexedDocToTypesenseDoc({ ...doc, ord: 0 });
+  const hash = createHash('sha1').update(JSON.stringify(unordered)).digest('hex');
+  // Dựng một lần (fold toàn văn là phần tốn), chỉ thay hai chỗ chứa ord.
+  return { ...unordered, ord: doc.ord, doc_json: JSON.stringify(doc), content_hash: hash };
 }
 
 /** Khôi phục IndexedDoc đã lưu lúc lập chỉ mục. Like, comment là số lúc lập chỉ mục (đối soát đêm hoặc sự kiện bài). */

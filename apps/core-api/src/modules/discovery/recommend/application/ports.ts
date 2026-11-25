@@ -13,6 +13,8 @@ export interface TasteQuery {
   /** Tag (đã bỏ dấu) người xem thích nhất, nặng trước. */
   tags: string[];
   postType: string | null;
+  /** Chỉ bài có lịch trình (mode has_plan). */
+  hasPlan: boolean;
   limitPerSource: number;
 }
 

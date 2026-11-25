@@ -14,11 +14,17 @@ describe('tasteOf: gu nổi bật làm nguồn ứng viên', () => {
       answers: { place: { 'place:da-lat': 0.69, 'place:lam-dong': 0.69 }, exp: { 'exp:nui': 0.61 }, with: { 'with:cap_doi': 0.38 } },
       interactionCount: 2,
     });
-    expect(taste).toEqual({ places: ['da-lat', 'lam-dong'], tags: ['nui'] });
+    // lam-dong là tỉnh cha của da-lat (trip_profile cộng cả hai): bỏ để dành chỗ cho nơi khác.
+    expect(taste).toEqual({ places: ['da-lat'], tags: ['nui'] });
   });
 
-  it('không có gu đủ nặng thì null', () => {
+  it('trip_profile lưu tổng thô: ngưỡng theo tỉ lệ trên mục nặng nhất (≥ 20%)', () => {
+    const taste = tasteOf({ answers: { place: {}, exp: { 'exp:an_uong': 21, 'exp:nui': 5, 'exp:bien': 3 } } });
+    expect(taste).toEqual({ places: [], tags: ['an_uong', 'nui'] });
+  });
+
+  it('không có gu thì null', () => {
     expect(tasteOf(null)).toBeNull();
-    expect(tasteOf({ places: { 'da-lat': 0.05 }, tags: {} })).toBeNull();
+    expect(tasteOf({ places: { 'da-lat': 0 }, tags: {} })).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { placeParentOf } from '../../search/domain/places.js';
 import { round4, type Candidate, type RankedItem } from './contracts.js';
 
 /** ~5% vị trí mỗi trang lấy ngẫu nhiên (đề xuất 6.2): tập đáp án không chệch để so thuật toán offline. */
@@ -53,18 +54,29 @@ export function interleave(ranked: RankedItem[], explore: RankedItem[], limit: n
 
 const TASTE_PLACES = 3;
 const TASTE_TAGS = 5;
-/** Trọng số gu tối thiểu: thấp hơn là nhiễu một lần xem, không đáng mở nguồn riêng. */
-const TASTE_MIN_WEIGHT = 0.2;
+/**
+ * Gu tối thiểu, tính theo tỉ lệ trên mục nặng nhất: tag_affinity chuẩn hoá [0, 1] còn trip_profile lưu tổng thô
+ * (đo 25/11: tới 21), ngưỡng tuyệt đối không lọc được gì.
+ */
+const TASTE_MIN_SHARE = 0.2;
 
-/** Khoá nặng nhất, bỏ tiền tố ngăn (`place:da-lat` → `da-lat`). */
-const topKeys = (v: unknown, n: number, prefix = ''): string[] =>
-  v && typeof v === 'object'
-    ? Object.entries(v as Record<string, unknown>)
-        .filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] >= TASTE_MIN_WEIGHT)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, n)
-        .map(([k]) => (prefix && k.startsWith(prefix) ? k.slice(prefix.length) : k))
-    : [];
+/** Khoá nặng nhất (đã bỏ tiền tố ngăn `place:da-lat` → `da-lat`), bỏ khoá nhẹ hơn TASTE_MIN_SHARE × khoá nặng nhất. */
+function topKeys(v: unknown, n: number, prefix = '', drop: (key: string, all: ReadonlySet<string>) => boolean = () => false): string[] {
+  if (!v || typeof v !== 'object') return [];
+  const entries = Object.entries(v as Record<string, unknown>)
+    .filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] > 0)
+    .map(([k, w]) => [prefix && k.startsWith(prefix) ? k.slice(prefix.length) : k, w] as const);
+  const max = Math.max(0, ...entries.map(([, w]) => w));
+  const all = new Set(entries.map(([k]) => k));
+  return entries
+    .filter(([k, w]) => w >= TASTE_MIN_SHARE * max && !drop(k, all))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, n)
+    .map(([k]) => k);
+}
+
+/** Tỉnh cha có cùng điểm với nơi con (trip_profile cộng cả hai): giữ nơi con, chỗ còn lại cho nơi khác. */
+const isParentOfAnother = (id: string, all: ReadonlySet<string>) => [...all].some((other) => placeParentOf(other) === id);
 
 /**
  * Nơi và tag/trải nghiệm người xem thích nhất; không có gu thì null. Đọc hai dạng hồ sơ:
@@ -72,7 +84,7 @@ const topKeys = (v: unknown, n: number, prefix = ''): string[] =>
  */
 export function tasteOf(features: Record<string, unknown> | null): { places: string[]; tags: string[] } | null {
   const answers = (features?.answers ?? null) as Record<string, unknown> | null;
-  const places = answers ? topKeys(answers.place, TASTE_PLACES, 'place:') : topKeys(features?.places, TASTE_PLACES);
+  const places = answers ? topKeys(answers.place, TASTE_PLACES, 'place:', isParentOfAnother) : topKeys(features?.places, TASTE_PLACES, '', isParentOfAnother);
   const tags = answers ? topKeys(answers.exp, TASTE_TAGS, 'exp:') : topKeys(features?.tags, TASTE_TAGS);
   return places.length || tags.length ? { places, tags } : null;
 }

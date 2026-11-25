@@ -25,7 +25,7 @@ export class TypesenseTasteRetrieval implements TasteRetrieval {
   ) {}
 
   async findPostIds(q: TasteQuery): Promise<string[]> {
-    const vertical = verticalFilter(q.postType);
+    const vertical = verticalFilter(q.postType) + (q.hasPlan ? ' && sections:=[`plan`]' : '');
     const places = q.places.flatMap((id) => placeBucketOfId(id) ?? []);
     const tags = q.tags.filter((t) => !NOISE_TAGS.has(t));
     const searches: TypesenseSearchRequest[] = [];

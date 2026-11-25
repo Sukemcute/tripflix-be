@@ -545,7 +545,9 @@ export async function searchExplore(
   const kinds = u.intents.length ? u.intents : full ? [...full] : SECTIONS.map(([k]) => k);
   // Engine ngoài (Typesense) đọc `limit`: nhánh câu không nhắm tới chỉ hiện 3 mục nên lấy ít ứng viên.
   // Lộ trình còn đến từ video kèm lịch trình. Nguồn trong RAM/Postgres có trần riêng (candidateLimitOf), bỏ qua `limit`.
-  const mainVerticals = new Set([...kinds.map((k) => VERTICAL_OF[k as keyof typeof VERTICAL_OF]), ...(kinds.includes('plan') ? ['videos'] : [])]);
+  // fullKinds (/search/posts, /search/places) luôn là nhánh chính dù câu nhắm vùng khác (vd 'khách sạn đà nẵng' ở tab Bài viết).
+  const mainKinds = [...kinds, ...(full ?? [])];
+  const mainVerticals = new Set([...mainKinds.map((k) => VERTICAL_OF[k as keyof typeof VERTICAL_OF]), ...(mainKinds.includes('plan') ? ['videos'] : [])]);
   const limitOf = (vertical: string) => (mainVerticals.has(vertical) ? candidateLimit : SIDE_CANDIDATE_LIMIT);
   const groups = await collect(st, interps, user, false, limitOf);
   const sections = buildSections(groups, u, perSection, full);

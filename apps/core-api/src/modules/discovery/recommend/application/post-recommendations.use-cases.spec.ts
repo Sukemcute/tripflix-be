@@ -589,19 +589,19 @@ describe('PostRecommendationUseCases', () => {
       const findPostIds = vi.fn(async () => ['t1', 'h01']);
       const { useCases, store } = setup({ taste: { findPostIds } });
       const page = await useCases.recommend(query({ limit: 30 }));
-      expect(findPostIds).toHaveBeenCalledWith({ places: ['da-lat'], tags: ['dalat'], postType: null, limitPerSource: 150 });
+      expect(findPostIds).toHaveBeenCalledWith({ places: ['da-lat'], tags: ['dalat'], postType: null, hasPlan: false, limitPerSource: 150 });
       expect(store.listCandidatesByIds).toHaveBeenCalledWith(expect.objectContaining({ limit: 2 }), ['t1', 'h01'], 'taste');
       expect(ids(page)).toContain('t1');
     });
 
-    it('trip_v1: có nguồn gu thì hot chỉ 500 thay vì 5000 (5000 không còn là "toàn bộ" ở ~40k bài)', async () => {
+    it('trip_v1: nguồn gu chỉ bổ sung, vẫn đọc 5000 hot (gu dài hạn không gồm "đang tìm hiểu / sắp đi")', async () => {
       const { useCases, store } = setup({
         algos: [{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }, ALGOS[1]!],
         taste: { findPostIds: vi.fn(async () => ['t1']) },
       });
       store.findUserFeatures.mockResolvedValue({ places: { 'nha-trang': 0.9 }, tags: {} } as never);
       await useCases.recommend(query());
-      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 5000 }));
     });
 
     it('nguồn gu lỗi: feed vẫn trả trang từ hot/fresh', async () => {

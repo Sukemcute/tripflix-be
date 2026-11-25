@@ -30,11 +30,6 @@ const RECENT_REASON = { code: 'recent', text: 'Mới đăng' };
 const ALGO_CACHE_MS = 60_000;
 const PLACE_PROFILE_CACHE_MS = 10 * 60_000;
 const HOT_LIMIT = 150;
-/**
- * Có nguồn gu (Typesense) thì không cần đọc gần hết bài làm ứng viên hot (trip_v1: 5000): hot 500 + bài theo nơi, tag
- * người xem thích. Ở ~40k bài, 5000 không còn là "toàn bộ" mà chỉ là top hot.
- */
-const HOT_LIMIT_WITH_TASTE = 500;
 /** Mỗi nguồn gu (nơi, tag) lấy chừng này bài. */
 const TASTE_PER_SOURCE = 150;
 const FRESH_LIMIT = 50;
@@ -417,15 +412,16 @@ export class PostRecommendationUseCases {
       now,
     };
     const taste = this.tasteRetrieval ? tasteOf(userFeatures) : null;
-    // Ranker "đọc toàn bộ" (candidateLimit) chỉ đúng khi không thay hot bằng nguồn gu.
-    const readsAll = Boolean(algo.ranker.candidateLimit) && !taste;
-    const hotLimit = taste ? Math.min(algo.ranker.candidateLimit ?? HOT_LIMIT, HOT_LIMIT_WITH_TASTE) : (algo.ranker.candidateLimit ?? HOT_LIMIT);
+    // Nguồn gu chỉ BỔ SUNG ứng viên, không thay hot: gu dài hạn không gồm "đang tìm hiểu / sắp đi" (live-answers, trọng số
+    // lớn nhất ở trip_v1). Giảm hot chỉ khi nguồn gu gồm cả tín hiệu đó và đã đo trên người dùng thật.
+    const readsAll = Boolean(algo.ranker.candidateLimit);
+    const hotLimit = algo.ranker.candidateLimit ?? HOT_LIMIT;
     const [hot, fresh, rawExplorePool, viewer, tasteIds] = await Promise.all([
       this.store.listHotCandidates({ ...base, limit: hotLimit }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
       this.store.listExplorePool({ ...base, excludePostIds: interacted, limit: EXPLORE_POOL_LIMIT, days: EXPLORE_DAYS }),
       algo.ranker.needsViewerRows && q.userId ? this.loadViewer(q.userId, new Date(sessionAt)) : null,
-      taste ? this.findTasteIds(taste, q.postType) : [],
+      taste ? this.findTasteIds(taste, q.postType, hasPlanOnly) : [],
     ]);
     const tasteCandidates = tasteIds.length ? await this.store.listCandidatesByIds({ ...base, limit: tasteIds.length }, tasteIds, 'taste') : [];
     const candidates = mergeCandidates(hot, fresh, tasteCandidates);
@@ -456,9 +452,9 @@ export class PostRecommendationUseCases {
   }
 
   /** Nguồn gu lỗi (Typesense chưa sẵn sàng) thì feed vẫn chạy với hot/fresh, chỉ ghi log. */
-  private async findTasteIds(taste: { places: string[]; tags: string[] }, postType: string | null): Promise<string[]> {
+  private async findTasteIds(taste: { places: string[]; tags: string[] }, postType: string | null, hasPlan: boolean): Promise<string[]> {
     try {
-      return await this.tasteRetrieval!.findPostIds({ ...taste, postType, limitPerSource: TASTE_PER_SOURCE });
+      return await this.tasteRetrieval!.findPostIds({ ...taste, postType, hasPlan, limitPerSource: TASTE_PER_SOURCE });
     } catch (error) {
       this.logger.warn(`Nguồn gu (Typesense) lỗi, feed dùng hot/fresh: ${(error as Error).message}`);
       return [];
