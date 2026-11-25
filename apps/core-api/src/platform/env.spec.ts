@@ -62,3 +62,21 @@ describe('CLOUDFRONT_KEY_PAIR_ID, CLOUDFRONT_PRIVATE_KEY', () => {
     expect(coreEnvSchema.parse({ ...required, MEDIA_PLAYBACK_TTL_SEC: '' }).MEDIA_PLAYBACK_TTL_SEC).toBeUndefined();
   });
 });
+
+describe('TYPESENSE_API_KEY ở production', () => {
+  // production cần cả khoá JWT; chỉ kiểm phần Typesense.
+  const prod = { ...required, NODE_ENV: 'production', AUTH_JWT_PRIVATE_KEY: 'k' };
+  const issueOn = (env: Record<string, string>) => coreEnvSchema.safeParse(env).error?.issues.some((i) => i.path[0] === 'TYPESENSE_API_KEY') ?? false;
+
+  it('SEARCH_BACKEND=typesense mà thiếu key (hoặc để key dev) thì lỗi ngay lúc khởi động', () => {
+    expect(issueOn({ ...prod, SEARCH_BACKEND: 'typesense' })).toBe(true);
+    expect(issueOn({ ...prod, SEARCH_BACKEND: 'typesense', TYPESENSE_API_KEY: 'dev-typesense-key' })).toBe(true);
+    expect(issueOn({ ...prod, SEARCH_BACKEND: 'typesense', TYPESENSE_API_KEY: '' })).toBe(true);
+  });
+
+  it('có key riêng, hoặc vẫn dùng Postgres, hoặc máy dev: không lỗi', () => {
+    expect(issueOn({ ...prod, SEARCH_BACKEND: 'typesense', TYPESENSE_API_KEY: 'secret-key' })).toBe(false);
+    expect(issueOn({ ...prod, SEARCH_BACKEND: 'postgres' })).toBe(false);
+    expect(issueOn({ ...required, SEARCH_BACKEND: 'typesense' })).toBe(false);
+  });
+});
