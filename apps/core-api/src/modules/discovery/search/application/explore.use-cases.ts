@@ -22,6 +22,8 @@ import {
   type PlacesStore,
 } from './ports.js';
 
+/** Post builder của for_you (trip_v1): ngăn của nó là cách phân loại chung giữa tìm kiếm và gợi ý. */
+const POST_BINS_BUILDER = 'post_profile@v1';
 /** Chặn vòng lặp nếu nguồn trả con trỏ lặp lại. */
 const MAX_PAGES = 1_000;
 const POST_KINDS = new Set(['post', 'plan', 'video']);
@@ -215,6 +217,9 @@ export function pointToObject(p: PointOfInterestSeed, city: string): ExploreObje
 }
 
 /** Bài video -> nhánh Video; bài có lộ trình (số ngày) -> Lộ trình; còn lại -> Bài viết. */
+/** Gắn ngăn recommend đã tính cho bài (không có thì giữ nguyên). */
+const withBins = (obj: ExploreObject, bins: Record<string, number> | undefined): ExploreObject => (bins ? { ...obj, bins: Object.keys(bins) } : obj);
+
 export function postToObject(p: ExplorePost): ExploreObject {
   const trip = p.tripAttachment;
   const days = trip?.daysCount ?? null;
@@ -299,7 +304,7 @@ export class ExploreUseCases {
     @Inject(EXPLORE_STORE) private readonly store: ExploreStore,
     @Inject(EXPLORE_CATALOG) private readonly catalog: ExploreCatalog,
     @Inject(PLACES_STORE) private readonly places: Pick<PlacesStore, 'listPlaces' | 'listPoints'>,
-    @Optional() @Inject(RECOMMEND_STORE) private readonly recommendStore?: Pick<RecommendStore, 'findPostScores'>,
+    @Optional() @Inject(RECOMMEND_STORE) private readonly recommendStore?: Pick<RecommendStore, 'findPostScores'> & Partial<Pick<RecommendStore, 'findPostBins'>>,
   ) {}
 
   async search(query: ExploreQuery): Promise<ExploreResultPage> {
@@ -501,6 +506,20 @@ export class ExploreUseCases {
     return ids.length ? this.catalog.getAuthorNames(ids) : new Map();
   }
 
+  /** Ngăn của post builder for_you; lỗi hay chưa có thì bài vào chỉ mục không kèm ngăn (recommend chỉ mất nguồn gu cho bài đó). */
+  private async loadPostBins(postIds: readonly string[]): Promise<Map<string, Record<string, number>>> {
+    const out = new Map<string, Record<string, number>>();
+    if (!this.recommendStore?.findPostBins || !postIds.length) return out;
+    try {
+      for (let i = 0; i < postIds.length; i += 1_000) {
+        for (const [id, bins] of await this.recommendStore.findPostBins(POST_BINS_BUILDER, postIds.slice(i, i + 1_000))) out.set(id, bins);
+      }
+    } catch (error) {
+      this.logger.warn(`Đọc ngăn bài (${POST_BINS_BUILDER}) lỗi, chỉ mục không kèm ngăn: ${(error as Error).message}`);
+    }
+    return out;
+  }
+
   /** Chỉ mục đã có tài liệu chưa. Postgres (không khai báo) coi như chưa: job dựng ngay lúc khởi động như trước. */
   hasIndex(): Promise<boolean> {
     return this.store.hasIndex ? this.store.hasIndex() : Promise.resolve(false);
@@ -516,7 +535,8 @@ export class ExploreUseCases {
     ]);
     const placeName = new Map(places.map((p) => [p.id, p.name]));
     const pois = points.flatMap((p) => pointToObject(p, placeName.get(p.cityId) ?? '') ?? []);
-    const index = buildIndex([...hotels.map(hotelToObject), ...posts.map(postToObject), ...pois]);
+    const bins = await this.loadPostBins(posts.map((p) => p.id));
+    const index = buildIndex([...hotels.map(hotelToObject), ...posts.map((p) => withBins(postToObject(p), bins.get(p.id))), ...pois]);
     if (!(await this.store.replaceAll(index))) return null;
     // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
     // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.
@@ -535,7 +555,7 @@ export class ExploreUseCases {
     if (this.catalog.getVisiblePosts && this.store.upsertDocuments) {
       const visible = await this.catalog.getVisiblePosts([postId]);
       if (visible.length > 0) {
-        const obj = postToObject(visible[0]!);
+        const obj = withBins(postToObject(visible[0]!), (await this.loadPostBins([postId])).get(postId));
         const vertical = VERTICAL_OF[obj.kind];
         if (!vertical) return 'skipped';
         const doc = indexDoc(obj, vertical, Math.floor(Date.now() % 1_000_000_000));

@@ -22,6 +22,8 @@ export interface TypesenseExploreDoc {
   place?: string;
   place_buckets?: string[];
   has_place: boolean;
+  place_bins?: string[];
+  exp_bins?: string[];
   location?: [number, number];
   price_from?: number;
   has_price: boolean;
@@ -59,6 +61,17 @@ function placeBucketsOf(place: string | null | undefined): string[] {
   }
   return [...buckets];
 }
+
+/** `place:da-lat` → place_bins `da-lat`; `exp:an_uong` → exp_bins `an_uong`. */
+function binFields(bins: readonly string[] | undefined): Pick<TypesenseExploreDoc, 'place_bins' | 'exp_bins'> {
+  const of = (prefix: string) => (bins ?? []).filter((b) => b.startsWith(prefix)).map((b) => b.slice(prefix.length));
+  const place = of('place:');
+  const exp = of('exp:');
+  return { ...(place.length ? { place_bins: place } : {}), ...(exp.length ? { exp_bins: exp } : {}) };
+}
+
+/** IndexedDoc cho rerank, bỏ toàn văn (obj.text) và ngăn: rank.ts và kết quả trả về không đọc, giảm payload mỗi hit. */
+const docJson = (doc: IndexedDoc) => JSON.stringify({ ...doc, obj: { ...doc.obj, text: undefined, bins: undefined } });
 
 /** Chuyển IndexedDoc sang document phẳng lưu trên Typesense. */
 export function indexedDocToTypesenseDoc(doc: IndexedDoc): TypesenseExploreDoc {
@@ -102,6 +115,7 @@ export function indexedDocToTypesenseDoc(doc: IndexedDoc): TypesenseExploreDoc {
     ...(o.place ? { place: o.place } : {}),
     ...(placeBuckets.length ? { place_buckets: placeBuckets } : {}),
     has_place: Boolean(o.place),
+    ...binFields(o.bins),
     ...(hasGeo ? { location: [o.lat!, o.lon!] } : {}),
     ...(priceFrom !== undefined ? { price_from: priceFrom } : {}),
     has_price: priceFrom !== undefined,
@@ -111,7 +125,7 @@ export function indexedDocToTypesenseDoc(doc: IndexedDoc): TypesenseExploreDoc {
     ...(brand ? { brand } : {}),
     quality_score: Number.isFinite(qualityScore) ? qualityScore : 0.35,
     created_at: Number.isFinite(createdMs) ? Math.trunc(createdMs) : 0,
-    doc_json: JSON.stringify(doc),
+    doc_json: docJson(doc),
   };
 }
 
@@ -123,7 +137,7 @@ export function toTypesenseDocWithHash(doc: IndexedDoc): TypesenseExploreDoc {
   const unordered = indexedDocToTypesenseDoc({ ...doc, ord: 0 });
   const hash = createHash('sha1').update(JSON.stringify(unordered)).digest('hex');
   // Dựng một lần (fold toàn văn là phần tốn), chỉ thay hai chỗ chứa ord.
-  return { ...unordered, ord: doc.ord, doc_json: JSON.stringify(doc), content_hash: hash };
+  return { ...unordered, ord: doc.ord, doc_json: docJson(doc), content_hash: hash };
 }
 
 /** Khôi phục IndexedDoc đã lưu lúc lập chỉ mục. Like, comment là số lúc lập chỉ mục (đối soát đêm hoặc sự kiện bài). */

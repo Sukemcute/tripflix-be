@@ -1,4 +1,3 @@
-import { placeBucketOfId } from '../../search/domain/places.js';
 import { escapeTypesenseFilterValue, TypesenseClient, type TypesenseSearchRequest } from '../../search/infra/typesense.client.js';
 import type { TasteQuery, TasteRetrieval } from '../application/ports.js';
 
@@ -26,13 +25,12 @@ export class TypesenseTasteRetrieval implements TasteRetrieval {
 
   async findPostIds(q: TasteQuery): Promise<string[]> {
     const vertical = verticalFilter(q.postType) + (q.hasPlan ? ' && sections:=[`plan`]' : '');
-    const places = q.places.flatMap((id) => placeBucketOfId(id) ?? []);
     const tags = q.tags.filter((t) => !NOISE_TAGS.has(t));
     const searches: TypesenseSearchRequest[] = [];
     const page = { q: '*', include_fields: 'id', sort_by: 'quality_score:desc,created_at:desc', per_page: q.limitPerSource };
-    if (places.length) searches.push({ ...page, filter_by: `${vertical} && ${list('place_buckets', places)}` });
-    // Tag người dùng (hashtag) hoặc chủ đề trải nghiệm (exp: nui, bien…): khớp hashtag hoặc token đã chuẩn hoá của bài.
-    if (tags.length) searches.push({ ...page, filter_by: `${vertical} && (${list('tags_folded', tags)} || ${list('terms', tags)})` });
+    if (q.places.length) searches.push({ ...page, filter_by: `${vertical} && ${list('place_bins', q.places)}` });
+    // Chủ đề exp (trip_profile: an_uong, nui…) khớp ngăn của bài; hashtag (tag_affinity) khớp tag của bài.
+    if (tags.length) searches.push({ ...page, filter_by: `${vertical} && (${list('exp_bins', tags)} || ${list('tags_folded', tags)})` });
     if (!searches.length) return [];
 
     const results = await this.client.multiSearch<{ id: string }>(searches, { collection: this.alias });

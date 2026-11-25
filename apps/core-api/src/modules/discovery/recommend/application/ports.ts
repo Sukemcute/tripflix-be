@@ -235,6 +235,8 @@ export interface RecommendStore {
   insertTextVectors(model: string, rows: Array<{ textHash: string; vector: number[] }>): Promise<void>;
   /** Điểm của một post builder (vd 'hot@v2') theo danh sách postId. Bài chưa có điểm không có trong Map. */
   findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>>;
+  /** Ngăn (`place:da-lat`, `exp:an_uong`…) post builder đã gán cho bài; bài chưa qua job thì không có trong Map. */
+  findPostBins(builderKey: string, postIds: string[]): Promise<Map<string, Record<string, number>>>;
   /** Ứng viên theo score desc, published_at desc, post_id desc (phá hoà cố định). */
   listHotCandidates(q: CandidateQuery): Promise<Candidate[]>;
   /** Ứng viên theo danh sách bài (nguồn gu), cùng điều kiện và đặc trưng như hot; bài chưa có trong recommend_posts bị bỏ. */

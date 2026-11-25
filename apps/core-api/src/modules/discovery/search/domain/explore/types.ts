@@ -40,6 +40,8 @@ export interface ExploreObject {
   authorId?: string | null;
   createdAt?: string | null;
   completeness?: number | null;
+  /** Bài: ngăn recommend đã gán (`place:da-lat`, `exp:an_uong`…), để recommend lấy ứng viên theo gu cùng cách phân loại với trip_v1. */
+  bins?: string[];
 }
 
 /** Một tài liệu trong chỉ mục của một nhánh. */

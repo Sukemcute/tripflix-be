@@ -32,6 +32,9 @@ export function buildExploreCollectionSchema(collectionName: string): TypesenseC
       { name: 'place', type: 'string', facet: true, optional: true },
       { name: 'place_buckets', type: 'string[]', facet: true, optional: true },
       { name: 'has_place', type: 'bool', facet: true },
+      // Ngăn recommend (bins.ts) cho nguồn gu: nơi suy từ 7 nguồn (cả khách sạn, hashtag), chủ đề exp.
+      { name: 'place_bins', type: 'string[]', facet: true, optional: true },
+      { name: 'exp_bins', type: 'string[]', facet: true, optional: true },
       { name: 'location', type: 'geopoint', optional: true },
 
       { name: 'price_from', type: 'int64', facet: true, optional: true },

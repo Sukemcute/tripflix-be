@@ -425,6 +425,16 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
       .onConflictDoNothing();
   }
 
+  async findPostBins(builderKey: string, postIds: string[]): Promise<Map<string, Record<string, number>>> {
+    if (!postIds.length) return new Map();
+    const { builder, version } = splitKey(builderKey);
+    const rows = await this.db
+      .select({ postId: recommendPostScores.postId, bins: sql<Record<string, number> | null>`${recommendPostScores.features} -> 'bins'` })
+      .from(recommendPostScores)
+      .where(and(eq(recommendPostScores.builder, builder), eq(recommendPostScores.version, version), inArray(recommendPostScores.postId, postIds)));
+    return new Map(rows.flatMap((r) => (r.bins ? [[r.postId, r.bins] as const] : [])));
+  }
+
   async findPostScores(builderKey: string, postIds: string[]): Promise<Map<string, number>> {
     if (!postIds.length) return new Map();
     const { builder, version } = splitKey(builderKey);

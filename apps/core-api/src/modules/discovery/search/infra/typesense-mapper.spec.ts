@@ -1,6 +1,6 @@
 import { indexDoc } from '../domain/explore/build.js';
 import type { ExploreObject } from '../domain/explore/types.js';
-import { indexedDocToTypesenseDoc, typesenseDocToIndexedDoc } from './typesense-mapper.js';
+import { indexedDocToTypesenseDoc, toTypesenseDocWithHash, typesenseDocToIndexedDoc } from './typesense-mapper.js';
 import { buildExploreCollectionSchema, buildExploreSynonyms } from './typesense-schema.js';
 
 describe('typesense-schema & typesense-mapper', () => {
@@ -60,5 +60,23 @@ describe('typesense-schema & typesense-mapper', () => {
     const restored = typesenseDocToIndexedDoc(tsDoc);
     expect(restored.obj.likes).toBe(10);
     expect(restored.obj.n).toBe(2);
+  });
+});
+
+describe('ngăn recommend và payload', () => {
+  it('bins của bài thành place_bins / exp_bins; doc_json bỏ toàn văn và ngăn', () => {
+    const obj: ExploreObject = {
+      id: 'post:P2', refId: 'P2', kind: 'post', title: 'Ăn sáng ở Đà Lạt', text: 'toàn văn rất dài #dalat', place: 'Đà Lạt',
+      bins: ['place:da-lat', 'place:lam-dong', 'exp:an_uong', 'cost:re'],
+    };
+    const tsDoc = toTypesenseDocWithHash(indexDoc(obj, 'plans', 3));
+    expect(tsDoc.place_bins).toEqual(['da-lat', 'lam-dong']);
+    expect(tsDoc.exp_bins).toEqual(['an_uong']);
+    expect(tsDoc.ord).toBe(3);
+    const restored = typesenseDocToIndexedDoc(tsDoc);
+    expect(restored.ord).toBe(3);
+    expect(restored.obj.text).toBeUndefined();
+    expect(restored.obj.bins).toBeUndefined();
+    expect(restored.obj.title).toBe('Ăn sáng ở Đà Lạt');
   });
 });

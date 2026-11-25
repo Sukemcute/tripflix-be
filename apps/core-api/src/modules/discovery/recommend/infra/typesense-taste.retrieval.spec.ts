@@ -2,7 +2,7 @@ import type { TypesenseClient } from '../../search/infra/typesense.client.js';
 import { TypesenseTasteRetrieval } from './typesense-taste.retrieval.js';
 
 describe('TypesenseTasteRetrieval', () => {
-  it('một multi_search: nơi (đổi mã sang tên nơi) và tag (bỏ tag trào lưu); chỉ trả id bài, không trùng', async () => {
+  it('một multi_search: nơi theo ngăn place_bins, tag theo exp_bins/hashtag (bỏ tag trào lưu); chỉ trả id bài, không trùng', async () => {
     const multiSearch = vi.fn(async () => [
       { hits: [{ document: { id: 'post:A' } }, { document: { id: 'post:B' } }] },
       { hits: [{ document: { id: 'post:B' } }, { document: { id: 'hotel:H' } }] },
@@ -12,8 +12,8 @@ describe('TypesenseTasteRetrieval', () => {
     expect(ids).toEqual(['A', 'B']);
     expect(multiSearch).toHaveBeenCalledWith(
       [
-        expect.objectContaining({ filter_by: 'vertical:=`videos` && place_buckets:=[`Đà Lạt`]', include_fields: 'id', per_page: 150 }),
-        expect.objectContaining({ filter_by: 'vertical:=`videos` && (tags_folded:=[`homestay`] || terms:=[`homestay`])' }),
+        expect.objectContaining({ filter_by: 'vertical:=`videos` && place_bins:=[`da-lat`]', include_fields: 'id', per_page: 150 }),
+        expect.objectContaining({ filter_by: 'vertical:=`videos` && (exp_bins:=[`homestay`] || tags_folded:=[`homestay`])' }),
       ],
       { collection: 'explore' },
     );
@@ -37,7 +37,7 @@ describe('TypesenseTasteRetrieval', () => {
     const retrieval = new TypesenseTasteRetrieval({ multiSearch } as unknown as TypesenseClient);
     await retrieval.findPostIds({ places: ['da-lat'], tags: [], postType: null, hasPlan: true, limitPerSource: 150 });
     expect(multiSearch).toHaveBeenCalledWith(
-      [expect.objectContaining({ filter_by: 'vertical:=[`plans`,`videos`] && sections:=[`plan`] && place_buckets:=[`Đà Lạt`]' })],
+      [expect.objectContaining({ filter_by: 'vertical:=[`plans`,`videos`] && sections:=[`plan`] && place_bins:=[`da-lat`]' })],
       { collection: 'explore' },
     );
   });
