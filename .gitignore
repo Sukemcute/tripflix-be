@@ -6,6 +6,8 @@ coverage/
 .env
 .env.*
 !.env.example
+# Mẫu config AI trên server; deploy/.env.ai thật vẫn bị bỏ qua bởi .env.*
+!deploy/.env.ai.example
 deploy/.env
 .claude/settings.local.json
 CLAUDE.local.md

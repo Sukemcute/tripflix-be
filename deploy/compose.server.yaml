@@ -234,32 +234,16 @@ services:
     image: ${AI_IMAGE_PREFIX:-ghcr.io/sukemcute/tripflix-ai}/ai-service:${AI_TAG:-develop}
     restart: unless-stopped
     logging: *logging
+    # Config AI (key, model, giá, bật tắt) nằm trong .env.ai, Bảo sửa qua ai-config.sh (deploy/SERVER.md, mục Config AI).
+    # Mẫu và ý nghĩa từng biến: deploy/.env.ai.example. Biến trong environment dưới đây ghi đè .env.ai, nên chỉ để
+    # địa chỉ nội bộ, CORS và mạng do deploy quản.
+    env_file:
+      - path: .env.ai
+        required: true
     environment:
       CORE_API_URL: http://core-api:3000
       # Web gọi /ai/chat từ trình duyệt; thiếu biến này ai-service chỉ nhận localhost và chặn preflight của web.
       CORS_ORIGINS: ${AUTH_WEB_ORIGINS:-https://tripflix.io.vn}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      # ViSoBERT INT8 chạy cạnh OpenAI moderation, cần AI_TAG từ sha-eadf699. Bận hoặc quá 1,5 giây thì dùng riêng kết quả OpenAI.
-      IS_VISOBERT_ENABLED: ${IS_VISOBERT_ENABLED:-false}
-      LOG_LEVEL: INFO
-      # Tripi v3 (TF31): Controller (OpenAI) chọn công cụ, Responder (DeepSeek) viết câu trả lời.
-      # Giá USD mỗi 1 triệu token của gpt-5-nano, Bảo xác nhận lại khi đổi model. Không để giá rỗng:
-      # ai-service đọc "" thành lỗi và không khởi động, kéo theo /moderate. Staging đặt model, giá trong .env.server.
-      CHAT_CONTROLLER_PROVIDER: ${CHAT_CONTROLLER_PROVIDER:-openai}
-      CHAT_CONTROLLER_MODEL: ${CHAT_CONTROLLER_MODEL:-gpt-5-nano}
-      CHAT_CONTROLLER_PRICE_INPUT: ${CHAT_CONTROLLER_PRICE_INPUT:-0.05}
-      CHAT_CONTROLLER_PRICE_CACHED_INPUT: ${CHAT_CONTROLLER_PRICE_CACHED_INPUT:-0.005}
-      CHAT_CONTROLLER_PRICE_OUTPUT: ${CHAT_CONTROLLER_PRICE_OUTPUT:-0.4}
-      # Trống thì dùng mặc định của code (minimal). gpt-5.6-luna không nhận minimal, phải đặt none,
-      # nếu không mọi lượt gọi Controller lỗi 400 và Tripi chỉ trả "chưa tìm thấy kết quả".
-      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
-      CHAT_RESPONDER_PROVIDER: ${CHAT_RESPONDER_PROVIDER:-deepseek}
-      # Băm IP của khách để tính hạn mức. Mỗi môi trường một chuỗi; đổi thì hạn mức khách tính lại từ đầu.
-      CHAT_IDENTITY_SALT: ${CHAT_IDENTITY_SALT:-}
-      # Hạn mức lượt, token, USD/ngày, lượt chạy cùng lúc để mặc định trong code; cần thì thêm CHAT_* vào đây.
-      CHAT_SYSTEM_DAILY_USD: ${CHAT_SYSTEM_DAILY_USD:-3}
       # Khoá lượt, đếm lượt/phút, lượt và token/ngày của Tripi.
       REDIS_URL: redis://redis:6379
       # fastapi run chỉ tin X-Forwarded-For từ các địa chỉ này. Đặt bằng dải mạng compose (SERVER.md, mục Trợ lý Tripi);
@@ -289,22 +273,16 @@ services:
     restart: unless-stopped
     logging: *logging
     command: ['/app/.venv/bin/python', '-m', 'app.workers.summary_worker']
+    # Config AI chung với ai-service (.env.ai). Ở đây chỉ giữ địa chỉ nội bộ, secret service client và số luồng theo số nhân.
+    env_file:
+      - path: .env.ai
+        required: true
     environment:
       CORE_API_URL: http://core-api:3000
       REDIS_URL: redis://redis:6379
-      # Thiếu key thì worker dừng lúc khởi động với lỗi DEEPSEEK_API_KEY is empty.
-      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
-      LLM_MODEL: ${LLM_MODEL:-}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       SERVICE_CLIENT_ID: ai-service
       SERVICE_CLIENT_SECRET: ${AI_SERVICE_CLIENT_SECRET:-}
-      # true = không gọi DeepSeek (tắt khẩn cấp, ví dụ khi tốn tiền bất thường).
-      SUMMARY_LLM_KILL: ${SUMMARY_LLM_KILL:-false}
       CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
-      # false = chỉ tóm tắt bằng luật, không chạy bộ phân loại (tắt khi model có vấn đề).
-      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
-      LOG_LEVEL: INFO
     cpus: ${AI_WORKER_CPUS:-1}
     mem_limit: 1536m
     depends_on:
@@ -319,12 +297,12 @@ services:
     restart: unless-stopped
     logging: *logging
     command: ['/app/.venv/bin/python', '-m', 'app.workers.label_worker']
+    env_file:
+      - path: .env.ai
+        required: true
     environment:
       REDIS_URL: redis://redis:6379
-      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
       CLASSIFIER_THREADS: ${AI_WORKER_CPUS:-1}
-      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-true}
-      LOG_LEVEL: INFO
     cpus: ${AI_WORKER_CPUS:-1}
     mem_limit: 1g
     depends_on:

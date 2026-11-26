@@ -61,22 +61,26 @@ EXPO_ACCESS_TOKEN=
 CORE_API_TAG=develop
 NOTIFICATION_TAG=develop
 
-# AI (profile ai, deploy/SERVER.md Giai đoạn 5): tóm tắt dùng DeepSeek, kiểm duyệt dùng OpenAI. Secret tạo bằng auth:create-service-client.
+# AI (profile ai, deploy/SERVER.md Giai đoạn 5). Key LLM, model, giá, cờ bật tắt nằm trong .env.ai (tạo cùng lúc, bên dưới).
+# Secret service client tạo bằng auth:create-service-client.
 AI_TAG=develop
-# Trợ lý Tripi (POST /ai/chat): true thì gọi LLM (Controller OpenAI, Responder DeepSeek), tốn tiền theo mỗi câu chat.
-CHAT_LLM_ENABLED=false
-# Giá token của Controller và trần chi tiêu/ngày lấy mặc định trong compose.server.yaml; chỉ thêm CHAT_* khi cần đổi.
-CHAT_IDENTITY_SALT=$(openssl rand -hex 32)
 # Dải mạng compose, xem deploy/SERVER.md mục Trợ lý Tripi. Trống thì ai-service chỉ tin 127.0.0.1.
 AI_FORWARDED_ALLOW_IPS=
 
 # Chuyển mã video (profile video, deploy/SERVER.md Giai đoạn 6), bản Go. Cần key AWS ở trên.
 VIDEO_WORKER_TAG=develop
-DEEPSEEK_API_KEY=
-OPENAI_API_KEY=
 AI_SERVICE_CLIENT_SECRET=
 # Kiểm duyệt: core-api gọi ai-service. Đặt AI_SERVICE_URL=http://ai-service:8000 khi ai-service đã chạy.
 AI_SERVICE_URL=
 MODERATION_SERVICE_CLIENT_SECRET=
 ENV
 echo "Đã tạo $target (quyền 600). Còn phải điền AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY."
+
+# Config AI riêng (deploy/SERVER.md, mục Config AI): 3 service AI đọc file này, Bảo sửa qua ai-config.sh.
+ai_target="$(dirname "$target")/.env.ai"
+if [ -e "$ai_target" ]; then
+  echo "Đã có $ai_target, giữ nguyên"
+else
+  sed "s/^CHAT_IDENTITY_SALT=\$/CHAT_IDENTITY_SALT=$(openssl rand -hex 32)/" "$(dirname "$0")/.env.ai.example" > "$ai_target"
+  echo "Đã tạo $ai_target (quyền 600). Còn phải điền OPENAI_API_KEY, DEEPSEEK_API_KEY."
+fi

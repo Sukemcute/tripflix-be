@@ -163,6 +163,85 @@ dc --profile mail exec -T notification-service node -e "console.log(process.env.
 
 Ba service cùng image `ghcr.io/sukemcute/tripflix-ai/ai-service` (public) và cùng `AI_TAG`, đều trong profile `ai`: `ai-summary-worker` tóm tắt bình luận, `ai-label-worker` gắn nhãn bình luận, `ai-service` nhận `POST /moderate` từ core-api và `POST /chat` từ app.
 
+### Config AI (`.env.ai`)
+
+Key LLM, model, giá, cờ bật tắt của AI nằm trong `deploy/.env.ai`, tách khỏi `.env.server`. Ba service AI cùng đọc file này (`env_file`). Mẫu và ý nghĩa từng biến: `deploy/.env.ai.example`. Biến mới của tripflix-ai thêm thẳng vào `.env.ai`, không cần sửa compose.
+
+Vẫn nằm trong `.env.server` vì deploy quản: `AI_TAG`, `AI_WORKER_CPUS`, `AI_FORWARDED_ALLOW_IPS`, `AI_SERVICE_CLIENT_SECRET`, `MODERATION_SERVICE_CLIENT_SECRET`, `AI_SERVICE_URL`. Địa chỉ nội bộ, CORS, `FORWARDED_ALLOW_IPS`, `SERVICE_CLIENT_*`, `CLASSIFIER_THREADS` đặt trong `environment` của compose và ghi đè `.env.ai`.
+
+Bảo (chủ tripflix-ai) sửa file này qua `ai-config.sh`: SSH key của Bảo chỉ chạy được script đó, không có shell, không có quyền Docker, không đọc được `.env.server`.
+
+```bash
+# Trên máy Bảo (tunnel IAP, xem dưới)
+ssh tripflix-ai get > ai.env            # tải bản đang chạy (có key, giữ file ở máy riêng)
+# sửa ai.env
+ssh tripflix-ai set < ai.env            # kiểm, backup, ghi, tạo lại 3 service AI; service không chạy ổn thì tự trả bản cũ
+ssh tripflix-ai status
+ssh tripflix-ai logs ai-summary-worker 300
+```
+
+`set` từ chối cả file, không đổi gì, khi: có ký tự CR, dòng không phải `TÊN=giá trị` (tên viết hoa), tên trùng, tên như `PATH`, `LD_*`, `PYTHON*`, biến do compose đặt (`REDIS_URL`…), thiếu hoặc rỗng `LLM_PROVIDER`, `CHAT_CONTROLLER_PRICE_*`. Đổi xong, script đợi 20 giây và kiểm 3 container vẫn chạy, không khởi động lại; không đạt thì trả bản cũ. Log từng lần `set` ở `~/deploy-logs/*-ai-config.log`, nhật ký ai đổi biến nào ở `~/deploy-logs/ai-config.log`, bản cũ ở `~/backups/env-ai/` (giữ 20 bản). Script dùng chung khoá với `deploy-api.sh` nên không chạy chồng với deploy.
+
+Test script trên máy dev (docker giả, không cần server): `docker run --rm -v "$PWD/deploy:/w:ro" debian:bookworm-slim sh /w/ai-config.test.sh`.
+
+#### Tạo `.env.ai` lần đầu
+
+Server mới: `init-server-env.sh` tạo sẵn. Server đã chạy AI với biến trong `.env.server`: chuyển một lần, giữ đúng giá trị đang chạy. Làm trước khi chép `compose.server.yaml` mới (compose mới bắt buộc có `.env.ai`):
+
+```bash
+cd ~/tripflix-be/deploy
+cp -p .env.server ~/backups/env.server-$(date -u +%Y%m%d-%H%M%S)-before-env-ai
+umask 077
+# Lưu env đang chạy của từng service để so sau khi chuyển (có key: để trong ~/backups, quyền 600).
+for s in ai-service ai-summary-worker ai-label-worker; do
+  docker exec tripflix-server-$s-1 printenv | grep -v '^HOSTNAME=' | sort > ~/backups/env-$s-before-env-ai
+done
+# Lấy biến AI đang chạy trong container (đã gồm mặc định của compose cũ), không in giá trị.
+{ docker exec tripflix-server-ai-service-1 printenv; docker exec tripflix-server-ai-summary-worker-1 printenv; } \
+  | grep -E '^(OPENAI_API_KEY|DEEPSEEK_API_KEY|DEEPSEEK_BASE_URL|LLM_PROVIDER|LLM_MODEL|SUMMARY_LLM_KILL|CLASSIFIER_ENABLED|IS_VISOBERT_ENABLED|LOG_LEVEL|OPENAI_REASONING_EFFORT|CHAT_[A-Z0-9_]+)=' \
+  | sort -u -t= -k1,1 > .env.ai
+names() { sed -n 's/^\([A-Z0-9_]*\)=.*/\1/p' "$1"; }
+names .env.ai | tr '\n' ' '; echo   # so với deploy/.env.ai.example: thiếu biến nào thì thêm theo mẫu
+```
+
+Chép `compose.server.yaml` mới, chạy lại AI rồi so biến trong container với trước khi chuyển. Lệnh chỉ in tên biến bị mất hoặc đổi giá trị, không in dòng nào là đạt. Worker có thêm biến AI khác (dùng chung file), app bỏ qua biến không dùng (`extra="ignore"`).
+
+```bash
+dc --profile ai up -d --no-deps --force-recreate --wait ai-service ai-summary-worker ai-label-worker
+for s in ai-service ai-summary-worker ai-label-worker; do
+  docker exec tripflix-server-$s-1 printenv | grep -v '^HOSTNAME=' | sort \
+    | comm -23 ~/backups/env-$s-before-env-ai - | cut -d= -f1 | sed "s/^/$s: /"
+done
+```
+
+Chạy ổn rồi mới xoá biến AI khỏi `.env.server` (giữ các biến deploy quản ở trên), để chỉ còn một nơi sửa.
+
+#### Cài cho Bảo
+
+```bash
+sudo install -m 755 -o root -g root ~/tripflix-be/deploy/ai-config.sh /opt/tripflix/ai-config.sh
+sudo adduser --disabled-password --gecos '' bao
+printf '%s\n' 'bao ALL=(<user>) NOPASSWD: /opt/tripflix/ai-config.sh' | sudo tee /etc/sudoers.d/tripflix-ai-config >/dev/null
+sudo chmod 440 /etc/sudoers.d/tripflix-ai-config
+sudo visudo -cf /etc/sudoers.d/tripflix-ai-config
+sudo install -d -m 700 -o bao -g bao /home/bao/.ssh
+# Key chỉ chạy được script này: không shell, không chuyển cổng. Chỉ thêm ở đây, không thêm vào metadata của project hay VM.
+echo 'restrict,command="/opt/tripflix/ai-config.sh" <public key của Bảo>' | sudo tee /home/bao/.ssh/authorized_keys >/dev/null
+sudo chown bao:bao /home/bao/.ssh/authorized_keys && sudo chmod 600 /home/bao/.ssh/authorized_keys
+sudo sshd -T -C user=bao,host=x,addr=127.0.0.1 | grep -i forcecommand   # phải in "forcecommand none"
+```
+
+Mạng công ty chặn SSH thẳng, nên Bảo đi qua tunnel IAP: cấp `roles/compute.viewer` trên VM và `roles/iap.tunnelResourceAccessor` có điều kiện `destination.ip == "<IP nội bộ của VM>" && destination.port == 22` cho tài khoản Google của Bảo. Trên máy Bảo, `~/.ssh/config`:
+
+```
+Host tripflix-ai
+  HostName tripflix-staging
+  User bao
+  ProxyCommand gcloud compute start-iap-tunnel %h 22 --listen-on-stdin --project=tripflix-staging --zone=asia-southeast1-b
+```
+
+Không dùng `gcloud compute ssh`: lệnh đó tự thêm key vào metadata của project, key đó vào được mọi VM. Thu hồi: xoá dòng trong `/home/bao/.ssh/authorized_keys` và gỡ hai quyền IAM.
+
 ### Tóm tắt bình luận
 
 Worker nghe bình luận, gọi DeepSeek, ghi tóm tắt về core-api. core-api cần từ `sha-307edcd` trở lên để ẩn `safety.pendingWarnings` với người không phải staff.
@@ -176,7 +255,7 @@ dc --profile api run --rm --no-deps -T core-api node dist/cli/service-client.js 
 grep -c '^AI_SERVICE_CLIENT_SECRET=.' deploy/.env.server   # 1 là đạt
 ```
 
-2. Trong `.env.server` cần `DEEPSEEK_API_KEY` (không gửi qua chat) và `AI_TAG=sha-<7 ký tự>`. Ghim `AI_TAG` thì thêm tag đó vào `GHCR_KEEP_TAGS` của repo `tripflix-ai`.
+2. Trong `.env.ai` cần `DEEPSEEK_API_KEY` (không gửi qua chat), trong `.env.server` cần `AI_TAG=sha-<7 ký tự>`. Ghim `AI_TAG` thì thêm tag đó vào `GHCR_KEEP_TAGS` của repo `tripflix-ai`.
 3. Chạy và xem log:
 
 ```bash
@@ -184,7 +263,7 @@ dc --profile ai up -d ai-summary-worker
 dc --profile ai logs -f ai-summary-worker
 ```
 
-Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` rồi chạy lại lệnh `up`. Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
+Mặc định worker được 1 nhân và 1 luồng phân loại (`AI_WORKER_CPUS`, tối đa 1,5 GB RAM), để không giành CPU của core-api trên máy 2 vCPU. Đo bằng `docker stats` khi có nhiều bình luận trước khi tăng. Tắt gọi DeepSeek khẩn cấp: đặt `SUMMARY_LLM_KILL=true` trong `.env.ai` (`ai-config.sh set` tự chạy lại service). Lần chạy đầu worker đọc lại cả sự kiện bình luận cũ, mỗi bài có bình luận tốn khoảng một lần gọi DeepSeek.
 
 ### Gắn nhãn bình luận (TF44)
 
@@ -196,18 +275,19 @@ dc --profile ai logs -f ai-label-worker   # cần dòng "listening on stream:cor
 dc exec redis redis-cli XINFO GROUPS stream:core.content   # ai-labels: lag 0, pending 0 là đạt
 ```
 
-Sự cố model: đặt `CLASSIFIER_ENABLED=false` (tắt bộ phân loại ở cả hai worker) hoặc `dc stop ai-label-worker`, rồi chạy lại `up`. Lần chạy đầu worker đọc lại cả sự kiện cũ trong stream.
+Sự cố model: đặt `CLASSIFIER_ENABLED=false` trong `.env.ai` (tắt bộ phân loại ở cả hai worker) hoặc `dc stop ai-label-worker`. Lần chạy đầu worker đọc lại cả sự kiện cũ trong stream.
 
 ### Kiểm duyệt (`ai-service`)
 
 core-api gọi `POST http://ai-service:8000/moderate` với chữ và URL ảnh của bài, bình luận; ai-service hỏi OpenAI moderation (miễn phí) rồi trả cờ vi phạm. Gateway chỉ mở `/ai/chat` (mục Trợ lý Tripi), nên `/moderate` chỉ gọi được trong mạng nội bộ. ai-service chỉ nhận service token của core-api, kiểm bằng `http://core-api:3000/.well-known/jwks.json`, issuer `tripflix-core` như core-api. Không dùng bộ phân loại, không cần `LLM_PROVIDER`; giới hạn nửa nhân, 1 GB RAM. Cần `AI_TAG` từ `sha-7a1ab56` trở lên.
 
-1. Nhập key OpenAI thẳng vào `.env.server`, không gửi qua chat, không in ra màn hình:
+1. Đặt `OPENAI_API_KEY` trong `.env.ai` (Bảo dùng `ai-config.sh set`), không gửi qua chat. Trên server, nhập thẳng mà không in ra màn hình:
 
 ```bash
 cd ~/tripflix-be
-read -rs k && printf 'OPENAI_API_KEY=%s\n' "$k" >> deploy/.env.server && unset k
-grep -c '^OPENAI_API_KEY=.' deploy/.env.server   # 1 là đạt
+grep -c '^OPENAI_API_KEY=' deploy/.env.ai   # 0 thì thêm, 1 thì sửa giá trị của dòng đó
+read -rs k && printf 'OPENAI_API_KEY=%s\n' "$k" >> deploy/.env.ai && unset k
+grep -c '^OPENAI_API_KEY=.' deploy/.env.ai   # 1 là đạt
 ```
 
 2. Chạy, rồi gọi thử từ core-api không kèm token: `401` là ai-service chạy, core-api tới được và đã chặn người gọi lạ.
@@ -217,7 +297,7 @@ dc --profile ai up -d --wait ai-service
 dc --profile api exec -T core-api node -e "fetch('http://ai-service:8000/moderate',{method:'POST'}).then(r=>console.log(r.status))"
 ```
 
-Thiếu key thì `/moderate` trả `503` và core giữ bước lọc regex. Thu hồi key: xoá dòng `OPENAI_API_KEY` rồi chạy lại lệnh `up`.
+Thiếu key thì `/moderate` trả `503` và core giữ bước lọc regex. Thu hồi key: để trống `OPENAI_API_KEY` trong `.env.ai` rồi chạy lại lệnh `up` (hoặc `ai-config.sh set`).
 
 3. Cho core-api gọi ai-service. Cần client `core-api` với audience `ai-service`: core-api dùng nó lấy token gửi kèm `/moderate`. Client này khác client `ai-service` của phần tóm tắt. Tạo client, ghi secret thẳng vào `.env.server`, không in ra màn hình. Secret chỉ tạo được một lần; client `core-api` đã có thì lệnh báo lỗi, khi đó hỏi người đang giữ secret.
 
@@ -243,8 +323,8 @@ Ra `http://ai-service:8000` và một số lớn hơn 0 là đạt. Bỏ kiểm 
 
 ```bash
 cd ~/tripflix-be
-grep -q '^IS_VISOBERT_ENABLED=' deploy/.env.server && sed -i 's/^IS_VISOBERT_ENABLED=.*/IS_VISOBERT_ENABLED=true/' deploy/.env.server \
-  || echo 'IS_VISOBERT_ENABLED=true' >> deploy/.env.server
+grep -q '^IS_VISOBERT_ENABLED=' deploy/.env.ai && sed -i 's/^IS_VISOBERT_ENABLED=.*/IS_VISOBERT_ENABLED=true/' deploy/.env.ai \
+  || echo 'IS_VISOBERT_ENABLED=true' >> deploy/.env.ai
 dc --profile ai up -d --no-deps --wait ai-service
 dc --profile ai exec -T ai-service printenv IS_VISOBERT_ENABLED   # true là đạt
 ```
@@ -262,7 +342,7 @@ App gọi `https://<API_HOST>/ai/chat`. Gateway chỉ nhận đúng `POST` vào 
 ```bash
 cd ~/tripflix-be
 sed -i 's/^AI_TAG=.*/AI_TAG=sha-164c7db/' deploy/.env.server
-grep -q '^CHAT_LLM_ENABLED=' deploy/.env.server || echo 'CHAT_LLM_ENABLED=false' >> deploy/.env.server
+grep -q '^CHAT_LLM_ENABLED=' deploy/.env.ai || echo 'CHAT_LLM_ENABLED=false' >> deploy/.env.ai
 dc --profile ai up -d --wait ai-service ai-summary-worker ai-label-worker
 dc --profile gateway up -d --wait traefik
 ```
@@ -279,18 +359,18 @@ Preflight của web: `200` và có `access-control-allow-origin: https://tripfli
 curl -si -X OPTIONS https://api.tripflix.io.vn/ai/chat -H 'Origin: https://tripflix.io.vn' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: authorization,content-type' | grep -iE '^HTTP|access-control-allow-origin'
 ```
 
-3. Chạy app với `EXPO_PUBLIC_AI_URL=https://api.tripflix.io.vn/ai`. Tắt trợ lý khẩn cấp: xoá router `ai-chat` trong `traefik/server.yml` rồi chạy lại gateway; chỉ tắt DeepSeek: đặt `CHAT_LLM_ENABLED=false` rồi chạy lại `ai-service`.
+3. Chạy app với `EXPO_PUBLIC_AI_URL=https://api.tripflix.io.vn/ai`. Tắt trợ lý khẩn cấp: xoá router `ai-chat` trong `traefik/server.yml` rồi chạy lại gateway; chỉ tắt DeepSeek: đặt `CHAT_LLM_ENABLED=false` trong `.env.ai` rồi chạy lại `ai-service` (hoặc `ai-config.sh set`).
 
 #### Tripi v3: hai agent và hạn mức
 
-Mỗi lượt chat gọi 2 LLM: Controller (OpenAI, mặc định `gpt-5-nano`) chọn công cụ, Responder (DeepSeek) viết câu trả lời. Hạn mức lượt, token và chi tiêu nằm trong Redis của stack. Giá token của Controller và `CHAT_SYSTEM_DAILY_USD=3` lấy mặc định trong `compose.server.yaml`. Không đặt giá rỗng trong `.env.server`.
+Mỗi lượt chat gọi 2 LLM: Controller (OpenAI, mặc định `gpt-5-nano`) chọn công cụ, Responder (DeepSeek) viết câu trả lời. Hạn mức lượt, token và chi tiêu nằm trong Redis của stack. Giá token của Controller và `CHAT_SYSTEM_DAILY_USD=3` nằm trong `.env.ai` (mặc định theo `.env.ai.example`). Không đặt giá rỗng: `ai-config.sh` từ chối.
 
-1. Trong `.env.server` cần `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` (không gửi qua chat), `CHAT_IDENTITY_SALT` và `AI_FORWARDED_ALLOW_IPS`. Hai biến sau lấy như sau:
+1. Trong `.env.ai` cần `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` (không gửi qua chat) và `CHAT_IDENTITY_SALT`; trong `.env.server` cần `AI_FORWARDED_ALLOW_IPS`. Hai biến sau lấy như sau:
 
 ```bash
 cd ~/tripflix-be
 # Salt băm IP khách: sinh một lần cho mỗi môi trường, không đổi (đổi thì hạn mức khách tính lại từ đầu).
-grep -q '^CHAT_IDENTITY_SALT=.' deploy/.env.server || echo "CHAT_IDENTITY_SALT=$(openssl rand -hex 32)" >> deploy/.env.server
+grep -q '^CHAT_IDENTITY_SALT=.' deploy/.env.ai || { sed -i '/^CHAT_IDENTITY_SALT=$/d' deploy/.env.ai; echo "CHAT_IDENTITY_SALT=$(openssl rand -hex 32)" >> deploy/.env.ai; }
 # Dải mạng compose có Traefik. ai-service chỉ tin X-Forwarded-For từ dải này.
 net=$(docker inspect tripflix-server-traefik-1 -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}')
 subnet=$(docker network inspect "$net" -f '{{(index .IPAM.Config 0).Subnet}}'); echo "$subnet"
@@ -310,7 +390,7 @@ dc --profile ai exec -T ai-service printenv FORWARDED_ALLOW_IPS   # phải là d
 ```
 
 3. Gọi thử từ app khi chưa đăng nhập: khách chat được, hạn mức tính theo IP (`chat_guest_daily_turns`, `chat_guest_turns_per_minute` trong `app/core/config.py` của tripflix-ai; compose không đặt nên lấy mặc định của image). `sha-336e170`: 5 lượt/ngày, 3 lượt/phút; từ commit `2ff99eb` (nới để test): 300 lượt/ngày, 15 lượt/phút. Hết lượt thì trả `429 GUEST_LIMIT_REACHED` và app mời đăng nhập. Log `ai-service` ghi mã người dùng hoặc IP đã băm, token, chi phí, không ghi nội dung tin nhắn.
-4. Đo tải trên staging trước khi mở cho người dùng: 10 rồi 30 lượt chat cùng lúc, trong lúc gửi bình luận để core gọi `/moderate` (hai việc chung một tiến trình, nửa nhân). Đạt khi p95 của `/moderate` vẫn dưới timeout của core-api và `ai-service` không bị khởi động lại vì hết RAM. Khi đo, hạ `CHAT_SYSTEM_DAILY_USD` (ví dụ `0.5`) trong `.env.server` rồi chạy lại `ai-service`.
+4. Đo tải trên staging trước khi mở cho người dùng: 10 rồi 30 lượt chat cùng lúc, trong lúc gửi bình luận để core gọi `/moderate` (hai việc chung một tiến trình, nửa nhân). Đạt khi p95 của `/moderate` vẫn dưới timeout của core-api và `ai-service` không bị khởi động lại vì hết RAM. Khi đo, hạ `CHAT_SYSTEM_DAILY_USD` (ví dụ `0.5`) trong `.env.ai` rồi chạy lại `ai-service`.
 
 ### Giữ log
 
