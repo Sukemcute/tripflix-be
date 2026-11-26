@@ -138,5 +138,96 @@ for (const [name, runs] of [...groups.entries()].sort(([a], [b]) => a.localeComp
   lines.push('');
 }
 
+// Chế độ vus (levels.js): mỗi file v-<kiểu>-<số VU>.run<N>.json là một lượt, chỉ tính bậc "measure" (bỏ khởi động).
+const VUS_FILE = /^v-(read|write|mixed)-(\d+)\.run(\d+)\.json$/;
+const KIND_TITLES = { read: 'R · đọc', mixed: 'M · hỗn hợp (80% đọc, 15% gửi, 5% mở trả lời)', write: 'W · gửi bình luận' };
+
+function readCsvRows(file) {
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((row) => row.split(','));
+}
+
+/** CPU trung vị và p90 của một lượt, chỉ lấy các mẫu có tải: trung vị để lúc setup, teardown đi hết trang không làm lệch. */
+function readCpu(file, column) {
+  const values = readCsvRows(file)
+    .map((cols) => Number(String(cols[column] ?? '').replace('%', '')))
+    .filter((v) => Number.isFinite(v) && v > 5);
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return { median: median(sorted), p90: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))] };
+}
+
+function readMeasure(data) {
+  const metric = (key) => data.metrics[key]?.values;
+  const all = metric('http_req_duration{step:measure}') ?? {};
+  const failed = metric('http_req_failed{step:measure}');
+  const byName = (name) => {
+    const values = metric(`http_req_duration{step:measure,name:${name}}`);
+    return values?.count ? values : undefined;
+  };
+  const thresholds = Object.values(data.metrics).flatMap((m) => Object.values(m.thresholds ?? {}));
+  return {
+    rps: (all.count ?? 0) / (data.setup_data?.steps?.measure ?? 60),
+    p50: all.med,
+    p95: all['p(95)'],
+    p99: all['p(99)'],
+    readP95: byName('read')?.['p(95)'],
+    writeP95: byName('write')?.['p(95)'],
+    repliesP95: byName('replies')?.['p(95)'],
+    failRate: failed?.rate ?? 0,
+    pagingMissing: metric('paging_missing')?.count,
+    pagingDuplicates: metric('paging_duplicates')?.count,
+    ok: thresholds.every((r) => r.ok),
+  };
+}
+
+const vusRuns = new Map();
+for (const file of readdirSync(OUT)) {
+  const match = VUS_FILE.exec(file);
+  if (!match) continue;
+  const [, kind, vus, run] = match;
+  const key = `${kind}:${vus}`;
+  if (!vusRuns.has(key)) vusRuns.set(key, { kind, vus: Number(vus), runs: [] });
+  const runName = `v-${kind}-${vus}.run${run}`;
+  vusRuns.get(key).runs.push({
+    measure: readMeasure(JSON.parse(readFileSync(join(OUT, file), 'utf8'))),
+    coreCpu: readCpu(join(OUT, `cpu-core-${runName}.csv`), 1),
+    pgCpu: readCpu(join(OUT, `cpu-pg-${runName}.csv`), 1),
+    locks: readLocks(join(OUT, `locks-${runName}.csv`)),
+    count: readCsvRows(join(OUT, `count-${runName}.csv`))[0]?.map(Number),
+  });
+}
+
+if (vusRuns.size) {
+  lines.push('# Đo theo số VU (mỗi VU nghỉ 1–3 s, đo 60 s sau 10 s khởi động)', '');
+  for (const kind of ['read', 'mixed', 'write']) {
+    const levels = [...vusRuns.values()].filter((g) => g.kind === kind).sort((a, b) => a.vus - b.vus);
+    if (levels.length === 0) continue;
+    lines.push(`## ${KIND_TITLES[kind]}`, '');
+    lines.push(
+      '| VU | Lần | Request/giây | p50 (ms) | p95 (ms) | p95 thấp–cao | p99 (ms) | p95 đọc / gửi / trả lời | Lỗi cao nhất | CPU core-api trung vị / p90 (% 1 nhân) | CPU Postgres trung vị | Chờ khoá | Đếm & phân trang | Đạt ngưỡng |',
+      '|---:|---:|---:|---:|---:|---:|---:|---|---:|---|---:|---:|---|---|',
+    );
+    for (const { vus, runs } of levels) {
+      const m = runs.map((r) => r.measure);
+      const p95s = m.map((v) => v.p95).filter((v) => v !== undefined);
+      const med = (pick) => median(m.map(pick));
+      const cores = runs.map((r) => r.coreCpu).filter(Boolean);
+      const pgs = runs.map((r) => r.pgCpu).filter(Boolean);
+      const locks = runs.map((r) => r.locks).filter(Boolean);
+      const counts = runs.map((r) => r.count).filter(Boolean);
+      const countOk = counts.every(([stored, actual, pending]) => stored === actual && pending === 0);
+      const pagingBad = m.reduce((sum, v) => sum + (v.pagingMissing ?? 0) + (v.pagingDuplicates ?? 0), 0);
+      const integrity = kind === 'read' ? '–' : `${counts.length ? (countOk ? 'khớp' : 'LỆCH') : '?'}, ${pagingBad === 0 ? 'đủ trang' : `thiếu/lặp ${pagingBad}`}`;
+      const split = [med((v) => v.readP95), med((v) => v.writeP95), med((v) => v.repliesP95)].map((v) => fixed(v, 0)).join(' / ');
+      lines.push(
+        `| ${vus} | ${runs.length} | ${fixed(med((v) => v.rps), 0)} | ${fixed(med((v) => v.p50))} | ${fixed(median(p95s))} | ${fixed(Math.min(...p95s), 0)}–${fixed(Math.max(...p95s), 0)} | ${fixed(med((v) => v.p99))} | ${split} | ${(Math.max(...m.map((v) => v.failRate)) * 100).toFixed(2)}% | ${cores.length ? `${fixed(median(cores.map((c) => c.median)), 0)} / ${fixed(median(cores.map((c) => c.p90)), 0)}` : '–'} | ${pgs.length ? `${fixed(median(pgs.map((c) => c.median)), 0)}%` : '–'} | ${locks.length ? `${fixed(median(locks.map((l) => l.lockShare * 100)), 0)}%` : '–'} | ${integrity} | ${m.filter((v) => v.ok).length}/${m.length} |`,
+      );
+    }
+    lines.push('');
+  }
+  lines.push('Ngưỡng: đọc và mở trả lời p95 < 150 ms, gửi p95 < 300 ms, lỗi < 1%, sau lượt ghi comment_count khớp và đi hết trang không thiếu, không lặp.', '');
+}
+
 writeFileSync(join(OUT, 'summary.md'), `${lines.join('\n')}\n`);
 process.stdout.write(lines.join('\n'));
