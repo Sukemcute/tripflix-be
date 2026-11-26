@@ -39,8 +39,11 @@ export function listComments(token, cursor, tags) {
 /**
  * Đi hết các trang bình luận gốc theo nextCursor như web bấm "Xem thêm": ghi cursor của từng trang và đếm bình luận
  * thấy được, để so với total (phát hiện phân trang bỏ sót hay lặp).
+ * WALK_MAX_PAGES: chỉ đi tối đa N trang (đo trên server, bình luận dồn lại qua các lượt thì đi hết trang quá lâu);
+ * khi đó missing không còn ý nghĩa.
  */
 export function walkAllPages(token) {
+  const maxPages = Number(__ENV.WALK_MAX_PAGES || 0) || Infinity;
   const cursors = [null];
   const seen = new Set();
   let duplicates = 0;
@@ -55,7 +58,7 @@ export function walkAllPages(token) {
       if (seen.has(item.id)) duplicates += 1;
       seen.add(item.id);
     }
-    if (!page.nextCursor) break;
+    if (!page.nextCursor || cursors.length >= maxPages) break;
     cursor = page.nextCursor;
     cursors.push(cursor);
   }
@@ -82,5 +85,6 @@ export function writeSummary(name, data) {
     const p = data.setup_data.pagination;
     lines.push(`phân trang: ${p.pages} trang, total ${p.total}, thấy ${p.seen}, thiếu ${p.missing}, lặp ${p.duplicates}`);
   }
-  return { [`/bench/out/${name}.json`]: JSON.stringify(data, null, 2), stdout: `${lines.join('\n')}\n` };
+  // OUT_DIR: k6 chạy thẳng (không qua Docker) thì thư mục out/ không nằm ở /bench/out.
+  return { [`${__ENV.OUT_DIR || '/bench/out'}/${name}.json`]: JSON.stringify(data, null, 2), stdout: `${lines.join('\n')}\n` };
 }
