@@ -27,7 +27,7 @@ Bản đo trên stack local theo số bài video vẫn ở `tools/bench/feed/`.
 ## Chạy (trên VM k6)
 
 ```bash
-sh run.sh scale c1        # cấu hình 1: 1 bản core-api APP_ROLE=all. RATES="50 100 200 400", mỗi mức 60 s
+sh run.sh scale c1        # cấu hình 1: 1 bản core-api APP_ROLE=all. RATES="25 50 100 150 200", mỗi mức 60 s; dừng khi lỗi quá STOP_FAIL (5%)
 # đổi staging sang 2 api + 1 worker (compose.bench.yaml của buổi đo bình luận, thêm core-api-2 vào service Traefik)
 sh run.sh scale c2
 sh run.sh cdn             # LEVELS="50 100 250 500", mỗi mức 2 phút

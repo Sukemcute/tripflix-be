@@ -1,0 +1,4 @@
+# Kết quả đo (summary k6, mẫu server): đưa số vào evidence, không commit file thô.
+out/
+results/
+smoke/
