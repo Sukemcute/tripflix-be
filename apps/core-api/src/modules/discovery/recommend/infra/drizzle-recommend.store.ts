@@ -15,6 +15,7 @@ import {
 import type { CandidateQuery, InteractionCounts, ProductFeatureStore, RecommendAdminStats, RecommendPostRow, RecommendStore } from '../application/ports.js';
 import { splitKey, type Candidate, type CandidateSource, type Kind, type ProductBuildOutput, type ProductType, type PostInteractionSample, type PostMeta, type RawRow } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
+import { APPEND_ONLY_KEEP, APPEND_ONLY_KINDS, OTHER_KIND_READ_CAP } from '../domain/row-limits.js';
 
 const CHUNK = 1000;
 const DAY_MS = 86_400_000;
@@ -23,7 +24,6 @@ const chunks = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / CHUNK)
 
 /** Hạn lưu bảng thô (đề xuất mục 4). Dòng thêm mới (ref = eventId) giữ ngắn hơn dòng trạng thái. */
 const RETENTION = { removedDays: 7, appendOnlyDays: 90, otherDays: 180 };
-const APPEND_ONLY_KINDS = ['share', 'search', 'stays_search', 'view', 'flight_search', 'booking_click'];
 
 const excluded = (column: string) => sql.raw(`excluded."${column}"`);
 
@@ -217,17 +217,29 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
 
   async listUserRows(userIds: string[], now: Date): Promise<RawRow[]> {
     if (!userIds.length) return [];
+    const t = recommendInteractions;
+    // Trần mỗi người mỗi loại (row-limits.ts): bảng phình vì bot / stress test thì RAM của job và feed vẫn có trần.
+    const ranked = this.db
+      .select({
+        actorType: t.actorType,
+        actorId: t.actorId,
+        kind: t.kind,
+        refId: t.refId,
+        targetType: t.targetType,
+        targetId: t.targetId,
+        value: t.value,
+        isRemoved: t.isRemoved,
+        detail: t.detail,
+        occurredAt: t.occurredAt,
+        rank: sql<number>`row_number() over (partition by ${t.actorId}, ${t.kind} order by ${t.occurredAt} desc, ${t.refId})`.as('rank'),
+      })
+      .from(t)
+      .where(and(eq(t.actorType, 'user'), inArray(t.actorId, userIds), gt(t.occurredAt, daysBefore(now, 30)), lte(t.occurredAt, now)))
+      .as('ranked');
     const rows = await this.db
       .select()
-      .from(recommendInteractions)
-      .where(
-        and(
-          eq(recommendInteractions.actorType, 'user'),
-          inArray(recommendInteractions.actorId, userIds),
-          gt(recommendInteractions.occurredAt, daysBefore(now, 30)),
-          lte(recommendInteractions.occurredAt, now),
-        ),
-      );
+      .from(ranked)
+      .where(sql`${ranked.rank} <= case when ${ranked.kind} in ${[...APPEND_ONLY_KINDS]} then ${APPEND_ONLY_KEEP}::int else ${OTHER_KIND_READ_CAP}::int end`);
     return rows.map((r) => ({
       actorType: r.actorType as RawRow['actorType'],
       actorId: r.actorId,
@@ -502,8 +514,28 @@ export class DrizzleRecommendStore implements RecommendStore, ProductFeatureStor
       delete from ${t} where ctid in (
         select ctid from ${t} where
           (${t.isRemoved} and ${t.occurredAt} < ${daysBefore(now, RETENTION.removedDays)})
-          or (${t.kind} in ${APPEND_ONLY_KINDS} and ${t.occurredAt} < ${daysBefore(now, RETENTION.appendOnlyDays)})
+          or (${t.kind} in ${[...APPEND_ONLY_KINDS]} and ${t.occurredAt} < ${daysBefore(now, RETENTION.appendOnlyDays)})
           or ${t.occurredAt} < ${daysBefore(now, RETENTION.otherDays)}
+        limit ${batchSize}
+      ) returning 1 as ok`);
+    return result.rows.length;
+  }
+
+  async purgeExcess(batchSize: number): Promise<number> {
+    const t = recommendInteractions;
+    const kinds = [...APPEND_ONLY_KINDS];
+    // Chỉ xếp hạng nhóm (người, loại) vượt trần, không chạy hàm cửa sổ trên cả bảng.
+    const result = await this.db.execute<{ ok: number }>(sql`
+      delete from ${t} where ctid in (
+        select ctid from (
+          select ctid, row_number() over (partition by ${t.actorType}, ${t.actorId}, ${t.kind} order by ${t.occurredAt} desc, ${t.refId}) as rank
+          from ${t}
+          where ${t.kind} in ${kinds} and (${t.actorType}, ${t.actorId}, ${t.kind}) in (
+            select ${t.actorType}, ${t.actorId}, ${t.kind} from ${t}
+            where ${t.kind} in ${kinds}
+            group by 1, 2, 3 having count(*) > ${APPEND_ONLY_KEEP}::int
+          )
+        ) ranked where rank > ${APPEND_ONLY_KEEP}::int
         limit ${batchSize}
       ) returning 1 as ok`);
     return result.rows.length;

@@ -5,6 +5,7 @@ import { migrateModule, startPostgres, type PostgresFixture } from '@tripflix/te
 import type pg from 'pg';
 import type { RawRow } from '../domain/contracts.js';
 import { resolveAlgo } from '../domain/registry.js';
+import { APPEND_ONLY_KEEP } from '../domain/row-limits.js';
 import { DrizzleRecommendStore } from './drizzle-recommend.store.js';
 
 const U = randomUUID();
@@ -260,5 +261,41 @@ describe('DrizzleRecommendStore trên Postgres thật', () => {
     expect(await store.purgeExpired(NOW, 2)).toBe(0);
     const { rows } = await pool.query('select ref_id from discovery.recommend_interactions order by ref_id');
     expect(rows.map((r: { ref_id: string }) => r.ref_id)).toEqual(['reaction-91d', 'removed-new']);
+  });
+
+  describe('trần số dòng mỗi người', () => {
+    const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+    const searches = (n: number, actorId = U) =>
+      Array.from({ length: n }, (_, i) => row({ actorId, kind: 'search', refId: `s${i}`, targetType: null, occurredAt: minutesAgo(i + 1) }));
+
+    it('listUserRows: chỉ đọc APPEND_ONLY_KEEP dòng tìm mới nhất, loại khác giữ đủ', async () => {
+      await store.upsertInteractions([...searches(APPEND_ONLY_KEEP + 20), row({ refId: 'like-1' })], meta());
+      const rows = await store.listUserRows([U], NOW);
+      const found = rows.filter((r) => r.kind === 'search');
+      expect(found).toHaveLength(APPEND_ONLY_KEEP);
+      // Mới nhất là s0 (1 phút trước); s300… bị cắt.
+      expect(new Set(found.map((r) => r.refId))).toEqual(new Set(Array.from({ length: APPEND_ONLY_KEEP }, (_, i) => `s${i}`)));
+      expect(rows.filter((r) => r.kind === 'reaction').map((r) => r.refId)).toEqual(['like-1']);
+      expect(found[0]!.occurredAt).toMatch(/Z$/);
+    });
+
+    it('purgeExcess: xoá theo lô phần vượt của người vượt trần, người dưới trần không đụng', async () => {
+      const other = randomUUID();
+      await store.upsertInteractions([...searches(APPEND_ONLY_KEEP + 5), row({ refId: 'like-1' })], meta());
+      await store.upsertInteractions(searches(3, other), meta());
+      expect(await store.purgeExcess(4)).toBe(4);
+      expect(await store.purgeExcess(4)).toBe(1);
+      expect(await store.purgeExcess(4)).toBe(0);
+      const { rows } = await pool.query<{ actor_id: string; kind: string; n: number }>(
+        'select actor_id, kind, count(*)::int n from discovery.recommend_interactions group by 1, 2',
+      );
+      const mine = rows.find((r) => r.actor_id === U && r.kind === 'search');
+      expect(mine?.n).toBe(APPEND_ONLY_KEEP);
+      expect(rows.find((r) => r.actor_id === U && r.kind === 'reaction')?.n).toBe(1);
+      expect(rows.find((r) => r.actor_id === other)?.n).toBe(3);
+      // Dòng cũ nhất (s304) bị xoá, dòng thứ 300 (s299) còn.
+      const left = await pool.query('select ref_id from discovery.recommend_interactions where actor_id = $1 and ref_id = any($2)', [U, ['s299', 's304']]);
+      expect(left.rows.map((r: { ref_id: string }) => r.ref_id)).toEqual(['s299']);
+    });
   });
 });

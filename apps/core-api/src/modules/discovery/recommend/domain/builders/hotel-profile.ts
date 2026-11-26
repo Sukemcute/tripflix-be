@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { normalizeText } from '../../../search/domain/normalize-text.js';
 import { distanceKm } from '../../../search/domain/points-of-interest.js';
 import { round4, type HotelBuilder, type HotelBuildInput, type HotelBuildItem, type ProductBuildOutput } from '../contracts.js';
+import { groupBy } from '../group-by.js';
 import { percentile } from './hot.js';
 
 export const HotelProfileV0FeaturesSchema = z.object({
@@ -39,11 +40,6 @@ const MIN_CITY_PEERS = 5;
 const cityKey = (city: string | null) => (city ? normalizeText(city).replace(/\s+/g, '') || null : null);
 
 const median = (xs: number[]) => (xs.length ? percentile(xs, 50) : null);
-const groupBy = <T>(xs: readonly T[], key: (x: T) => string) => {
-  const m = new Map<string, T[]>();
-  for (const x of xs) m.set(key(x), [...(m.get(key(x)) ?? []), x]);
-  return m;
-};
 
 function geo(h: HotelBuildItem, input: HotelBuildInput) {
   if (!h.location || !input.points.length) return { nearestSightName: null, nearestSightKm: null, placesNearby: null };

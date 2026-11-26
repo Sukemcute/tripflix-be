@@ -67,6 +67,23 @@ describe('BuildFeaturesUseCases', () => {
     expect(store.setJobState).toHaveBeenCalledWith('build-features', expect.objectContaining({ lastError: 'Builder lỗi: hot@v0' }));
   });
 
+  it('quá ngân sách thời gian: dừng phần người dùng, giữ đặc trưng cũ, ghi lỗi; phần bài vẫn ghi', async () => {
+    const { store, useCases } = setup();
+    store.listActiveUserIds.mockResolvedValue(Array.from({ length: 450 }, (_, i) => `u${i}`));
+    expect(await useCases.runCycle(NOW, -1)).toMatchObject({ users: 450, failedBuilders: ['tag_affinity@v0'] });
+    expect(store.replacePostScores).toHaveBeenCalled();
+    expect(store.listUserRows).not.toHaveBeenCalled();
+    expect(store.upsertUserFeatures).not.toHaveBeenCalled();
+    expect(store.setJobState).toHaveBeenCalledWith('tag_affinity@v0', { lastRunAt: NOW, lastError: expect.stringContaining('0/450 người') });
+  });
+
+  it('chạy đủ các lô 200 người khi còn ngân sách', async () => {
+    const { store, useCases } = setup();
+    store.listActiveUserIds.mockResolvedValue(Array.from({ length: 450 }, (_, i) => `u${i}`));
+    expect((await useCases.runCycle(NOW))?.failedBuilders).toEqual([]);
+    expect(store.listUserRows).toHaveBeenCalledTimes(3);
+  });
+
   it('dòng recommend_algos có bộ ba sai thì bỏ qua builder của nó', async () => {
     const { store, useCases } = setup();
     await useCases.runCycle(NOW);

@@ -150,6 +150,14 @@ export interface ServedStore {
   add(userId: string, postIds: string[], at: Date): Promise<void>;
 }
 
+export const INGEST_QUOTA = Symbol('INGEST_QUOTA');
+
+/** Đếm dòng chỉ-thêm đã nạp theo (người, loại, ngày UTC) để chặn bot / stress test. Thật: Redis, hết hạn sau 2 ngày. */
+export interface IngestQuota {
+  /** Cộng `count` dòng, trả tổng sau khi cộng. */
+  add(actorId: string, kind: string, day: string, count: number): Promise<number>;
+}
+
 export const RECENT_POSTS_STORE = Symbol('RECENT_POSTS_STORE');
 
 /** Bài người dùng vừa tương tác (gu trong phiên, ≤ 20 bài, 2 giờ). Thật: Redis. Mất thì job 10 phút vẫn tính đủ. */
@@ -253,4 +261,6 @@ export interface RecommendStore {
   // Dọn hạn lưu
   /** Xoá một lô dòng hết hạn, trả số dòng đã xoá. */
   purgeExpired(now: Date, batchSize: number): Promise<number>;
+  /** Xoá một lô dòng chỉ-thêm vượt APPEND_ONLY_KEEP dòng mới nhất mỗi người mỗi loại, trả số dòng đã xoá. */
+  purgeExcess(batchSize: number): Promise<number>;
 }

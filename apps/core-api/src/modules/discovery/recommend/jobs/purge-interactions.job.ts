@@ -3,6 +3,7 @@ import type { CoreEnv } from '../../../../platform/env.js';
 import { CORE_ENV } from '../../../../platform/tokens.js';
 import { JobRuns, type JobTrigger } from '../../jobs/job-runs.js';
 import { RECOMMEND_STORE, type RecommendStore } from '../application/ports.js';
+import { APPEND_ONLY_KEEP } from '../domain/row-limits.js';
 import { dayOf, QUERY_GRAMS_RETENTION_DAYS } from '../../search/application/explore.use-cases.js';
 import { EXPLORE_STORE, type ExploreStore } from '../../search/application/ports.js';
 
@@ -13,7 +14,8 @@ const LOCK = 'discovery.recommend-retention';
 /**
  * Dọn hạn lưu bảng thô mỗi 24 giờ (và lúc worker khởi động), xoá theo lô 5.000 để không khoá bảng lâu:
  * is_removed quá 7 ngày; share/search/stays_search/view/flight_search quá 90 ngày; còn lại quá 180 ngày.
- * Cùng lượt: xoá đếm câu tìm của tìm kiếm (search_query_grams) quá 90 ngày.
+ * Cùng lượt: xoá dòng chỉ-thêm vượt APPEND_ONLY_KEEP mỗi người mỗi loại (bot / stress test), và đếm câu tìm của tìm kiếm
+ * (search_query_grams) quá 90 ngày. Admin bấm "Chạy ngay" để dọn ngay.
  * Advisory lock riêng: hai worker cùng chạy thì một bên bỏ lượt.
  */
 @Injectable()
@@ -49,7 +51,10 @@ export class PurgeInteractionsJob implements OnApplicationBootstrap, OnApplicati
         const total = await this.store.withLock(LOCK, async () => {
           let sum = 0;
           for (let n = BATCH; n === BATCH; sum += n) n = await this.store.purgeExpired(now, BATCH);
-          return sum + (await this.explore.purgeQueryGrams(dayOf(now, QUERY_GRAMS_RETENTION_DAYS)));
+          let excess = 0;
+          for (let n = BATCH; n === BATCH; excess += n) n = await this.store.purgeExcess(BATCH);
+          if (excess) this.logger.warn(`Đã xoá ${excess} dòng chỉ-thêm vượt ${APPEND_ONLY_KEEP} dòng mỗi người mỗi loại`);
+          return sum + excess + (await this.explore.purgeQueryGrams(dayOf(now, QUERY_GRAMS_RETENTION_DAYS)));
         });
         return total === null ? { outcome: 'skipped' } : { outcome: 'succeeded', summary: { deleted: total } };
       });
