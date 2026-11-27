@@ -4,10 +4,12 @@ import type { z } from 'zod';
 import { FlightSearchUseCases } from '../application/flight-search.use-cases.js';
 import { FlightCalendarQueryDto, FlightCalendarQuerySchema, FlightCalendarResultDto, FlightOfferDto, FlightOfferQueryDto, FlightOfferQuerySchema, FlightRouteDto, FlightSearchQueryDto, FlightSearchQuerySchema, FlightSearchResultDto } from './flights.dto.js';
 import { CommerceErrorFilter, ZodQuery } from './http.js';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 
 /** Tìm chuyến bay còn ghế cho web và app. Công khai, không cần đăng nhập; chỉ đọc. Đặt vé qua POST /checkout. */
 @ApiTags('flights')
 @Controller('flights')
+@AdmissionLane('browse')
 @UseFilters(CommerceErrorFilter)
 export class FlightsController {
   constructor(@Inject(FlightSearchUseCases) private readonly flights: FlightSearchUseCases) {}

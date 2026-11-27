@@ -4,6 +4,7 @@ import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import type { Request } from 'express';
 import { z } from 'zod';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 import { CommerceErrorFilter, IDEMPOTENCY_KEY_HEADER, ZodQuery } from '../../inventory/api/http.js';
 import { VnpayUseCases } from '../application/vnpay.use-cases.js';
 
@@ -41,6 +42,7 @@ class CancelVnpayResultDto {
 @ApiTags('checkout')
 @ApiBearerAuth()
 @Controller('checkout')
+@AdmissionLane('transaction')
 @UseFilters(CommerceErrorFilter)
 @Authenticated()
 export class VnpayCheckoutController {
@@ -73,6 +75,7 @@ export class VnpayCheckoutController {
  */
 @ApiTags('payments')
 @Controller('payments/vnpay')
+@AdmissionLane('exempt')
 @UseFilters(CommerceErrorFilter)
 export class VnpayCallbackController {
   constructor(@Inject(VnpayUseCases) private readonly vnpay: VnpayUseCases) {}

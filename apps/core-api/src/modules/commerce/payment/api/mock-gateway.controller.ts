@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Post } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 import { CreateTokenRequestDto, CreateTokenRequestSchema, TokenDto } from '../../booking/api/checkout.dto.js';
 import { ZodQuery } from '../../inventory/api/http.js';
 import { PAYMENT_GATEWAY, type PaymentGateway } from '../application/gateway.port.js';
@@ -12,6 +13,7 @@ import { MockGateway, TEST_CARDS } from '../infra/mock-gateway.js';
  */
 @ApiTags('mock-gateway')
 @Controller('mock-gateway')
+@AdmissionLane('transaction')
 export class MockGatewayController {
   constructor(@Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway) {}
 

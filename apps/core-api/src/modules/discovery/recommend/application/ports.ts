@@ -150,6 +150,14 @@ export interface ServedStore {
   add(userId: string, postIds: string[], at: Date): Promise<void>;
 }
 
+export const RECOMMEND_TUNING = Symbol('RECOMMEND_TUNING');
+
+/** Tham số gợi ý admin chỉnh được lúc chạy, không cần deploy. Thật: Redis. null = dùng mặc định trong code. */
+export interface RecommendTuning {
+  getCandidateLimit(): Promise<number | null>;
+  setCandidateLimit(limit: number | null): Promise<void>;
+}
+
 export const INGEST_QUOTA = Symbol('INGEST_QUOTA');
 
 /** Đếm dòng chỉ-thêm đã nạp theo (người, loại, ngày UTC) để chặn bot / stress test. Thật: Redis, hết hạn sau 2 ngày. */
