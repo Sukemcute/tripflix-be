@@ -8,6 +8,7 @@ import { CommerceErrorFilter, ZodQuery } from './http.js';
 import { TtlCache } from '../application/ttl-cache.js';
 import type { HotelDetail } from '../application/hotel-detail.use-cases.js';
 import { isDatabaseUnavailable } from './database-unavailable.js';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 
 /**
  * Trang khách sạn đọc nhiều, ít đổi: giữ 10 giây. Database lỗi thì trả bản tốt gần nhất (cũ tối đa 30 phút)
@@ -20,6 +21,7 @@ const MAX_HOTEL_DETAIL_ENTRIES = 2_000;
 /** Trang chi tiết khách sạn cho web và app. Công khai, không cần đăng nhập; chỉ đọc. */
 @ApiTags('hotels')
 @Controller('hotels')
+@AdmissionLane('browse')
 @UseFilters(CommerceErrorFilter)
 export class HotelsController {
   constructor(

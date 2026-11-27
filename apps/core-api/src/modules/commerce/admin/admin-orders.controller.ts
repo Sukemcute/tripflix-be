@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ZodQuery } from '../inventory/api/http.js';
 import { AdminOrdersStore } from './admin-orders.store.js';
 import { ANOMALY_KINDS } from './anomaly-kinds.js';
+import { AdmissionLane } from '../platform/admission-lane.decorator.js';
 
 const ORDER_STATUSES = ['pending', 'paying', 'paid', 'cancelled', 'expired'] as const;
 const csvOf = <T extends readonly [string, ...string[]]>(values: T) =>
@@ -37,6 +38,7 @@ export const SearchAdminProductsQuerySchema = z.object({
 @ApiTags('admin-commerce')
 @ApiBearerAuth()
 @Controller('admin/commerce')
+@AdmissionLane('exempt')
 @Roles('superadmin')
 export class AdminOrdersController {
   constructor(@Inject(AdminOrdersStore) private readonly store: AdminOrdersStore) {}

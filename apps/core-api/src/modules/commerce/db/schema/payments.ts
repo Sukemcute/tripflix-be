@@ -39,6 +39,8 @@ export const payments = commerceSchema.table(
     // Chốt ở database: một đơn tối đa một khoản trừ đang chạy hoặc đã thành công, dù code sai hay khoá khác nhau.
     uniqueIndex('uq_payments_one_live_per_order').on(t.orderId).where(sql`${t.status} in ('initiated', 'requires_action', 'succeeded')`),
     index('idx_payments_due').on(t.nextCheckAt).where(sql`${t.status} = 'initiated' and not ${t.needsReview}`),
+    // Câu đếm thẻ lỗi và tra khoản theo đơn chạy mỗi lượt trả tiền; thiếu index thì quét cả bảng.
+    index('idx_payments_order_id').on(t.orderId, t.status),
   ],
 );
 
@@ -68,6 +70,7 @@ export const refunds = commerceSchema.table(
     check('ck_refunds_status', sql`${t.status} in ('initiated', 'succeeded')`),
     check('ck_refunds_amount', sql`${t.amount} > 0`),
     uniqueIndex('uq_refunds_gateway_key').on(t.gatewayKey),
+    index('idx_refunds_order_id').on(t.orderId),
   ],
 );
 

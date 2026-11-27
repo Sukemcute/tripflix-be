@@ -47,6 +47,9 @@ import { VNPAY_CONFIG, VnpayUseCases, type VnpayConfig } from './payment/applica
 import { REFUND_GATEWAYS, type RefundGateways } from './payment/application/refund-gateways.port.js';
 import { VNPAY_GATEWAY } from './payment/domain/vnpay-signature.js';
 import { VNPAY_DEFAULT_API_URL, VnpayRefundClient } from './payment/infra/vnpay-refund-gateway.js';
+import { COMMERCE_ADMISSION_CONFIG, loadAdmissionConfig, type AdmissionConfig } from './platform/admission-config.js';
+import { AdmissionGate } from './platform/admission-gate.js';
+import { AdmissionInterceptor } from './platform/admission.interceptor.js';
 
 /** Ngày theo giờ Việt Nam: lịch trống và luật bán tính theo ngày địa phương, không theo UTC. */
 // Tạo Intl.DateTimeFormat có múi giờ tốn khoảng 85µs mỗi lần: tạo một lần rồi dùng lại (đo tải TF29).
@@ -132,6 +135,9 @@ function buildMediaUrl(cdnBaseUrl: string | undefined): MediaUrl {
     AdminMetricsController, AdminOrdersController,
   ],
   providers: [
+    { provide: COMMERCE_ADMISSION_CONFIG, useFactory: () => loadAdmissionConfig(process.env) },
+    { provide: AdmissionGate, inject: [COMMERCE_ADMISSION_CONFIG], useFactory: (config: AdmissionConfig) => new AdmissionGate(config) },
+    AdmissionInterceptor,
     AdminOrdersStore,
     { provide: COMMERCE_STORE, useClass: DrizzleCommerceStore },
     TraceContext,
