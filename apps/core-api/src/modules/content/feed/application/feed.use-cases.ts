@@ -63,8 +63,10 @@ export class InvalidHotCursorError extends Error {}
 export const FEED_FIRST_PAGE_TTL_SECONDS = 60;
 
 /**
- * F1: for_you xếp theo điểm tương tác có bán rã, bài chưa có tương tác chen vào ngẫu nhiên; hot theo điểm job chấm sẵn
- * trong trend_scores (TF111), bằng điểm thì ngẫu nhiên (domain/feed-rank.ts). Trang tác giả và Reels đã lưu vẫn mới nhất trước.
+ * F1: for_you và hot cùng xếp theo điểm job chấm sẵn trong trend_scores (TF111), bằng điểm thì ngẫu nhiên
+ * (domain/feed-rank.ts). TF121: for_you từng chấm điểm mọi bài ở mỗi lần đọc, chỉ chịu khoảng 10 req/s (TF120);
+ * người đăng nhập đã đọc Dành cho bạn từ discovery, nên feed for_you chỉ còn cho khách, app bản cũ và màn trợ lý.
+ * Trang tác giả và Reels đã lưu vẫn mới nhất trước.
  * Trending, snapshot, tab following thuộc các phần sau (docs/09 mục 3 đến 5).
  */
 @Injectable()
@@ -94,9 +96,9 @@ export class FeedUseCases {
     const tab = query.tab === 'hot' ? 'hot' : 'for_you';
     const shared = query.isSavedOnly
       ? await this.loadSharedPage('for_you', query.limit, query.after, query.viewerId, query.authorId)
-      : query.after || query.authorId
+      : query.authorId
         ? await this.loadSharedPage(tab, query.limit, query.after, null, query.authorId)
-        : await this.loadFirstPage(tab, query.limit);
+        : await this.loadHotOrderPage(query.limit, query.after);
     if (!query.viewerId) return shared;
     return { items: await this.withViewerState(shared.items, query.viewerId), nextCursor: shared.nextCursor };
   }
@@ -173,6 +175,13 @@ export class FeedUseCases {
     }));
   }
 
+  /** Thứ tự Hot của cả hai tab. Cursor for_you trước TF121 (chưa có điểm Hot) không nối tiếp được: trả lại trang đầu, giữ seed. */
+  private loadHotOrderPage(limit: number, after: FeedCursor | null): Promise<SharedFeedPage<FeedCard>> {
+    if (!after) return this.loadFirstPage('hot', limit);
+    if (after.score === undefined) return this.loadSharedPage('hot', limit, null, null, undefined, after.seed ?? 0);
+    return this.loadSharedPage('hot', limit, after);
+  }
+
   private async loadFirstPage(tab: FeedTab, limit: number): Promise<SharedFeedPage<FeedCard>> {
     // Mỗi lần mở hay tải lại chọn seed mới, nên thứ tự đổi; mỗi seed một khoá để cache vẫn trúng khi đông người.
     const seed = pickFeedSeed(this.random);
@@ -211,19 +220,15 @@ export class FeedUseCases {
     firstPageSeed?: number,
   ): Promise<SharedFeedPage<FeedCard>> {
     const isHot = tab === 'hot' && !savedByUserId;
-    // Trang tác giả và Reels đã lưu giữ mới nhất trước; cursor for_you cũ (app bản trước, chưa có rank) cũng vậy.
-    const isRankedForYou = tab === 'for_you' && !savedByUserId && !authorId && (!after || after.rank !== undefined);
     // Cursor cũ chưa có seed thì lấy seed 0, để các trang sau của nó vẫn cùng một thứ tự.
     const seed = after ? (after.seed ?? 0) : (firstPageSeed ?? pickFeedSeed(this.random));
-    const asOf = after?.asOf ?? new Date().toISOString();
     const listQuery = { limit: limit + 1, after, ...(authorId ? { authorId } : {}) };
+    // Trang tác giả tab for_you và Reels đã lưu giữ mới nhất trước.
     const rows = await (savedByUserId
       ? this.store.listSavedPlayablePosts({ ...listQuery, userId: savedByUserId })
       : isHot
         ? this.store.listHotPosts({ ...listQuery, seed })
-        : isRankedForYou
-          ? this.store.listForYouPosts({ ...listQuery, seed, asOf })
-          : this.store.listPlayablePosts(listQuery));
+        : this.store.listPlayablePosts(listQuery));
     const pageRows = rows.slice(0, limit);
     const items = await this.buildCards(pageRows);
 
@@ -236,7 +241,6 @@ export class FeedUseCases {
               at: last.cursorAt,
               id: last.id,
               ...(isHot ? { score: last.hotScore ?? 0, seed } : {}),
-              ...(isRankedForYou && last.rank !== undefined ? { rank: last.rank, seed, asOf } : {}),
             })
           : null,
     };

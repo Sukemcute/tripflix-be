@@ -2,8 +2,6 @@ import type { Db } from '@tripflix/db';
 import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { bookmarks, mediaAssets, posts, reactions, renditions, trendScores } from '../../db/schema/index.js';
 import type { FeedCursor } from '../domain/feed-cursor.js';
-import { FOR_YOU_AGE_OFFSET_HOURS, FOR_YOU_GRAVITY, FOR_YOU_SHUFFLE } from '../domain/feed-rank.js';
-import { HOT_SCORE_WEIGHTS } from '../domain/hot-score.js';
 import type { FeedListQuery, FeedPostRow, FeedStore, RankedFeedListQuery } from '../application/ports.js';
 
 const UUID_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
@@ -11,14 +9,6 @@ const UUID_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 function newestFirstCursor(after: FeedCursor | null): SQL | undefined {
   return after ? sql`(${posts.createdAt}, ${posts.id}) < (${after.at}::timestamptz, ${after.id}::uuid)` : undefined;
 }
-
-/** Điểm tương tác theo bộ đếm của bài, chỉ còn dùng cho tab Dành cho bạn (tab hot đọc trend_scores từ TF111). */
-const counterScore = sql`(
-  ${posts.reactionTotal} * ${HOT_SCORE_WEIGHTS.like}::int
-  + ${posts.commentCount} * ${HOT_SCORE_WEIGHTS.comment}::int
-  + ${posts.bookmarkCount} * ${HOT_SCORE_WEIGHTS.save}::int
-  + ${posts.shareCount} * ${HOT_SCORE_WEIGHTS.share}::int
-)`;
 
 /**
  * Số ngẫu nhiên cố định cho (seed, id bài), từ 0 tới 2^32 - 1: 32 bit đầu của md5.
@@ -62,26 +52,6 @@ export class DrizzleFeedStore implements FeedStore {
     });
   }
 
-  listForYouPosts({ limit, after, authorId, seed, asOf }: RankedFeedListQuery & { asOf: string }): Promise<FeedPostRow[]> {
-    const ageHours = sql`greatest(0, extract(epoch from (${asOf}::timestamptz - ${posts.createdAt})) / 3600)`;
-    // ponytail: chấm điểm mọi bài phát được mỗi lần đọc; đủ cho pilot (vài nghìn bài).
-    // Nhiều bài hơn thì chuyển sang điểm tính sẵn theo lô (giống recommend_post_scores) hoặc giới hạn cửa sổ ngày.
-    // Số ngẫu nhiên [0, 1) cố định theo (seed, id bài), nên sang trang vẫn ra đúng điểm trang trước đã dùng.
-    const seededUnit = sql`(${seededTieBreak(seed, sql`${posts.id}`)} / 4294967296.0::float8)`;
-    const rank = sql<number>`(
-      ln(2 + ${counterScore}) / power(${ageHours} + ${FOR_YOU_AGE_OFFSET_HOURS}::float8, ${FOR_YOU_GRAVITY}::float8)
-        * exp(${FOR_YOU_SHUFFLE}::float8 * (2 * ${seededUnit} - 1))
-    )::float8`;
-    return this.selectPlayablePosts({
-      limit,
-      authorId,
-      cursorFilter:
-        after?.rank !== undefined ? sql`(${rank}, ${posts.id}) < (${after.rank}::float8, ${after.id}::uuid)` : undefined,
-      orderBy: [sql`${rank} desc`, desc(posts.id)],
-      rank,
-    });
-  }
-
   listHotPosts({ limit, after, authorId, seed }: RankedFeedListQuery): Promise<FeedPostRow[]> {
     // Điểm do job chấm sẵn mỗi 5 phút (TF111), chỉ có cho bài video đăng trong 30 ngày: bài ngoài bảng không vào tab hot.
     // Nối thẳng trend_scores để chỉ xét chừng nghìn bài có điểm: lấy điểm bằng truy vấn con cho mọi bài trong posts
@@ -113,14 +83,12 @@ export class DrizzleFeedStore implements FeedStore {
     authorId,
     cursorFilter,
     orderBy,
-    rank,
     isHotOnly = false,
   }: {
     limit: number;
     authorId?: string;
     cursorFilter: SQL | undefined;
     orderBy: SQL[];
-    rank?: SQL<number>;
     /** Chỉ bài có trong trend_scores, kèm điểm Hot. */
     isHotOnly?: boolean;
   }): Promise<FeedPostRow[]> {
@@ -139,7 +107,6 @@ export class DrizzleFeedStore implements FeedStore {
         bookmarkCount: posts.bookmarkCount,
         shareCount: posts.shareCount,
         cursorAt: sql<string>`to_char(${posts.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
-        ...(rank ? { rank: rank.mapWith(Number) } : {}),
         ...(isHotOnly ? { hotScore: trendScores.score } : {}),
       })
       .from(posts)
