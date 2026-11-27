@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Đo tải tab Hot</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --surface-0: #f6f6f4;
+        --surface-1: #ffffff;
+        --border: #e3e3df;
+        --grid: #ececea;
+        --axis: #9a9a96;
+        --text-primary: #191919;
+        --text-secondary: #666666;
+        --series-1: #257de0;
+        --series-2: #f47230;
+        --threshold: #8a8a86;
+        --good: #0a7d24;
+        --warn: #a35f00;
+        --bad: #c62f30;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          color-scheme: dark;
+          --surface-0: #111111;
+          --surface-1: #191919;
+          --border: #2c2c2c;
+          --grid: #262626;
+          --axis: #6c6c6c;
+          --text-primary: #efefef;
+          --text-secondary: #9c9c9c;
+          --series-1: #338ced;
+          --series-2: #e76624;
+          --threshold: #8c8c8c;
+          --good: #3cc35a;
+          --warn: #e0a030;
+          --bad: #eb6263;
+        }
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+        --surface-0: #111111;
+        --surface-1: #191919;
+        --border: #2c2c2c;
+        --grid: #262626;
+        --axis: #6c6c6c;
+        --text-primary: #efefef;
+        --text-secondary: #9c9c9c;
+        --series-1: #338ced;
+        --series-2: #e76624;
+        --threshold: #8c8c8c;
+        --good: #3cc35a;
+        --warn: #e0a030;
+        --bad: #eb6263;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--surface-0);
+        color: var(--text-primary);
+        font:
+          15px/1.55 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 32px 16px 64px;
+      }
+      h1 {
+        font-size: 26px;
+        line-height: 1.25;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        margin: 0 0 24px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .kpi {
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .kpi .label {
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .kpi .value {
+        font-size: 26px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        margin: 2px 0;
+      }
+      .kpi .note {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .status svg {
+        width: 14px;
+        height: 14px;
+      }
+      .status.good {
+        color: var(--good);
+      }
+      .status.warn {
+        color: var(--warn);
+      }
+      .status.bad {
+        color: var(--bad);
+      }
+      section.card {
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      .lead {
+        color: var(--text-secondary);
+        margin: 0 0 14px;
+      }
+      .charts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+      }
+      figure {
+        margin: 0;
+        min-width: 0;
+      }
+      figcaption {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 0 0 6px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 14px;
+        height: 3px;
+        border-radius: 2px;
+      }
+      .legend i.box {
+        height: 10px;
+        width: 10px;
+      }
+      .legend i.dash {
+        height: 0;
+        border-top: 2px dashed var(--threshold);
+        background: none;
+      }
+      .chart {
+        position: relative;
+        width: 100%;
+      }
+      .chart svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .chart text {
+        fill: var(--text-secondary);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .chart .lbl {
+        fill: var(--text-primary);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .tip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--surface-1);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.1s;
+        z-index: 2;
+      }
+      .tip .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tip .sw {
+        width: 10px;
+        height: 3px;
+        border-radius: 2px;
+      }
+      ul.find,
+      ol.find {
+        margin: 14px 0 0;
+        padding-left: 20px;
+      }
+      ul.find li,
+      ol.find li {
+        margin-bottom: 6px;
+      }
+      details {
+        margin-top: 14px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+      .tablewrap {
+        overflow-x: auto;
+        margin-top: 8px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      th,
+      td {
+        text-align: right;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+      th {
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0 8px;
+        color: var(--text-secondary);
+        margin-left: 6px;
+        vertical-align: 2px;
+      }
+      footer {
+        color: var(--text-secondary);
+        font-size: 13px;
+        margin-top: 24px;
+      }
+      code {
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Đo tải tab Hot trên staging</h1>
+      <p class="sub">
+        TF120 · SCRUM-192 · Đo tối 26/11/2026, 16:58–17:15 UTC · k6 v2.4.0 trên VM cùng region
+        (asia-southeast1) · staging 4 vCPU, 42.821 bài · toàn bộ là khách ·
+        <code>GET /api/v1/feed?tab=hot</code>
+      </p>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">50 req/s, 1 bản core-api</div>
+          <div class="value">p95 42 ms</div>
+          <div class="note">0 lỗi, Postgres 72% CPU</div>
+          <div class="status good">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" fill="currentColor" />
+              <path d="M4.5 8.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+            >Bền vững
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="label">100 req/s, 1 bản core-api</div>
+          <div class="value">p95 1,5 s</div>
+          <div class="note">0 lỗi nhưng chậm, Postgres 173% CPU</div>
+          <div class="status warn">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1.5l7 13H1z" fill="currentColor" />
+              <path d="M8 6v4M8 11.6v.8" stroke="#fff" stroke-width="1.8" /></svg
+            >Vượt ngưỡng 500 ms
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="label">200 req/s, 1 bản core-api</div>
+          <div class="value">53% lỗi</div>
+          <div class="note">Chỉ đạt 153 req/s, p95 9,3 s</div>
+          <div class="status bad">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" fill="currentColor" />
+              <path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.8" /></svg
+            >Quá tải
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="label">Thêm bản core-api thứ 2</div>
+          <div class="value">Tệ hơn</div>
+          <div class="note">100 req/s: p95 4,1 s thay vì 1,5 s</div>
+          <div class="status bad">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" fill="currentColor" />
+              <path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.8" /></svg
+            >Không giúp
+          </div>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2>Cách đo</h2>
+        <ul class="find">
+          <li>
+            Tốc độ cố định (<code>constant-arrival-rate</code>) mỗi mức 60 giây, nghỉ 30 giây giữa hai mức:
+            50, 100, 200 req/s. Tự dừng nếu lỗi quá 5%.
+          </li>
+          <li>Mỗi request: 30% trang đầu, 70% trang 2–5 (đi theo cursor). Mỗi trang 10 thẻ, khoảng 29 KB.</li>
+          <li>
+            <b>Cấu hình 1:</b> 1 bản core-api <code>APP_ROLE=all</code>. <b>Cấu hình 2:</b> 2 bản
+            <code>api</code> + 1 <code>worker</code>, Traefik chia đều.
+          </li>
+          <li>Ngưỡng bền vững: p95 &lt; 500 ms và lỗi &lt; 1%.</li>
+          <li>
+            Tab Hot đọc điểm job chấm sẵn mỗi 5 phút (<code>trend_scores</code>, TF111, chỉ bài video trong 30
+            ngày). Trang đầu cache Redis 60 giây theo seed; trang 2 trở đi không cache.
+          </li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Độ trễ theo tải</h2>
+        <p class="lead">
+          Ở 50 req/s cả hai cấu hình đều nhanh. Từ 100 req/s, cấu hình 2 chậm gấp khoảng 3 lần cấu hình 1.
+        </p>
+        <div class="charts">
+          <figure>
+            <figcaption>p95 (ms, thang log) theo req/s</figcaption>
+            <div class="legend">
+              <span><i style="background: var(--series-1)"></i>Cấu hình 1 (1 bản)</span>
+              <span><i style="background: var(--series-2)"></i>Cấu hình 2 (2 bản)</span>
+              <span><i class="dash"></i>Ngưỡng 500 ms</span>
+            </div>
+            <div class="chart" id="p95"></div>
+          </figure>
+          <figure>
+            <figcaption>Số kết nối Postgres đang chạy, lớn nhất mỗi mức</figcaption>
+            <div class="legend">
+              <span><i class="box" style="background: var(--series-1)"></i>Cấu hình 1 (1 bản)</span>
+              <span><i class="box" style="background: var(--series-2)"></i>Cấu hình 2 (2 bản)</span>
+              <span><i class="dash"></i>Pool 1 bản (10)</span>
+            </div>
+            <div class="chart" id="conn"></div>
+          </figure>
+        </div>
+        <details>
+          <summary>Bảng số</summary>
+          <div class="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cấu hình</th>
+                  <th>Đặt</th>
+                  <th>Đạt req/s</th>
+                  <th>p50 ms</th>
+                  <th>p90 ms</th>
+                  <th>p95 ms</th>
+                  <th>p99 ms</th>
+                  <th>max ms</th>
+                  <th>Lỗi</th>
+                  <th>CPU core-api %</th>
+                  <th>CPU Postgres %</th>
+                  <th>Kết nối PG max</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Nút thắt nằm ở Postgres</h2>
+        <ul class="find">
+          <li>
+            core-api không phải chỗ nghẽn: ở 100 req/s chỉ dùng 65% của 1 core, trong khi Postgres lên 173% và
+            p95 đã vượt 1,4 giây.
+          </li>
+          <li>
+            Ở 100 req/s và 200 req/s, số kết nối Postgres đang chạy chạm 10–11, đúng bằng pool
+            <code>content</code> của 1 bản (10 kết nối, chờ tối đa 3 giây). Request phải xếp hàng chờ kết nối;
+            lỗi 500 ở 200 req/s là <code>timeout exceeded when trying to connect</code>.
+          </li>
+          <li>
+            Cấu hình 2 có 2 pool nên đẩy tới 21–22 câu chạy song song vào cùng một Postgres 4 vCPU. Các câu
+            giành CPU của nhau nên câu nào cũng chậm hơn: thêm bản core-api làm tình hình tệ hơn.
+          </li>
+          <li>
+            Ở 200 req/s, k6 không bắn đủ (153 req/s ở cấu hình 1, 171 req/s ở cấu hình 2) vì request treo lâu,
+            hết 800 VU dự phòng.
+          </li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Vì sao tới 100 req/s đã chậm <span class="tag">giả thuyết, chưa kiểm</span></h2>
+        <p class="lead">
+          Chưa chạy <code>EXPLAIN ANALYZE</code>, nên đây là các chỗ đáng ngờ, xếp theo mức ảnh hưởng dự đoán.
+        </p>
+        <ol class="find">
+          <li>
+            <b>Trang 2–5 không cache</b>, chiếm 70% request. Nhưng thứ tự tab Hot giống nhau với mọi người
+            cùng seed (16 seed), và chỉ đổi khi job chấm lại 5 phút một lần. Tức là cả tab Hot chỉ có khoảng
+            16 × 5 = 80 trang khác nhau, cache được hết.
+          </li>
+          <li>
+            <b>Thứ tự có <code>md5(seed:id)</code></b> để xáo bài bằng điểm: Postgres phải tính md5 cho mọi
+            dòng trong <code>trend_scores</code> rồi mới sắp xếp, không đi theo index được. Điều kiện cursor
+            trang sau cũng tính md5.
+          </li>
+          <li>
+            <b>Dựng thẻ tốn thêm truy vấn</b>: mỗi trang còn gọi lấy video phát được, tác giả và ảnh bìa lộ
+            trình, và câu chính kiểm <code>media_ids</code> từng bài.
+          </li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Đề xuất</h2>
+        <ol class="find">
+          <li>
+            Chạy <code>EXPLAIN (ANALYZE, BUFFERS)</code> câu <code>listHotPosts</code> trên staging (trang đầu
+            và trang 3) để biết thời gian rơi vào đâu trước khi sửa.
+          </li>
+          <li>
+            Cache cả trang 2–5 của Hot theo khoá (seed, cursor), sống tới lần job chấm điểm kế tiếp. Dự kiến
+            gần như mọi request Hot không còn chạm Postgres, giống trang đầu.
+          </li>
+          <li>
+            Nếu md5 là phần đắt: job chấm điểm tính sẵn số xáo cho từng seed, hoặc chỉ xáo trong top N bài.
+          </li>
+          <li>
+            Không tăng số bản core-api hay kích thước pool để chữa: số đo cho thấy chỉ làm Postgres quá tải
+            nhanh hơn.
+          </li>
+          <li>
+            Sau khi sửa, đo lại bằng đúng bộ k6 này (<code>MIX=hot</code>, 50 / 100 / 200 req/s) và so với
+            bảng trên.
+          </li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Tương đương bao nhiêu người dùng <span class="tag">ước tính</span></h2>
+        <p class="lead">
+          Một người gọi feed một lần mỗi 10 reel. Số người = req/s × 10 × số giây xem mỗi reel. Chưa có số
+          giây xem thật; sẽ lấy từ <code>watchedMs</code> của sự kiện xem (TF23).
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cách lướt</th>
+                <th>Giây mỗi reel</th>
+                <th>50 req/s (bền vững)</th>
+                <th>100 req/s (đã chậm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Lướt nhanh</td>
+                <td>3</td>
+                <td>≈ 1.500 người</td>
+                <td>≈ 3.000 người</td>
+              </tr>
+              <tr>
+                <td>Trung bình (giống k6 phép 1)</td>
+                <td>11</td>
+                <td>≈ 5.500 người</td>
+                <td>≈ 11.000 người</td>
+              </tr>
+              <tr>
+                <td>Xem kỹ</td>
+                <td>20</td>
+                <td>≈ 10.000 người</td>
+                <td>≈ 20.000 người</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="lead" style="margin-top: 10px">
+          Số thật thấp hơn, vì cùng Postgres còn phục vụ cookie video, sự kiện xem, thích, bình luận, tìm
+          kiếm. Chỉ nên dùng như mức "vài nghìn người lướt cùng lúc".
+        </p>
+      </section>
+
+      <footer>
+        Dữ liệu gốc: <code>tools/bench/feed-load/results/out/scale-c1hot-*.json</code>,
+        <code>scale-c2hot-*.json</code> và mẫu server <code>feed-20261126-160242/</code> (docker.csv, pg.csv),
+        mỗi 5–8 giây một mẫu. CPU tính theo % của 1 core, cấu hình 2 cộng cả 3 container core-api. Báo cáo đầy
+        đủ ba phép đo: <code>TF120-do-tai-feed.html</code>.
+      </footer>
+    </main>
+
+    <script>
+      const DATA = [
+        {
+          cfg: 1,
+          rate: 50,
+          got: 49.1,
+          p50: 28,
+          p90: 37,
+          p95: 42,
+          p99: 225,
+          max: 609,
+          fail: 0,
+          api: 30,
+          pg: 72,
+          conn: 2,
+        },
+        {
+          cfg: 1,
+          rate: 100,
+          got: 97.6,
+          p50: 41,
+          p90: 1197,
+          p95: 1469,
+          p99: 2049,
+          max: 2201,
+          fail: 0,
+          api: 65,
+          pg: 173,
+          conn: 10,
+        },
+        {
+          cfg: 1,
+          rate: 200,
+          got: 152.7,
+          p50: 3224,
+          p90: 9122,
+          p95: 9343,
+          p99: 9725,
+          max: 13035,
+          fail: 52.6,
+          api: 91,
+          pg: 235,
+          conn: 11,
+        },
+        {
+          cfg: 2,
+          rate: 50,
+          got: 49.1,
+          p50: 26,
+          p90: 44,
+          p95: 67,
+          p99: 168,
+          max: 360,
+          fail: 0,
+          api: 54,
+          pg: 78,
+          conn: 3,
+        },
+        {
+          cfg: 2,
+          rate: 100,
+          got: 94.0,
+          p50: 512,
+          p90: 3350,
+          p95: 4077,
+          p99: 5851,
+          max: 6348,
+          fail: 0,
+          api: 112,
+          pg: 222,
+          conn: 21,
+        },
+        {
+          cfg: 2,
+          rate: 200,
+          got: 170.8,
+          p50: 3097,
+          p90: 7725,
+          p95: 9448,
+          p99: 10001,
+          max: 11790,
+          fail: 66.6,
+          api: 130,
+          pg: 199,
+          conn: 22,
+        },
+      ];
+      const RATES = [50, 100, 200];
+      const COLORS = { 1: 'var(--series-1)', 2: 'var(--series-2)' };
+      const NAMES = { 1: 'Cấu hình 1', 2: 'Cấu hình 2' };
+      const fmt = (n) => n.toLocaleString('vi-VN');
+      const NS = 'http://www.w3.org/2000/svg';
+
+      function el(tag, attrs, parent) {
+        const node = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+        if (parent) parent.appendChild(node);
+        return node;
+      }
+      function text(parent, x, y, str, attrs = {}) {
+        const t = el('text', { x, y, ...attrs }, parent);
+        t.textContent = str;
+        return t;
+      }
+      function makeTip(host) {
+        const tip = document.createElement('div');
+        tip.className = 'tip';
+        host.appendChild(tip);
+        return {
+          show(html, x, y) {
+            tip.innerHTML = html;
+            tip.style.opacity = 1;
+            const w = tip.offsetWidth;
+            const hostW = host.clientWidth;
+            tip.style.left = Math.min(Math.max(0, x - w / 2), hostW - w) + 'px';
+            tip.style.top = y - tip.offsetHeight - 10 + 'px';
+          },
+          hide() {
+            tip.style.opacity = 0;
+          },
+        };
+      }
+      function tipRows(rate, key, unit) {
+        return (
+          `<b>${rate} req/s</b>` +
+          [1, 2]
+            .map((c) => {
+              const d = DATA.find((r) => r.cfg === c && r.rate === rate);
+              return `<div class="row"><span class="sw" style="background:${COLORS[c]}"></span>${NAMES[c]}: ${fmt(d[key])}${unit}${
+                d.fail ? ` · lỗi ${fmt(d.fail)}%` : ''
+              }</div>`;
+            })
+            .join('')
+        );
+      }
+
+      // p95 theo req/s, thang log.
+      (function drawP95() {
+        const host = document.getElementById('p95');
+        const W = 480,
+          H = 280,
+          L = 52,
+          R = 16,
+          T = 16,
+          B = 34;
+        const svg = el(
+          'svg',
+          { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'p95 theo req/s' },
+          host,
+        );
+        const xs = (i) => L + ((W - L - R) * (i + 0.5)) / RATES.length;
+        const lo = Math.log10(20),
+          hi = Math.log10(20000);
+        const ys = (v) => T + (H - T - B) * (1 - (Math.log10(v) - lo) / (hi - lo));
+        for (const v of [20, 100, 1000, 10000]) {
+          el('line', { x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: 'var(--grid)' }, svg);
+          text(svg, L - 8, ys(v) + 4, v >= 1000 ? fmt(v / 1000) + ' s' : v + ' ms', { 'text-anchor': 'end' });
+        }
+        el(
+          'line',
+          {
+            x1: L,
+            x2: W - R,
+            y1: ys(500),
+            y2: ys(500),
+            stroke: 'var(--threshold)',
+            'stroke-width': 1.5,
+            'stroke-dasharray': '5 4',
+          },
+          svg,
+        );
+        text(svg, W - R, ys(500) - 5, '500 ms', { 'text-anchor': 'end' });
+        RATES.forEach((r, i) => text(svg, xs(i), H - 12, r + ' req/s', { 'text-anchor': 'middle' }));
+        for (const c of [1, 2]) {
+          const pts = RATES.map((r, i) => [xs(i), ys(DATA.find((d) => d.cfg === c && d.rate === r).p95)]);
+          el(
+            'polyline',
+            {
+              points: pts.map((p) => p.join(',')).join(' '),
+              fill: 'none',
+              stroke: COLORS[c],
+              'stroke-width': 2,
+              'stroke-linejoin': 'round',
+            },
+            svg,
+          );
+          pts.forEach(([x, y]) =>
+            el(
+              'circle',
+              { cx: x, cy: y, r: 4.5, fill: COLORS[c], stroke: 'var(--surface-1)', 'stroke-width': 2 },
+              svg,
+            ),
+          );
+          const mid = pts[1];
+          text(
+            svg,
+            mid[0] + (c === 1 ? 12 : -10),
+            mid[1] + (c === 1 ? 16 : -8),
+            fmt(DATA.find((d) => d.cfg === c && d.rate === 100).p95) + ' ms',
+            {
+              class: 'lbl',
+              'text-anchor': c === 1 ? 'start' : 'end',
+            },
+          );
+        }
+        const tip = makeTip(host);
+        RATES.forEach((r, i) => {
+          const band = (W - L - R) / RATES.length;
+          const hit = el(
+            'rect',
+            { x: xs(i) - band / 2, y: T, width: band, height: H - T - B, fill: 'transparent' },
+            svg,
+          );
+          hit.addEventListener('pointerenter', () => {
+            const box = host.getBoundingClientRect(),
+              sb = svg.getBoundingClientRect();
+            tip.show(tipRows(r, 'p95', ' ms'), (xs(i) / W) * sb.width + sb.left - box.left, 24);
+          });
+          hit.addEventListener('pointerleave', tip.hide);
+        });
+      })();
+
+      // Kết nối Postgres lớn nhất mỗi mức, cột nhóm.
+      (function drawConn() {
+        const host = document.getElementById('conn');
+        const W = 480,
+          H = 280,
+          L = 36,
+          R = 16,
+          T = 16,
+          B = 34,
+          MAX = 25;
+        const svg = el(
+          'svg',
+          { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Kết nối Postgres lớn nhất' },
+          host,
+        );
+        const ys = (v) => T + (H - T - B) * (1 - v / MAX);
+        for (const v of [0, 5, 10, 15, 20, 25]) {
+          el(
+            'line',
+            { x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)' },
+            svg,
+          );
+          text(svg, L - 8, ys(v) + 4, v, { 'text-anchor': 'end' });
+        }
+        const band = (W - L - R) / RATES.length,
+          bw = 30,
+          gap = 2;
+        const tip = makeTip(host);
+        RATES.forEach((r, i) => {
+          const cx = L + band * (i + 0.5);
+          text(svg, cx, H - 12, r + ' req/s', { 'text-anchor': 'middle' });
+          [1, 2].forEach((c, j) => {
+            const d = DATA.find((x) => x.cfg === c && x.rate === r);
+            const x = cx + (j === 0 ? -bw - gap / 2 : gap / 2);
+            const y = ys(d.conn),
+              h = ys(0) - y,
+              rr = Math.min(4, h);
+            el(
+              'path',
+              {
+                d: `M${x},${ys(0)} V${y + rr} Q${x},${y} ${x + rr},${y} H${x + bw - rr} Q${x + bw},${y} ${x + bw},${y + rr} V${ys(0)} Z`,
+                fill: COLORS[c],
+              },
+              svg,
+            );
+            text(svg, x + bw / 2, y - 5, d.conn, { class: 'lbl', 'text-anchor': 'middle' });
+          });
+          const hit = el(
+            'rect',
+            { x: cx - band / 2, y: T, width: band, height: H - T - B, fill: 'transparent' },
+            svg,
+          );
+          hit.addEventListener('pointerenter', () => {
+            const box = host.getBoundingClientRect(),
+              sb = svg.getBoundingClientRect();
+            tip.show(tipRows(r, 'conn', ' kết nối'), (cx / W) * sb.width + sb.left - box.left, 24);
+          });
+          hit.addEventListener('pointerleave', tip.hide);
+        });
+        el(
+          'line',
+          {
+            x1: L,
+            x2: W - R,
+            y1: ys(10),
+            y2: ys(10),
+            stroke: 'var(--threshold)',
+            'stroke-width': 1.5,
+            'stroke-dasharray': '5 4',
+          },
+          svg,
+        );
+      })();
+
+      document.getElementById('rows').innerHTML = DATA.map(
+        (d) =>
+          `<tr><td>${d.cfg === 1 ? '1 (1 bản all)' : '2 (2 api + worker)'}</td><td>${d.rate}</td><td>${fmt(d.got)}</td><td>${fmt(d.p50)}</td><td>${fmt(
+            d.p90,
+          )}</td><td>${fmt(d.p95)}</td><td>${fmt(d.p99)}</td><td>${fmt(d.max)}</td><td>${fmt(d.fail)}%</td><td>${d.api}</td><td>${d.pg}</td><td>${d.conn}</td></tr>`,
+      ).join('');
+    </script>
+  </body>
+</html>
