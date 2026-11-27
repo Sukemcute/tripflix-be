@@ -21,6 +21,7 @@ import {
   PRODUCT_FEATURE_STORE,
   PRODUCT_PROFILE_CATALOG,
   INGEST_QUOTA,
+  RECOMMEND_TUNING,
   RECENT_POSTS_STORE,
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
@@ -36,6 +37,7 @@ import { TripAddonUseCases } from './recommend/application/trip-addons.use-cases
 import { AiEmbeddingClient } from './recommend/infra/ai-embedding.client.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisIngestQuota } from './recommend/infra/redis-ingest-quota.store.js';
+import { RedisRecommendTuning } from './recommend/infra/redis-recommend-tuning.store.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { TypesenseTasteRetrieval } from './recommend/infra/typesense-taste.retrieval.js';
@@ -221,6 +223,7 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     { provide: SERVED_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisServedStore(redis) },
     { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
     { provide: INGEST_QUOTA, inject: [REDIS], useFactory: (redis: Redis) => new RedisIngestQuota(redis) },
+    { provide: RECOMMEND_TUNING, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecommendTuning(redis) },
     {
       provide: TEXT_EMBEDDER,
       inject: [CORE_ENV],
