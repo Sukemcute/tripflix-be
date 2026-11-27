@@ -145,6 +145,18 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await app?.close();
   });
   const http = () => request(app.getHttpServer());
+  it('chỉ superadmin được xem các mẫu luật kiểm duyệt dựng sẵn', async () => {
+    const url = '/api/v1/admin/moderation/keyword-rules/built-in';
+    const auth = { type: 'bearer' } as const;
+    await http().get(url).expect(401);
+    await http().get(url).auth(tokens.moderator!, auth).expect(403);
+    const response = await http().get(url).auth(tokens.superadmin!, auth).expect(200);
+    expect(response.body).toHaveLength(9);
+    expect(response.body).toEqual(expect.arrayContaining([
+      { code: 'PROFANITY', patterns: expect.arrayContaining(['óc chó']) },
+      { code: 'CONTACT_INVITE', patterns: expect.arrayContaining(['dat coc', 'ib zalo']) },
+    ]));
+  });
   it('chỉ superadmin được xem và cấu hình quy tắc từ khóa', async () => {
     const url = '/api/v1/admin/moderation/keyword-rules';
     await http().get(url).expect(401);
