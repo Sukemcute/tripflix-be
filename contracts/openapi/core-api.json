@@ -6159,6 +6159,46 @@
         ]
       }
     },
+    "/api/v1/admin/discovery/jobs/candidate-limit": {
+      "put": {
+        "operationId": "AdminDiscoveryJobsController_setCandidateLimit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCandidateLimitRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateLimitDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ngoài 200–5000, hoặc ranker của for_you không đọc nhiều bài"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đặt số ứng viên hot gợi ý for_you xếp mỗi trang đầu; có hiệu lực trong vòng 1 phút, không cần deploy",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
     "/api/hotels/{slug}": {
       "get": {
         "operationId": "HotelsController_getHotel",
@@ -16022,6 +16062,77 @@
           "lastError"
         ]
       },
+      "RankTimingDto": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "number",
+            "description": "Số lượt dựng phiên đã ghi (tối đa 200 gần nhất, process trả lời request này)"
+          },
+          "p50Ms": {
+            "type": "number",
+            "nullable": true,
+            "description": "Trung vị thời gian dựng phiên (đọc ứng viên + xếp), ms; null khi chưa có lượt nào"
+          },
+          "p95Ms": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "samples",
+          "p50Ms",
+          "p95Ms"
+        ]
+      },
+      "CandidateLimitDto": {
+        "type": "object",
+        "properties": {
+          "algo": {
+            "type": "string",
+            "example": "for_you"
+          },
+          "ranker": {
+            "type": "string",
+            "example": "trip_v1"
+          },
+          "limit": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số ứng viên hot ranker đang xếp; null khi ranker không đọc nhiều bài (không chỉnh được)"
+          },
+          "defaultLimit": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mặc định trong code"
+          },
+          "isOverridden": {
+            "type": "boolean",
+            "description": "Admin đã đặt khác mặc định"
+          },
+          "min": {
+            "type": "number",
+            "example": 200
+          },
+          "max": {
+            "type": "number",
+            "example": 5000
+          },
+          "rankTiming": {
+            "$ref": "#/components/schemas/RankTimingDto"
+          }
+        },
+        "required": [
+          "algo",
+          "ranker",
+          "limit",
+          "defaultLimit",
+          "isOverridden",
+          "min",
+          "max",
+          "rankTiming"
+        ]
+      },
       "RecommendStatsDto": {
         "type": "object",
         "properties": {
@@ -16048,6 +16159,14 @@
             "items": {
               "$ref": "#/components/schemas/RecommendJobStateDto"
             }
+          },
+          "candidateLimit": {
+            "description": "Số ứng viên hot của for_you (chỉnh bằng PUT …/jobs/candidate-limit)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateLimitDto"
+              }
+            ]
           }
         },
         "required": [
@@ -16056,7 +16175,8 @@
           "posts",
           "usersWithFeatures",
           "algos",
-          "jobStates"
+          "jobStates",
+          "candidateLimit"
         ]
       },
       "DiscoveryJobsDto": {
@@ -16149,6 +16269,22 @@
           "job",
           "intervalMs",
           "defaultIntervalMs"
+        ]
+      },
+      "SetCandidateLimitRequestDto": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 200,
+            "maximum": 5000,
+            "example": 1000,
+            "description": "Số ứng viên mới; null = về mặc định"
+          }
+        },
+        "required": [
+          "limit"
         ]
       },
       "ProvinceDto": {
