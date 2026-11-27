@@ -49,10 +49,11 @@ export class BuildFeaturesJob implements OnApplicationBootstrap, OnApplicationSh
     const startedAt = Date.now();
     this.lastStartedAt = startedAt;
     try {
-      await this.runs.track('recommend_build', trigger, async () => {
+      await this.runs.track('recommend_build', trigger, async (signal) => {
         // Hồ sơ khách sạn, chuyến bay (TF39) không phụ thuộc bài: dựng trước, kể cả khi lượt bài bị bỏ.
         const products = await this.products.runCycle();
-        const result = await this.features.runCycle();
+        signal?.throwIfAborted();
+        const result = await this.features.runCycle(undefined, undefined, signal);
         if (result === null) {
           this.logger.log('Worker khác đang tính đặc trưng gợi ý (hoặc chưa có bài), bỏ lượt');
           return { outcome: 'skipped' };

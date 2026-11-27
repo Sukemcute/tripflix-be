@@ -58,6 +58,31 @@ describe('TypesenseExploreStore', () => {
     expect(redis.eval).toHaveBeenCalledTimes(1);
   });
 
+  it('replaceAll dừng khẩn cấp trong lúc nạp: xoá collection dựng dở, không đổi alias, nhả khoá', async () => {
+    const redis = mockRedis('OK');
+    const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);
+    const controller = new AbortController();
+    const importDocuments = vi.fn(async () => {
+      controller.abort(new Error('Dừng khẩn cấp: thử'));
+      return { success: 2, failed: 0 };
+    });
+    const upsertAlias = vi.fn(async () => undefined);
+    const deleteCollection = vi.fn(async () => undefined);
+    const client = {
+      getAlias: vi.fn(async () => null),
+      createCollection: vi.fn(async () => undefined),
+      upsertSynonym: vi.fn(async () => undefined),
+      importDocuments,
+      upsertAlias,
+      deleteCollection,
+    } as unknown as TypesenseClient;
+    const store = new TypesenseExploreStore(client, statsCache, queryGramsStore, redis as unknown as Pick<Redis, 'set' | 'eval'>, 'explore');
+    await expect(store.replaceAll(index, controller.signal)).rejects.toThrow('Dừng khẩn cấp: thử');
+    expect(upsertAlias).not.toHaveBeenCalled();
+    expect(deleteCollection).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^explore_${EXPLORE_SCHEMA_VERSION}_\\d+$`)));
+    expect(redis.eval).toHaveBeenCalledTimes(1);
+  });
+
   it('replaceAll: bỏ lượt (trả false) khi worker khác đang giữ khoá Redis', async () => {
     const redis = mockRedis(null);
     const statsCache = new ExploreStatsCache(redis as unknown as Pick<Redis, 'get' | 'set'>);

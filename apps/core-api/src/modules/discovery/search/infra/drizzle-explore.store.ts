@@ -97,7 +97,8 @@ export class DrizzleExploreStore implements ExploreStore {
     return rows.map((r) => r.doc);
   }
 
-  async replaceAll(index: BuiltIndex): Promise<boolean> {
+  /** Một transaction: dừng khẩn cấp giữa chừng thì rollback, chỉ mục cũ còn nguyên. */
+  async replaceAll(index: BuiltIndex, signal?: AbortSignal): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const lock = await tx.execute<{ ok: boolean }>(sql`select pg_try_advisory_xact_lock(hashtextextended(${INDEX_LOCK}, 0)) as ok`);
       if (!lock.rows[0]?.ok) return false;
@@ -116,7 +117,11 @@ export class DrizzleExploreStore implements ExploreStore {
         streets: d.streets,
         doc: d,
       }));
-      for (let i = 0; i < docs.length; i += CHUNK) await tx.insert(searchDocuments).values(docs.slice(i, i + CHUNK));
+      for (let i = 0; i < docs.length; i += CHUNK) {
+        signal?.throwIfAborted();
+        await tx.insert(searchDocuments).values(docs.slice(i, i + CHUNK));
+      }
+      signal?.throwIfAborted();
       for (let i = 0; i < index.counts.length; i += CHUNK) await tx.insert(searchCounts).values(index.counts.slice(i, i + CHUNK));
       return true;
     });

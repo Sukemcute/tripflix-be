@@ -6,7 +6,7 @@ import { REDIS } from '../../../platform/tokens.js';
 export const JOB_KEYS = ['explore', 'suggest', 'recommend_build', 'recommend_purge'] as const;
 export type JobKey = (typeof JOB_KEYS)[number];
 export type JobTrigger = 'schedule' | 'manual';
-export const JOB_OUTCOMES = ['running', 'succeeded', 'skipped', 'failed'] as const;
+export const JOB_OUTCOMES = ['running', 'succeeded', 'skipped', 'failed', 'cancelled'] as const;
 export type JobOutcome = (typeof JOB_OUTCOMES)[number];
 
 export interface JobSummary {
@@ -33,6 +33,25 @@ export interface JobResult {
   outcome: 'succeeded' | 'skipped';
   summary?: JobSummary;
   error?: string;
+  /** track trả true khi không chạy vì admin đang tạm dừng job (không ghi lịch sử). */
+  isPaused?: boolean;
+}
+
+/** Ai dừng/tạm dừng job, lúc nào, vì sao. */
+export interface JobStop {
+  /** userId của quản trị viên */
+  by: string;
+  /** epoch ms */
+  at: number;
+  reason: string;
+}
+
+/** Lý do AbortSignal của lượt khi admin dừng khẩn cấp. */
+export class JobCancelledError extends Error {
+  constructor(readonly stop: JobStop) {
+    super(`Dừng khẩn cấp: ${stop.reason}`);
+    this.name = 'JobCancelledError';
+  }
 }
 
 /** Job có chu kỳ admin đổi được đọc lại chu kỳ mỗi nhịp này: đổi có hiệu lực trong vòng một nhịp, không cần khởi động lại. */
@@ -50,6 +69,11 @@ const TTL_SECONDS = 7 * 24 * 3600;
 const key = (job: JobKey) => `discovery:job-runs:${job}`;
 const intervalKey = (job: JobKey) => `discovery:job-interval:${job}`;
 const aliveKey = (runId: string) => `discovery:job-run-alive:${runId}`;
+const pauseKey = (job: JobKey) => `discovery:job-paused:${job}`;
+const cancelKey = (runId: string) => `discovery:job-cancel:${runId}`;
+/** Lượt chạy ở process khác (worker) thấy lệnh dừng trong vòng nhịp này. */
+const CANCEL_POLL_MS = 2_000;
+const CANCEL_TTL_SECONDS = 3600;
 // Làm mới mỗi 30 giây, hết hạn sau 2 phút: event loop nghẽn hay Redis chập chờn vài nhịp vẫn chưa bị coi là chết.
 // Lỡ coi nhầm thì lúc lượt đó chạy xong, finish ghi đè lại kết quả thật.
 const ALIVE_REFRESH_MS = 30_000;
@@ -63,22 +87,68 @@ export class JobRuns {
 
   constructor(@Inject(REDIS) private readonly redis: Redis) {}
 
-  /** Ghi "running", chạy fn, ghi kết quả. Redis lỗi chỉ log: không làm hỏng job. Lỗi của fn ném lại cho job xử lý. */
-  async track(job: JobKey, trigger: JobTrigger, fn: () => Promise<JobResult>): Promise<JobResult> {
+  /**
+   * Ghi "running", chạy fn, ghi kết quả. Redis lỗi chỉ log: không làm hỏng job. Lỗi của fn ném lại cho job xử lý.
+   * Job đang tạm dừng thì không chạy, không ghi lịch sử (lịch chạy mỗi phút sẽ đẩy hết lịch sử thật ra ngoài).
+   * fn nhận signal: admin dừng khẩn cấp (requestCancel, có thể từ process khác) thì signal bị huỷ trong vòng 2 giây;
+   * fn tự kiểm ở chỗ dừng an toàn. Ném ra sau khi bị huỷ thì lượt ghi là "cancelled".
+   */
+  async track(job: JobKey, trigger: JobTrigger, fn: (signal: AbortSignal) => Promise<JobResult>): Promise<JobResult> {
+    if (await this.getPause(job)) return { outcome: 'skipped', isPaused: true };
     const run: JobRun = { runId: randomUUID(), trigger, startedAt: Date.now(), finishedAt: null, outcome: 'running', durationMs: null, summary: null, error: null };
+    const controller = new AbortController();
     await this.markAlive(run.runId);
     const heartbeat = setInterval(() => void this.markAlive(run.runId), ALIVE_REFRESH_MS);
     heartbeat.unref();
+    const cancelPoll = setInterval(() => void this.checkCancel(run.runId, controller), CANCEL_POLL_MS);
+    cancelPoll.unref();
     await this.save(job, run);
     try {
-      const result = await fn();
+      const result = await fn(controller.signal);
       await this.finish(job, run, result.outcome, result.summary ?? null, result.error ?? null);
       return result;
     } catch (error) {
-      await this.finish(job, run, 'failed', null, (error instanceof Error ? error.message : String(error)).slice(0, 1000));
+      const reason: unknown = controller.signal.aborted ? controller.signal.reason : error;
+      const message = (reason instanceof Error ? reason.message : String(reason)).slice(0, 1000);
+      await this.finish(job, run, controller.signal.aborted ? 'cancelled' : 'failed', null, message);
       throw error;
     } finally {
       clearInterval(heartbeat);
+      clearInterval(cancelPoll);
+    }
+  }
+
+  /** Admin đang tạm dừng job thì trả ai/lúc nào/vì sao. Redis lỗi coi như không tạm dừng: không làm job đứng vì Redis. */
+  async getPause(job: JobKey): Promise<JobStop | null> {
+    try {
+      const raw = await this.redis.get(pauseKey(job));
+      return raw ? (JSON.parse(raw) as JobStop) : null;
+    } catch (err) {
+      this.logger.warn({ err, job }, 'Đọc trạng thái tạm dừng job lỗi (Redis), coi như không tạm dừng');
+      return null;
+    }
+  }
+
+  /** Tạm dừng (không hết hạn, tới khi admin bấm tiếp tục) hoặc bỏ tạm dừng. Lỗi Redis ném ra để admin biết chưa lưu. */
+  async setPause(job: JobKey, stop: JobStop | null): Promise<void> {
+    if (stop === null) await this.redis.del(pauseKey(job));
+    else await this.redis.set(pauseKey(job), JSON.stringify(stop));
+  }
+
+  /** Báo mọi lượt đang chạy của job dừng lại (process nào đang chạy cũng thấy, qua Redis). Trả số lượt đã báo. */
+  async requestCancel(job: JobKey, stop: JobStop): Promise<number> {
+    const running = (await this.list(job)).filter((r) => r.outcome === 'running');
+    for (const run of running) await this.redis.set(cancelKey(run.runId), JSON.stringify(stop), 'EX', CANCEL_TTL_SECONDS);
+    return running.length;
+  }
+
+  private async checkCancel(runId: string, controller: AbortController): Promise<void> {
+    if (controller.signal.aborted) return;
+    try {
+      const raw = await this.redis.get(cancelKey(runId));
+      if (raw) controller.abort(new JobCancelledError(JSON.parse(raw) as JobStop));
+    } catch (err) {
+      this.logger.warn({ err, runId }, 'Đọc lệnh dừng job lỗi (Redis), thử lại nhịp sau');
     }
   }
 
