@@ -19,6 +19,21 @@ import { moderationActions } from './moderation-actions.js';
 
 export const contentIdempotencyKeys = createIdempotencyKeysTable(contentSchema);
 
+export const moderationKeywordRules = contentSchema.table(
+  'moderation_keyword_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    keyword: varchar('keyword', { length: 120 }).notNull(),
+    normalizedKeyword: text('normalized_keyword').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    updatedBy: uuid('updated_by').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_moderation_keyword_rules_normalized_keyword').on(table.normalizedKeyword),
+  ],
+);
+
 export type ModerationTarget = 'post' | 'comment';
 export const moderationAppeals = contentSchema.table(
   'moderation_appeals',

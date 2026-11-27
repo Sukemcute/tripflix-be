@@ -41,6 +41,7 @@ import { ChangeVisibilityUseCase } from './change-visibility.use-case.js';
 import { ReviewQueueUseCase } from './review-queue.use-case.js';
 import { ClaimDeferredScansUseCase } from './recover-screening.use-case.js';
 import { ScreeningConsumer } from '../consumers/screening.consumer.js';
+import { KeywordRulesUseCases } from './keyword-rules.use-cases.js';
 import {
   DecideAppealUseCase,
   DecideCaseUseCase,
@@ -105,6 +106,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       outbox,
     );
     return {
+      keywords: new KeywordRulesUseCases(repository),
       frames,
       partScreen,
       repository,
@@ -170,7 +172,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
     displayNames.clear();
     failOutbox = false;
     await pool.query(
-      'truncate content.posts, content.moderation_cases, content.reports, content.outbox_events, content.moderation_processed_events, content.moderation_scans cascade',
+      'truncate content.posts, content.moderation_cases, content.reports, content.outbox_events, content.moderation_processed_events, content.moderation_scans, content.moderation_keyword_rules cascade',
     );
     postId = randomUUID();
     await pool.query(
@@ -1727,6 +1729,31 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       cases.decide.execute(item!.id, { actorId: AUTHOR, action: 'hide', reasonCode: 'OTHER' }),
     ).rejects.toThrow(/đã được xử lý/);
   });
+  it('áp dụng từ khóa đã lưu khi quét, đưa vào hàng chờ và bỏ qua quy tắc đã tắt', async () => {
+    const rule = await cases.keywords.create({ keyword: 'Kiểm tra nội dung', enabled: true }, AUTHOR);
+    await expect(cases.keywords.create({ keyword: 'kiem tra noi dung', enabled: true }, AUTHOR))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(cases.keywords.update(rule.id, { keyword: 'Ví dụ du lịch' }, AUTHOR))
+      .resolves.toMatchObject({ keyword: 'Ví dụ du lịch', enabled: true });
+
+    async function scanComment() {
+      const comment = await cases.add.execute({ postId, authorId: AUTHOR, body: 'VI DU, du lich!' });
+      const target = (await cases.repository.loadTarget('comment', comment.id))!;
+      await cases.screen.execute(randomUUID(), target, null);
+      return target;
+    }
+
+    const flagged = await scanComment();
+    expect(await cases.repository.pending(flagged)).toMatchObject({
+      sources: ['rule'],
+      flags: { rules: [{ code: 'CUSTOM_KEYWORD', match: 'Ví dụ du lịch' }] },
+    });
+    expect(await cases.repository.loadTarget('comment', flagged.targetId)).toMatchObject({ status: 'visible' });
+
+    await cases.keywords.update(rule.id, { enabled: false }, AUTHOR);
+    expect(await cases.repository.pending(await scanComment())).toBeUndefined();
+  });
+
   it('regex scam tự ẩn dù AI lỗi; event lặp chỉ xử lý một lần; bản sạch không tạo case', async () => {
     const clean = await cases.repository.loadTarget('post', postId);
     await cases.screen.execute(randomUUID(), clean!, null);

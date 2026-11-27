@@ -32,6 +32,8 @@ import { AiModerationClient } from './infra/ai-moderation.client.js';
 import { ModerationRepository } from './infra/moderation.repository.js';
 import { ReviewQueueUseCase } from './application/review-queue.use-case.js';
 import { PostPartsScreeningUseCase } from './application/post-parts-screening.use-case.js';
+import { AdminModerationKeywordRulesController } from './api/keyword-rules.controller.js';
+import { KeywordRulesUseCases } from './application/keyword-rules.use-cases.js';
 
 const OUTBOX = Symbol('MODERATION_OUTBOX');
 const CONFIG = Symbol('MODERATION_CONFIG');
@@ -45,9 +47,10 @@ const CONFIG = Symbol('MODERATION_CONFIG');
         new DrizzleIdempotencyStore(createDb(pools.content), contentIdempotencyKeys),
     }),
   ],
-  controllers: [ReportsController, AdminModerationController],
+  controllers: [ReportsController, AdminModerationController, AdminModerationKeywordRulesController],
   exports: [CONTENT_GATE_PORT],
   providers: [
+    KeywordRulesUseCases,
     {
       provide: PostPartsScreeningUseCase,
       inject: [ModerationRepository, MediaFacade, AiModerationClient, RecordScreeningUseCase, OUTBOX],

@@ -5093,6 +5093,114 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/keyword-rules": {
+      "get": {
+        "operationId": "AdminModerationKeywordRulesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModerationKeywordRuleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminModerationKeywordRulesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModerationKeywordRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationKeywordRuleDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/moderation/keyword-rules/{id}": {
+      "patch": {
+        "operationId": "AdminModerationKeywordRulesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModerationKeywordRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationKeywordRuleDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/suggest": {
       "get": {
         "description": "Dùng cho web OTA (kiểu Traveloka), gọi sau mỗi lần ngừng gõ khoảng 250 ms. Công khai, không cần đăng nhập.\n\n- Tối đa 8 dòng lẫn loại: khoảng 3 địa điểm, 4 khách sạn, 1 sân bay; loại nào thiếu thì lấy thêm loại khác.\n- Khớp không dấu, gõ tắt (`pq`, `hcm`, `sg`), gõ sai nhẹ (`nha trag`, `da nng`). Khớp đầu từ xếp trước khớp gần đúng.\n- Câu ngắn hơn 4 ký tự (sau khi bỏ ký tự lạ) chỉ khớp đầu từ, không tìm gần đúng.\n- Không có giá, không kiểm còn phòng: chọn địa điểm thì gọi `/api/stays?placeId=<refId>` (chưa có), chọn khách sạn thì mở trang chi tiết.\n- Không khớp gì thì `items: []` (không phải lỗi).",
@@ -13304,6 +13412,63 @@
           "items",
           "nextCursor"
         ]
+      },
+      "ModerationKeywordRuleDto": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "keyword",
+          "enabled",
+          "id",
+          "updatedAt"
+        ]
+      },
+      "CreateModerationKeywordRuleDto": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "keyword",
+          "enabled"
+        ]
+      },
+      "UpdateModerationKeywordRuleDto": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
       },
       "SuggestionDto": {
         "type": "object",
