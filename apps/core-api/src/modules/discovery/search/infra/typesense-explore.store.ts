@@ -104,14 +104,14 @@ export class TypesenseExploreStore implements ExploreStore {
    * (theo `content_hash`) và xoá mục không còn — lượng ghi tỉ lệ với số mục đổi, không phải cả chỉ mục.
    * Chưa có chỉ mục hoặc đổi schema: dựng collection mới rồi đổi alias (0 ms gián đoạn).
    */
-  async replaceAll(index: BuiltIndex): Promise<boolean> {
+  async replaceAll(index: BuiltIndex, signal?: AbortSignal): Promise<boolean> {
     const token = randomUUID();
     const acquired = await this.redis.set(REBUILD_LOCK_KEY, token, 'PX', REBUILD_LOCK_MS, 'NX');
     if (!acquired) return false;
     try {
       const current = (await this.client.getAlias(this.alias))?.collection_name;
-      if (current?.startsWith(`${this.alias}_${EXPLORE_SCHEMA_VERSION}_`)) await this.reconcile(current, index);
-      else await this.rebuild(index);
+      if (current?.startsWith(`${this.alias}_${EXPLORE_SCHEMA_VERSION}_`)) await this.reconcile(current, index, signal);
+      else await this.rebuild(index, signal);
       await this.statsCache.save(index.counts);
       return true;
     } finally {
@@ -121,7 +121,8 @@ export class TypesenseExploreStore implements ExploreStore {
     }
   }
 
-  private async reconcile(collection: string, index: BuiltIndex): Promise<void> {
+  /** Dừng khẩn cấp: kiểm trước khi ghi; đã bắt đầu ghi thì ghi nốt (mỗi lần ghi là một mẻ upsert/xoá). */
+  private async reconcile(collection: string, index: BuiltIndex, signal?: AbortSignal): Promise<void> {
     const indexed = new Map(
       (await this.client.exportDocuments<{ id: string; content_hash?: string }>(collection, 'id,content_hash')).map((d) => [d.id, d.content_hash]),
     );
@@ -132,20 +133,24 @@ export class TypesenseExploreStore implements ExploreStore {
       indexed.delete(d.id);
     }
     const removed = [...indexed.keys()];
+    signal?.throwIfAborted();
     await this.upsertSynonyms(collection);
     if (changed.length) await this.client.importDocuments(collection, changed, 'upsert');
     if (removed.length) await this.client.deleteDocumentsByIds(collection, removed);
     this.logger.log(`Đối soát chỉ mục ${collection}: ghi ${changed.length}, xoá ${removed.length}, giữ nguyên ${index.docs.length - changed.length}`);
   }
 
-  private async rebuild(index: BuiltIndex): Promise<void> {
+  /** Dừng khẩn cấp trước khi đổi alias: xoá collection dựng dở, alias vẫn trỏ chỉ mục cũ. */
+  private async rebuild(index: BuiltIndex, signal?: AbortSignal): Promise<void> {
     const nextCollection = `${this.alias}_${EXPLORE_SCHEMA_VERSION}_${Date.now()}`;
     let swapped = false;
     try {
       await this.client.createCollection(buildExploreCollectionSchema(nextCollection));
       await this.upsertSynonyms(nextCollection);
       const docs = index.docs.map((d) => toTypesenseDocWithHash(d) as unknown as Record<string, unknown>);
+      signal?.throwIfAborted();
       await this.client.importDocuments(nextCollection, docs, 'create');
+      signal?.throwIfAborted();
       await this.client.upsertAlias(this.alias, nextCollection);
       swapped = true;
       await this.cleanupOldCollections(nextCollection);

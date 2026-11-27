@@ -526,7 +526,8 @@ export class ExploreUseCases {
   }
 
   /** Dựng lại toàn bộ chỉ mục từ commerce + content + điểm OSM. Trả số tài liệu, hoặc null nếu worker khác đang dựng. */
-  async rebuildIndex(): Promise<number | null> {
+  /** `signal` (admin dừng khẩn cấp): dừng trước khi ghi, hoặc store tự bỏ phần dựng dở; chỉ mục cũ giữ nguyên. */
+  async rebuildIndex(signal?: AbortSignal): Promise<number | null> {
     const [hotels, posts, places, points] = await Promise.all([
       readAll((c) => this.catalog.listHotels(c)),
       readAll((c) => this.catalog.listPosts(c)),
@@ -537,7 +538,8 @@ export class ExploreUseCases {
     const pois = points.flatMap((p) => pointToObject(p, placeName.get(p.cityId) ?? '') ?? []);
     const bins = await this.loadPostBins(posts.map((p) => p.id));
     const index = buildIndex([...hotels.map(hotelToObject), ...posts.map((p) => withBins(postToObject(p), bins.get(p.id))), ...pois]);
-    if (!(await this.store.replaceAll(index))) return null;
+    signal?.throwIfAborted();
+    if (!(await this.store.replaceAll(index, signal))) return null;
     // Bài bị ẩn sau lúc đọc ở trên đã bị replaceAll ghi lại, và lượt xoá của consumer có thể đã hụt vì đụng transaction.
     // Hỏi lại Content sau khi commit thì bắt được hết: Content lưu trạng thái ẩn trước khi phát event.
     // Lỗi ở đây chỉ để lại bài ẩn tới lượt sau, chỉ mục mới vẫn dùng được.

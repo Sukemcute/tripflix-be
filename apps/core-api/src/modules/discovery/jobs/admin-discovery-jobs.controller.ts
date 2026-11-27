@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiAcceptedResponse, ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Roles } from '@tripflix/auth';
+import { ApiAcceptedResponse, ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CurrentUser, Roles, type AuthUser } from '@tripflix/auth';
 import { z } from 'zod';
 import { CANDIDATE_LIMIT_RANGE, PostRecommendationUseCases, type CandidateLimitInfo } from '../recommend/application/post-recommendations.use-cases.js';
 import { RECOMMEND_STORE, type RecommendStore } from '../recommend/application/ports.js';
@@ -8,7 +8,7 @@ import { BUILD_FEATURES_EVERY_MS, BuildFeaturesJob } from '../recommend/jobs/bui
 import { PURGE_INTERACTIONS_EVERY_MS, PurgeInteractionsJob } from '../recommend/jobs/purge-interactions.job.js';
 import { RebuildExploreIndexJob } from '../search/jobs/rebuild-explore-index.job.js';
 import { RebuildSuggestIndexJob } from '../search/jobs/rebuild-suggest-index.job.js';
-import { JOB_KEYS, JOB_OUTCOMES, JobRuns, type JobKey, type JobOutcome, type JobTrigger } from './job-runs.js';
+import { JOB_KEYS, JOB_OUTCOMES, JobRuns, type JobKey, type JobOutcome, type JobStop, type JobTrigger } from './job-runs.js';
 
 const GROUPS = ['search', 'recommend'] as const;
 type JobGroup = (typeof GROUPS)[number];
@@ -19,6 +19,10 @@ const CHANGEABLE_JOBS = 'explore, recommend_build';
 
 export const SetJobIntervalRequestSchema = z.object({
   intervalMs: z.number().int().min(INTERVAL_LIMITS.min, 'Ít nhất 1 phút').max(INTERVAL_LIMITS.max, 'Nhiều nhất 24 giờ').nullable(),
+});
+
+export const StopJobRequestSchema = z.object({
+  reason: z.string().trim().min(3, 'Ghi lý do ít nhất 3 ký tự').max(300, 'Lý do tối đa 300 ký tự'),
 });
 
 export const SetCandidateLimitRequestSchema = z.object({
@@ -73,6 +77,33 @@ class JobRunDto {
   error!: string | null;
 }
 
+class JobStopDto {
+  @ApiProperty({ type: String, description: 'userId của quản trị viên' })
+  by!: string;
+
+  @ApiProperty({ type: Number, description: 'epoch ms' })
+  at!: number;
+
+  @ApiProperty({ type: String })
+  reason!: string;
+}
+
+class StopJobRequestDto {
+  @ApiProperty({ type: String, minLength: 3, maxLength: 300, example: 'Điểm gợi ý ra sai sau lượt build' })
+  reason!: string;
+}
+
+class StopJobDto {
+  @ApiProperty({ enum: JOB_KEYS })
+  job!: JobKey;
+
+  @ApiProperty({ type: JobStopDto, description: 'Job đã tạm dừng: không tự chạy, không chạy tay được tới khi tiếp tục' })
+  pause!: JobStopDto;
+
+  @ApiProperty({ type: Number, description: 'Số lượt đang chạy đã được báo dừng (dừng trong vòng vài giây, ở điểm dừng an toàn kế tiếp)' })
+  cancelledRuns!: number;
+}
+
 class DiscoveryJobDto {
   @ApiProperty({ enum: JOB_KEYS })
   job!: JobKey;
@@ -94,6 +125,9 @@ class DiscoveryJobDto {
 
   @ApiProperty({ type: [JobRunDto], description: '20 lần chạy gần nhất, mới nhất trước' })
   runs!: JobRunDto[];
+
+  @ApiProperty({ type: JobStopDto, nullable: true, description: 'Đang tạm dừng (dừng khẩn cấp); null = chạy bình thường' })
+  pause!: JobStopDto | null;
 }
 
 class RecommendAlgoDto {
@@ -217,8 +251,8 @@ class RunJobDto {
   @ApiProperty({ type: Boolean })
   accepted!: boolean;
 
-  @ApiProperty({ type: String, nullable: true, enum: ['running'], description: "'running': job đang chạy, không chạy chồng" })
-  reason!: 'running' | null;
+  @ApiProperty({ type: String, nullable: true, enum: ['running', 'paused'], description: "'running': job đang chạy, không chạy chồng; 'paused': job đang tạm dừng" })
+  reason!: 'running' | 'paused' | null;
 }
 
 interface RunnableJob {
@@ -266,11 +300,12 @@ export class AdminDiscoveryJobsController {
       Promise.all(
         keys.map(async (job) => {
           const { intervalMs: defaultIntervalMs, canChangeInterval, instance } = this.jobs[job];
-          const [runs, intervalMs] = await Promise.all([
+          const [runs, intervalMs, pause] = await Promise.all([
             this.runs.list(job).catch(() => []),
             canChangeInterval && defaultIntervalMs !== null ? this.runs.getIntervalMs(job, defaultIntervalMs) : defaultIntervalMs,
+            this.runs.getPause(job),
           ]);
-          return { job, group: group as JobGroup, intervalMs, defaultIntervalMs, canChangeInterval, isRunning: instance.isRunning, runs };
+          return { job, group: group as JobGroup, intervalMs, defaultIntervalMs, canChangeInterval, isRunning: instance.isRunning, runs, pause };
         }),
       ),
       group === 'recommend' ? this.recommendStats(now) : Promise.resolve(null),
@@ -285,13 +320,53 @@ export class AdminDiscoveryJobsController {
   @ApiParam({ name: 'job', enum: JOB_KEYS })
   @ApiAcceptedResponse({ type: RunJobDto })
   @ApiNotFoundResponse({ description: 'Không có job này' })
-  run(@Param('job') job: string): RunJobDto {
+  async run(@Param('job') job: string): Promise<RunJobDto> {
     if (!JOB_KEYS.includes(job as JobKey)) throw new NotFoundException('Không có job này');
     const { instance } = this.jobs[job as JobKey];
     if (instance.isRunning) return { accepted: false, reason: 'running' };
+    if (await this.runs.getPause(job as JobKey)) return { accepted: false, reason: 'paused' };
     // Không chờ: job có thể chạy vài giây; job tự log và tự ghi lỗi vào lịch sử.
     void instance.run('manual');
     return { accepted: true, reason: null };
+  }
+
+  @Post(':job/stop')
+  @Roles('superadmin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dừng khẩn cấp: tạm dừng lịch và báo lượt đang chạy dừng lại',
+    description:
+      'Lượt đang chạy (ở bất kỳ process nào) dừng trong vòng vài giây, tại điểm dừng an toàn kế tiếp; phần đã ghi trước đó giữ nguyên. ' +
+      'Job không tự chạy và không chạy tay được tới khi gọi …/resume. Gọi lại khi đã dừng chỉ cập nhật lý do.',
+  })
+  @ApiParam({ name: 'job', enum: JOB_KEYS })
+  @ApiBody({ type: StopJobRequestDto })
+  @ApiOkResponse({ type: StopJobDto })
+  @ApiBadRequestResponse({ description: 'Thiếu lý do' })
+  @ApiNotFoundResponse({ description: 'Không có job này' })
+  async stop(@Param('job') job: string, @Body() body: unknown, @CurrentUser() user: AuthUser): Promise<StopJobDto> {
+    if (!JOB_KEYS.includes(job as JobKey)) throw new NotFoundException('Không có job này');
+    const parsed = StopJobRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ message: 'Tham số không hợp lệ', errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) });
+    }
+    const pause: JobStop = { by: user.userId, at: Date.now(), reason: parsed.data.reason };
+    // Tạm dừng trước: lượt mới (lịch hoặc process khác) không bắt đầu chen vào giữa lúc báo dừng.
+    await this.runs.setPause(job as JobKey, pause);
+    const cancelledRuns = await this.runs.requestCancel(job as JobKey, pause);
+    return { job: job as JobKey, pause, cancelledRuns };
+  }
+
+  @Post(':job/resume')
+  @Roles('superadmin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Tiếp tục lịch sau khi dừng khẩn cấp; lượt kế tiếp chạy theo chu kỳ như thường (muốn ngay thì bấm Chạy ngay)' })
+  @ApiParam({ name: 'job', enum: JOB_KEYS })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse({ description: 'Không có job này' })
+  async resume(@Param('job') job: string): Promise<void> {
+    if (!JOB_KEYS.includes(job as JobKey)) throw new NotFoundException('Không có job này');
+    await this.runs.setPause(job as JobKey, null);
   }
 
   @Put(':job/interval')

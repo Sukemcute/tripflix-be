@@ -84,6 +84,50 @@ describe('BuildFeaturesUseCases', () => {
     expect(store.listUserRows).toHaveBeenCalledTimes(3);
   });
 
+  describe('dừng khẩn cấp', () => {
+    it('dừng trong lúc post builder tính: không ghi điểm, không chạy builder khác, không ghi đã chạy xong', async () => {
+      const { store, useCases } = setup();
+      const controller = new AbortController();
+      const spy = vi.spyOn(hotV0, 'build').mockImplementationOnce(async (items) => {
+        controller.abort(new Error('Dừng khẩn cấp: thử'));
+        return items.map((i) => ({ postId: i.postId, score: 1, features: { reactions: 0, comments: 0, shares: 0, bookmarks: 0, velocity24h: 0, ageHours: 1 } }));
+      });
+      try {
+        await expect(useCases.runCycle(NOW, undefined, controller.signal)).rejects.toThrow('Dừng khẩn cấp: thử');
+      } finally {
+        spy.mockRestore();
+      }
+      expect(store.replacePostScores).not.toHaveBeenCalled();
+      expect(store.upsertUserFeatures).not.toHaveBeenCalled();
+      expect(store.setJobState).not.toHaveBeenCalledWith('build-features', expect.anything());
+      expect(store.setJobState).not.toHaveBeenCalledWith('hot@v0', expect.anything());
+    });
+
+    it('dừng giữa các lô người dùng: lô đã ghi giữ nguyên, lô sau không tính', async () => {
+      const { store, useCases } = setup();
+      const controller = new AbortController();
+      store.listActiveUserIds.mockResolvedValue(Array.from({ length: 450 }, (_, i) => `u${i}`));
+      store.upsertUserFeatures.mockImplementationOnce(async () => controller.abort(new Error('Dừng khẩn cấp: thử')));
+      await expect(useCases.runCycle(NOW, undefined, controller.signal)).rejects.toThrow('Dừng khẩn cấp: thử');
+      expect(store.replacePostScores).toHaveBeenCalled();
+      expect(store.upsertUserFeatures).toHaveBeenCalledTimes(1);
+      expect(store.setJobState).not.toHaveBeenCalledWith('build-features', expect.anything());
+    });
+
+    it('post builder chạy qua runner được tiêm; phiên luôn được đóng', async () => {
+      const { store } = setup();
+      const close = vi.fn(async () => undefined);
+      const build = vi.fn(async () => [{ postId: 'p1', score: 3, features: {} }]);
+      const runner = { open: vi.fn(async () => ({ build, close })) };
+      const catalog = (setup() as unknown as { useCases: { catalog: RecommendCatalog } }).useCases.catalog;
+      await new BuildFeaturesUseCases(store as unknown as RecommendStore, catalog, undefined, runner).runCycle(NOW);
+      expect(runner.open).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ postId: 'p1' })]), NOW, undefined);
+      expect(build).toHaveBeenCalledWith(hotV0);
+      expect(store.replacePostScores).toHaveBeenCalledWith('hot@v0', [{ postId: 'p1', score: 3, features: {}, postType: 'video' }]);
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('dòng recommend_algos có bộ ba sai thì bỏ qua builder của nó', async () => {
     const { store, useCases } = setup();
     await useCases.runCycle(NOW);

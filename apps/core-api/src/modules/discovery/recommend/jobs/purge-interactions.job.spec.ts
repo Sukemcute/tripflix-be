@@ -29,6 +29,24 @@ describe('PurgeInteractionsJob', () => {
     expect(purgeExcess).toHaveBeenCalledWith(5_000);
   });
 
+  it('dừng khẩn cấp giữa các lô: không xoá lô kế tiếp, không xoá đếm câu tìm', async () => {
+    const controller = new AbortController();
+    const purgeExpired = vi.fn(async () => {
+      controller.abort(new Error('Dừng khẩn cấp: thử'));
+      return 5_000;
+    });
+    const purgeExcess = vi.fn(async () => 0);
+    const purgeQueryGrams = vi.fn(async () => 7);
+    const store = { withLock: (_: string, fn: () => Promise<number>) => fn(), purgeExpired, purgeExcess };
+    const runs = { track: (_job: string, _trigger: string, fn: (signal: AbortSignal) => Promise<unknown>) => fn(controller.signal) } as unknown as JobRuns;
+    const job = new PurgeInteractionsJob({ APP_ROLE: 'worker' } as CoreEnv, store as unknown as RecommendStore, runs, { purgeQueryGrams });
+    expect(await job.run()).toBeNull();
+    expect(purgeExpired).toHaveBeenCalledTimes(1);
+    expect(purgeExcess).not.toHaveBeenCalled();
+    expect(purgeQueryGrams).not.toHaveBeenCalled();
+    expect(job.isRunning).toBe(false);
+  });
+
   it('xoá đếm câu tìm trước 90 ngày', async () => {
     const { job, purgeQueryGrams } = make([0]);
     await job.run('schedule', new Date('2026-11-16T03:00:00Z'));

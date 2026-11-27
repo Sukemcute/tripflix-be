@@ -67,9 +67,9 @@ export class RebuildExploreIndexJob implements OnApplicationBootstrap, OnApplica
     const startedAt = Date.now();
     this.lastStartedAt = startedAt;
     try {
-      await this.runs.track('explore', trigger, async () => {
+      await this.runs.track('explore', trigger, async (signal) => {
         this.health.start('explore', startedAt, this.intervalMs);
-        const count = await this.explore.rebuildIndex();
+        const count = await this.explore.rebuildIndex(signal);
         this.health.finish('explore', startedAt, count === null ? 'skipped' : 'succeeded', count ?? undefined);
         if (count === null) {
           this.logger.log('Worker khác đang dựng chỉ mục tìm khám phá, bỏ lượt');

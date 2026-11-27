@@ -12,7 +12,8 @@ export const PLACES_STORE = Symbol('PLACES_STORE');
 /** Chỉ mục tìm khám phá (Typesense hoặc Postgres). */
 export interface ExploreStore extends ExploreSource {
   /** Thay toàn bộ chỉ mục. false = worker khác đang dựng, bỏ lượt này. */
-  replaceAll(index: BuiltIndex): Promise<boolean>;
+  /** signal bị huỷ thì bỏ phần đang dựng, chỉ mục đang phục vụ giữ nguyên. */
+  replaceAll(index: BuiltIndex, signal?: AbortSignal): Promise<boolean>;
   /** Thêm hoặc cập nhật một nhóm tài liệu lên chỉ mục (real-time event sync). */
   upsertDocuments?(docs: readonly IndexedDoc[]): Promise<number>;
   /** Chỉ mục đã dựng và có tài liệu chưa (engine ngoài; Postgres không khai báo). */

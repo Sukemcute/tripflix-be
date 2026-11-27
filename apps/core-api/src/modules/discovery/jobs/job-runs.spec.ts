@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import { isDue, JobRuns } from './job-runs.js';
+import { isDue, JobCancelledError, JobRuns } from './job-runs.js';
 
 /** Redis giả: đủ hset/hvals/hdel/expire và multi().hset().expire().exec(). */
 function fakeRedis(opts: { isBroken?: boolean } = {}) {
@@ -46,6 +46,68 @@ describe('JobRuns', () => {
     const runs = new JobRuns(fakeRedis().redis);
     await expect(runs.track('explore', 'schedule', () => Promise.reject(new Error('index hỏng')))).rejects.toThrow('index hỏng');
     expect(await runs.list('explore')).toMatchObject([{ outcome: 'failed', error: 'index hỏng' }]);
+  });
+
+  describe('dừng khẩn cấp', () => {
+    const stop = { by: 'admin-1', at: 1, reason: 'Điểm ra sai' };
+
+    it('đang tạm dừng: không chạy thân job, không ghi lịch sử; bỏ tạm dừng thì chạy lại', async () => {
+      const { redis } = fakeRedis();
+      const runs = new JobRuns(redis);
+      const body = vi.fn(async () => ({ outcome: 'succeeded' as const }));
+      await runs.setPause('recommend_build', stop);
+      expect(await runs.getPause('recommend_build')).toEqual(stop);
+      expect(await runs.getPause('explore')).toBeNull();
+      expect(await runs.track('recommend_build', 'schedule', body)).toEqual({ outcome: 'skipped', isPaused: true });
+      expect(body).not.toHaveBeenCalled();
+      expect(await runs.list('recommend_build')).toEqual([]);
+      await runs.setPause('recommend_build', null);
+      await runs.track('recommend_build', 'schedule', body);
+      expect(body).toHaveBeenCalledTimes(1);
+    });
+
+    it('lệnh dừng từ process khác: signal bị huỷ trong vòng 2 giây, lượt ghi cancelled kèm lý do', async () => {
+      const { redis } = fakeRedis();
+      const worker = new JobRuns(redis);
+      const admin = new JobRuns(redis);
+      vi.useFakeTimers();
+      try {
+        let seen: AbortSignal | undefined;
+        const tracking = worker.track('recommend_build', 'schedule', (signal) => {
+          seen = signal;
+          return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+        });
+        const outcome = expect(tracking).rejects.toBeInstanceOf(JobCancelledError);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(await admin.requestCancel('recommend_build', stop)).toBe(1);
+        expect(seen!.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(seen!.aborted).toBe(true);
+        await outcome;
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(await admin.list('recommend_build')).toMatchObject([{ outcome: 'cancelled', error: 'Dừng khẩn cấp: Điểm ra sai' }]);
+      expect(await admin.requestCancel('recommend_build', stop)).toBe(0);
+    });
+
+    it('thân job chạy xong trước điểm dừng kế tiếp: ghi kết quả thật', async () => {
+      const { redis } = fakeRedis();
+      const runs = new JobRuns(redis);
+      vi.useFakeTimers();
+      try {
+        const tracking = runs.track('explore', 'manual', async () => {
+          await runs.requestCancel('explore', stop);
+          await vi.advanceTimersByTimeAsync(2_000);
+          return { outcome: 'succeeded', summary: { count: 7 } };
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        await expect(tracking).resolves.toMatchObject({ outcome: 'succeeded' });
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(await runs.list('explore')).toMatchObject([{ outcome: 'succeeded', summary: { count: 7 } }]);
+    });
   });
 
   it('giữ 20 lần gần nhất, mới nhất trước', async () => {

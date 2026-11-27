@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { AuthUser } from '@tripflix/auth';
 import type { RecommendStore } from '../recommend/application/ports.js';
 import type { CandidateLimitInfo, PostRecommendationUseCases } from '../recommend/application/post-recommendations.use-cases.js';
 import type { BuildFeaturesJob } from '../recommend/jobs/build-features.job.js';
@@ -6,7 +7,7 @@ import type { PurgeInteractionsJob } from '../recommend/jobs/purge-interactions.
 import type { RebuildExploreIndexJob } from '../search/jobs/rebuild-explore-index.job.js';
 import type { RebuildSuggestIndexJob } from '../search/jobs/rebuild-suggest-index.job.js';
 import { AdminDiscoveryJobsController } from './admin-discovery-jobs.controller.js';
-import type { JobRuns } from './job-runs.js';
+import type { JobRuns, JobStop } from './job-runs.js';
 
 function setup() {
   const job = () => ({ isRunning: false, run: vi.fn(() => Promise.resolve()) });
@@ -18,6 +19,9 @@ function setup() {
     list: vi.fn(async (name: string) => [{ runId: `r-${name}`, outcome: 'succeeded' }]),
     getIntervalMs: vi.fn(async (_job: string, fallback: number) => fallback),
     setIntervalMs: vi.fn(async () => undefined),
+    getPause: vi.fn(async (): Promise<JobStop | null> => null),
+    setPause: vi.fn(async () => undefined),
+    requestCancel: vi.fn(async () => 1),
   };
   const store = {
     getAdminStats: vi.fn(async () => ({
@@ -75,22 +79,63 @@ describe('AdminDiscoveryJobsController', () => {
     await expect(setup().controller.list('ai')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('quyền: xem cho moderator và superadmin, chạy ngay và đổi chu kỳ chỉ superadmin', () => {
-    const roles = (method: 'list' | 'run' | 'setInterval' | 'setCandidateLimit') => Reflect.getMetadata('tripflix:roles', AdminDiscoveryJobsController.prototype[method]) as string[];
+  it('quyền: xem cho moderator và superadmin, chạy ngay, đổi chu kỳ, dừng khẩn cấp chỉ superadmin', () => {
+    const roles = (method: 'list' | 'run' | 'setInterval' | 'setCandidateLimit' | 'stop' | 'resume') => Reflect.getMetadata('tripflix:roles', AdminDiscoveryJobsController.prototype[method]) as string[];
+    expect(roles('stop')).toEqual(['superadmin']);
+    expect(roles('resume')).toEqual(['superadmin']);
     expect(roles('list')).toEqual(['moderator', 'superadmin']);
     expect(roles('run')).toEqual(['superadmin']);
     expect(roles('setInterval')).toEqual(['superadmin']);
     expect(roles('setCandidateLimit')).toEqual(['superadmin']);
   });
 
-  it('chạy ngay: gọi run("manual") không chờ; đang chạy thì từ chối; job lạ → 404', () => {
+  it('chạy ngay: gọi run("manual") không chờ; đang chạy thì từ chối; job lạ → 404', async () => {
     const { controller, build } = setup();
-    expect(controller.run('recommend_build')).toEqual({ accepted: true, reason: null });
+    expect(await controller.run('recommend_build')).toEqual({ accepted: true, reason: null });
     expect(build.run).toHaveBeenCalledWith('manual');
     build.isRunning = true;
-    expect(controller.run('recommend_build')).toEqual({ accepted: false, reason: 'running' });
+    expect(await controller.run('recommend_build')).toEqual({ accepted: false, reason: 'running' });
     expect(build.run).toHaveBeenCalledTimes(1);
-    expect(() => controller.run('drop_db')).toThrow(NotFoundException);
+    await expect(controller.run('drop_db')).rejects.toThrow(NotFoundException);
+  });
+
+  describe('dừng khẩn cấp', () => {
+    const admin = { userId: 'admin-1', role: 'superadmin', sid: 's', exp: 0 } as AuthUser;
+
+    it('stop: tạm dừng (ghi ai, lúc nào, lý do) rồi báo lượt đang chạy dừng', async () => {
+      const { controller, runs } = setup();
+      const result = await controller.stop('recommend_build', { reason: '  Điểm ra sai  ' }, admin);
+      expect(result).toMatchObject({ job: 'recommend_build', cancelledRuns: 1, pause: { by: 'admin-1', reason: 'Điểm ra sai' } });
+      expect(runs.setPause).toHaveBeenCalledWith('recommend_build', result.pause);
+      expect(runs.requestCancel).toHaveBeenCalledWith('recommend_build', result.pause);
+      expect(runs.setPause.mock.invocationCallOrder[0]).toBeLessThan(runs.requestCancel.mock.invocationCallOrder[0]!);
+    });
+
+    it.each([{}, { reason: '' }, { reason: 'ab' }, { reason: 'x'.repeat(301) }, { reason: 3 }])('stop body sai %o → 400, không dừng gì', async (body) => {
+      const { controller, runs } = setup();
+      await expect(controller.stop('explore', body, admin)).rejects.toBeInstanceOf(BadRequestException);
+      expect(runs.setPause).not.toHaveBeenCalled();
+      expect(runs.requestCancel).not.toHaveBeenCalled();
+    });
+
+    it('stop/resume job lạ → 404', async () => {
+      const { controller } = setup();
+      await expect(controller.stop('drop_db', { reason: 'thử xem' }, admin)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(controller.resume('drop_db')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('đang tạm dừng: GET hiện ai dừng, chạy ngay bị từ chối; resume xoá tạm dừng', async () => {
+      const { controller, runs, build } = setup();
+      const pause = { by: 'admin-1', at: 1, reason: 'Điểm ra sai' };
+      runs.getPause.mockImplementation(async (job?: string) => (job === 'recommend_build' ? pause : null));
+      const [buildJob, purgeJob] = (await controller.list('recommend')).jobs;
+      expect(buildJob!.pause).toEqual(pause);
+      expect(purgeJob!.pause).toBeNull();
+      expect(await controller.run('recommend_build')).toEqual({ accepted: false, reason: 'paused' });
+      expect(build.run).not.toHaveBeenCalled();
+      await controller.resume('recommend_build');
+      expect(runs.setPause).toHaveBeenCalledWith('recommend_build', null);
+    });
   });
 
   describe('TF103: chu kỳ job', () => {

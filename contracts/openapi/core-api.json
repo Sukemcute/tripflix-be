@@ -6130,6 +6130,103 @@
         ]
       }
     },
+    "/api/v1/admin/discovery/jobs/{job}/stop": {
+      "post": {
+        "description": "Lượt đang chạy (ở bất kỳ process nào) dừng trong vòng vài giây, tại điểm dừng an toàn kế tiếp; phần đã ghi trước đó giữ nguyên. Job không tự chạy và không chạy tay được tới khi gọi …/resume. Gọi lại khi đã dừng chỉ cập nhật lý do.",
+        "operationId": "AdminDiscoveryJobsController_stop",
+        "parameters": [
+          {
+            "name": "job",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "explore",
+                "suggest",
+                "recommend_build",
+                "recommend_purge"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopJobRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu lý do"
+          },
+          "404": {
+            "description": "Không có job này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dừng khẩn cấp: tạm dừng lịch và báo lượt đang chạy dừng lại",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
+    "/api/v1/admin/discovery/jobs/{job}/resume": {
+      "post": {
+        "operationId": "AdminDiscoveryJobsController_resume",
+        "parameters": [
+          {
+            "name": "job",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "explore",
+                "suggest",
+                "recommend_build",
+                "recommend_purge"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "Không có job này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tiếp tục lịch sau khi dừng khẩn cấp; lượt kế tiếp chạy theo chu kỳ như thường (muốn ngay thì bấm Chạy ngay)",
+        "tags": [
+          "Admin Discovery Jobs"
+        ]
+      }
+    },
     "/api/v1/admin/discovery/jobs/{job}/interval": {
       "put": {
         "operationId": "AdminDiscoveryJobsController_setInterval",
@@ -15976,7 +16073,8 @@
               "running",
               "succeeded",
               "skipped",
-              "failed"
+              "failed",
+              "cancelled"
             ]
           },
           "durationMs": {
@@ -16006,6 +16104,27 @@
           "durationMs",
           "summary",
           "error"
+        ]
+      },
+      "JobStopDto": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string",
+            "description": "userId của quản trị viên"
+          },
+          "at": {
+            "type": "number",
+            "description": "epoch ms"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "by",
+          "at",
+          "reason"
         ]
       },
       "DiscoveryJobDto": {
@@ -16051,6 +16170,16 @@
             "items": {
               "$ref": "#/components/schemas/JobRunDto"
             }
+          },
+          "pause": {
+            "nullable": true,
+            "description": "Đang tạm dừng (dừng khẩn cấp); null = chạy bình thường",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobStopDto"
+              }
+            ]
           }
         },
         "required": [
@@ -16060,7 +16189,8 @@
           "defaultIntervalMs",
           "canChangeInterval",
           "isRunning",
-          "runs"
+          "runs",
+          "pause"
         ]
       },
       "RecommendAlgoDto": {
@@ -16266,14 +16396,60 @@
             "type": "string",
             "nullable": true,
             "enum": [
-              "running"
+              "running",
+              "paused"
             ],
-            "description": "'running': job đang chạy, không chạy chồng"
+            "description": "'running': job đang chạy, không chạy chồng; 'paused': job đang tạm dừng"
           }
         },
         "required": [
           "accepted",
           "reason"
+        ]
+      },
+      "StopJobRequestDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300,
+            "example": "Điểm gợi ý ra sai sau lượt build"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "StopJobDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string",
+            "enum": [
+              "explore",
+              "suggest",
+              "recommend_build",
+              "recommend_purge"
+            ]
+          },
+          "pause": {
+            "description": "Job đã tạm dừng: không tự chạy, không chạy tay được tới khi tiếp tục",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobStopDto"
+              }
+            ]
+          },
+          "cancelledRuns": {
+            "type": "number",
+            "description": "Số lượt đang chạy đã được báo dừng (dừng trong vòng vài giây, ở điểm dừng an toàn kế tiếp)"
+          }
+        },
+        "required": [
+          "job",
+          "pause",
+          "cancelledRuns"
         ]
       },
       "SetJobIntervalRequestDto": {

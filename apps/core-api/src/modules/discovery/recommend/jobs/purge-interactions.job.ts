@@ -47,19 +47,27 @@ export class PurgeInteractionsJob implements OnApplicationBootstrap, OnApplicati
     this.isRunning = true;
     const startedAt = Date.now();
     try {
-      const { summary } = await this.runs.track('recommend_purge', trigger, async () => {
+      const { summary, isPaused } = await this.runs.track('recommend_purge', trigger, async (signal) => {
+        // Dừng khẩn cấp: kiểm giữa các lô; lô đã xoá thì không lấy lại (dữ liệu đã hết hạn lưu).
         const total = await this.store.withLock(LOCK, async () => {
           let sum = 0;
-          for (let n = BATCH; n === BATCH; sum += n) n = await this.store.purgeExpired(now, BATCH);
+          for (let n = BATCH; n === BATCH; sum += n) {
+            signal?.throwIfAborted();
+            n = await this.store.purgeExpired(now, BATCH);
+          }
           let excess = 0;
-          for (let n = BATCH; n === BATCH; excess += n) n = await this.store.purgeExcess(BATCH);
+          for (let n = BATCH; n === BATCH; excess += n) {
+            signal?.throwIfAborted();
+            n = await this.store.purgeExcess(BATCH);
+          }
           if (excess) this.logger.warn(`Đã xoá ${excess} dòng chỉ-thêm vượt ${APPEND_ONLY_KEEP} dòng mỗi người mỗi loại`);
           return sum + excess + (await this.explore.purgeQueryGrams(dayOf(now, QUERY_GRAMS_RETENTION_DAYS)));
         });
         return total === null ? { outcome: 'skipped' } : { outcome: 'succeeded', summary: { deleted: total } };
       });
       const deleted = summary?.deleted ?? null;
-      if (deleted === null) this.logger.log('Worker khác đang dọn bảng thô gợi ý, bỏ lượt');
+      if (isPaused) this.logger.log('Admin đang tạm dừng job dọn bảng thô gợi ý, bỏ lượt');
+      else if (deleted === null) this.logger.log('Worker khác đang dọn bảng thô gợi ý, bỏ lượt');
       else this.logger.log(`Đã dọn ${deleted} dòng thô gợi ý hết hạn trong ${Date.now() - startedAt} ms`);
       return deleted;
     } catch (error) {
