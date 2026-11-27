@@ -79,6 +79,13 @@ describe('Phát sự kiện tìm kiếm', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
+  it('truy vấn giám sát của admin có kết quả nhưng không phát sự kiện người dùng', async () => {
+    const { controller, publish, explorePage } = setup();
+    expect(await controller.monitorSearch({ q: 'đà lạt' })).toBe(explorePage);
+    expect(await controller.monitorSearchPosts({ q: 'đà lạt' })).toMatchObject({ total: 7 });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it('Redis lỗi: không chặn, không làm hỏng response', async () => {
     const { controller, explorePage } = setup(vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
     expect(await controller.search({ q: 'đà lạt' }, USER)).toBe(explorePage);

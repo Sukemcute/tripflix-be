@@ -290,6 +290,31 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
         .set(await proof('login', origin)).send({ code }).expect(status);
     }
 
+    it('route admin đăng nhập và làm mới chỉ cấp phiên cho nhân viên', async () => {
+      const email = 'admin-login-staff@example.com';
+      await staffWebLogin(email, 'moderator');
+      const proof = await createTestBrowserProof();
+      const login = await http().post('/api/admin/auth/login').set(ADMIN)
+        .set(await proof('login', ADMIN_ORIGIN)).send({ email, password: PASSWORD }).expect(200);
+      const cookie = ([] as string[]).concat(login.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      const refresh = await http().post('/api/admin/auth/refresh').set({ ...ADMIN, Cookie: cookie })
+        .set(await proof('refresh', ADMIN_ORIGIN)).expect(200);
+      const authorization = 'Bearer ' + refresh.body.accessToken;
+      await http().get('/api/admin/me').set('Authorization', authorization).expect(200);
+      await http().post('/api/admin/auth/logout').set('Authorization', authorization).expect(204);
+      await http().get('/api/admin/me').set('Authorization', authorization).expect(401);
+
+      const memberEmail = 'admin-login-member@example.com';
+      await register(memberEmail);
+      await http().post('/api/admin/auth/login').set(ADMIN)
+        .set(await proof('login', ADMIN_ORIGIN)).send({ email: memberEmail, password: PASSWORD }).expect(403);
+      const member = await http().post('/api/auth/login').set(ADMIN)
+        .set(await proof('login', ADMIN_ORIGIN)).send({ email: memberEmail, password: PASSWORD }).expect(200);
+      const memberCookie = ([] as string[]).concat(member.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      await http().post('/api/admin/auth/refresh').set({ ...ADMIN, Cookie: memberCookie })
+        .set(await proof('refresh', ADMIN_ORIGIN)).expect(401);
+    });
+
     it('nhân viên đổi mã lấy phiên admin riêng, cookie admin, vào được /admin/me', async () => {
       const staff = await staffWebLogin('handoff-mod@example.com', 'moderator');
       const created = await createCode(staff.accessToken).expect(200);
@@ -297,7 +322,7 @@ describe('TF056: refresh token trong cookie cho web, admin', () => {
       expect(created.body).toEqual({ code: expect.any(String), expiresIn: 60 });
 
       const proof = await createTestBrowserProof();
-      const res = await http().post('/api/auth/admin-handoff/exchange').set(ADMIN)
+      const res = await http().post('/api/admin/auth/handoff/exchange').set(ADMIN)
         .set(await proof('login', ADMIN_ORIGIN)).send({ code: created.body.code }).expect(200);
       expect(res.body).toEqual({ accessToken: expect.any(String), tokenType: 'Bearer', expiresIn: 900 });
       const adminCookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;

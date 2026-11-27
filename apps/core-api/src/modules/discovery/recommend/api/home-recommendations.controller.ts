@@ -1,5 +1,6 @@
+import { Roles } from '@tripflix/auth';
 import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiOkResponse, ApiBearerAuth, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { HomeRecommendationUseCases } from '../application/home-recommendations.use-cases.js';
 import { MAX_RECENT_PLACES, type HomeReasonCode } from '../domain/home-picks.js';
@@ -61,11 +62,11 @@ export class HomeRecommendationsDto {
 
 /** Khối "Gợi ý dành cho bạn" trên trang chủ web. Công khai; không theo dõi người dùng ở server. */
 @ApiTags('discovery')
-@Controller('recommendations')
+@Controller()
 export class HomeRecommendationsController {
   constructor(@Inject(HomeRecommendationUseCases) private readonly recommendations: HomeRecommendationUseCases) {}
 
-  @Get('home')
+  @Get('recommendations/home')
   @ApiOperation({
     summary: 'Gợi ý điểm đến và khách sạn deal hời cho trang chủ web',
     description: [
@@ -90,5 +91,15 @@ export class HomeRecommendationsController {
       });
     }
     return { items: await this.recommendations.recommendForHome(parsed.data) };
+  }
+
+  @Get('admin/recommendations/home')
+  @Roles('moderator', 'superadmin')
+  @ApiBearerAuth()
+  @ApiQuery({ name: 'recentPlaceIds', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkResponse({ type: HomeRecommendationsDto })
+  monitorHomeRecommendations(@Query() query: Record<string, unknown>): Promise<HomeRecommendationsDto> {
+    return this.recommendForHome(query);
   }
 }

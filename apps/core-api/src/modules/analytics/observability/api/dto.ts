@@ -17,7 +17,11 @@ export const TraceQuerySchema = ObservabilityQuerySchema.extend({
     .transform((value) => value === 'true'),
   minDurationMs: z.coerce.number().int().min(0).max(3_600_000).default(0),
 });
-export type ObservabilityQuery = z.infer<typeof ObservabilityQuerySchema>;
+export const TRAFFIC_AUDIENCES = ['admin', 'user'] as const;
+export const OverviewQuerySchema = ObservabilityQuerySchema.extend({
+  audience: z.enum(TRAFFIC_AUDIENCES).optional(),
+});
+export type ObservabilityQuery = z.infer<typeof OverviewQuerySchema>;
 export type TraceQuery = z.infer<typeof TraceQuerySchema>;
 
 export class TelemetrySourceDto {

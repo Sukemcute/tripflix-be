@@ -278,6 +278,7 @@ export class AuthUseCases {
     },
     meta: RequestMeta,
     browserProof?: BrowserProof,
+    options?: { audience: 'admin' },
   ): Promise<TokenPair> {
     const { email, user } = await this.verifyPasswordCredentials(input, meta);
 
@@ -297,6 +298,9 @@ export class AuthUseCases {
 
     await this.limiter.reset(email);
     const browserKey = browserProof ? await this.authenticateBrowser(browserProof, 'login') : undefined;
+    if (options?.audience === 'admin' && !STAFF_ROLES.has(user.role)) {
+      throw new AccessError('forbidden', ADMIN_HANDOFF_FORBIDDEN_MESSAGE);
+    }
     const refreshToken = createRefreshToken(browserKey);
     const session = await this.openSession(
       user,
@@ -381,7 +385,12 @@ export class AuthUseCases {
     return verified.thumbprint;
   }
 
-  async refresh(refreshToken: string, meta: RequestMeta, browserProof?: BrowserProof): Promise<TokenPair> {
+  async refresh(
+    refreshToken: string,
+    meta: RequestMeta,
+    browserProof?: BrowserProof,
+    options?: { audience: 'admin' },
+  ): Promise<TokenPair> {
     const presented = hashRefreshToken(refreshToken);
     const session = await this.store.sessions.findByTokenHash(presented);
     if (!session) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
@@ -406,7 +415,9 @@ export class AuthUseCases {
     }
 
     const user = await this.store.users.findById(session.userId);
-    if (!user || user.status !== 'active') throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    if (!user || user.status !== 'active' || (options?.audience === 'admin' && !STAFF_ROLES.has(user.role))) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
 
     const next = createRefreshToken(browserKey);
     const hasRotated = await this.rotateSession(session, { presented, nextHash: hashRefreshToken(next), decision, now });

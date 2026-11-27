@@ -31,7 +31,12 @@ it.each([
   expect(JSON.stringify(span.setAttributes.mock.calls)).not.toContain('client.test');
 });
 
-it('records one bounded route metric and span without secrets, even when finish and close both fire', () => {
+it.each([
+  ['/api/v1/posts/:id/comment-permissions', 'user'],
+  ['/api/admin/search', 'admin'],
+  ['/api/analytics/observability', 'admin'],
+  ['/api/v1/internal/ai-summary/reconciliation', 'other'],
+])('records a bounded metric for %s with only one finish', (route, audience) => {
   const record = vi.fn();
   const span = {
     isRecording: () => true,
@@ -54,7 +59,7 @@ it('records one bounded route metric and span without secrets, even when finish 
     method: 'GET',
     url: '/api/users/private-id?token=query-secret',
     headers: { authorization: 'Bearer auth-secret' },
-    route: { path: '/api/users/:id' },
+    route: { path: route },
   };
   const next = vi.fn();
   createTelemetryMiddleware()(req as unknown as IncomingMessage, response as unknown as ServerResponse, next);
@@ -63,10 +68,11 @@ it('records one bounded route metric and span without secrets, even when finish 
   expect(next).toHaveBeenCalledOnce();
   expect(span.end).toHaveBeenCalledOnce();
   expect(record).toHaveBeenCalledOnce();
-  expect(span.updateName).toHaveBeenCalledWith('GET /api/users/:id');
+  expect(span.updateName).toHaveBeenCalledWith('GET ' + route);
   expect(record.mock.calls[0]?.[1]).toEqual({
     'http.request.method': 'GET',
-    'http.route': '/api/users/:id',
+    'http.route': route,
+    'tripflix.request.audience': audience,
     'http.response.status_code': 503,
   });
   expect(JSON.stringify(span.setAttributes.mock.calls)).not.toMatch(/private-id|query-secret|auth-secret/);
