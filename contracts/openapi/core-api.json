@@ -5228,6 +5228,32 @@
         "tags": [
           "Moderation - Admin"
         ]
+      },
+      "delete": {
+        "operationId": "AdminModerationKeywordRulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
       }
     },
     "/api/suggest": {

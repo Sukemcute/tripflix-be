@@ -1729,7 +1729,7 @@ describe('TF32 moderation: transaction Postgres thật', () => {
       cases.decide.execute(item!.id, { actorId: AUTHOR, action: 'hide', reasonCode: 'OTHER' }),
     ).rejects.toThrow(/đã được xử lý/);
   });
-  it('áp dụng từ khóa đã lưu khi quét, đưa vào hàng chờ và bỏ qua quy tắc đã tắt', async () => {
+  it('áp dụng từ khóa đã lưu khi quét và bỏ qua quy tắc đã tắt hoặc đã xóa', async () => {
     const rule = await cases.keywords.create({ keyword: 'Kiểm tra nội dung', enabled: true }, AUTHOR);
     await expect(cases.keywords.create({ keyword: 'kiem tra noi dung', enabled: true }, AUTHOR))
       .rejects.toMatchObject({ status: 409 });
@@ -1752,6 +1752,15 @@ describe('TF32 moderation: transaction Postgres thật', () => {
 
     await cases.keywords.update(rule.id, { enabled: false }, AUTHOR);
     expect(await cases.repository.pending(await scanComment())).toBeUndefined();
+
+    await cases.keywords.update(rule.id, { enabled: true }, AUTHOR);
+    await cases.keywords.remove(rule.id);
+    await cases.keywords.remove(rule.id);
+    expect(await cases.keywords.list()).not.toContainEqual(expect.objectContaining({ id: rule.id }));
+    expect(await cases.repository.pending(await scanComment())).toBeUndefined();
+    expect(await cases.repository.pending(flagged)).toBeDefined();
+    await expect(cases.keywords.create({ keyword: 'Ví dụ du lịch', enabled: true }, AUTHOR))
+      .resolves.toMatchObject({ keyword: 'Ví dụ du lịch' });
   });
 
   it('regex scam tự ẩn dù AI lỗi; event lặp chỉ xử lý một lần; bản sạch không tạo case', async () => {

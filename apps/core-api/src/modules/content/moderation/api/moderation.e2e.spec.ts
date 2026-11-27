@@ -79,6 +79,7 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     list: vi.fn().mockResolvedValue([keywordRule]),
     create: vi.fn().mockResolvedValue(keywordRule),
     update: vi.fn().mockResolvedValue({ ...keywordRule, enabled: false }),
+    remove: vi.fn().mockResolvedValue(undefined),
   };
   beforeAll(async () => {
     const ref = await Test.createTestingModule({
@@ -172,6 +173,21 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await http().patch(url + '/' + keywordRule.id).auth(tokens.superadmin!, auth)
       .set('Idempotency-Key', randomUUID()).send({ enabled: false }).expect(200);
     expect(keywordRules.update).toHaveBeenCalledWith(keywordRule.id, { enabled: false }, expect.any(String));
+  });
+  it('xóa quy tắc tùy chỉnh theo UUID, chỉ qua Superadmin và xử lý lặp an toàn', async () => {
+    const base = '/api/v1/admin/moderation/keyword-rules';
+    const url = `${base}/${keywordRule.id}`;
+    const auth = { type: 'bearer' } as const;
+    const key = randomUUID();
+    await http().delete(url).expect(401);
+    await http().delete(url).auth(tokens.moderator!, auth).set('Idempotency-Key', key).expect(403);
+    await http().delete(url).auth(tokens.superadmin!, auth).expect(400);
+    await http().delete(`${base}/built-in`).auth(tokens.superadmin!, auth)
+      .set('Idempotency-Key', key).expect(400);
+    await http().delete(url).auth(tokens.superadmin!, auth).set('Idempotency-Key', key).expect(204);
+    await http().delete(url).auth(tokens.superadmin!, auth).set('Idempotency-Key', key)
+      .expect('Idempotency-Replayed', 'true').expect(204);
+    expect(keywordRules.remove).toHaveBeenCalledExactlyOnceWith(keywordRule.id);
   });
   it('BE09: evidence and retry endpoints are staff-only and writes require idempotency', async () => {
     const id = randomUUID();
