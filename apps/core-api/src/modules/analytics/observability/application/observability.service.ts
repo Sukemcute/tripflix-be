@@ -128,10 +128,13 @@ export class ObservabilityService {
     } satisfies ObservabilityDto;
     const base = this.env.ANALYTICS_PROMETHEUS_URL;
     if (!base) return empty;
-    // Input is a restricted service name, still quote it before constructing selectors.
-    const filter = query.service ? `service_name=${JSON.stringify(query.service)}` : '';
-    const selector = `{${filter}}`;
-    const errors = `{${filter ? `${filter},` : ''}http_response_status_code=~"5.."}`;
+    const serviceFilters = query.service ? [`service_name=${JSON.stringify(query.service)}`] : [];
+    const requestFilters = query.audience
+      ? [...serviceFilters, `tripflix_request_audience=${JSON.stringify(query.audience)}`]
+      : serviceFilters;
+    const serviceSelector = `{${serviceFilters.join(',')}}`;
+    const selector = `{${requestFilters.join(',')}}`;
+    const errors = `{${[...requestFilters, 'http_response_status_code=~"5.."'].join(',')}}`;
     const window = `${RANGE_SECONDS[query.range]}s`;
     const metricsFor = (group: string) => [
       stat(`sum ${group}(increase(${HISTOGRAM}_count${selector}[${window}]))`, 'requests'),
@@ -146,13 +149,13 @@ export class ObservabilityService {
     ];
     const vectorQuery = [
       ...metricsFor('by (service_name)'),
-      stat(`max by (service_name)(tripflix_service_heartbeat${selector})`, 'heartbeat'),
+      stat(`max by (service_name)(tripflix_service_heartbeat${serviceSelector})`, 'heartbeat'),
       stat(
-        `sum by (service_name)(tripflix_process_memory_bytes${selector} and on (service_name,service_instance_id) (tripflix_service_heartbeat${selector} > time() - 60))`,
+        `sum by (service_name)(tripflix_process_memory_bytes${serviceSelector} and on (service_name,service_instance_id) (tripflix_service_heartbeat${serviceSelector} > time() - 60))`,
         'memory',
       ),
       stat(
-        `min by (service_name)(tripflix_process_uptime_seconds${selector} and on (service_name,service_instance_id) (tripflix_service_heartbeat${selector} > time() - 60))`,
+        `min by (service_name)(tripflix_process_uptime_seconds${serviceSelector} and on (service_name,service_instance_id) (tripflix_service_heartbeat${serviceSelector} > time() - 60))`,
         'uptime',
       ),
       // Global quantiles must use merged buckets, never averages of per-service quantiles.

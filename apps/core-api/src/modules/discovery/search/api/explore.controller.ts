@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OptionalAuthenticated, OptionalCurrentUser, type AuthUser } from '@tripflix/auth';
+import { OptionalAuthenticated, OptionalCurrentUser, Roles, type AuthUser } from '@tripflix/auth';
 import { ExploreUseCases } from '../application/explore.use-cases.js';
 import { SearchEventsPublisher } from '../application/search-events.publisher.js';
 import {
@@ -27,8 +27,7 @@ function invalidBody(issues: ReadonlyArray<{ path: PropertyKey[]; message: strin
  * Đăng nhập tuỳ chọn: có người dùng thì phát discovery.search.performed cho gợi ý (trang đầu, không await).
  */
 @ApiTags('discovery')
-@Controller('search')
-@OptionalAuthenticated()
+@Controller()
 @ApiBearerAuth()
 export class ExploreController {
   constructor(
@@ -36,7 +35,8 @@ export class ExploreController {
     @Inject(SearchEventsPublisher) private readonly searchEvents: SearchEventsPublisher,
   ) {}
 
-  @Post()
+  @Post('search')
+  @OptionalAuthenticated()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Tìm khám phá bằng câu tự nhiên, kết quả chia theo vùng (Ở đâu, Lộ trình, Bài viết, Video...)',
@@ -64,7 +64,8 @@ export class ExploreController {
     return page;
   }
 
-  @Post('posts')
+  @Post('search/posts')
+  @OptionalAuthenticated()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Tìm bài (lộ trình, video, bài viết) bằng câu tự nhiên, có phân trang',
@@ -94,7 +95,26 @@ export class ExploreController {
     return page;
   }
 
-  @Post('places')
+  @Post('admin/search')
+  @Roles('moderator', 'superadmin')
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: ExploreRequestDto })
+  @ApiOkResponse({ type: ExploreResponseDto })
+  monitorSearch(@Body() body: unknown): Promise<ExploreResponseDto> {
+    return this.search(body, undefined);
+  }
+
+  @Post('admin/search/posts')
+  @Roles('moderator', 'superadmin')
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: SearchPostsRequestDto })
+  @ApiOkResponse({ type: SearchPostsResponseDto })
+  monitorSearchPosts(@Body() body: unknown): Promise<SearchPostsResponseDto> {
+    return this.searchPosts(body, undefined);
+  }
+
+  @Post('search/places')
+  @OptionalAuthenticated()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Tìm một loại chỗ, điểm (khách sạn, điểm tham quan, quán ăn, quán nước) bằng câu tự nhiên, có phân trang',

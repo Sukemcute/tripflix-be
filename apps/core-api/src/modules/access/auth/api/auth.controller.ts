@@ -24,7 +24,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
+import { Authenticated, CurrentUser, Roles, type AuthUser } from '@tripflix/auth';
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { ADMIN_HANDOFF_FORBIDDEN_MESSAGE, AuthUseCases, type TokenPair } from '../application/auth.use-cases.js';
@@ -72,7 +72,7 @@ const WEB_CLIENT_API_HEADER = {
 };
 
 @ApiTags('auth')
-@Controller('auth')
+@Controller()
 @UseFilters(AccessErrorFilter)
 export class AuthController {
   constructor(
@@ -81,7 +81,7 @@ export class AuthController {
     @Inject(PasswordEncryption) private readonly passwords: PasswordEncryption,
   ) {}
 
-  @Post('registration-code')
+  @Post('auth/registration-code')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiBody({ type: RegistrationCodeDto })
   @ApiAcceptedResponse({ type: RegistrationCodeResultDto })
@@ -97,7 +97,7 @@ export class AuthController {
    * Khoá công khai để client mã hoá mật khẩu trước khi gửi (TF056). 503 khi server chưa có khoá:
    * client gửi mật khẩu thường (chỉ được khi chưa bật AUTH_PASSWORD_ENCRYPTION_REQUIRED).
    */
-  @Get('password-key')
+  @Get('auth/password-key')
   @Header('Cache-Control', 'no-store')
   @ApiOkResponse({ type: PasswordKeyDto })
   @ApiServiceUnavailableResponse({ description: PASSWORD_ENCRYPTION_UNAVAILABLE_MESSAGE })
@@ -107,7 +107,15 @@ export class AuthController {
     return key;
   }
 
-  @Post('register')
+  @Get('admin/auth/password-key')
+  @Header('Cache-Control', 'no-store')
+  @ApiOkResponse({ type: PasswordKeyDto })
+  @ApiServiceUnavailableResponse({ description: PASSWORD_ENCRYPTION_UNAVAILABLE_MESSAGE })
+  adminPasswordKey(): PasswordKeyDto {
+    return this.passwordKey();
+  }
+
+  @Post('auth/register')
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'register' }] })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({ type: UserDto })
@@ -116,7 +124,7 @@ export class AuthController {
     return this.auth.register(body, readRequestMeta(req));
   }
 
-  @Post('login-code')
+  @Post('auth/login-code')
   @HttpCode(HttpStatus.ACCEPTED)
   @Header('Cache-Control', 'no-store')
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
@@ -131,7 +139,7 @@ export class AuthController {
     return { loginChallengeId, resendAfterSeconds: REGISTRATION_CODE_COOLDOWN_SECONDS };
   }
 
-  @Post('login')
+  @Post('auth/login')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
@@ -152,11 +160,31 @@ export class AuthController {
     return isWeb ? this.toWebResponse(req, res, pair) : pair;
   }
 
+  @Post('admin/auth/login')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @EncryptedPasswords({ subjectField: 'email', fields: [{ encrypted: 'encPassword', plain: 'password', purpose: 'login' }] })
+  @ApiHeader({ ...WEB_CLIENT_API_HEADER, required: true })
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: true })
+  @ApiBody({ type: LoginDto })
+  @ApiOkResponse({ type: TokenPairDto })
+  @ApiForbiddenResponse({ description: ADMIN_HANDOFF_FORBIDDEN_MESSAGE })
+  async adminLogin(
+    @Body(new ZodBody(LoginRequestSchema)) body: z.infer<typeof LoginRequestSchema>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.web.assertTrustedOrigin(req);
+    if (!isWebClient(req)) throw new AccessError('forbidden', ADMIN_HANDOFF_FORBIDDEN_MESSAGE);
+    const pair = await this.auth.login(body, readRequestMeta(req), this.readBrowserProof(req), { audience: 'admin' });
+    return this.toWebResponse(req, res, pair);
+  }
+
   /**
    * Đăng nhập bằng Google: app, web gửi ID token lấy từ Google Sign-In. Lần đầu tạo member (hoặc liên kết vào
    * tài khoản trùng email), lần sau vào đúng tài khoản đó. Chế độ web (cookie) giống /auth/login.
    */
-  @Post('google')
+  @Post('auth/google')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
@@ -181,7 +209,7 @@ export class AuthController {
    * App mobile gửi refreshToken trong body. Web, admin để body trống: đọc cookie, bắt buộc Origin tin cậy.
    * Làm mới lỗi ở chế độ web thì xoá cookie để trình duyệt không gửi token hỏng nữa.
    */
-  @Post('refresh')
+  @Post('auth/refresh')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiHeader(WEB_CLIENT_API_HEADER)
@@ -194,6 +222,34 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    return this.refreshSession(body, req, res);
+  }
+
+  @Post('admin/auth/refresh')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ ...WEB_CLIENT_API_HEADER, required: true })
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: true })
+  @ApiOkResponse({ type: TokenPairDto })
+  @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
+  adminRefresh(
+    @Body(new ZodBody(RefreshRequestSchema)) body: z.infer<typeof RefreshRequestSchema>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.web.assertTrustedOrigin(req);
+    if (!isWebClient(req) || body.refreshToken !== undefined) {
+      throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
+    }
+    return this.refreshSession(body, req, res, { audience: 'admin' });
+  }
+
+  private async refreshSession(
+    body: z.infer<typeof RefreshRequestSchema>,
+    req: Request,
+    res: Response,
+    options?: { audience: 'admin' },
+  ) {
     const cookieToken = this.web.readRefreshToken(req);
     const isFromCookie = body.refreshToken === undefined && cookieToken !== undefined;
     const isWeb = isWebClient(req) || isFromCookie;
@@ -202,7 +258,7 @@ export class AuthController {
     const refreshToken = body.refreshToken ?? cookieToken;
     try {
       if (!refreshToken || (isWeb && !isFromCookie)) throw new AccessError('invalid_refresh', INVALID_REFRESH_MESSAGE);
-      const pair = await this.auth.refresh(refreshToken, readRequestMeta(req), isFromCookie ? this.readBrowserProof(req) : undefined);
+      const pair = await this.auth.refresh(refreshToken, readRequestMeta(req), isFromCookie ? this.readBrowserProof(req) : undefined, options);
       return isWeb ? this.toWebResponse(req, res, pair) : pair;
     } catch (err) {
       if (isWeb && err instanceof AccessError) this.web.clearRefreshCookie(res, req);
@@ -211,7 +267,7 @@ export class AuthController {
   }
 
   /** Web gọi khi nhân viên bấm "Mở trang quản trị": nhận mã một lần rồi chuyển sang admin kèm mã. */
-  @Post('admin-handoff')
+  @Post('auth/admin-handoff')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @Authenticated()
@@ -223,7 +279,7 @@ export class AuthController {
   }
 
   /** Trang quản trị đổi mã lấy phiên riêng (chế độ web, cookie), gắn với khoá trình duyệt của admin. */
-  @Post('admin-handoff/exchange')
+  @Post('auth/admin-handoff/exchange')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiHeader({ ...WEB_CLIENT_API_HEADER, required: true })
@@ -242,8 +298,24 @@ export class AuthController {
     return this.toWebResponse(req, res, pair);
   }
 
+  @Post('admin/auth/handoff/exchange')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ ...WEB_CLIENT_API_HEADER, required: true })
+  @ApiHeader({ name: BROWSER_PROOF_HEADER, required: true })
+  @ApiBody({ type: AdminHandoffExchangeDto })
+  @ApiOkResponse({ type: TokenPairDto })
+  @ApiForbiddenResponse({ description: UNTRUSTED_ORIGIN_MESSAGE })
+  adminExchangeHandoff(
+    @Body(new ZodBody(AdminHandoffExchangeRequestSchema)) body: z.infer<typeof AdminHandoffExchangeRequestSchema>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.exchangeAdminHandoff(body, req, res);
+  }
+
   /** Xoá phiên của access token; web có cookie thì xoá luôn cookie. */
-  @Post('logout')
+  @Post('auth/logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Authenticated()
   @ApiBearerAuth()
@@ -256,7 +328,19 @@ export class AuthController {
     if (isWebClient(req) || this.web.hasRefreshCookie(req)) this.web.clearRefreshCookie(res, req);
   }
 
-  @Get('me')
+  @Post('admin/auth/logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('moderator', 'superadmin')
+  @ApiBearerAuth()
+  async adminLogout(
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    return this.logout(user, req, res);
+  }
+
+  @Get('auth/me')
   @Authenticated()
   @Header('Cache-Control', 'no-store')
   @ApiBearerAuth()

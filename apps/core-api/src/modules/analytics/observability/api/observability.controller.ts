@@ -4,7 +4,8 @@ import { Roles } from '@tripflix/auth';
 import { ObservabilityService } from '../application/observability.service.js';
 import {
   ObservabilityDto,
-  ObservabilityQuerySchema,
+  OverviewQuerySchema,
+  TRAFFIC_AUDIENCES,
   TraceDetailDto,
   TraceListDto,
   TraceQuerySchema,
@@ -21,9 +22,10 @@ export class ObservabilityController {
   @Header('Cache-Control', 'no-store')
   @ApiQuery({ name: 'range', required: false, enum: ['15m', '1h', '6h', '24h'] })
   @ApiQuery({ name: 'service', required: false, type: String })
+  @ApiQuery({ name: 'audience', required: false, enum: [...TRAFFIC_AUDIENCES] })
   @ApiOkResponse({ type: ObservabilityDto })
   getOverview(@Query() raw: unknown): Promise<ObservabilityDto> {
-    const query = ObservabilityQuerySchema.safeParse(raw);
+    const query = OverviewQuerySchema.safeParse(raw);
     if (!query.success) throw new BadRequestException('Bộ lọc số liệu không hợp lệ');
     return this.service.getOverview(query.data);
   }

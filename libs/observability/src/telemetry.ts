@@ -97,6 +97,23 @@ function isSuccessfulCorsPreflight(req: IncomingMessage, res: ServerResponse, st
   return requestedHeaders.every((header) => allowedHeaders.includes(header) || (header !== 'authorization' && allowedHeaders.includes('*') && !allowsCredentials));
 }
 
+function requestAudience(route: string, method: string): 'admin' | 'user' | 'other' {
+  if (/^\/api\/(?:admin|v1\/admin|analytics)(?:\/|$)/.test(route) || route === '/api/auth/admin-handoff/exchange') {
+    return 'admin';
+  }
+  if (
+    /^\/api\/(?:v1\/)?internal(?:\/|$)/.test(route) ||
+    route === '/api/auth/service-token' ||
+    route === '/api/payments/vnpay/ipn' ||
+    route === '/api/v1/posts/:postId/comments/sample' ||
+    route === '/api/v1/posts/:postId/comment-stats' ||
+    (method === 'PUT' && /^\/api\/v1\/posts\/:postId\/ai-summary(?:\/|$)/.test(route))
+  ) {
+    return 'other';
+  }
+  return /^\/(?:api|notifications)(?:\/|$)/.test(route) ? 'user' : 'other';
+}
+
 export function createTelemetryMiddleware() {
   const tracer = trace.getTracer('tripflix-http');
   const duration = metrics
@@ -135,7 +152,10 @@ export function createTelemetryMiddleware() {
       span.updateName(isSuccessfulCorsPreflight(req, res, status) ? SUCCESSFUL_CORS_PREFLIGHT_SPAN_NAME : `${method} ${route}`);
       span.setAttributes(attributes);
       if (status >= 500 || status === 499) span.setStatus({ code: SpanStatusCode.ERROR });
-      duration.record((performance.now() - start) / 1000, attributes, active);
+      duration.record((performance.now() - start) / 1000, {
+        ...attributes,
+        'tripflix.request.audience': requestAudience(route, method),
+      }, active);
       span.end();
     };
     res.once('finish', context.bind(active, finish));

@@ -112,6 +112,24 @@ it('merges histogram buckets server-side, normalizes nonfinite samples, keeps ga
   expect(request.searchParams.get('query')).toContain('service_name="core-api"');
 });
 
+it('filters request metrics and keeps process health independent of audience', async () => {
+  const fetch = vi.fn(async (_input: URL) => response([]));
+  vi.stubGlobal('fetch', fetch);
+  const service = new ObservabilityService(env);
+  for (const audience of ['admin', 'user'] as const) {
+    fetch.mockClear();
+    await service.getOverview({ range: '15m', service: 'core-api', audience });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const queries = fetch.mock.calls.map(([input]) => input.searchParams.get('query') ?? '');
+    for (const query of queries) {
+      expect(query).toContain('tripflix_request_audience="' + audience + '"');
+    }
+    expect(queries[0]).toContain('tripflix_service_heartbeat{service_name="core-api"}');
+    expect(queries[0]).toContain('http_response_status_code=~"5.."');
+    expect(queries[0]).toContain('histogram_quantile(0.95');
+  }
+});
+
 it('does not expose upstream failure details or replace failures with zero', async () => {
   vi.stubGlobal(
     'fetch',

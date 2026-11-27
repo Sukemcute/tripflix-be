@@ -70,6 +70,30 @@
         ]
       }
     },
+    "/api/admin/auth/password-key": {
+      "get": {
+        "operationId": "AuthController_adminPasswordKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordKeyDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Máy chủ chưa bật mã hoá mật khẩu"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -197,6 +221,61 @@
         ]
       }
     },
+    "/api/admin/auth/login": {
+      "post": {
+        "operationId": "AuthController_adminLogin",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tài khoản không có quyền vào trang quản trị"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/google": {
       "post": {
         "operationId": "AuthController_loginWithGoogle",
@@ -315,6 +394,51 @@
         ]
       }
     },
+    "/api/admin/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_adminRefresh",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/admin-handoff": {
       "post": {
         "operationId": "AuthController_createAdminHandoff",
@@ -400,9 +524,83 @@
         ]
       }
     },
+    "/api/admin/auth/handoff/exchange": {
+      "post": {
+        "operationId": "AuthController_adminExchangeHandoff",
+        "parameters": [
+          {
+            "name": "X-Tripflix-Session-Proof",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tripflix-Client",
+            "in": "header",
+            "description": "Web, admin gửi \"web\": refresh token đặt vào cookie tripflix_refresh, không trả trong body. Cần Origin nằm trong AUTH_WEB_ORIGINS",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminHandoffExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Nguồn gửi request không được phép"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/admin/auth/logout": {
+      "post": {
+        "operationId": "AuthController_adminLogout",
         "parameters": [],
         "responses": {
           "204": {
@@ -5227,6 +5425,78 @@
         ]
       }
     },
+    "/api/admin/search": {
+      "post": {
+        "operationId": "ExploreController_monitorSearch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/admin/search/posts": {
+      "post": {
+        "operationId": "ExploreController_monitorSearchPosts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPostsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPostsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/api/search/places": {
       "post": {
         "description": "Cho các tab riêng của trang tìm web Cảm hứng. Công khai. Cùng bộ hiểu câu và chỉ mục với `POST /api/search`.\n\n- `kind`: `stay` (khách sạn đặt được, `refId` là mã khách sạn), `see`, `food`, `cafe` (địa điểm ngoài Tripflix từ OpenStreetMap, không đặt được, có `location`).\n- Có điểm OpenStreetMap thì `attribution` khác null và phải hiện kèm danh sách.\n- Phân trang, `isFallback`, `dropped`, `fallbackRelaxed` như `POST /api/search/posts`.",
@@ -5308,6 +5578,47 @@
           }
         },
         "summary": "Gợi ý điểm đến và khách sạn deal hời cho trang chủ web",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/api/admin/recommendations/home": {
+      "get": {
+        "operationId": "HomeRecommendationsController_monitorHomeRecommendations",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "recentPlaceIds",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeRecommendationsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "discovery"
         ]
@@ -7176,6 +7487,18 @@
       "get": {
         "operationId": "ObservabilityController_getOverview",
         "parameters": [
+          {
+            "name": "audience",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "admin",
+                "user"
+              ],
+              "type": "string"
+            }
+          },
           {
             "name": "service",
             "required": false,
