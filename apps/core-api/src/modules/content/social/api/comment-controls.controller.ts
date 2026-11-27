@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseFilters } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -14,6 +14,7 @@ import { CommentControlsUseCases } from '../application/comment-controls.use-cas
 import { normalizeCommentKeyword } from '../domain/comment-filter.js';
 import { ZodBody } from './http.js';
 import { CommentMentionDto } from './dto/comment.dto.js';
+import { SocialErrorFilter } from './social-error.filter.js';
 
 export class CommentSettingsDto {
   @ApiProperty() enabled!: boolean;
@@ -84,6 +85,7 @@ const settingsSchema = z
 
 @ApiTags('Social - Comment Controls')
 @Controller('v1')
+@UseFilters(SocialErrorFilter)
 export class CommentControlsController {
   constructor(private readonly controls: CommentControlsUseCases) {}
 
