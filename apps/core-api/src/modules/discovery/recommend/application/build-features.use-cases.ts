@@ -7,10 +7,13 @@ import { groupBy } from '../domain/group-by.js';
 import { placeIdOfPost } from '../domain/place-of-post.js';
 import { resolveAlgo } from '../domain/registry.js';
 import { CAPTION_MODEL } from '../domain/topics.js';
+import { InProcessPostBuildRunner } from './post-build-runner.js';
 import {
+  POST_BUILD_RUNNER,
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
   TEXT_EMBEDDER,
+  type PostBuildRunner,
   type RecommendCatalog,
   type RecommendPostRow,
   type RecommendSourcePost,
@@ -87,6 +90,7 @@ export class BuildFeaturesUseCases {
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
     @Inject(RECOMMEND_CATALOG) private readonly catalog: RecommendCatalog,
     @Optional() @Inject(TEXT_EMBEDDER) private readonly embedder?: TextEmbedder,
+    @Optional() @Inject(POST_BUILD_RUNNER) private readonly postRunner: PostBuildRunner = new InProcessPostBuildRunner(),
   ) {}
 
   /**
@@ -144,12 +148,15 @@ export class BuildFeaturesUseCases {
     }
   }
 
-  /** null = worker khác đang chạy hoặc content tạm rỗng, bỏ lượt. */
-  runCycle(now = new Date(), budgetMs = BUILD_BUDGET_MS): Promise<BuildCycleResult | null> {
-    return this.store.withLock(LOCK, () => this.build(now, Date.now() + budgetMs)).then((r) => r ?? null);
+  /**
+   * null = worker khác đang chạy hoặc content tạm rỗng, bỏ lượt. `signal` (admin dừng khẩn cấp) được kiểm trước mỗi bước ghi
+   * và giữa các lô người dùng; post builder đang tính trong worker_thread thì bị cắt ngay. Phần đã ghi trước đó giữ nguyên.
+   */
+  runCycle(now = new Date(), budgetMs = BUILD_BUDGET_MS, signal?: AbortSignal): Promise<BuildCycleResult | null> {
+    return this.store.withLock(LOCK, () => this.build(now, Date.now() + budgetMs, signal)).then((r) => r ?? null);
   }
 
-  private async build(now: Date, deadline: number): Promise<BuildCycleResult | null> {
+  private async build(now: Date, deadline: number, signal?: AbortSignal): Promise<BuildCycleResult | null> {
     const [sourcePosts, hotels] = await Promise.all([
       readAll((c) => this.catalog.listPosts(c)),
       readAll((c) => this.catalog.listHotelProvinces(c)),
@@ -181,6 +188,7 @@ export class BuildFeaturesUseCases {
         publishedAt: p.createdAt,
       };
     });
+    signal?.throwIfAborted();
     if (!(await this.store.replacePosts(posts))) {
       this.logger.warn('listPosts trả 0 bài (content tạm rỗng?), giữ dữ liệu gợi ý cũ, bỏ lượt');
       return null;
@@ -214,16 +222,22 @@ export class BuildFeaturesUseCases {
       ...(samples ? { interactionSamples: samples.get(p.postId) ?? [] } : {}),
       content: contentById.get(p.postId),
     }));
-    for (const builder of postBuilders) {
-      await this.runBuilder(builder.key, now, failedBuilders, async () => {
-        const out = await builder.build(items, now);
-        for (const o of out) builder.featuresSchema.parse(o.features);
-        const postType = new Map(posts.map((p) => [p.postId, p.postType]));
-        await this.store.replacePostScores(
-          builder.key,
-          out.filter((o) => postType.has(o.postId)).map((o) => ({ ...o, postType: postType.get(o.postId)! })),
-        );
-      });
+    signal?.throwIfAborted();
+    const postType = new Map(posts.map((p) => [p.postId, p.postType]));
+    const session = await this.postRunner.open(items, now, signal);
+    try {
+      for (const builder of postBuilders) {
+        await this.runBuilder(builder.key, now, failedBuilders, signal, async () => {
+          const out = await session.build(builder);
+          signal?.throwIfAborted();
+          await this.store.replacePostScores(
+            builder.key,
+            out.filter((o) => postType.has(o.postId)).map((o) => ({ ...o, postType: postType.get(o.postId)! })),
+          );
+        });
+      }
+    } finally {
+      await session.close();
     }
 
     const userIds = await this.store.listActiveUserIds(now);
@@ -235,8 +249,9 @@ export class BuildFeaturesUseCases {
     );
     const productPlaces = Object.fromEntries(hotelProvinces);
     for (const builder of userBuilders) {
-      await this.runBuilder(builder.key, now, failedBuilders, async () => {
+      await this.runBuilder(builder.key, now, failedBuilders, signal, async () => {
         for (let i = 0; i < userIds.length; i += USER_BATCH) {
+          signal?.throwIfAborted();
           if (Date.now() > deadline) {
             throw new Error(`Quá ngân sách thời gian của lượt, mới tính ${i}/${userIds.length} người; phần còn lại giữ đặc trưng cũ`);
           }
@@ -276,13 +291,15 @@ export class BuildFeaturesUseCases {
     return { postBuilders: [...postBuilders.values()], userBuilders: [...userBuilders.values()] };
   }
 
-  private async runBuilder(key: string, now: Date, failed: string[], run: () => Promise<void>): Promise<void> {
+  private async runBuilder(key: string, now: Date, failed: string[], signal: AbortSignal | undefined, run: () => Promise<void>): Promise<void> {
     const startedAt = Date.now();
     try {
       await run();
       await this.store.setJobState(key, { lastRunAt: now, lastError: null });
       this.logger.log(`Builder ${key}: ${Date.now() - startedAt} ms`);
     } catch (error) {
+      // Admin dừng khẩn cấp: dừng cả lượt, không chạy tiếp builder khác; báo lý do dừng thay vì lỗi phụ do bị cắt ngang.
+      if (signal?.aborted) throw signal.reason;
       // Giữ dữ liệu cũ của builder này (replacePostScores chạy trong transaction), chạy tiếp builder khác.
       failed.push(key);
       const message = (error as Error).message;

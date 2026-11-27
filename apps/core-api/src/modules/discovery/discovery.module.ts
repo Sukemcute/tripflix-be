@@ -21,6 +21,7 @@ import {
   PRODUCT_FEATURE_STORE,
   PRODUCT_PROFILE_CATALOG,
   INGEST_QUOTA,
+  POST_BUILD_RUNNER,
   RECOMMEND_TUNING,
   RECENT_POSTS_STORE,
   RECOMMEND_CATALOG,
@@ -38,6 +39,8 @@ import { AiEmbeddingClient } from './recommend/infra/ai-embedding.client.js';
 import { DrizzleRecommendStore } from './recommend/infra/drizzle-recommend.store.js';
 import { RedisIngestQuota } from './recommend/infra/redis-ingest-quota.store.js';
 import { RedisRecommendTuning } from './recommend/infra/redis-recommend-tuning.store.js';
+import { ThreadPostBuildRunner } from './recommend/infra/thread-post-build-runner.js';
+import { InProcessPostBuildRunner } from './recommend/application/post-build-runner.js';
 import { RedisRecentPostsStore } from './recommend/infra/redis-recent-posts.store.js';
 import { RedisServedStore } from './recommend/infra/redis-served.store.js';
 import { TypesenseTasteRetrieval } from './recommend/infra/typesense-taste.retrieval.js';
@@ -224,6 +227,12 @@ const productProfileCatalog = (commerce: CommerceFacade): ProductProfileCatalog 
     { provide: RECENT_POSTS_STORE, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecentPostsStore(redis) },
     { provide: INGEST_QUOTA, inject: [REDIS], useFactory: (redis: Redis) => new RedisIngestQuota(redis) },
     { provide: RECOMMEND_TUNING, inject: [REDIS], useFactory: (redis: Redis) => new RedisRecommendTuning(redis) },
+    {
+      // Vitest không nạp được file worker .ts: test chạy builder trong process.
+      provide: POST_BUILD_RUNNER,
+      inject: [CORE_ENV],
+      useFactory: (env: CoreEnv) => (env.NODE_ENV === 'test' ? new InProcessPostBuildRunner() : new ThreadPostBuildRunner()),
+    },
     {
       provide: TEXT_EMBEDDER,
       inject: [CORE_ENV],

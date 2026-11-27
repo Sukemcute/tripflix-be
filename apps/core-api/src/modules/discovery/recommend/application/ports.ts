@@ -1,4 +1,4 @@
-import type { Candidate, CandidateSource, Kind, ProductBuildOutput, ProductType, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
+import type { Candidate, CandidateSource, Kind, ProductBuildOutput, ProductType, PostBuilder, PostBuildItem, PostBuildOutput, PostInteractionSample, PostMeta, RawRow, UserBuildOutput } from '../domain/contracts.js';
 import type { OrderCancellation } from '../domain/ingest/to-raw-rows.js';
 import type { AlgoRow } from '../domain/registry.js';
 
@@ -6,6 +6,22 @@ export const RECOMMEND_STORE = Symbol('RECOMMEND_STORE');
 export const RECOMMEND_CATALOG = Symbol('RECOMMEND_CATALOG');
 export const TEXT_EMBEDDER = Symbol('TEXT_EMBEDDER');
 export const TASTE_RETRIEVAL = Symbol('TASTE_RETRIEVAL');
+export const POST_BUILD_RUNNER = Symbol('POST_BUILD_RUNNER');
+
+/**
+ * Chạy post builder (vòng lặp CPU trên mọi bài, post_profile@v1 ~3 giây với 41k bài). Thật: worker_thread, để event loop
+ * vẫn trả lời API và admin dừng khẩn cấp được ngay giữa lúc tính. Test: chạy trong process.
+ */
+export interface PostBuildRunner {
+  /** Gửi bài sang nơi chạy một lần cho cả lượt; signal bị huỷ thì dừng ngay, lời gọi đang chờ bị từ chối. */
+  open(items: PostBuildItem[], now: Date, signal?: AbortSignal): Promise<PostBuildSession>;
+}
+
+export interface PostBuildSession {
+  /** Điểm của builder đã kiểm featuresSchema. */
+  build(builder: PostBuilder): Promise<PostBuildOutput[]>;
+  close(): Promise<void>;
+}
 
 export interface TasteQuery {
   /** Mã nơi người xem thích nhất (vd 'da-lat'), nặng trước. */
