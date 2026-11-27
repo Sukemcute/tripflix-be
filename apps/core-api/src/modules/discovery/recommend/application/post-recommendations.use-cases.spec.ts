@@ -1,7 +1,7 @@
 import type { TasteRetrieval } from './ports.js';
 import type { Candidate, RawRow } from '../domain/contracts.js';
 import type { AlgoRow } from '../domain/registry.js';
-import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, ServedStore } from './ports.js';
+import type { CandidateQuery, RecentPostsStore, RecommendCatalog, RecommendStore, RecommendTuning, ServedStore } from './ports.js';
 import { InvalidRecommendCursorError, PostRecommendationUseCases, ReelsFeedNotWiredError } from './post-recommendations.use-cases.js';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
@@ -25,7 +25,7 @@ const ALGOS: AlgoRow[] = [
 ];
 
 /** 30 bài hot (h00 điểm cao nhất), bài Đà Lạt d1 điểm thấp, bài mới f1, pool explore e00..e09. */
-function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[]; viewerRows?: RawRow[]; taste?: TasteRetrieval } = {}) {
+function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?: string[]; viewerRows?: RawRow[]; taste?: TasteRetrieval; tuning?: RecommendTuning } = {}) {
   const hot = Array.from({ length: 30 }, (_, i) => cand(`h${String(i).padStart(2, '0')}`, { score: 1 - i / 100 }));
   hot.push(cand('d1', { score: 0.1, tags: ['dalat'], placeId: 'da-lat' }));
   hot.push(cand('b1', { score: 0.05, tags: ['beach', 'bien', 'nhatrang'], placeId: 'nha-trang', postFeatures: { bins: { 'place:nha-trang': 1 } } }));
@@ -71,7 +71,7 @@ function setup(opts: { algos?: AlgoRow[]; served?: Partial<ServedStore>; hidden?
       ids.filter((id) => !opts.hidden?.includes(id)).map((id) => ({ id, postType: 'video', title: id, hashtags: [], coverMediaId: null, authorId: 'a', reactionTotal: 0 })),
     ),
   };
-  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served, recent, opts.taste);
+  const useCases = new PostRecommendationUseCases(store as unknown as RecommendStore, catalog as unknown as RecommendCatalog, served, recent, opts.taste, opts.tuning);
   return { useCases, store, servedList, servedAdd, seenAt, catalog, recentAt };
 }
 
@@ -87,6 +87,55 @@ const query = (over: Partial<Parameters<PostRecommendationUseCases['recommend']>
 const ids = (page: { items: Array<{ post: { id: string } }> }) => page.items.map((i) => i.post.id);
 
 describe('PostRecommendationUseCases', () => {
+  describe('số ứng viên admin đặt (trip_v1)', () => {
+    const TRIP: AlgoRow[] = [{ name: 'for_you', postBuilder: 'post_profile@v1', userBuilder: 'trip_profile@v1', ranker: 'trip_v1' }, ALGOS[1]!];
+    const tuning = (value: number | null | Error) => ({
+      getCandidateLimit: vi.fn(async () => {
+        if (value instanceof Error) throw value;
+        return value;
+      }),
+      setCandidateLimit: vi.fn(async () => undefined),
+    });
+
+    it('đọc ứng viên hot theo số admin đặt, admin xem được mặc định và thời gian dựng phiên', async () => {
+      const t = tuning(2000);
+      const { useCases, store } = setup({ algos: TRIP, tuning: t });
+      await useCases.recommend(query());
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 2000 }));
+      const info = await useCases.describeCandidateLimit();
+      expect(info).toMatchObject({ ranker: 'trip_v1', limit: 2000, isOverridden: true, min: 200, max: 5000 });
+      expect(info.defaultLimit).toBeGreaterThan(0);
+      expect(info.rankTiming.samples).toBe(1);
+      expect(info.rankTiming.p50Ms).not.toBeNull();
+    });
+
+    it.each([null, 50, 99_999, new Error('redis down')])('không đặt / ngoài khoảng / Redis lỗi (%s): dùng mặc định của ranker', async (value) => {
+      const { useCases, store } = setup({ algos: TRIP, tuning: tuning(value) });
+      await useCases.recommend(query());
+      const info = await useCases.describeCandidateLimit();
+      expect(info.isOverridden).toBe(false);
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: info.defaultLimit }));
+    });
+
+    it('đặt mới: ghi Redis, đọc lại ngay (không chờ cache 1 phút)', async () => {
+      const t = tuning(null);
+      const { useCases, store } = setup({ algos: TRIP, tuning: t });
+      await useCases.recommend(query());
+      t.getCandidateLimit.mockResolvedValue(1500);
+      await useCases.setCandidateLimit(1500);
+      expect(t.setCandidateLimit).toHaveBeenCalledWith(1500);
+      await useCases.recommend(query({ fresh: true }));
+      expect(store.listHotCandidates).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 1500 }));
+    });
+
+    it('ranker không đọc nhiều bài (tag_affinity_v0): không chỉnh, vẫn lấy 150 bài hot', async () => {
+      const { useCases, store } = setup({ tuning: tuning(2000) });
+      await useCases.recommend(query());
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 150 }));
+      expect(await useCases.describeCandidateLimit()).toMatchObject({ limit: null, defaultLimit: null, isOverridden: false });
+    });
+  });
+
   it('ranker v1 (trip_v1): đọc toàn bộ bài, đưa dòng thô người xem vào ranker; vừa tìm Nha Trang thì bài Nha Trang lên đầu', async () => {
     const search = (i: number): RawRow => ({
       actorType: 'user', actorId: U, kind: 'search', refId: `s${i}`, targetType: 'place', targetId: 'nha-trang',

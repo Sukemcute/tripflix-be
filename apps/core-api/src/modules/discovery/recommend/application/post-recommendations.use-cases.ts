@@ -12,6 +12,7 @@ import {
   RECENT_POSTS_STORE,
   RECOMMEND_CATALOG,
   RECOMMEND_STORE,
+  RECOMMEND_TUNING,
   SERVED_STORE,
   TASTE_RETRIEVAL,
   type RecommendCardPost,
@@ -19,6 +20,7 @@ import {
   type RecentPostsStore,
   type RecommendCatalog,
   type RecommendStore,
+  type RecommendTuning,
   type ServedStore,
   type TasteRetrieval,
 } from './ports.js';
@@ -49,6 +51,12 @@ const RANKED_SESSION_CACHE_MS = 5 * 60_000;
 const RANKED_SESSION_CACHE_MAX = 500;
 /** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 5.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
 const RANKED_SESSION_CACHE_ITEMS = 300;
+/** Khoảng admin được đặt số ứng viên hot cho ranker đọc nhiều bài (trip_v1). Đo 27/11: dưới 1.000 điểm top 10 bắt đầu tụt. */
+export const CANDIDATE_LIMIT_RANGE = { min: 200, max: 5000 } as const;
+/** Đọc lại số ứng viên admin đặt sau chừng này; đổi ở admin có hiệu lực trong vòng 1 phút. */
+const TUNING_CACHE_MS = 60_000;
+/** Giữ thời gian dựng phiên của chừng này lượt gần nhất (mỗi process) để admin theo dõi. */
+const RANK_TIMING_SAMPLES = 200;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
 
@@ -178,6 +186,9 @@ export class PostRecommendationUseCases {
   private algoCache: { at: number; rows: Map<string, AlgoRow> } | null = null;
   private placeProfileCache: { at: number; profiles: Map<string, Record<string, number>> } | null = null;
   private readonly rankedSessions = new Map<string, RankedSession & { at: number }>();
+  private tuningCache: { at: number; limit: number | null } | null = null;
+  /** Thời gian dựng phiên (đọc ứng viên + xếp) của ranker đọc nhiều bài, mới nhất cuối. */
+  private readonly rankTimingsMs: number[] = [];
 
   constructor(
     @Inject(RECOMMEND_STORE) private readonly store: RecommendStore,
@@ -185,7 +196,34 @@ export class PostRecommendationUseCases {
     @Inject(SERVED_STORE) private readonly served: ServedStore,
     @Inject(RECENT_POSTS_STORE) private readonly recentPosts: RecentPostsStore,
     @Optional() @Inject(TASTE_RETRIEVAL) private readonly tasteRetrieval?: TasteRetrieval,
+    @Optional() @Inject(RECOMMEND_TUNING) private readonly tuning?: RecommendTuning,
   ) {}
+
+  /** Admin: số ứng viên hot của for_you đang dùng, mặc định trong code, và thời gian dựng phiên gần đây trên process này. */
+  async describeCandidateLimit(): Promise<CandidateLimitInfo> {
+    const algo = await this.loadAlgo('for_you');
+    const defaultLimit = algo.ranker.candidateLimit ?? null;
+    this.tuningCache = null;
+    const tuned = await this.tunedCandidateLimit();
+    return {
+      algo: algo.name,
+      ranker: algo.ranker.name,
+      limit: defaultLimit === null ? null : (tuned ?? defaultLimit),
+      defaultLimit,
+      isOverridden: defaultLimit !== null && tuned !== null,
+      ...CANDIDATE_LIMIT_RANGE,
+      rankTiming: summarizeTimings(this.rankTimingsMs),
+    };
+  }
+
+  /** Admin đặt số ứng viên (null = về mặc định). Có hiệu lực ngay trên process này, process khác trong vòng 1 phút. */
+  async setCandidateLimit(limit: number | null): Promise<void> {
+    if (!this.tuning) throw new Error('Chưa cấu hình nơi lưu tham số gợi ý (RECOMMEND_TUNING)');
+    await this.tuning.setCandidateLimit(limit);
+    this.tuningCache = null;
+    this.rankTimingsMs.length = 0;
+  }
+
 
   async recommend(q: PostRecommendationQuery): Promise<PostRecommendationPage> {
     const now = q.now ?? new Date();
@@ -349,7 +387,7 @@ export class PostRecommendationUseCases {
     // Trang đầu (cả khi tải lại) luôn xếp mới; trang sau của cùng phiên đọc lại kết quả đó.
     const cached = cursor ? this.readRankedSession(sessionKey, offset + q.limit) : null;
     const { rankedOnly, reserved, rankedTotal } =
-      cached ?? this.writeRankedSession(sessionKey, await this.rankSession(q, { algo, hasPlanOnly, seenUntil, sessionAt, now }));
+      cached ?? this.writeRankedSession(sessionKey, await this.timedRankSession(q, { algo, hasPlanOnly, seenUntil, sessionAt, now }));
     const explore = reserved.slice(page * slots, (page + 1) * slots);
     // Kho explore thiếu (ít bài, mọi bài đã là ứng viên hot) thì lấp chỗ trống bằng bài đã xếp hạng.
     const rankedTake = rankedOnly.slice(offset, offset + q.limit - explore.length);
@@ -388,10 +426,35 @@ export class PostRecommendationUseCases {
     return session;
   }
 
+  private async timedRankSession(q: PostRecommendationQuery, opts: RankSessionOptions) {
+    const startedAt = performance.now();
+    const ranked = await this.rankSession(q, opts);
+    if (opts.algo.ranker.candidateLimit) {
+      this.rankTimingsMs.push(performance.now() - startedAt);
+      if (this.rankTimingsMs.length > RANK_TIMING_SAMPLES) this.rankTimingsMs.shift();
+    }
+    return ranked;
+  }
+
+  /** Số ứng viên admin đặt, cache 1 phút. Redis lỗi hoặc giá trị ngoài khoảng: dùng mặc định trong code. */
+  private async tunedCandidateLimit(): Promise<number | null> {
+    if (!this.tuning) return null;
+    if (this.tuningCache && Date.now() - this.tuningCache.at < TUNING_CACHE_MS) return this.tuningCache.limit;
+    let limit: number | null = null;
+    try {
+      const value = await this.tuning.getCandidateLimit();
+      limit = value !== null && value >= CANDIDATE_LIMIT_RANGE.min && value <= CANDIDATE_LIMIT_RANGE.max ? value : null;
+    } catch (err) {
+      this.logger.warn({ err }, 'Đọc số ứng viên admin đặt lỗi (Redis), dùng mặc định');
+    }
+    this.tuningCache = { at: Date.now(), limit };
+    return limit;
+  }
+
   /** Xếp hạng cả phiên: ứng viên, ranker, chính sách theo người xem, tập bài khám phá giữ trước. */
   private async rankSession(
     q: PostRecommendationQuery,
-    { algo, hasPlanOnly, seenUntil, sessionAt, now }: { algo: ResolvedAlgo; hasPlanOnly: boolean; seenUntil: number; sessionAt: number; now: Date },
+    { algo, hasPlanOnly, seenUntil, sessionAt, now }: RankSessionOptions,
   ): Promise<{ rankedOnly: RankedItem[]; reserved: RankedItem[] }> {
     // Mọi tín hiệu người xem chốt theo trang đầu (sessionAt): tương tác giữa phiên không làm trang sau xô lệch.
     const [interacted, seenIds, longTaste, recent, rawOwnRecent] = q.userId
@@ -429,7 +492,7 @@ export class PostRecommendationUseCases {
     // Nguồn gu chỉ BỔ SUNG ứng viên, không thay hot: gu dài hạn không gồm "đang tìm hiểu / sắp đi" (live-answers, trọng số
     // lớn nhất ở trip_v1). Giảm hot chỉ khi nguồn gu gồm cả tín hiệu đó và đã đo trên người dùng thật.
     const readsAll = Boolean(algo.ranker.candidateLimit);
-    const hotLimit = algo.ranker.candidateLimit ?? HOT_LIMIT;
+    const hotLimit = readsAll ? ((await this.tunedCandidateLimit()) ?? algo.ranker.candidateLimit!) : HOT_LIMIT;
     const [hot, fresh, rawExplorePool, viewer, tasteIds] = await Promise.all([
       this.store.listHotCandidates({ ...base, limit: hotLimit }),
       this.store.listFreshCandidates({ ...base, limit: FRESH_LIMIT, hours: FRESH_HOURS }),
@@ -655,4 +718,31 @@ export class PostRecommendationUseCases {
       this.logger.warn({ err }, 'Ghi bài đã phục vụ lỗi (Redis)');
     }
   }
+}
+
+interface RankSessionOptions {
+  algo: ResolvedAlgo;
+  hasPlanOnly: boolean;
+  seenUntil: number;
+  sessionAt: number;
+  now: Date;
+}
+
+export interface CandidateLimitInfo {
+  algo: string;
+  ranker: string;
+  /** Số ứng viên hot đang dùng; null khi ranker của for_you không đọc nhiều bài (không chỉnh được). */
+  limit: number | null;
+  defaultLimit: number | null;
+  isOverridden: boolean;
+  min: number;
+  max: number;
+  rankTiming: { samples: number; p50Ms: number | null; p95Ms: number | null };
+}
+
+function summarizeTimings(timingsMs: number[]): CandidateLimitInfo['rankTiming'] {
+  if (timingsMs.length === 0) return { samples: 0, p50Ms: null, p95Ms: null };
+  const sorted = [...timingsMs].sort((a, b) => a - b);
+  const at = (p: number) => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]!);
+  return { samples: sorted.length, p50Ms: at(0.5), p95Ms: at(0.95) };
 }
