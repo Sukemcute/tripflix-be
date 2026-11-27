@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Controller, Get, UseFilters, type INestApplication } from '@nestjs/common';
+import { BadRequestException, Controller, Get, UseFilters, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -30,6 +30,16 @@ class ErrorController {
   @Get('invalid-comment-body') invalidCommentBody() {
     throw new InvalidCommentBodyException('Nội dung bình luận không được vượt quá 2,000 ký tự');
   }
+  @Get('pool-timeout') poolTimeout() {
+    // Drizzle bọc lỗi của pg trong cause, như khi chờ mượn kết nối pool quá connectionTimeoutMillis.
+    throw new Error('Failed query', { cause: new Error('timeout exceeded when trying to connect') });
+  }
+  @Get('bad-request') badRequest() {
+    throw new BadRequestException('Thiếu nội dung');
+  }
+  @Get('bug') bug() {
+    throw new Error('lỗi code');
+  }
 }
 let app: INestApplication;
 beforeAll(async () => {
@@ -58,4 +68,13 @@ it('returns 400 for invalid comment body instead of 500', async () => {
     statusCode: 400,
     message: expect.stringContaining('2,000 ký tự'),
   });
+});
+it('returns 503 with Retry-After when the database pool times out under load', async () => {
+  const res = await request(app.getHttpServer()).get('/social-errors/pool-timeout').expect(503);
+  expect(res.headers['retry-after']).toBe('5');
+  expect(res.body).toMatchObject({ statusCode: 503, reason: 'SERVICE_UNAVAILABLE' });
+});
+it('leaves HTTP exceptions and code bugs to Nest as before', async () => {
+  await request(app.getHttpServer()).get('/social-errors/bad-request').expect(400);
+  await request(app.getHttpServer()).get('/social-errors/bug').expect(500);
 });
