@@ -1,6 +1,6 @@
 # TF28 — Dừng khẩn cấp job discovery, tính điểm bài trong worker_thread
 
-- Notion: TF28 · Nhánh: `duy/TF28-dung-khan-cap-job` (phụ thuộc PR #346) · Người làm: Duy (dùng AI: có) · Ngày: 2026-11-27
+- Notion: TF28 · Nhánh: `duy/TF28-dung-khan-cap-job` · Người làm: Duy (dùng AI: có) · Ngày: 2026-11-27
 
 ## Đã làm
 
@@ -73,7 +73,7 @@ Kiểm dừng khẩn cấp (`stop-check.mjs stop`): bấm dừng sau 4 giây, l�
 - `pnpm turbo run lint typecheck test --affected --concurrency=2`:
   - lint và typecheck pass. Lint chỉ có warning có sẵn, ví dụ `job-runs.ts:179` từ trước.
   - Test lỗi 7 test e2e của content/access vì timeout, do máy bận chạy container bench. Chạy riêng thì pass.
-- `pnpm --filter @tripflix/core-api test`: 208 file pass, 2 skipped; 3.274 test pass, 4 skipped.
+- `pnpm --filter @tripflix/core-api test` (sau khi merge develop có #345, #346): 211 file pass, 2 skipped; 3.323 test pass, 4 skipped.
 
 ## Cách kiểm lại
 
