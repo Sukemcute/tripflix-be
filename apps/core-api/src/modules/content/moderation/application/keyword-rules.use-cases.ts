@@ -14,6 +14,11 @@ export class KeywordRulesUseCases {
   }
 
   @Transactional('content')
+  async remove(id: string): Promise<void> {
+    await this.repository.db.delete(moderationKeywordRules).where(eq(moderationKeywordRules.id, id));
+  }
+
+  @Transactional('content')
   async create(input: { keyword: string; enabled: boolean }, updatedBy: string) {
     const [rule] = await this.repository.db
       .insert(moderationKeywordRules)

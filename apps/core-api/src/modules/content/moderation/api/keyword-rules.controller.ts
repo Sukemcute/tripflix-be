@@ -1,5 +1,14 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser, Roles, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import { z } from 'zod';
@@ -83,5 +92,13 @@ export class AdminModerationKeywordRulesController {
     @CurrentUser() user: AuthUser,
   ): Promise<ModerationKeywordRuleDto> {
     return toDto(await this.rules.update(id, body, user.userId));
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @Idempotent()
+  @ApiNoContentResponse()
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.rules.remove(id);
   }
 }
