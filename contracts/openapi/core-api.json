@@ -5156,6 +5156,35 @@
         ]
       }
     },
+    "/api/v1/admin/moderation/keyword-rules/built-in": {
+      "get": {
+        "operationId": "AdminModerationKeywordRulesController_listBuiltIn",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BuiltInModerationRuleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Moderation - Admin"
+        ]
+      }
+    },
     "/api/v1/admin/moderation/keyword-rules/{id}": {
       "patch": {
         "operationId": "AdminModerationKeywordRulesController_update",
@@ -13438,6 +13467,24 @@
           "enabled",
           "id",
           "updatedAt"
+        ]
+      },
+      "BuiltInModerationRuleDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "patterns"
         ]
       },
       "CreateModerationKeywordRuleDto": {
