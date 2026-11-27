@@ -84,6 +84,8 @@ export function resolveRequestId(req: TracedRequest): string {
       // Mỗi request một ngữ cảnh, mã trùng x-request-id của log HTTP (nestjs-pino), để sự kiện và lịch sử đơn nối về log.
       middleware: {
         mount: true,
+        // Không dùng proxy provider nào; bật thì mỗi request phải nạp lại module, p95 giữ chỗ chậm gấp 4.
+        resolveProxyProviders: false,
         generateId: true,
         idGenerator: (req: TracedRequest) => resolveRequestId(req),
         setup: (cls, req: TracedRequest) => cls.set(TRACE_SOURCE_KEY, `${req.method} ${(req.originalUrl ?? req.url ?? '').split('?')[0]}`),
