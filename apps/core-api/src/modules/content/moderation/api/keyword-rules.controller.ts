@@ -7,6 +7,7 @@ import type { moderationKeywordRules } from '../../db/schema/index.js';
 import { ZodBody } from '../../social/api/http.js';
 import { normalizeCommentKeyword } from '../../social/domain/comment-filter.js';
 import { KeywordRulesUseCases } from '../application/keyword-rules.use-cases.js';
+import { BUILT_IN_RULE_PATTERNS } from '../domain/rules.js';
 
 const keyword = z.string().trim().min(1).max(120).refine(
   (text) => normalizeCommentKeyword(text).length > 0,
@@ -33,6 +34,11 @@ export class ModerationKeywordRuleDto extends CreateModerationKeywordRuleDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+export class BuiltInModerationRuleDto {
+  @ApiProperty() code!: string;
+  @ApiProperty({ type: [String] }) patterns!: string[];
+}
+
 function toDto(rule: typeof moderationKeywordRules.$inferSelect): ModerationKeywordRuleDto {
   return { id: rule.id, keyword: rule.keyword, enabled: rule.enabled, updatedAt: rule.updatedAt.toISOString() };
 }
@@ -48,6 +54,12 @@ export class AdminModerationKeywordRulesController {
   @ApiOkResponse({ type: ModerationKeywordRuleDto, isArray: true })
   async list(): Promise<ModerationKeywordRuleDto[]> {
     return (await this.rules.list()).map(toDto);
+  }
+
+  @Get('built-in')
+  @ApiOkResponse({ type: BuiltInModerationRuleDto, isArray: true })
+  listBuiltIn(): BuiltInModerationRuleDto[] {
+    return BUILT_IN_RULE_PATTERNS;
   }
 
   @Post()
