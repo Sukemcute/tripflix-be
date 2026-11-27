@@ -22,7 +22,7 @@ export class FeedController {
   @OptionalAuthenticated()
   @ApiOperation({
     summary:
-      'Bảng tin Reels: chỉ gồm bài dạng video phát được. for_you xếp mới nhất trước, hot xếp theo tổng tương tác có trọng số. Khách cũng xem được.',
+      'Bảng tin Reels: chỉ gồm bài dạng video phát được. for_you và hot cùng xếp theo điểm Hot chấm sẵn mỗi 5 phút (bài video trong 30 ngày), bằng điểm thì ngẫu nhiên theo seed của trang đầu. Trang tác giả (author_id) của tab for_you và Reels đã lưu xếp mới nhất trước. Khách cũng xem được.',
   })
   @ApiQuery({ name: 'tab', required: false, enum: FEED_TABS })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: FEED_DEFAULT_LIMIT, description: `Tối đa ${FEED_MAX_LIMIT}` })

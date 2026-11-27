@@ -51,11 +51,15 @@ export const FeedQuerySchema = z
     if (query.saved && query.tab === 'hot') {
       ctx.addIssue({ code: 'custom', path: ['saved'], message: 'saved chỉ dùng với tab for_you' });
     }
-    // Cursor của tab này dùng ở tab kia sẽ cắt danh sách sai vị trí.
+    // Cursor của danh sách này dùng ở danh sách kia sẽ cắt sai vị trí. Hai tab cùng thứ tự Hot (TF121), nên for_you
+    // nhận cursor có điểm Hot; cursor for_you cũ (không có điểm) vẫn nhận để trả lại trang Hot đầu.
+    // Reels đã lưu và trang tác giả for_you xếp mới nhất trước, nên không nhận cursor có điểm Hot.
+    const cursor = query.cursor;
+    const isNewestFirst = query.tab !== 'hot' && (query.saved || Boolean(query.author_id));
+    const hasHotScore = cursor?.score !== undefined;
     if (
-      query.cursor &&
-      ((query.tab === 'hot') !== (query.cursor.score !== undefined) ||
-        (query.tab === 'hot' && query.cursor.rank !== undefined))
+      cursor &&
+      ((query.tab === 'hot' && (!hasHotScore || cursor.rank !== undefined)) || (isNewestFirst && hasHotScore))
     ) {
       ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor không thuộc tab này' });
     }

@@ -5,13 +5,13 @@ import { FEED_SEED_COUNT } from './feed-rank.js';
 export interface FeedCursor {
   at: string;
   id: string;
-  /** Chỉ tab Đang hot có điểm (trend_scores, 0 tới 1), vì tab này xếp theo điểm trước rồi mới tới thứ tự ngẫu nhiên. */
+  /** Điểm Hot (trend_scores, 0 tới 1) của bài cuối trang: cả hai tab xếp theo điểm trước rồi mới tới thứ tự ngẫu nhiên. */
   score?: number;
   /** Seed của thứ tự ngẫu nhiên (feed-rank.ts), chọn ở trang đầu và giữ suốt các trang sau. */
   seed?: number;
-  /** Chỉ tab Dành cho bạn: điểm xếp hạng của bài cuối trang trước. */
+  /** Deprecated (TF121): cursor Dành cho bạn cũ. Còn đọc được để trả lại trang Hot đầu, không cấp mới. */
   rank?: number;
-  /** Chỉ tab Dành cho bạn: mốc giờ tính tuổi bài, cố định từ trang đầu để điểm không trôi khi sang trang. */
+  /** Deprecated (TF121): đi cùng `rank` trong cursor Dành cho bạn cũ. */
   asOf?: string;
 }
 

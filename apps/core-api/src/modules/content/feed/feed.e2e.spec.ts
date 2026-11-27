@@ -70,13 +70,6 @@ class FakeFeedStore implements FeedStore {
     return Promise.resolve(rows.slice(start, start + limit));
   }
 
-  /** Giữ thứ tự của rows; điểm giảm dần theo vị trí để cursor có rank như bản thật. */
-  listForYouPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
-    const ranked = this.rows.map((row, i) => ({ ...row, rank: 1 / (i + 1) }));
-    const start = after ? ranked.findIndex((row) => row.id === after.id) + 1 : 0;
-    return Promise.resolve(ranked.slice(start, start + limit));
-  }
-
   listHotPosts({ limit, after }: { limit: number; after: FeedCursor | null }): Promise<FeedPostRow[]> {
     const sorted = [...this.rows].sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
     const start = after ? sorted.findIndex((row) => row.id === after.id) + 1 : 0;
@@ -283,6 +276,44 @@ describe('GET /api/v1/feed E2E', () => {
     expect(second.nextCursor).toBeNull();
   });
 
+  it('TF121: tab for_you trả cùng thứ tự với tab hot, sang trang bằng cursor có điểm', async () => {
+    feedStore.rows = [
+      buildRow(1),
+      { ...buildRow(2), hotScore: 1 },
+      { ...buildRow(3), hotScore: 0.4 },
+    ];
+
+    const hot = (await http().get('/api/v1/feed?tab=hot&limit=3').expect(200)).body as FeedPageBody;
+    const first = (await http().get('/api/v1/feed?tab=for_you&limit=2').expect(200)).body as FeedPageBody;
+    const second = (await http().get(`/api/v1/feed?tab=for_you&limit=2&cursor=${first.nextCursor}`).expect(200))
+      .body as FeedPageBody;
+
+    expect([...first.items, ...second.items].map((item) => item.postId)).toEqual(hot.items.map((item) => item.postId));
+    expect(first.items.map((item) => item.postId)).toEqual([buildPostId(2), buildPostId(3)]);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('TF121: cursor for_you cũ (có rank, chưa có điểm Hot) thì trả lại trang Hot đầu, không lỗi', async () => {
+    feedStore.rows = [buildRow(1), { ...buildRow(2), hotScore: 1 }];
+    const oldCursor = encodeFeedCursor({
+      at: '2026-11-05T10:00:01.000000Z',
+      id: buildPostId(1),
+      rank: 0.5,
+      seed: 1,
+      asOf: '2026-11-13T00:00:00.000Z',
+    });
+
+    const page = (await http().get(`/api/v1/feed?tab=for_you&limit=2&cursor=${oldCursor}`).expect(200)).body as FeedPageBody;
+
+    expect(page.items.map((item) => item.postId)).toEqual([buildPostId(2), buildPostId(1)]);
+  });
+
+  it('TF121: Reels đã lưu không nhận cursor có điểm Hot', async () => {
+    const hotScoreCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 0.7, seed: 2 });
+
+    await http().get(`/api/v1/feed?saved=true&cursor=${hotScoreCursor}`).set('Authorization', `Bearer ${token}`).expect(400);
+  });
+
   const plainCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1) });
   const hotCursor = encodeFeedCursor({ at: '2026-11-05T10:00:01.000000Z', id: buildPostId(1), score: 0.7 });
   const rankedCursor = encodeFeedCursor({
@@ -297,7 +328,7 @@ describe('GET /api/v1/feed E2E', () => {
   it.each([
     ['tab chưa có', 'tab=following'],
     ['cursor của for_you dùng cho hot', `tab=hot&cursor=${plainCursor}`],
-    ['cursor của hot dùng cho for_you', `tab=for_you&cursor=${hotCursor}`],
+    ['cursor có điểm Hot dùng cho trang tác giả của for_you', `author_id=018d9f00-0000-7000-8000-000000000001&cursor=${hotCursor}`],
     ['cursor có rank của for_you dùng cho hot', `tab=hot&cursor=${rankedCursor}`],
     ['limit vượt 20', 'limit=21'],
     ['limit bằng 0', 'limit=0'],

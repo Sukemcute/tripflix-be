@@ -22,8 +22,6 @@ export interface FeedPostRow {
   bookmarkCount: number;
   shareCount: number;
   cursorAt: string;
-  /** Điểm xếp hạng tab Dành cho bạn (feed-rank.ts); chỉ listForYouPosts trả. */
-  rank?: number;
   /** Điểm Hot trong trend_scores (TF111); chỉ listHotPosts trả. */
   hotScore?: number;
 }
@@ -40,12 +38,7 @@ export interface RankedFeedListQuery extends FeedListQuery {
 }
 
 export interface FeedStore {
-  /**
-   * Tab Dành cho bạn: cùng điều kiện lọc với listPlayablePosts, xếp theo điểm có bán rã tính tới `asOf`;
-   * bài chưa có tương tác nhận điểm ngẫu nhiên theo seed. Trả kèm `rank` của từng bài cho cursor.
-   */
-  listForYouPosts(query: RankedFeedListQuery & { asOf: string }): Promise<FeedPostRow[]>;
-  /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước (trang tác giả, cursor cũ). */
+  /** Bài công khai đã đăng, có ít nhất một video phát được, mới nhất trước (trang tác giả tab for_you). */
   listPlayablePosts(query: FeedListQuery): Promise<FeedPostRow[]>;
   /** Cùng điều kiện lọc với listPlayablePosts nhưng chỉ bài có trong trend_scores, xếp theo điểm Hot giảm dần; bằng điểm thì ngẫu nhiên theo seed. */
   listHotPosts(query: RankedFeedListQuery): Promise<FeedPostRow[]>;

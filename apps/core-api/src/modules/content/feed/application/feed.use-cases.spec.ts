@@ -31,7 +31,6 @@ const playback = (id: string): PlaybackInfo => ({
 function setup(cache?: FeedPageCache) {
   const store = {
     listPlayablePosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
-    listForYouPosts: vi.fn(() => Promise.resolve([row('p1'), row('p2')])),
     listHotPosts: vi.fn(() => Promise.resolve<FeedPostRow[]>([{ ...row('p2'), hotScore: 0.8 }, { ...row('p1'), hotScore: 0.2 }])),
     listSavedPlayablePosts: vi.fn(() => Promise.resolve([row('p2')])),
     findPlayablePostsByIds: vi.fn((ids: string[]) => Promise.resolve(ids.filter((id) => id !== 'hidden').map(row))),
@@ -67,9 +66,9 @@ describe('FeedUseCases cache trang đầu', () => {
     await Promise.all(Array.from({ length: 10 }, () => feed.getPage({ limit: 10, after: null, viewerId: null })));
     const later = await feed.getPage({ limit: 10, after: null, viewerId: null });
 
-    expect(store.listForYouPosts).toHaveBeenCalledTimes(1);
-    expect(cache.set).toHaveBeenCalledWith('feed:first-page:v3:for_you:0:10', expect.anything(), FEED_FIRST_PAGE_TTL_SECONDS);
-    expect(later.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
+    expect(store.listHotPosts).toHaveBeenCalledTimes(1);
+    expect(cache.set).toHaveBeenCalledWith('feed:first-page:v3:hot:0:10', expect.anything(), FEED_FIRST_PAGE_TTL_SECONDS);
+    expect(later.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
     expect(later.items[0]?.viewerState).toBeNull();
   });
 
@@ -79,29 +78,29 @@ describe('FeedUseCases cache trang đầu', () => {
     const mine = await feed.getPage({ limit: 10, after: null, viewerId: 'u1' });
     const theirs = await feed.getPage({ limit: 10, after: null, viewerId: 'u2' });
 
-    expect(store.listForYouPosts).toHaveBeenCalledTimes(1);
-    expect(mine.items.map((item) => item.viewerState?.liked)).toEqual([true, false]);
+    expect(store.listHotPosts).toHaveBeenCalledTimes(1);
+    expect(mine.items.map((item) => item.viewerState?.liked)).toEqual([false, true]);
     expect(theirs.items.map((item) => item.viewerState?.liked)).toEqual([false, false]);
   });
 
-  it('tab hot và for_you cache riêng', async () => {
+  it('for_you trả đúng thứ tự Hot và dùng chung cache trang đầu với tab hot (TF121)', async () => {
     const { store, feed } = setup(memoryCache());
 
     const hot = await feed.getPage({ tab: 'hot', limit: 10, after: null, viewerId: null });
-    await feed.getPage({ limit: 10, after: null, viewerId: null });
+    const forYou = await feed.getPage({ tab: 'for_you', limit: 10, after: null, viewerId: null });
 
-    expect(hot.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(forYou.items.map((item) => item.postId)).toEqual(hot.items.map((item) => item.postId));
     expect(store.listHotPosts).toHaveBeenCalledTimes(1);
-    expect(store.listForYouPosts).toHaveBeenCalledTimes(1);
+    expect(store.listPlayablePosts).not.toHaveBeenCalled();
   });
 
-  it('mỗi seed một khoá cache; trang sau giữ seed và mốc giờ của trang đầu', async () => {
+  it('mỗi seed một khoá cache; trang sau của for_you giữ seed và điểm Hot của trang đầu', async () => {
     const cache = memoryCache();
     const store = setup().store;
-    store.listForYouPosts.mockResolvedValue([
-      { ...row('p1'), rank: 0.5 },
-      { ...row('p2'), rank: 0.25 },
-      { ...row('p3'), rank: 0.1 },
+    store.listHotPosts.mockResolvedValue([
+      { ...row('p1'), hotScore: 0.5 },
+      { ...row('p2'), hotScore: 0.25 },
+      { ...row('p3'), hotScore: 0.1 },
     ]);
     const media = {
       getPlayback: vi.fn((ids: string[]) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, playback(id)])))),
@@ -112,38 +111,49 @@ describe('FeedUseCases cache trang đầu', () => {
     const first = await feed.getPage({ limit: 2, after: null, viewerId: null });
     await feed.getPage({ limit: 2, after: null, viewerId: null });
 
-    expect(cache.set.mock.calls.map(([key]) => key)).toEqual([
-      'feed:first-page:v3:for_you:15:2',
-      'feed:first-page:v3:for_you:0:2',
-    ]);
+    expect(cache.set.mock.calls.map(([key]) => key)).toEqual(['feed:first-page:v3:hot:15:2', 'feed:first-page:v3:hot:0:2']);
     // Id giả không phải UUID nên đọc thẳng JSON thay vì decodeFeedCursor (hàm đó kiểm UUID).
     const cursor = JSON.parse(Buffer.from(first.nextCursor ?? '', 'base64url').toString('utf8')) as FeedCursor;
-    expect(cursor).toMatchObject({ id: 'p2', rank: 0.25, seed: 15 });
-    expect(cursor.asOf).toMatch(/Z$/);
-    store.listForYouPosts.mockClear();
+    expect(cursor).toEqual({ at: '2026-11-11T00:00:00.000000Z', id: 'p2', score: 0.25, seed: 15 });
+    store.listHotPosts.mockClear();
     await feed.getPage({ limit: 2, after: cursor, viewerId: null });
-    expect(store.listForYouPosts).toHaveBeenCalledWith(expect.objectContaining({ seed: 15, asOf: cursor.asOf }));
+    expect(store.listHotPosts).toHaveBeenCalledWith(expect.objectContaining({ seed: 15, after: cursor }));
   });
 
-  it('cursor for_you cũ (chưa có rank) và trang tác giả vẫn mới nhất trước', async () => {
+  it.each([
+    ['có rank (trước TF121)', { at: '2026-11-11T00:00:00.000000Z', id: 'p0', rank: 0.2, seed: 3, asOf: '2026-11-13T00:00:00.000Z' }, 3],
+    ['không có rank, không có seed', { at: '2026-11-11T00:00:00.000000Z', id: 'p0' }, 0],
+  ])('cursor for_you cũ %s thì trả lại trang Hot đầu, giữ seed, không ghi cache', async (_name, after, seed) => {
+    const cache = memoryCache();
+    const { store, feed } = setup(cache);
+
+    const page = await feed.getPage({ limit: 10, after, viewerId: null });
+
+    expect(store.listHotPosts).toHaveBeenCalledWith(expect.objectContaining({ after: null, seed }));
+    expect(store.listPlayablePosts).not.toHaveBeenCalled();
+    expect(page.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('trang tác giả của tab for_you vẫn mới nhất trước', async () => {
     const { store, feed } = setup();
 
-    await feed.getPage({ limit: 10, after: { at: '2026-11-11T00:00:00.000000Z', id: 'p0' }, viewerId: null });
     await feed.getPage({ limit: 10, after: null, viewerId: null, authorId: 'a1' });
+    await feed.getPage({ limit: 10, after: { at: '2026-11-11T00:00:00.000000Z', id: 'p0' }, viewerId: null, authorId: 'a1' });
 
     expect(store.listPlayablePosts).toHaveBeenCalledTimes(2);
-    expect(store.listForYouPosts).not.toHaveBeenCalled();
+    expect(store.listHotPosts).not.toHaveBeenCalled();
   });
 
   it('trang sau (có con trỏ) luôn đọc database, không cache', async () => {
     const cache = memoryCache();
     const { store, feed } = setup(cache);
-    const after = { at: '2026-11-11T00:00:00.000000Z', id: 'p0', rank: 0.2, seed: 3, asOf: '2026-11-13T00:00:00.000Z' };
+    const after = { at: '2026-11-11T00:00:00.000000Z', id: 'p0', score: 0.3, seed: 3 };
 
     await feed.getPage({ limit: 10, after, viewerId: null });
     await feed.getPage({ limit: 10, after, viewerId: null });
 
-    expect(store.listForYouPosts).toHaveBeenCalledTimes(2);
+    expect(store.listHotPosts).toHaveBeenCalledTimes(2);
     expect(cache.set).not.toHaveBeenCalled();
   });
 
@@ -156,8 +166,8 @@ describe('FeedUseCases cache trang đầu', () => {
 
     const page = await feed.getPage({ limit: 10, after: null, viewerId: 'u1' });
 
-    expect(page.items.map((item) => item.postId)).toEqual(['p1', 'p2']);
-    expect(store.listForYouPosts).toHaveBeenCalledTimes(1);
+    expect(page.items.map((item) => item.postId)).toEqual(['p2', 'p1']);
+    expect(store.listHotPosts).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -171,7 +181,7 @@ describe('FeedUseCases Reels đã lưu', () => {
 
     expect(store.listSavedPlayablePosts).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u2' }));
     expect(store.listPlayablePosts).not.toHaveBeenCalled();
-    expect(store.listForYouPosts).not.toHaveBeenCalled();
+    expect(store.listHotPosts).not.toHaveBeenCalled();
     expect(cache.set).not.toHaveBeenCalled();
     expect(page.items.map((item) => item.postId)).toEqual(['p2']);
     expect(page.items[0]?.viewerState).toEqual({ liked: false, saved: true });
