@@ -14,13 +14,13 @@
 
 ## Đối chiếu "Xong khi"
 
-| Tiêu chí (chép từ Jira)                                                                                   | Đạt  | Bằng chứng                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tab=for_you` (không saved, không author_id) trả cùng thứ tự với `tab=hot` cùng seed; có test unit và e2e | Đạt  | Unit `feed.use-cases.spec.ts` "for_you trả đúng thứ tự Hot và dùng chung cache trang đầu"; e2e `feed.e2e.spec.ts` "TF121: tab for_you trả cùng thứ tự với tab hot"; int `feed.int.spec.ts` "seed nào cũng ra đúng thứ tự tab hot" (Postgres thật) |
-| Cursor `for_you` cũ (có `rank`) không gây lỗi 500                                                         | Đạt  | Unit "cursor for_you cũ … thì trả lại trang Hot đầu, giữ seed"; e2e "TF121: cursor for_you cũ … trả lại trang Hot đầu, không lỗi" (200)                                                                                                           |
-| Mô tả OpenAPI của tab cập nhật, `pnpm contracts:build` chạy lại                                           | Đạt  | `contracts/openapi/core-api.json`: chỉ đổi `summary` của `GET /api/v1/feed`                                                                                                                                                                       |
-| `pnpm turbo run lint typecheck test --affected` đạt                                                       | Đạt  | Mục "Kết quả kiểm tra"                                                                                                                                                                                                                            |
-| Đo lại bằng bộ k6 TF120 trên staging, ghi số trước/sau; staging trả về như cũ                             | Chưa | Chờ merge và Phong cho phép đo trên staging                                                                                                                                                                                                       |
+| Tiêu chí (chép từ Jira)                                                                                   | Đạt | Bằng chứng                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tab=for_you` (không saved, không author_id) trả cùng thứ tự với `tab=hot` cùng seed; có test unit và e2e | Đạt | Unit `feed.use-cases.spec.ts` "for_you trả đúng thứ tự Hot và dùng chung cache trang đầu"; e2e `feed.e2e.spec.ts` "TF121: tab for_you trả cùng thứ tự với tab hot"; int `feed.int.spec.ts` "seed nào cũng ra đúng thứ tự tab hot" (Postgres thật) |
+| Cursor `for_you` cũ (có `rank`) không gây lỗi 500                                                         | Đạt | Unit "cursor for_you cũ … thì trả lại trang Hot đầu, giữ seed"; e2e "TF121: cursor for_you cũ … trả lại trang Hot đầu, không lỗi" (200)                                                                                                           |
+| Mô tả OpenAPI của tab cập nhật, `pnpm contracts:build` chạy lại                                           | Đạt | `contracts/openapi/core-api.json`: chỉ đổi `summary` của `GET /api/v1/feed`                                                                                                                                                                       |
+| `pnpm turbo run lint typecheck test --affected` đạt                                                       | Đạt | Mục "Kết quả kiểm tra"                                                                                                                                                                                                                            |
+| Đo lại bằng bộ k6 TF120 trên staging, ghi số trước/sau; staging trả về như cũ                             | Đạt | Mục "Đo lại trên staging"; Traefik trả từ backup (`loadtest-bypass` = 0, giống backup), VM k6 bắn 200 req/s trong 8 giây bị trả 429 khoảng 70%; sampler dừng; VM k6 tắt                                                                           |
 
 ## Kết quả kiểm tra
 
@@ -37,7 +37,24 @@
 
 ## Đo lại trên staging
 
-- Chưa đo. Sẽ chạy `tools/bench/feed-load` (`sh run.sh scale c1`, feed trộn, khách) và so với bảng TF120 (`docs/evidence/TF120-do-tai-feed.md`, phép 2).
+Đo ngày 27/11, 03:36–03:42 UTC, sau khi deploy `core-api sha-b050468`. Cùng bộ k6 và cùng cách như TF120 phép 2: VM `tripflix-k6` cùng region, router Traefik bỏ rate limit cho IP VM, toàn bộ là khách, 1 bản core-api `APP_ROLE=all`, kiểm duyệt bật. Kịch bản feed trộn: 30% trang đầu for_you, 50% trang 2–5 for_you, 20% trang đầu hot; mỗi mức 60 giây (`RATES="10 25 50 100" sh run.sh scale c1`).
+
+Trước khi đo đã kiểm trên staging: `for_you` và `hot` trả cùng 10 bài đầu (khác thứ tự trong nhóm bằng điểm do seed), trang 2 không lặp bài, cursor kiểu cũ (`rank`) trả 200.
+
+| req/s | Trước (TF120, 26/11) p95 | Trước: lỗi | Sau (TF121) p50 | Sau: p95 | Sau: lỗi | Sau: CPU core-api % | Sau: CPU Postgres % | Sau: kết nối Postgres đang chạy (lớn nhất) |
+| ----- | ------------------------ | ---------- | --------------- | -------- | -------- | ------------------- | ------------------- | ------------------------------------------ |
+| 10    | 397 ms                   | 0%         | 24 ms           | 35 ms    | 0%       | 30                  | 11                  | 2                                          |
+| 15    | 3.489 ms                 | 0%         | —               | —        | —        | —                   | —                   | —                                          |
+| 20    | 9.859 ms                 | 21,2%      | —               | —        | —        | —                   | —                   | —                                          |
+| 25    | (không đo, dừng ở 20)    | —          | 24 ms           | 34 ms    | 0%       | 16                  | 21                  | 2                                          |
+| 50    | —                        | —          | 24 ms           | 36 ms    | 0%       | 64                  | 52                  | 2                                          |
+| 100   | —                        | —          | 29 ms           | 282 ms   | 0%       | 56                  | 124                 | 5                                          |
+
+- Trần bền vững của feed trộn (p95 < 500 ms, lỗi < 1%) từ **10 req/s lên ít nhất 100 req/s**. Chưa đo trên 100 req/s nên chưa biết trần mới.
+- Ở 10 req/s, CPU Postgres từ 119% (TF120) xuống 11%; ở 100 req/s mới 124%, kết nối đang chạy lớn nhất 5 (pool 10).
+- Ở 100 req/s, p99 khoảng 1 giây, lớn nhất 2,02 giây.
+- Lưu ý khi so: TF120 đo buổi tối, lần này đo trong giờ làm; tab hot riêng ở TF120 (70% trang 2–5) đã chậm ở 100 req/s (p95 1,5 s), kịch bản trộn lần này có một nửa request là trang đầu (có cache) nên nhẹ hơn.
+- Dữ liệu gốc: summary k6 `scale-c1-*.json`, `runs.csv` và mẫu server `feed-20261127-033621/` (giữ ngoài repo, như TF120).
 
 ## Ảnh / video
 
