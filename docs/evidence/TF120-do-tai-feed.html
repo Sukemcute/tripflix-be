@@ -291,7 +291,8 @@
       <h1>Đo tải feed trên staging</h1>
       <p class="sub">
         TF120 · SCRUM-192 · Đo tối 26/11/2026, 16:52–17:30 UTC · k6 v2.4.0 trên VM cùng region
-        (asia-southeast1), staging 4 vCPU, 42.821 bài, toàn bộ là khách
+        (asia-southeast1), staging 4 vCPU, 42.821 bài, toàn bộ là khách · Đo lại sau TF121: 27/11, 03:36–03:42
+        UTC
       </p>
 
       <div class="kpis">
@@ -308,13 +309,13 @@
         </div>
         <div class="kpi">
           <div class="label">Feed trộn, trần bền vững</div>
-          <div class="value">10 req/s</div>
-          <div class="note">Nghẽn ở Postgres; thêm core-api không giúp</div>
-          <div class="status bad">
+          <div class="value">10 → ≥ 100 req/s</div>
+          <div class="note">Sau TF121: p95 282 ms ở 100 req/s, 0 lỗi (trước: 10 req/s, nghẽn Postgres)</div>
+          <div class="status good">
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="8" cy="8" r="7" fill="currentColor" />
-              <path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.8" /></svg
-            >Điểm nghẽn
+              <path d="M4.5 8.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+            >Đã sửa (TF121)
           </div>
         </div>
         <div class="kpi">
@@ -387,13 +388,48 @@
             request; trang 2 trở đi không qua cache. Tab hot đọc theo bộ đếm có index, khoảng 60 ms.
           </li>
           <li>
-            Đề xuất: tính điểm "Dành cho bạn" trước theo lịch như tab hot, hoặc lọc tập ứng viên trước khi
-            chấm.
+            Đã sửa ở TF121: "Dành cho bạn" của feed đọc đúng thứ tự tab hot (điểm chấm sẵn), xem mục "Sau
+            TF121" bên dưới.
           </li>
         </ul>
         <details>
           <summary>Bảng số</summary>
           <div class="tablewrap" id="t2"></div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Sau TF121 · "Dành cho bạn" đọc thứ tự Hot</h2>
+        <p class="lead">
+          Đo lại ngày 27/11, 03:36–03:42 UTC, sau khi deploy <code>core-api sha-b050468</code>: cùng bộ k6,
+          cùng kịch bản feed trộn, khách, 1 bản core-api. Trước: số cấu hình 1 của phép 2 ở trên.
+        </p>
+        <div class="legend">
+          <span><i style="background: var(--series-1)"></i>Trước TF121 (26/11)</span>
+          <span><i style="background: var(--series-2)"></i>Sau TF121 (27/11)</span>
+          <span><i class="dash"></i>Ngưỡng p95 500 ms</span>
+        </div>
+        <figure style="max-width: 520px">
+          <figcaption>Feed trộn: p95 theo req/s (thang log)</figcaption>
+          <div class="chart" id="c3"></div>
+        </figure>
+        <ul class="find">
+          <li>
+            Trần bền vững từ <b>10 req/s lên ít nhất 100 req/s</b>: 10, 25, 50, 100 req/s đều 0 lỗi, p95 35,
+            34, 36, 282 ms. Chưa đo trên 100 req/s.
+          </li>
+          <li>
+            CPU Postgres ở 10 req/s từ 119% xuống 11%; ở 100 req/s là 124%, kết nối đang chạy lớn nhất 5 (pool
+            10).
+          </li>
+          <li>
+            Khi so: lần trước đo buổi tối, lần này trong giờ làm. Một nửa request là trang đầu (có cache).
+            Khách giờ thấy phần đầu hai tab giống nhau, chỉ còn bài video trong 30 ngày (đã chấp nhận).
+          </li>
+        </ul>
+        <details>
+          <summary>Bảng số</summary>
+          <div class="tablewrap" id="t3"></div>
         </details>
       </section>
 
@@ -470,6 +506,13 @@
             ],
           },
         },
+        // Sau TF121, feed trộn, 1 bản all: [req/s, p50, p95, lỗi %, CPU core-api %, CPU Postgres %].
+        tf121: [
+          [10, 24, 35, 0, 30, 11],
+          [25, 24, 34, 0, 16, 21],
+          [50, 24, 36, 0, 64, 52],
+          [100, 29, 282, 0, 56, 124],
+        ],
         lag: [
           ['17:28:33', 0, 0, 0],
           ['17:28:41', 0, 0, 0],
@@ -571,7 +614,7 @@
       }
 
       // Đường p95 theo req/s cho 2 cấu hình, thang log, ngưỡng 500 ms nét đứt.
-      function scaleChart(id, set) {
+      function scaleChart(id, set, names = ['Cấu hình 1', 'Cấu hình 2']) {
         const host = document.getElementById(id);
         const f = frame(host);
         const { svg, m, iw, ih } = f;
@@ -604,8 +647,8 @@
         });
         el('text', { x: iw / 2, y: ih + 32, 'text-anchor': 'middle' }, g).textContent = 'req/s';
         const series = [
-          ['c1', 'var(--series-1)', 'Cấu hình 1', 'circle'],
-          ['c2', 'var(--series-2)', 'Cấu hình 2', 'square'],
+          ['c1', 'var(--series-1)', names[0], 'circle'],
+          ['c2', 'var(--series-2)', names[1], 'square'],
         ];
         for (const [k, color, , shape] of series) {
           const pts = set[k].map((r) => [x(r[0]), y(r[2])]);
@@ -789,6 +832,7 @@
       barChart('c1b', DATA.cdn, { key: 'cpu', max: 100, unit: '%', label: 'CPU core-api' });
       scaleChart('c2a', DATA.scale.mixed);
       scaleChart('c2b', DATA.scale.hot);
+      scaleChart('c3', { c1: DATA.scale.mixed.c1, c2: DATA.tf121 }, ['Trước TF121', 'Sau TF121']);
       lagChart('c4');
 
       table(
@@ -826,6 +870,32 @@
         't2',
         ['Cấu hình', 'Kịch bản', 'req/s', 'p50 ms', 'p95 ms', 'Lỗi', 'CPU core-api %', 'CPU Postgres %'],
         rowsScale,
+      );
+      table(
+        't3',
+        ['Lần đo', 'Kịch bản', 'req/s', 'p50 ms', 'p95 ms', 'Lỗi', 'CPU core-api %', 'CPU Postgres %'],
+        [
+          ...DATA.scale.mixed.c1.map((r) => [
+            'Trước TF121 (26/11)',
+            'Feed trộn',
+            r[0],
+            r[1],
+            r[2],
+            r[3] + '%',
+            r[4],
+            r[5],
+          ]),
+          ...DATA.tf121.map((r) => [
+            'Sau TF121 (27/11)',
+            'Feed trộn',
+            r[0],
+            r[1],
+            r[2],
+            r[3] + '%',
+            r[4],
+            r[5],
+          ]),
+        ],
       );
       table(
         't4',
