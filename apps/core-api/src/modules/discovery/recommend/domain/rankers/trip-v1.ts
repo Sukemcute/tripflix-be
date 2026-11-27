@@ -156,8 +156,10 @@ const mainExp = (bins: Record<string, number>) =>
 export const tripRankerV1: Ranker = {
   name: 'trip_v1',
   accepts: { postBuilders: ['post_profile@v1'], userBuilders: ['trip_profile@v1'] },
-  // ponytail: đọc toàn bộ bài mỗi lượt gọi, ổn tới vài nghìn bài; lớn hơn thì lấy theo ngăn có index (thiết kế v1 mục 3.2).
-  candidateLimit: 5000,
+  // 1.000 bài hot đầu (cộng nguồn gu, fresh). Đo 27/11 trên 200 người mô phỏng, 8.255 bài video: so với 5.000, điểm top 10
+  // giữ 98%, tỉ lệ bài hợp gu không đổi, thời gian xếp 136 → 52 ms. Xuống 500 thì điểm top 10 tụt 9%.
+  // ponytail: lâu dài lấy ứng viên theo ngăn có index thay vì theo hot (thiết kế v1 mục 3.2).
+  candidateLimit: 1000,
   needsViewerRows: true,
   rank({ candidates, userFeatures, now, viewer, placeProfiles }) {
     const postBins = new Map(candidates.map((c) => [c.postId, weightMap(c.postFeatures.bins)]));

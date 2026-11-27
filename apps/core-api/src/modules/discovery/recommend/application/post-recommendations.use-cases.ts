@@ -43,11 +43,11 @@ const FULL_READ_EXPLORE_SKIP = 100;
 const MAX_EMPTY_PAGE_SKIPS = 3;
 /**
  * Kết quả xếp hạng của một phiên (đã chốt theo sessionAt nên trang nào cũng như nhau): giữ lại để trang sau chỉ cắt
- * offset, không đọc lại tới 5.000 ứng viên và xếp lại.
+ * offset, không đọc lại tới 1.000 ứng viên và xếp lại.
  */
 const RANKED_SESSION_CACHE_MS = 5 * 60_000;
 const RANKED_SESSION_CACHE_MAX = 500;
-/** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 5.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
+/** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 1.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
 const RANKED_SESSION_CACHE_ITEMS = 300;
 /** Bộ ba dự phòng khi dòng trending trong DB cũng hỏng: endpoint không bao giờ chết vì cấu hình. */
 const FALLBACK: AlgoRow = { name: 'trending', postBuilder: 'hot@v1', userBuilder: 'none@v0', ranker: 'popular_v0' };
