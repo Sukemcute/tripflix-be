@@ -1,10 +1,11 @@
 import { hostname } from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { DEFAULT_POOL_SIZE, setPoolMax } from '@tripflix/db';
 import type { Redis } from 'ioredis';
 import type { CoreEnv } from '../../../platform/env.js';
 import { CORE_ENV, DB_POOLS, REDIS, type DbPools } from '../../../platform/tokens.js';
+import { AdmissionGate, type AdmissionSnapshot } from '../platform/admission-gate.js';
 import { computePoolCap, decidePoolMax, type AutoscaleState } from './pool-autoscale.js';
 
 /** Mỗi instance ghi một khoá; khoá tự hết hạn nên instance đã tắt không còn trong tổng. */
@@ -19,7 +20,7 @@ const SAMPLE_WAITING_EVERY_MS = 250;
 export type HoldOutcome = 'created' | 'sold_out' | 'lock_busy' | 'rate_limited' | 'rejected' | 'error';
 export type PayOutcome = 'paid' | 'requires_action' | 'pending' | 'failed' | 'rejected' | 'error';
 
-/** Số đo một instance ghi vào Redis mỗi 5 giây; bộ đếm là số trong 5 giây vừa qua. */
+/** Số đo mỗi 5 giây; admission giữ bộ đếm tích luỹ để không mất lần từ chối giữa các lượt đọc. */
 export interface InstanceMetrics {
   instance: string;
   role: string;
@@ -27,9 +28,14 @@ export interface InstanceMetrics {
   windowSeconds: number;
   /** waiting: số request chờ kết nối cao nhất trong 5 giây; max: số kết nối tối đa hiện tại (có thể đã tự tăng). */
   pool: { total: number; idle: number; waiting: number; max: number };
+  admission?: AdmissionSnapshot;
   eventLoopDelayP99Ms: number;
   holds: Partial<Record<HoldOutcome, number>>;
   payments: Partial<Record<PayOutcome, number>>;
+}
+
+function createEmptyAdmissionSnapshot(): AdmissionSnapshot {
+  return { browseInFlight: 0, txInFlight: 0, txWaiting: 0, browseRejected: 0, txRejected: 0, txQueuedTotal: 0, txWaitMsMax: 0 };
 }
 
 /**
@@ -56,6 +62,7 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
     @Inject(CORE_ENV) private readonly env: CoreEnv,
     @Inject(DB_POOLS) private readonly pools: DbPools,
     @Inject(REDIS) private readonly redis: Redis,
+    @Optional() @Inject(AdmissionGate) private readonly admissionGate?: AdmissionGate,
   ) {}
 
   onApplicationBootstrap() {
@@ -84,7 +91,7 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
     this.payments[outcome] = (this.payments[outcome] ?? 0) + 1;
   }
 
-  /** Lấy số của 5 giây vừa qua rồi đặt lại bộ đếm. */
+  /** Chỉ đặt lại bộ đếm giữ chỗ và thanh toán vì admission tích luỹ suốt vòng đời instance. */
   snapshot(): InstanceMetrics {
     const pool = this.pools.commerce;
     const metrics: InstanceMetrics = {
@@ -93,6 +100,7 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
       at: new Date().toISOString(),
       windowSeconds: PUBLISH_EVERY_MS / 1000,
       pool: { total: pool.totalCount, idle: pool.idleCount, waiting: Math.max(this.peakWaiting, pool.waitingCount), max: pool.options.max ?? 0 },
+      admission: this.admissionGate?.snapshot() ?? createEmptyAdmissionSnapshot(),
       eventLoopDelayP99Ms: this.loopDelay ? Math.round(this.loopDelay.percentile(99) / 1e6) : 0,
       holds: this.holds,
       payments: this.payments,
@@ -152,8 +160,8 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
   }
 
   /** Số đo mới nhất của mọi instance còn sống, kèm tổng. Redis lỗi thì báo không đọc được, không ném lỗi. */
-  async readAll(): Promise<{ isAvailable: boolean; instances: InstanceMetrics[]; totals: { holds: Partial<Record<HoldOutcome, number>>; payments: Partial<Record<PayOutcome, number>>; poolWaiting: number } }> {
-    const totals = { holds: {} as Partial<Record<HoldOutcome, number>>, payments: {} as Partial<Record<PayOutcome, number>>, poolWaiting: 0 };
+  async readAll(): Promise<{ isAvailable: boolean; instances: InstanceMetrics[]; totals: { holds: Partial<Record<HoldOutcome, number>>; payments: Partial<Record<PayOutcome, number>>; poolWaiting: number; admission: AdmissionSnapshot } }> {
+    const totals = { holds: {} as Partial<Record<HoldOutcome, number>>, payments: {} as Partial<Record<PayOutcome, number>>, poolWaiting: 0, admission: createEmptyAdmissionSnapshot() };
     try {
       const keys = await this.listMetricKeys();
       const values = keys.length ? await this.redis.mget(...keys) : [];
@@ -162,6 +170,16 @@ export class CommerceMetrics implements OnApplicationBootstrap, OnApplicationShu
         for (const [k, n] of Object.entries(m.holds)) totals.holds[k as HoldOutcome] = (totals.holds[k as HoldOutcome] ?? 0) + (n ?? 0);
         for (const [k, n] of Object.entries(m.payments)) totals.payments[k as PayOutcome] = (totals.payments[k as PayOutcome] ?? 0) + (n ?? 0);
         totals.poolWaiting += m.pool.waiting;
+        // Bản cũ chưa có admission vẫn được cộng chung trong lúc triển khai cuốn chiếu.
+        if (m.admission) {
+          totals.admission.browseInFlight += m.admission.browseInFlight;
+          totals.admission.txInFlight += m.admission.txInFlight;
+          totals.admission.txWaiting += m.admission.txWaiting;
+          totals.admission.browseRejected += m.admission.browseRejected;
+          totals.admission.txRejected += m.admission.txRejected;
+          totals.admission.txQueuedTotal += m.admission.txQueuedTotal;
+          totals.admission.txWaitMsMax = Math.max(totals.admission.txWaitMsMax, m.admission.txWaitMsMax);
+        }
       }
       return { isAvailable: true, instances, totals };
     } catch {
