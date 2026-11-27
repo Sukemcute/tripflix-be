@@ -45,11 +45,11 @@ const FULL_READ_EXPLORE_SKIP = 100;
 const MAX_EMPTY_PAGE_SKIPS = 3;
 /**
  * Kết quả xếp hạng của một phiên (đã chốt theo sessionAt nên trang nào cũng như nhau): giữ lại để trang sau chỉ cắt
- * offset, không đọc lại tới 5.000 ứng viên và xếp lại.
+ * offset, không đọc lại tới 1.000 ứng viên và xếp lại.
  */
 const RANKED_SESSION_CACHE_MS = 5 * 60_000;
 const RANKED_SESSION_CACHE_MAX = 500;
-/** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 5.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
+/** Chỉ giữ chừng này bài xếp hạng đầu mỗi phiên (~40 trang): giữ đủ 1.000 ứng viên × 500 phiên thì tốn hàng trăm MB RAM. */
 const RANKED_SESSION_CACHE_ITEMS = 300;
 /** Khoảng admin được đặt số ứng viên hot cho ranker đọc nhiều bài (trip_v1). Đo 27/11: dưới 1.000 điểm top 10 bắt đầu tụt. */
 export const CANDIDATE_LIMIT_RANGE = { min: 200, max: 5000 } as const;

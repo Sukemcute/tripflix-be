@@ -15,11 +15,13 @@ import {
   UpdateRoomCalendarRequestSchema,
 } from './admin-calendar.dto.js';
 import { CommerceErrorFilter, ZodQuery } from './http.js';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 
 /** Màn "Lịch trống & giá" trong trang quản trị: xem và sửa giá, số phòng / ghế, luật bán theo khoảng ngày. Chỉ superadmin. */
 @ApiTags('admin-commerce')
 @ApiBearerAuth()
 @Controller('admin/commerce')
+@AdmissionLane('exempt')
 @UseFilters(CommerceErrorFilter)
 @Roles('superadmin')
 export class AdminCalendarController {

@@ -146,7 +146,7 @@ describe('PostRecommendationUseCases', () => {
       viewerRows: [search(0), search(1)],
     });
     const page = await useCases.recommend(query());
-    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'post_profile@v1', limit: 5000 }));
+    expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ postBuilder: 'post_profile@v1', limit: 1000 }));
     expect(store.listUserRows).toHaveBeenCalledWith([U], expect.any(Date));
     expect(page.items[0]).toMatchObject({ post: { id: 'b1' }, reason: { code: 'matches_place', text: 'Vì bạn đang tìm hiểu Nha Trang' } });
     // Mọi bài là ứng viên: ô khám phá vẫn có bài (lấy ngoài top), không rỗng.
@@ -696,7 +696,7 @@ describe('PostRecommendationUseCases', () => {
       });
       store.findUserFeatures.mockResolvedValue({ places: { 'nha-trang': 0.9 }, tags: {} } as never);
       await useCases.recommend(query());
-      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 5000 }));
+      expect(store.listHotCandidates).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000 }));
     });
 
     it('nguồn gu lỗi: feed vẫn trả trang từ hot/fresh', async () => {

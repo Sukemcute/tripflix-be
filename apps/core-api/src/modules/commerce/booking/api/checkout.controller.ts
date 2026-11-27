@@ -3,6 +3,7 @@ import { ApiAcceptedResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHea
 import { Authenticated, CurrentUser, type AuthUser } from '@tripflix/auth';
 import { Idempotent } from '@tripflix/idempotency';
 import type { z } from 'zod';
+import { AdmissionLane } from '../../platform/admission-lane.decorator.js';
 import { CommerceErrorFilter, IDEMPOTENCY_KEY_HEADER, ZodQuery } from '../../inventory/api/http.js';
 import { CardPaymentGuard } from '../../payment/api/card-payment.guard.js';
 import { PaymentUseCases } from '../../payment/application/payment.use-cases.js';
@@ -34,6 +35,7 @@ import {
 @ApiTags('checkout')
 @ApiBearerAuth()
 @Controller('checkout')
+@AdmissionLane('transaction')
 @UseFilters(CommerceErrorFilter)
 @Authenticated()
 export class CheckoutController {
