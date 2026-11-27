@@ -32,6 +32,8 @@ import { ReviewQueueUseCase } from '../application/review-queue.use-case.js';
 import { ClaimDeferredScansUseCase } from '../application/recover-screening.use-case.js';
 import { ModerationRepository } from '../infra/moderation.repository.js';
 import { AdminModerationController, ReportsController } from './moderation.controller.js';
+import { AdminModerationKeywordRulesController } from './keyword-rules.controller.js';
+import { KeywordRulesUseCases } from '../application/keyword-rules.use-cases.js';
 import { MediaFacade } from '../../media/media.facade.js';
 import { PostPartsScreeningUseCase } from '../application/post-parts-screening.use-case.js';
 
@@ -72,6 +74,12 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     status: 'hidden',
   });
   const tokens: Record<string, string> = {};
+  const keywordRule = { id: randomUUID(), keyword: 'câu thử nghiệm', enabled: true, updatedAt: new Date() };
+  const keywordRules = {
+    list: vi.fn().mockResolvedValue([keywordRule]),
+    create: vi.fn().mockResolvedValue(keywordRule),
+    update: vi.fn().mockResolvedValue({ ...keywordRule, enabled: false }),
+  };
   beforeAll(async () => {
     const ref = await Test.createTestingModule({
       imports: [
@@ -80,8 +88,9 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
         ClsModule.forRoot({ global: true, plugins: createNoOpTransactionalPlugins() }),
         IdempotencyModule.forFeature({ useFactory: () => new MemoryIdempotencyStore() }),
       ],
-      controllers: [AdminModerationController, ReportsController],
+      controllers: [AdminModerationController, ReportsController, AdminModerationKeywordRulesController],
       providers: [
+        { provide: KeywordRulesUseCases, useValue: keywordRules },
         { provide: PostPartsScreeningUseCase, useValue: { detail: async () => ({ items: [], contentVersion: 'qa', imagePolicy: 'review_only' }), exists: async () => false, retry: vi.fn() } },
         { provide: MediaFacade, useValue: { getPlayback: async () => ({}) } },
         { provide: SubmitReportUseCase, useValue: { execute: submit } },
@@ -136,6 +145,22 @@ describe('TF32 HTTP roles, validation và Idempotency-Key', () => {
     await app?.close();
   });
   const http = () => request(app.getHttpServer());
+  it('chỉ superadmin được xem và cấu hình quy tắc từ khóa', async () => {
+    const url = '/api/v1/admin/moderation/keyword-rules';
+    await http().get(url).expect(401);
+    await http().get(url).auth(tokens.moderator!, { type: 'bearer' }).expect(403);
+    const auth = { type: 'bearer' } as const;
+    await http().get(url).auth(tokens.superadmin!, auth).expect(200);
+    await http().post(url).auth(tokens.superadmin!, auth).set('Idempotency-Key', randomUUID())
+      .send({ keyword: '!?', enabled: true }).expect(400);
+    await http().post(url).auth(tokens.superadmin!, auth).set('Idempotency-Key', randomUUID())
+      .send({ keyword: keywordRule.keyword, enabled: true }).expect(201);
+    await http().patch(url + '/' + keywordRule.id).auth(tokens.superadmin!, auth)
+      .set('Idempotency-Key', randomUUID()).send({}).expect(400);
+    await http().patch(url + '/' + keywordRule.id).auth(tokens.superadmin!, auth)
+      .set('Idempotency-Key', randomUUID()).send({ enabled: false }).expect(200);
+    expect(keywordRules.update).toHaveBeenCalledWith(keywordRule.id, { enabled: false }, expect.any(String));
+  });
   it('BE09: evidence and retry endpoints are staff-only and writes require idempotency', async () => {
     const id = randomUUID();
     const url = `/api/v1/admin/moderation/posts/${id}/parts`;

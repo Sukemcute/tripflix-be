@@ -16,6 +16,7 @@ import {
   moderationAppeals,
   moderationProcessedEvents,
   moderationScans,
+  moderationKeywordRules,
   moderationParts,
   posts,
   reports,
@@ -43,6 +44,13 @@ export class ModerationRepository {
   constructor(private readonly getDb: () => Db) {}
   get db(): Db {
     return this.getDb();
+  }
+
+  enabledKeywordRules() {
+    return this.db
+      .select({ keyword: moderationKeywordRules.keyword, normalizedKeyword: moderationKeywordRules.normalizedKeyword })
+      .from(moderationKeywordRules)
+      .where(eq(moderationKeywordRules.enabled, true));
   }
 
   async scan(eventId: string) {

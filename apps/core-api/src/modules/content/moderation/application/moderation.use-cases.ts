@@ -13,6 +13,7 @@ import {
 import { MediaFacade } from '../../media/media.facade.js';
 import type { ContentOutbox } from '../../social/application/ports/content-outbox.port.js';
 import { evaluateRules } from '../domain/rules.js';
+import { matchModerationKeywords } from '../domain/keyword-rules.js';
 import { evaluateSeverity, type AiVerdict, type SeverityConfig } from '../domain/severity.js';
 import { ModerationRepository, type TargetSnapshot } from '../infra/moderation.repository.js';
 import { ChangeVisibilityUseCase, type ChangeVisibilityCommand } from './change-visibility.use-case.js';
@@ -235,7 +236,10 @@ export class RecordScreeningUseCase {
         },
       });
     await this.outbox.add({ type: 'content.moderation.changed', payload: { scope: 'scan', id: eventId } });
-    const rules = evaluateRules(target.text, this.config.allowedDomains);
+    const rules = [
+      ...evaluateRules(target.text, this.config.allowedDomains),
+      ...matchModerationKeywords(target.text, await this.repository.enabledKeywordRules()),
+    ];
     const reportCount = await this.repository.countRecentReports(target);
     const verdict = evaluateSeverity(rules, ai, reportCount, this.config);
     if (

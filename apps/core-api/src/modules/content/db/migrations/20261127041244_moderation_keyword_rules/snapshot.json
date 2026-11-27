@@ -1,0 +1,194 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "46e2cc02-8cb3-4662-9f3d-40e680088d45",
+  "prevIds": [
+    "dd775b50-dfa2-45eb-802c-acd096f04ee3"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "content",
+        "moderation_keyword_rules"
+      ],
+      "writes": [
+        "s|tbl|content.moderation_keyword_rules",
+        "n|tbl|content.moderation_keyword_rules",
+        "e|tbl|content.moderation_keyword_rules",
+        "n|rel|content.moderation_keyword_rules",
+        "n|type|content.moderation_keyword_rules",
+        "n|rel|content.moderation_keyword_rules_pkey"
+      ],
+      "reads": [
+        "n|sch|content"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "content",
+        "moderation_keyword_rules",
+        "uq_moderation_keyword_rules_normalized_keyword"
+      ],
+      "writes": [
+        "s|idx|content.uq_moderation_keyword_rules_normalized_keyword",
+        "n|idx|content.uq_moderation_keyword_rules_normalized_keyword",
+        "e|idx|content.uq_moderation_keyword_rules_normalized_keyword",
+        "n|rel|content.uq_moderation_keyword_rules_normalized_keyword"
+      ],
+      "reads": [
+        "n|tbl|content.moderation_keyword_rules",
+        "n|sch|content",
+        "n|col|content.moderation_keyword_rules.normalized_keyword"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "name": "moderation_keyword_rules",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "gen_random_uuid()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "keyword",
+        "type": "varchar(120)",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "normalized_keyword",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "enabled",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "updated_by",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "uq_moderation_keyword_rules_normalized_keyword",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "normalized_keyword",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "content",
+        "table": "moderation_keyword_rules",
+        "name": "moderation_keyword_rules_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}
